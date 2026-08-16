@@ -1,0 +1,257 @@
+<!doctype html>
+<html lang="en-IN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="session-token" content="__SESSION_TOKEN__">
+  <title>The 45-Day Clock</title>
+  <link rel="stylesheet" href="/assets/app.css">
+  <link rel="stylesheet" href="/assets/storage.css">
+  <link rel="stylesheet" href="/assets/welcome.css">
+  <link rel="stylesheet" href="/assets/capstone.css">
+</head>
+<body>
+  <div class="welcome-overlay" id="welcome-overlay" hidden>
+    <section class="welcome-panel" role="dialog" aria-modal="true" aria-labelledby="welcome-title">
+      <div class="welcome-mark">45</div>
+      <p class="eyebrow">WELCOME TO THE 45-DAY CLOCK</p>
+      <h1 id="welcome-title">Your client ledger stays on this computer.</h1>
+      <p class="welcome-lead">The application runs entirely offline. It does not upload purchase ledgers, vendor records, Udyam evidence or computation results to any server.</p>
+      <div class="welcome-facts">
+        <div><strong>No internet required</strong><span>The application and licence check work locally.</span></div>
+        <div><strong>You control the data folder</strong><span>Choose a firm-controlled or client-controlled folder below.</span></div>
+        <div><strong>30-day trial</strong><span>Trial analyses are limited to 200 purchase lines. The demonstration ledger remains available.</span></div>
+      </div>
+      <div class="welcome-folder" id="welcome-folder">
+        <div><strong id="welcome-folder-title">No data folder selected</strong><span id="welcome-folder-path">Choose a folder before continuing.</span></div>
+        <button class="button primary" id="welcome-choose-folder">Choose data folder</button>
+      </div>
+      <div class="welcome-licence">
+        <div><strong id="welcome-licence-title">Start with the offline trial</strong><span id="welcome-licence-copy">If your firm already has a signed licence, you may install it now.</span></div>
+        <button class="button secondary" id="welcome-choose-licence" disabled>Install licence file</button>
+      </div>
+      <div class="welcome-actions"><button class="button primary large" id="welcome-continue" disabled>Continue to the application</button></div>
+    </section>
+  </div>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="brand-mark">45</div>
+        <div><strong>The 45-Day Clock</strong><span>MSME payable exposure</span></div>
+      </div>
+      <nav aria-label="Analysis workflow">
+        <button class="nav-item active" data-screen="home"><span class="nav-number">1</span><span>Home</span></button>
+        <button class="nav-item" data-screen="load"><span class="nav-number">2</span><span>Load ledger</span></button>
+        <button class="nav-item locked" data-screen="vendors"><span class="nav-number">3</span><span>Vendors</span></button>
+        <button class="nav-item locked" data-screen="assumptions"><span class="nav-number">4</span><span>Assumptions</span></button>
+        <button class="nav-item locked" data-screen="results"><span class="nav-number">5</span><span>Results</span></button>
+        <button class="nav-item locked" data-screen="exclusions"><span class="nav-number">6</span><span>Exclusion register</span></button>
+        <button class="nav-item locked" data-screen="export"><span class="nav-number">7</span><span>Export</span></button>
+      </nav>
+      <div class="privacy-note"><span class="privacy-dot"></span><div><strong>Offline and private</strong><span>Data stays on this computer</span></div></div>
+    </aside>
+
+    <main class="main">
+      <header class="topbar">
+        <div><p class="eyebrow" id="screen-step">ANALYSIS WORKSPACE</p><h1 id="screen-title">Client analyses</h1></div>
+        <div class="entity-chip" id="entity-chip" hidden><span id="entity-name"></span><strong id="entity-fy"></strong></div>
+      </header>
+
+      <div class="notice" id="notice" role="status" aria-live="polite" hidden></div>
+
+      <section class="screen active" id="screen-home">
+        <div class="hero-row">
+          <div><h2>Know the exposure. Defend the exclusions.</h2><p>Review Section 43B(h) / Section 37 exposure with a complete invoice-level trail.</p></div>
+          <button class="button primary large" id="new-analysis">New Analysis</button>
+        </div>
+        <div class="storage-card card">
+          <div class="storage-copy">
+            <p class="eyebrow">LOCAL DATA FILE</p>
+            <h3 id="storage-title">Choose where this firm's data will be kept</h3>
+            <p id="storage-path">No database folder is configured. Work remains in this session until you choose one.</p>
+          </div>
+          <div class="storage-actions">
+            <button class="button primary" id="choose-data-folder">Choose data folder</button>
+            <button class="button secondary" id="backup-database" disabled>Back up database</button>
+            <button class="button secondary" id="restore-database" disabled>Restore database</button>
+          </div>
+        </div>
+        <div class="storage-card card firm-profile-card">
+          <div class="storage-copy">
+            <p class="eyebrow">REPORT IDENTITY</p>
+            <h3 id="firm-profile-title">Set up the CA firm profile</h3>
+            <p id="firm-profile-summary">Firm name, FRN, preparer and reviewer will be printed on audit outputs.</p>
+          </div>
+          <div class="storage-actions"><button class="button secondary" id="edit-firm-profile">Edit firm profile</button></div>
+        </div>
+        <div class="card readiness-card" id="readiness-card">
+          <div class="readiness-heading"><div><p class="eyebrow">PROJECT READINESS</p><h3 id="readiness-title">Start an analysis to see readiness</h3></div><span class="status amber" id="readiness-status">Not started</span></div>
+          <div class="readiness-grid" id="readiness-checks"></div>
+          <div class="readiness-issues" id="readiness-issues" hidden></div>
+        </div>
+        <div class="section-heading"><div><h3>Client entities</h3><p>Current and recent analysis workspaces</p></div></div>
+        <div class="entity-grid" id="entity-list"><div class="empty-state">No client analysis has been loaded in this session.</div></div>
+        <div class="section-heading run-heading"><div><h3>Past computation runs</h3><p>Immutable results identified by their run hash</p></div></div>
+        <div class="card table-card"><div class="table-wrap"><table><thead><tr><th>Entity</th><th>Tax year</th><th class="money">Disallowance</th><th>Run date</th><th>Run hash</th></tr></thead><tbody id="run-list"><tr><td colspan="5" class="empty-cell">No completed runs in this session.</td></tr></tbody></table></div></div>
+      </section>
+
+      <section class="screen" id="screen-load">
+        <div class="screen-intro"><div><h2>Load the purchase ledger</h2><p>Choose an import route. Nothing is uploaded outside this local application.</p></div><div class="button-row"><button class="button secondary" id="download-template">Download input template</button><button class="button secondary" id="load-demo">Load demonstration dataset</button></div></div>
+        <div class="route-grid" role="radiogroup" aria-label="Ledger source">
+          <button class="route-card selected" data-route="file"><span class="route-label">Excel / CSV</span><strong>Map your ledger columns</strong><small>Recommended for purchase ledgers and payment allocations</small></button>
+          <button class="route-card" data-route="tally"><span class="route-label">Tally XML</span><strong>Read voucher exports</strong><small>Purchase and payment vouchers with confirmation flags</small></button>
+          <button class="route-card" data-route="manual"><span class="route-label">Manual entry</span><strong>Paste directly from Excel</strong><small>For small clients and short ledgers</small></button>
+        </div>
+        <div class="card load-panel" id="file-panel">
+          <div class="field-row"><label class="file-picker"><span>Select ledger file</span><input type="file" id="ledger-file" accept=".xlsx,.xlsm,.csv,.xml"><strong id="file-name">Choose Excel, CSV or XML</strong></label><label><span>Data being loaded</span><select id="record-type"><option value="purchase">Purchase invoices</option><option value="payment">Payments</option></select></label><button class="button primary" id="inspect-file">Inspect columns</button></div>
+        </div>
+        <div class="card load-panel" id="manual-panel" hidden>
+          <label><span>Paste cells from Excel, including the header row</span><textarea id="manual-data" rows="7" placeholder="Invoice No&#9;Invoice Date&#9;Vendor Name&#9;GSTIN&#9;Amount&#10;PI-001&#9;01-04-2025&#9;Sharma Industries&#9;27ABCDE1234F1Z5&#9;1,25,000"></textarea></label>
+          <div class="panel-actions"><button class="button primary" id="analyse-manual">Analyse pasted rows</button></div>
+        </div>
+        <div class="card mapping-panel" id="mapping-panel" hidden>
+          <div class="section-heading"><div><h3>Confirm column mapping</h3><p>Match the client’s headings to the fields used by the computation engine.</p></div></div>
+          <div class="mapping-grid" id="mapping-grid"></div>
+          <div class="alert warning" id="unmapped-columns" hidden></div>
+          <div class="panel-actions"><button class="button primary" id="apply-mapping">Apply mapping and reconcile</button></div>
+        </div>
+        <div class="control-card" id="control-panel" hidden>
+          <div class="control-icon" id="control-icon">✓</div>
+          <div class="control-copy"><p class="eyebrow">CONTROL TOTALS</p><h3 id="control-status">Totals tie</h3><p id="control-source"></p></div>
+          <dl class="control-values"><div><dt>Lines read</dt><dd id="lines-read">—</dd></div><div><dt>Total value read</dt><dd id="value-read">—</dd></div><div><dt>Value accounted for</dt><dd id="value-accounted">—</dd></div><div><dt>Lines in selected FY</dt><dd id="in-period-lines">—</dd></div><div><dt>Value in selected FY</dt><dd id="in-period-value">—</dd></div><div><dt>Outside selected FY</dt><dd id="out-period-value">—</dd></div></dl>
+          <button class="button primary" id="continue-vendors" disabled>Continue to vendors</button>
+        </div>
+        <div class="alert warning" id="import-confirmations" hidden></div>
+        <div class="error-rows" id="error-rows" hidden></div>
+      </section>
+
+      <section class="screen" id="screen-vendors">
+        <div class="screen-intro"><div><h2>Confirm vendor coverage</h2><p>Every classification remains visible and attributable. ASSUMED evidence blocks sign-off.</p></div><button class="button primary" id="continue-assumptions">Continue to assumptions</button></div>
+        <div class="alert danger" id="assumed-alert" hidden><strong>Sign-off blocked</strong><span id="assumed-message"></span></div>
+        <div class="toolbar"><div class="filters" id="vendor-filters"><button class="filter active" data-filter="all">All</button><button class="filter" data-filter="unconfirmed">Unconfirmed</button><button class="filter" data-filter="traders">Traders</button><button class="filter" data-filter="medium">Medium</button><button class="filter" data-filter="covered">Covered</button></div><div class="bulk"><select id="bulk-source"><option value="">Bulk evidence action</option><option value="VENDOR_DECLARATION">Mark declaration received</option><option value="CLIENT_ERP_FLAG">Mark client ERP flag</option></select><button class="button secondary small" id="apply-bulk">Apply to selected</button></div></div>
+        <div class="card table-card vendor-table"><div class="table-wrap"><table><thead><tr><th><input type="checkbox" id="select-all" aria-label="Select all vendors"></th><th>Vendor</th><th>PAN / GSTIN</th><th>Udyam / class</th><th>NIC / activity</th><th>Credit days</th><th>Validation</th><th>Coverage</th><th>Evidence</th><th>Required action</th><th>Actions</th></tr></thead><tbody id="vendor-list"></tbody></table></div></div>
+      </section>
+
+      <section class="screen" id="screen-assumptions">
+        <div class="screen-intro"><div><h2>Set the acceptance-date policy</h2><p>This step is mandatory. The selected wording becomes part of the signed working paper.</p></div></div>
+        <div class="assumption-layout"><div class="policy-list" id="policy-list"></div><div class="card wording-card"><p class="eyebrow">WORDING PRINTED IN THE WORKING PAPER</p><blockquote id="policy-wording"></blockquote><label id="plus-days-field" hidden><span>Inspection period in days</span><input type="number" id="plus-days" min="0" max="45" value="0"></label><label class="confirmation-check"><input type="checkbox" id="policy-confirm"><span>I have considered this policy for the client and confirm that the wording is appropriate.</span></label><button class="button primary full" id="run-analysis" disabled>Run analysis</button></div></div>
+        <label class="confirmation-check card"><input type="checkbox" id="payments-confirm"><span>I confirm that payment information is complete. Invoices with no payment entry were unpaid as at the relevant date.</span></label>
+      </section>
+
+      <section class="screen" id="screen-results">
+        <div class="screen-intro"><div><h2>Exposure at 31 March</h2><p id="result-law">Invoice-level result under the applicable provision</p></div><button class="button secondary" data-go="exclusions">Open exclusion register</button></div>
+        <div class="result-grid">
+          <button class="result-card risk" data-drill="disallowance"><span>You will lose</span><strong id="result-disallowance">—</strong><small id="result-section">Disallowance</small><em>View affected invoices</em></button>
+          <button class="result-card interest" data-drill="interest"><span>Interest exposure</span><strong id="result-interest">—</strong><small>MSMED s.16 · NOT DEDUCTIBLE (s.23)</small><em>View interest arithmetic</em></button>
+          <button class="result-card safe" data-drill="excluded"><span>Correctly not disallowed</span><strong id="result-excluded">—</strong><small>Protected by the four coverage gates</small><em>View excluded invoices</em></button>
+        </div>
+        <div class="result-reconciliation card" id="result-reconciliation"></div>
+        <div class="formula-note card" id="result-formulas"></div>
+        <div class="two-column"><div class="card"><div class="card-title"><div><h3>31 March Action List</h3><p>Highest cash-saving opportunities first</p></div></div><div class="table-wrap"><table><thead><tr><th>Vendor</th><th>Invoices</th><th class="money">Pay now</th><th class="money">Interest</th></tr></thead><tbody id="action-list"></tbody></table></div></div><div class="card"><div class="card-title"><div><h3>Paid late within the year</h3><p>Deductible principal, but s.16 interest remains</p></div></div><div class="table-wrap"><table><thead><tr><th>Vendor</th><th>Invoices</th><th class="money">Interest</th></tr></thead><tbody id="interest-list"></tbody></table></div></div></div>
+      </section>
+
+      <section class="screen" id="screen-exclusions">
+        <div class="exclusion-hero"><div><p class="eyebrow">THE DEFENSIBLE NON-DISALLOWANCE</p><h2>Exclusion Register</h2><p>Every excluded vendor, the coverage gate that failed, the legal reason, and the exact amount another tool would have wrongly added back.</p></div><div><span>Correctly not disallowed</span><strong id="exclusion-total">—</strong></div></div>
+        <div class="gate-strip"><div><span>Gate 1</span><strong>Enterprise class</strong></div><div><span>Gate 2</span><strong>Trader activity</strong></div><div><span>Gate 3</span><strong>Udyam registration</strong></div><div><span>Gate 4</span><strong>Registration timing</strong></div></div>
+        <div class="result-reconciliation card" id="exclusion-reconciliation"></div>
+        <div id="exclusion-groups" class="exclusion-groups"></div>
+        <div class="screen-footer-actions"><button class="button primary" data-go="export">Continue to export</button></div>
+      </section>
+
+      <section class="screen" id="screen-export">
+        <div class="screen-intro"><div><h2>Export the audit file</h2><p>Preview each finished output or create one structured audit-pack folder without overwriting an earlier pack.</p></div><button class="button primary" id="export-audit-pack">Export Complete Audit Pack</button></div>
+        <div class="export-summary"><div><span>Computation locked to run hash</span><strong id="export-hash">—</strong></div><p>All outputs use the same confirmed assumptions and invoice-level findings.</p></div>
+        <div class="panel-actions"><button class="button secondary" id="export-all-folder">Export the four core files to one folder</button></div>
+        <div class="export-grid" id="export-files"></div>
+        <div class="preview-card card"><div class="preview-paper"><span>THE 45-DAY CLOCK</span><h3>Working paper preview</h3><div class="preview-rule"></div><p>Entity, tax year, governing provision and immutable run hash</p><p>Control totals and the selected acceptance-date wording</p><p>Clause 22 exposure, s.16 interest and the Exclusion Register headline</p><small>Computation aid — classifications require human confirmation.</small></div></div>
+      </section>
+    </main>
+  </div>
+
+  <div class="modal" id="drill-modal" hidden>
+    <div class="modal-backdrop" data-close-modal></div>
+    <div class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+      <div class="modal-header"><div><p class="eyebrow">INVOICE-LEVEL TRACE</p><h2 id="modal-title">Arithmetic drilldown</h2></div><button class="button secondary small" data-close-modal>Close</button></div>
+      <div id="modal-content"></div>
+    </div>
+  </div>
+  <div class="modal" id="analysis-modal" hidden>
+    <div class="modal-backdrop" data-close-analysis></div>
+    <div class="modal-panel compact-modal" role="dialog" aria-modal="true" aria-labelledby="analysis-modal-title">
+      <div class="modal-header"><div><p class="eyebrow">NEW ANALYSIS</p><h2 id="analysis-modal-title">Select the client and financial year</h2></div><button class="button secondary small" data-close-analysis>Cancel</button></div>
+      <div class="form-stack">
+        <label><span>Client entity name</span><input type="text" id="analysis-entity" placeholder="ABC Private Limited"></label>
+        <label><span>Client PAN (optional)</span><input type="text" id="analysis-pan" placeholder="ABCDE1234F" maxlength="10"></label>
+        <label><span>Financial year being tested</span><select id="analysis-fy"><option value="2025-26">2025-26</option><option value="2026-27">2026-27</option><option value="2024-25">2024-25</option></select></label>
+        <p class="form-help">Invoices outside this financial year will be separately identified. An analysis cannot run when no invoice falls within the selected year.</p>
+        <button class="button primary full" id="start-analysis">Create analysis and load ledger</button>
+      </div>
+    </div>
+  </div>
+  <div class="modal" id="firm-modal" hidden>
+    <div class="modal-backdrop" data-close-firm></div>
+    <div class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="firm-modal-title">
+      <div class="modal-header"><div><p class="eyebrow">FIRM PROFILE</p><h2 id="firm-modal-title">Identity printed on reports</h2></div><button class="button secondary small" data-close-firm>Cancel</button></div>
+      <div class="form-grid">
+        <label><span>CA firm name</span><input type="text" id="firm-name" placeholder="ABC & Co."></label>
+        <label><span>Firm Registration Number</span><input type="text" id="firm-frn" placeholder="012345N"></label>
+        <label class="span-two"><span>Office address</span><textarea id="firm-address" rows="3"></textarea></label>
+        <label><span>Professional email</span><input type="text" id="firm-email"></label>
+        <label><span>Telephone</span><input type="text" id="firm-phone"></label>
+        <label><span>Prepared by</span><input type="text" id="firm-preparer" placeholder="CA Name"></label>
+        <label><span>Reviewed by</span><input type="text" id="firm-reviewer" placeholder="CA Name"></label>
+        <label><span>Default document status</span><select id="firm-status"><option value="DRAFT">Draft</option><option value="REVIEWED">Reviewed</option><option value="FINAL">Final</option></select></label>
+        <label><span>Illustrative tax-impact rate for Action List (%)</span><input type="number" id="firm-tax-rate" min="0" max="100" step="0.01" value="25.17"></label>
+        <label class="span-two"><span>Basis for tax-impact rate</span><input type="text" id="firm-tax-basis" placeholder="Example: 22% base x 10% surcharge x 4% cess; confirm client eligibility"></label>
+      </div>
+      <p class="form-help">The prefilled 25.17% is not a statutory default and is not auto-calculated. Numerically it reflects 22% x 110% x 104%, rounded. Confirm the client-specific tax regime and record the basis. This rate estimates and ranks Action List savings only; it never changes statutory disallowance or MSMED interest.</p>
+      <button class="button primary full" id="save-firm-profile">Save firm profile</button>
+    </div>
+  </div>
+  <div class="modal" id="vendor-modal" hidden>
+    <div class="modal-backdrop" data-close-vendor></div>
+    <div class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="vendor-modal-title">
+      <div class="modal-header"><div><p class="eyebrow">VENDOR MASTER</p><h2 id="vendor-modal-title">Update Udyam classification</h2><p id="vendor-modal-subtitle"></p></div><button class="button secondary small" data-close-vendor>Cancel</button></div>
+      <div class="form-grid">
+        <label class="span-two"><span>Udyam registration number</span><input type="text" id="vendor-udyam" placeholder="UDYAM-MH-26-0123456" maxlength="23"><small>Leave blank only when reliable evidence confirms that the vendor is not Udyam-registered.</small></label>
+        <label><span>Enterprise class</span><select id="vendor-class"><option value="">Not registered / not established</option><option value="MICRO">Micro</option><option value="SMALL">Small</option><option value="MEDIUM">Medium</option></select></label>
+        <label><span>Udyam registration date</span><input type="date" id="vendor-registration-date"></label>
+        <label><span>NIC code</span><input type="text" id="vendor-nic" inputmode="numeric" maxlength="5" placeholder="25999"></label>
+        <label><span>Activity shown in evidence</span><input type="text" id="vendor-activity" placeholder="Manufacturing / services / trade"></label>
+        <label><span>Evidence source</span><select id="vendor-source"><option value="ASSUMED">Assumed — blocks sign-off</option><option value="CLIENT_ERP_FLAG">Client ERP flag — weak</option><option value="VENDOR_DECLARATION">Vendor declaration — medium</option><option value="UDYAM_CERTIFICATE">Uploaded Udyam certificate — strong</option></select></label>
+        <label><span>Confirmed by</span><input type="text" id="vendor-confirmed-by" placeholder="CA / team member name"></label>
+      </div>
+      <div class="decision-preview"><strong>Current legal conclusion</strong><p id="vendor-current-reason"></p><small>The application never reads or guesses certificate fields. Enter exactly what the certificate or declaration states; every change is written to the audit log.</small></div>
+      <button class="button primary full" id="save-vendor">Save vendor classification</button>
+    </div>
+  </div>
+  <div class="modal" id="certificate-modal" hidden>
+    <div class="modal-backdrop" data-close-certificate></div>
+    <div class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="certificate-modal-title">
+      <div class="modal-header"><div><p class="eyebrow">UDYAM CERTIFICATE REVIEW</p><h2 id="certificate-modal-title">Confirm extracted values</h2><p id="certificate-review-status"></p></div><button class="button secondary small" data-close-certificate>Cancel</button></div>
+      <div class="alert warning" id="certificate-conflicts" hidden></div>
+      <div class="form-grid">
+        <label><span>Enterprise name</span><input type="text" id="cert-enterprise-name"></label>
+        <label><span>PAN</span><input type="text" id="cert-pan" maxlength="10"></label>
+        <label><span>Udyam registration number</span><input type="text" id="cert-udyam"></label>
+        <label><span>Class for project FY</span><select id="cert-class"><option value="">Select</option><option value="MICRO">Micro</option><option value="SMALL">Small</option><option value="MEDIUM">Medium</option></select></label>
+        <label><span>NIC code used for coverage</span><input type="text" id="cert-nic"></label>
+        <label><span>Major activity</span><input type="text" id="cert-activity"></label>
+        <label><span>Type of organisation</span><input type="text" id="cert-organisation"></label>
+        <label><span>Udyam registration date</span><input type="date" id="cert-registration-date"></label>
+        <label><span>Date of incorporation</span><input type="date" id="cert-incorporation-date"></label>
+        <label><span>Date of commencement</span><input type="date" id="cert-commencement-date"></label>
+        <label class="span-two"><span>Registered address</span><textarea id="cert-address" rows="3"></textarea></label>
+        <label class="span-two"><span>Confirmed by</span><input type="text" id="cert-confirmed-by" placeholder="CA / team member name"></label>
+      </div>
+      <div class="history-review"><div class="section-heading"><div><h3>Year-wise enterprise classification</h3><p>Keep one row for each year shown on the certificate. The project year must be present.</p></div><button class="button secondary small" id="add-history-row">Add year</button></div><div id="certificate-history"></div></div>
+      <label class="confirmation-check"><input type="checkbox" id="certificate-confirm-check"><span>I compared these values with the uploaded certificate and confirm they may update this vendor record.</span></label>
+      <button class="button primary full" id="save-certificate-review" disabled>Confirm certificate and save vendor</button>
+    </div>
+  </div>
+  <div class="busy-overlay" id="busy-overlay" hidden aria-live="polite" aria-busy="true">
+    <div class="busy-card"><span class="busy-spinner" aria-hidden="true"></span><div><strong id="busy-title">Working…</strong><small>This may take a little longer for a large ledger. The application is still running.</small></div></div>
+  </div>
+  <script src="/assets/app.js"></script>
+</body>
+</html>
