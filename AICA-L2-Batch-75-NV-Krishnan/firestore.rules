@@ -1,0 +1,95 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function getUserData() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
+    function getUserRole() {
+      return getUserData().role;
+    }
+
+    function isStaff() {
+      return isAuthenticated() && (
+        getUserRole() == 'full_admin' || 
+        getUserRole() == 'team_member'
+      );
+    }
+
+    function isClient() {
+      return isAuthenticated() && getUserRole() == 'client';
+    }
+
+    // Users collection
+    match /users/{userId} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated();
+    }
+
+    // Services collection (Statutory reference catalog)
+    match /services/{serviceId} {
+      allow read: if true;
+      allow write: if isStaff();
+    }
+
+    // Clients collection
+    match /clients/{clientId} {
+      allow read: if isAuthenticated();
+      allow write: if isStaff();
+    }
+
+    // Engagements collection
+    match /engagements/{engagementId} {
+      allow read: if isAuthenticated();
+      allow create, delete: if isStaff();
+      allow update: if isStaff() || (
+        isClient() && 
+        resource.data.clientId == getUserData().linkedClientId && 
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['consentStatus', 'updatedAt'])
+      );
+
+      // Documents subcollection with strict role-based visibility:
+      // - Staff (full_admin & team_member) can read all documents
+      // - Client accounts can ONLY read documents where uploadedByRole == 'client'
+      // - Documents uploaded by team_member / full_admin are NEVER readable by clients
+      match /documents/{docId} {
+        allow read: if isStaff() || (isClient() && resource.data.uploadedByRole == 'client');
+        allow create: if isAuthenticated();
+        allow update, delete: if isStaff();
+      }
+
+      // Client Comments subcollection (client-only append channel)
+      match /clientComments/{commentId} {
+        allow read: if isAuthenticated();
+        allow create, delete: if isAuthenticated();
+        allow update: if false;
+      }
+
+      // Review Notes subcollection (internal confidential channel for staff ONLY - clients forbidden)
+      match /reviewNotes/{noteId} {
+        allow read, create, update, delete: if isStaff();
+      }
+
+      // Pending Items subcollection (firm to client one-way action notice)
+      match /pendingItems/{itemId} {
+        allow read: if isAuthenticated();
+        allow create, delete: if isStaff();
+        allow update: if isAuthenticated();
+      }
+    }
+
+    // Consent Log collection (append-only)
+    match /consentLog/{logId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update, delete: if false; // strictly append-only
+    }
+  }
+}
+

@@ -1,0 +1,42 @@
+rules_version = '2';
+
+// Firebase Storage Security Rules
+// Scoped to engagement access control
+service firebase.storage {
+  match /b/{bucket}/o {
+    
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function getUserRole() {
+      return firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.role;
+    }
+
+    function isStaff() {
+      return isAuthenticated() && (
+        getUserRole() == 'full_admin' || 
+        getUserRole() == 'team_member'
+      );
+    }
+
+    function isClient() {
+      return isAuthenticated() && getUserRole() == 'client';
+    }
+
+    // Engagement documents are stored under engagements/{engagementId}/documents/{docId}/{fileName}
+    match /engagements/{engagementId}/documents/{docId}/{fileName} {
+      // Staff can read all files. Client accounts can only read files where the Firestore metadata shows uploadedByRole == 'client'
+      allow read: if isStaff() || (
+        isClient() && 
+        firestore.get(/databases/(default)/documents/engagements/$(engagementId)/documents/$(docId)).data.uploadedByRole == 'client'
+      );
+      allow write: if isAuthenticated();
+    }
+
+    match /{allPaths=**} {
+      allow read, write: if isAuthenticated();
+    }
+  }
+}
+
