@@ -181,7 +181,7 @@ displayed the remaining time and recommended action.
 ## Project Folder Structure
 
 ``` text
-AICA_LEVEL2_CAPSTONE/
+AICA-L2-Batch-77-Ramesh-Hasija/
 ├── 01_Dummy_Data/
 │   ├── Dummy_Income_Tax_Notice.docx
 │   ├── Dummy_Income_Tax_Notice.pdf
