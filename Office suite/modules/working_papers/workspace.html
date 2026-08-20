@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FD Working Paper Workspace</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/modules/working_papers/style.css">
+</head>
+<body>
+  <!-- Top Workspace Banner -->
+  <div class="workspace-banner">
+    <div class="active-client-info">
+      <div class="header-icon" style="width: 38px; height: 38px; min-width: 38px;">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+          <polyline points="14 2 14 8 20 8"></polyline>
+          <line x1="16" y1="13" x2="8" y2="13"></line>
+        </svg>
+      </div>
+      <div>
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <h2 style="font-size: 1.15rem; font-weight: 700;" id="active-client-name">Loading Entity...</h2>
+          <span class="badge badge-success" id="active-client-status">Active</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Financial Year Selector & Export Buttons -->
+    <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+      <div style="display: flex; align-items: center; gap: 8px;">
+        <label style="font-size: 0.85rem; font-weight: 600; color: var(--text-secondary);">Financial Year:</label>
+        <select id="select-fy" style="font-weight: 700; color: var(--primary-accent); padding: 8px 14px; font-size: 0.9rem;">
+          <option value="2027-28">FY 2027-28</option>
+          <option value="2026-27">FY 2026-27</option>
+          <option value="2025-26">FY 2025-26</option>
+          <option value="2024-25" selected>FY 2024-25</option>
+          <option value="2023-24">FY 2023-24</option>
+          <option value="2022-23">FY 2022-23</option>
+        </select>
+      </div>
+
+      <!-- Hidden Roll-Forward Button (Functional in backend only) -->
+      <button class="btn-secondary btn-sm" id="btn-trigger-rollforward" style="display: none;">
+        ⚡ Auto Roll-Forward PY Active FDs
+      </button>
+
+      <button class="btn-secondary btn-sm" id="btn-refresh-data">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polyline points="23 4 23 10 17 10"></polyline>
+          <polyline points="1 20 1 14 7 14"></polyline>
+          <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+        </svg>
+        Refresh Data
+      </button>
+
+      <button class="btn-secondary btn-sm" id="btn-download-template">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+          <polyline points="7 10 12 15 17 10"></polyline>
+          <line x1="12" y1="15" x2="12" y2="3"></line>
+        </svg>
+        Download Template
+      </button>
+
+      <button class="btn-primary btn-sm" id="btn-export-excel" style="background: var(--emerald-accent);">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+          <polyline points="14 2 14 8 20 8"></polyline>
+        </svg>
+        Export Working Paper (4 Sheets .xlsx)
+      </button>
+    </div>
+  </div>
+
+  <!-- STATUTORY CLASSIFICATION & PERIOD INTEREST SUMMARY WIDGETS (6 TILES GRID) -->
+  <div class="summary-grid" style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));">
+    <!-- Tile 1: Class 1 -->
+    <div class="summary-card class-1-card">
+      <div class="summary-header">
+        <span class="badge badge-class1">Class 1</span>
+        <span style="font-size:0.72rem; color:var(--text-muted);">Orig ≤ 90 Days</span>
+      </div>
+      <div class="summary-title">Cash & Cash Equivalents</div>
+      <div class="summary-val" id="val-class1-total">₹0.00</div>
+      <div class="summary-sub" id="val-class1-count">0 FD Records</div>
+    </div>
+
+    <!-- Tile 2: Class 2 -->
+    <div class="summary-card class-2-card">
+      <div class="summary-header">
+        <span class="badge badge-class2">Class 2</span>
+        <span style="font-size:0.72rem; color:var(--text-muted);">Rem ≤ 365 Days</span>
+      </div>
+      <div class="summary-title">Other Current Bank Balances</div>
+      <div class="summary-val" id="val-class2-total">₹0.00</div>
+      <div class="summary-sub" id="val-class2-count">0 FD Records</div>
+    </div>
+
+    <!-- Tile 3: Class 3 -->
+    <div class="summary-card class-3-card">
+      <div class="summary-header">
+        <span class="badge badge-class3">Class 3</span>
+        <span style="font-size:0.72rem; color:var(--text-muted);">Rem > 365 Days</span>
+      </div>
+      <div class="summary-title">Non-Current Assets</div>
+      <div class="summary-val" id="val-class3-total">₹0.00</div>
+      <div class="summary-sub" id="val-class3-count">0 FD Records</div>
+    </div>
+
+    <!-- Tile 4: Grand Total FD Investments -->
+    <div class="summary-card total-card">
+      <div class="summary-header">
+        <span class="badge badge-success">Master Total</span>
+        <span style="font-size:0.72rem; color:var(--text-muted);" id="val-reporting-date">As of Mar 31</span>
+      </div>
+      <div class="summary-title">Total FD Investment</div>
+      <div class="summary-val" id="val-overall-total" style="color:var(--primary-accent);">₹0.00</div>
+      <div class="summary-sub" id="val-overall-count">0 Total FDs</div>
+    </div>
+
+    <!-- Tile 5: Total Interest Income FY (Placed after Total FD Investment!) -->
+    <div class="summary-card" style="border-left: 4px solid var(--emerald-accent); background: linear-gradient(135deg, var(--bg-card) 0%, rgba(16, 185, 129, 0.1) 100%);">
+      <div class="summary-header">
+        <span class="badge" style="background: rgba(16, 185, 129, 0.2); color: var(--emerald-accent); font-weight: 700;">Revenue</span>
+        <span style="font-size:0.72rem; color:var(--text-muted);">Current FY</span>
+      </div>
+      <div class="summary-title">Total Interest Income (FY)</div>
+      <div class="summary-val" id="val-overall-interest" style="color:var(--success-text);">₹0.00</div>
+      <div class="summary-sub">Earned in Financial Year</div>
+    </div>
+
+    <!-- Tile 6: Total Accrued Interest (Separate Tile!) -->
+    <div class="summary-card" style="border-left: 4px solid var(--warning-text); background: linear-gradient(135deg, var(--bg-card) 0%, rgba(245, 158, 11, 0.1) 100%);">
+      <div class="summary-header">
+        <span class="badge badge-warning" style="font-weight: 700;">Accrued</span>
+        <span style="font-size:0.72rem; color:var(--text-muted);">Closing Balance</span>
+      </div>
+      <div class="summary-title">Total Accrued Interest</div>
+      <div class="summary-val" id="val-overall-accrued" style="color:var(--warning-text);">₹0.00</div>
+      <div class="summary-sub">Accrued but Not Due</div>
+    </div>
+  </div>
+
+  <!-- UPLOADERS & ACTION CONTROLS (3 DROPZONES) -->
+  <div class="card-section">
+    <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1.25rem;">
+      <!-- Option A: Excel Spreadsheet Import -->
+      <div class="dropzone" id="dropzone-excel">
+        <div class="dropzone-icon">
+          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+            <polyline points="14 2 14 8 20 8"></polyline>
+            <path d="M12 18v-6m0 0l-3 3m3-3l3 3"></path>
+          </svg>
+        </div>
+        <h4 style="font-size: 0.9rem; font-weight: 700;">Import FD Excel Schedule</h4>
+        <p style="font-size:0.75rem; color:var(--text-muted);">Drag & drop completed .xlsx template</p>
+        <input type="file" id="file-excel" accept=".xlsx, .xls" style="display:none;">
+        <div id="status-excel" style="margin-top:6px;"></div>
+      </div>
+
+      <!-- Option B: PDF Advice Import -->
+      <div class="dropzone" id="dropzone-pdf">
+        <div class="dropzone-icon">
+          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+            <polyline points="14 2 14 8 20 8"></polyline>
+            <line x1="16" y1="13" x2="8" y2="13"></line>
+          </svg>
+        </div>
+        <h4 style="font-size: 0.9rem; font-weight: 700;">Import Bank FD Advice PDF</h4>
+        <p style="font-size:0.75rem; color:var(--text-muted);">Drag & drop FD advice receipt PDF</p>
+        <input type="file" id="file-pdf" accept=".pdf" style="display:none;">
+        <div id="status-pdf" style="margin-top:6px;"></div>
+      </div>
+
+      <!-- Option C: Form 26AS PDF / CSV Import -->
+      <div class="dropzone" id="dropzone-26as" style="border-color: var(--purple-accent);">
+        <div class="dropzone-icon" style="color: var(--purple-accent);">
+          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <path d="M9 12h6m-6 4h6m2 5H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5.586a1 1 0 0 1 .707.293l5.414 5.414a1 1 0 0 1 .293.707V19a2 2 0 0 1-2 2z"></path>
+          </svg>
+        </div>
+        <h4 style="font-size: 0.9rem; font-weight: 700;">Import Form 26AS PDF / CSV</h4>
+        <p style="font-size:0.75rem; color:var(--text-muted);">Drag & drop Form 26AS PDF or CSV file</p>
+        <input type="file" id="file-26as" accept=".pdf, .csv" style="display:none;">
+        <div id="status-26as" style="margin-top:6px;"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- FORM 26AS SEC 194A RECONCILIATION TABLE -->
+  <div class="card-section">
+    <div class="section-header" style="border-bottom: 2px solid var(--purple-accent); padding-bottom: 8px;">
+      <span style="display: flex; align-items: center; gap: 8px;">
+        <span class="badge badge-class3" style="font-size: 0.85rem;">Section 194A</span>
+        Form 26AS vs FD Schedule Interest Reconciliation
+      </span>
+      <div style="display: flex; align-items: center; gap: 12px;">
+        <div id="reco-summary-text" style="font-size: 0.85rem; font-weight: 600; color: var(--text-secondary);">
+          FD Interest: ₹0.00 | 26AS Interest: ₹0.00 | Variance: ₹0.00
+        </div>
+        <button class="btn-primary btn-sm" id="btn-delete-26as-data" style="background: var(--danger-bg); color: var(--danger-text); border: 1px solid var(--danger-text);">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="3 6 5 6 21 6"></polyline>
+            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+          </svg>
+          Delete 26AS Data
+        </button>
+      </div>
+    </div>
+
+    <div class="table-scroll-container" style="max-height: 320px;">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>FD Schedule Bank Name</th>
+            <th>Form 26AS Deductor Name</th>
+            <th>TAN of Deductor</th>
+            <th>FD Interest Income (₹)</th>
+            <th>26AS Gross Interest u/s 194A (₹)</th>
+            <th>Variance (₹)</th>
+            <th>FD Schedule TDS (₹)</th>
+            <th>Reconciliation Status</th>
+          </tr>
+        </thead>
+        <tbody id="tbody-reco">
+          <tr><td colspan="8" style="text-align:center; color:var(--text-muted);">No 26AS entries loaded yet. Import Form 26AS PDF or CSV above to view bank reconciliation.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- FD MOVEMENT & COMPUTATION DATA TABLE -->
+  <div class="card-section">
+    <div class="section-header">
+      <span>FD Movement & Statutory Classification Schedule</span>
+      <div style="display: flex; align-items: center; gap: 8px;">
+        <button class="btn-primary btn-sm" id="btn-delete-all-fds" style="background: var(--danger-bg); color: var(--danger-text); border: 1px solid var(--danger-text);">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="3 6 5 6 21 6"></polyline>
+            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+          </svg>
+          Delete All
+        </button>
+        <button class="btn-primary btn-sm" id="btn-open-add-fd-modal">+ Add Manual FD</button>
+      </div>
+    </div>
+
+    <div class="table-scroll-container">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Bank Name</th>
+            <th>FD Account No</th>
+            <th>Opening Principal (₹)</th>
+            <th>Created in FY (₹)</th>
+            <th>Matured in FY (₹)</th>
+            <th>Closing Principal (₹)</th>
+            <th>Issue Date</th>
+            <th>Maturity Date</th>
+            <th>Rate (%)</th>
+            <th>Freq</th>
+            <th>Orig Days</th>
+            <th>Rem Days</th>
+            <th>Opening Accrued (₹)</th>
+            <th>Interest Earned (₹)</th>
+            <th>TDS Deducted (₹)</th>
+            <th>Settled Accrued (₹)</th>
+            <th>Closing Accrued (₹)</th>
+            <th>Total Closing (₹)</th>
+            <th>Statutory Classification</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody id="tbody-fds">
+          <tr><td colspan="21" style="text-align:center; color:var(--text-muted);">No FD records found for this financial year.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- MODAL: ADD / EDIT FD RECORD -->
+  <div class="modal-overlay" id="modal-fd">
+    <div class="modal-card" style="max-width: 580px;">
+      <h2 class="modal-title" id="modal-fd-title">Add Manual Fixed Deposit</h2>
+      <form id="form-fd">
+        <input type="hidden" id="input-fd-id">
+        
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+          <div class="form-group">
+            <label>Bank Name *</label>
+            <input type="text" id="input-bank-name" required placeholder="e.g. State Bank of India">
+          </div>
+
+          <div class="form-group">
+            <label>FD Account Number *</label>
+            <input type="text" id="input-fd-acc" required placeholder="e.g. FD-398249102">
+          </div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1rem;">
+          <div class="form-group">
+            <label>Principal Amount (₹) *</label>
+            <input type="number" step="0.01" id="input-principal" required placeholder="500000">
+          </div>
+
+          <div class="form-group">
+            <label>Interest Rate (%) *</label>
+            <input type="number" step="0.01" id="input-rate" required placeholder="7.25">
+          </div>
+
+          <div class="form-group">
+            <label>Compounding Freq</label>
+            <select id="select-freq">
+              <option value="Quarterly" selected>Quarterly</option>
+              <option value="Monthly">Monthly</option>
+              <option value="Half-Yearly">Half-Yearly</option>
+              <option value="Annual">Annual</option>
+              <option value="Simple">Simple</option>
+            </select>
+          </div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+          <div class="form-group">
+            <label>Date of Issue *</label>
+            <input type="date" id="input-date-issue" required>
+          </div>
+
+          <div class="form-group">
+            <label>Date of Maturity *</label>
+            <input type="date" id="input-date-maturity" required>
+          </div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1rem;">
+          <div class="form-group">
+            <label>Opening Accrued (₹)</label>
+            <input type="number" step="0.01" id="input-opening-accrued" value="0.0">
+          </div>
+
+          <div class="form-group">
+            <label>TDS Deducted (₹)</label>
+            <input type="number" step="0.01" id="input-tds" value="0.0">
+          </div>
+
+          <div class="form-group">
+            <label>Status</label>
+            <select id="select-fd-status">
+              <option value="Active" selected>Active</option>
+              <option value="Matured">Matured</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="modal-actions">
+          <button type="button" class="btn-secondary" id="btn-close-fd-modal">Cancel</button>
+          <button type="submit" class="btn-primary">Compute & Save FD</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script src="/modules/working_papers/workspace.js"></script>
+</body>
+</html>
