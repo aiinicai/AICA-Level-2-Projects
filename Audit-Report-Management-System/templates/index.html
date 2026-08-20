@@ -1,0 +1,43 @@
+{% extends 'base.html' %}{% block content %}
+<div class="page-head"><div><h1>Stage 5 – New Audit Report</h1><p class="muted">Select an existing Client and Engagement to carry forward prior-year information. You can still edit the current report inputs before generation.</p></div><div class="actions"><a class="button secondary" href="{{url_for('applicability_home')}}">Applicability Dashboard</a><a class="button secondary" href="{{url_for('client_new')}}">+ New Client</a><a class="button secondary" href="{{url_for('engagement_new')}}">+ New Engagement</a></div></div>
+{% if error %}<div class="error">{{error}}</div>{% endif %}
+<form method="post" action="{{url_for('review')}}" class="card">
+<h2>Client & Engagement</h2>
+<div class="grid">
+<label>Existing Client (optional)<select name="client_id" id="client_id"><option value="">— Enter client details below —</option>{% for c in clients %}<option value="{{c.ClientID}}" {% if form.get('client_id')==c.ClientID %}selected{% endif %}>{{c.ClientName}}{% if c.CIN %} — CIN {{c.CIN}}{% endif %}</option>{% endfor %}</select><span class="muted">Selecting a client supplies default legal name, CIN and city; you may edit them for this report.</span></label>
+<label>Existing Engagement (optional)<select name="engagement_id" id="engagement_id"><option value="">— No Existing Engagement (enter current report details) —</option></select><span class="muted">An engagement supplies defaults only. Any changes made below for this report will be retained.</span></label>
+</div>
+<h2>Client Details</h2><div class="grid">
+<label>Client Name*<input name="client_name" id="client_name" value="{{form.get('client_name','')}}" required></label>
+<label>CIN*<input name="cin" id="cin" value="{{form.get('cin','')}}" required></label>
+<label>City*<input name="city" id="city" value="{{form.get('city','')}}" required></label>
+<label>Financial Year*<input name="financial_year" id="financial_year" value="{{form.get('financial_year','')}}" placeholder="2025-26" required></label>
+<label>Year Ending*<input name="year_ending" id="year_ending" value="{{form.get('year_ending','')}}" placeholder="31st March, 2026" required></label>
+<label>Place of Signing*<input name="place" id="place" value="{{form.get('place','')}}" placeholder="Defaults from Firm / Partner Master" required></label>
+</div>
+<h2>Entity & Opinion</h2><div class="grid">
+<label>Entity Type*<select name="entity_type" id="entity_type" required>{% for k,v in entity_options.items() %}<option value="{{k}}" {% if form.get('entity_type')==k %}selected{% endif %}>{{v}}</option>{% endfor %}</select></label>
+<label>Small Company*<select name="small_company" id="small_company" required><option value="no" {% if form.get('small_company') != 'yes' %}selected{% endif %}>No</option><option value="yes" {% if form.get('small_company') == 'yes' %}selected{% endif %}>Yes</option></select></label>
+<label>Opinion*<select name="opinion" id="opinion" required>{% for k,v in opinion_options.items() %}<option value="{{k}}" {% if form.get('opinion')==k %}selected{% endif %}>{{v}}</option>{% endfor %}</select></label>
+</div>
+<h2>CA Firm & Signing Partner</h2><div class="grid">
+<label>CA Firm*<select name="firm_id" id="firm_id" required><option value="">Select Firm</option>{% for f in firms %}<option value="{{f.FirmID}}" {% if form.get('firm_id')==f.FirmID %}selected{% endif %}>{{f.FirmName}} — FRN {{f.FRN}}</option>{% endfor %}</select></label>
+<label>Signing CA / Partner*<select name="partner_id" id="partner_id" required><option value="">Select Firm First</option></select></label>
+</div>
+<div class="card" style="margin-top:12px;background:#f7f9fc"><h3 style="margin-top:0">Selected Signing Details</h3><div class="grid"><div><strong>Firm Name</strong><div id="firm_name_display" class="readonly-value">—</div></div><div><strong>FRN</strong><div id="frn_display" class="readonly-value">—</div></div><div><strong>Signing CA / Partner</strong><div id="partner_name_display" class="readonly-value">—</div></div><div><strong>Membership No.</strong><div id="membership_display" class="readonly-value">—</div></div></div></div>
+<div class="grid"><label>Date of Report*<input type="date" name="report_date" required><span class="muted">Word format: August 17, 2026</span></label><label>UDIN (optional)<input name="udin" value="{{form.get('udin','')}}"></label></div>
+<div class="actions"><button type="submit">Review Before Generate</button></div>
+</form>
+<script>
+const client=document.getElementById('client_id'), engagement=document.getElementById('engagement_id');
+async function loadClient(id){if(!id)return;const c=await (await fetch('/api/client/'+encodeURIComponent(id))).json(); if(c.ClientName){document.getElementById('client_name').value=c.ClientName||'';document.getElementById('cin').value=c.CIN||'';document.getElementById('city').value=c.City||'';}}
+async function loadEngagements(id,selected=''){engagement.innerHTML='<option value="">— Enter current report details —</option>'; if(!id)return; const es=await (await fetch('/api/engagements/'+encodeURIComponent(id))).json(); es.forEach(e=>{const o=document.createElement('option');o.value=e.EngagementID;o.textContent=e.FinancialYear+' — '+(e.YearEnding||'')+' — '+(e.EntityType||'')+' — '+(e.Opinion||'');if(e.EngagementID===selected)o.selected=true;engagement.appendChild(o);});}
+async function loadEngagement(id){if(!id)return;const e=await (await fetch('/api/engagements/'+encodeURIComponent(id))).json().find(x=>x.EngagementID===engagement.value); if(!e)return; document.getElementById('financial_year').value=e.FinancialYear||'';document.getElementById('year_ending').value=e.YearEnding||'';document.getElementById('entity_type').value=e.EntityType||'private_ltd';document.getElementById('small_company').value=(String(e.SmallCompany).toLowerCase()==='yes'?'yes':'no');document.getElementById('opinion').value=e.Opinion||'unmodified';document.getElementById('firm_id').value=e.FirmID||'';await refreshPartners(e.FirmID,e.PartnerID||'');document.getElementById('place').value=e.Place||document.getElementById('place').value;}
+client.addEventListener('change',async()=>{await loadClient(client.value);await loadEngagements(client.value);}); engagement.addEventListener('change',()=>loadEngagement(engagement.value));
+const firm=document.getElementById('firm_id'), partner=document.getElementById('partner_id'), firmName=document.getElementById('firm_name_display'), frn=document.getElementById('frn_display'), partnerName=document.getElementById('partner_name_display'), membership=document.getElementById('membership_display'), place=document.getElementById('place');
+async function refreshPartners(firmId,selectedId=''){partner.innerHTML='<option value="">Select Partner</option>';firmName.textContent=frn.textContent=partnerName.textContent=membership.textContent='—';if(!firmId)return;const [pr,fr]=await Promise.all([fetch('/api/partners/'+encodeURIComponent(firmId)),fetch('/api/firm/'+encodeURIComponent(firmId))]);const ps=await pr.json(),f=await fr.json();firmName.textContent=f.FirmName||'—';frn.textContent=f.FRN||'—';if(!place.value&&f.DefaultPlace)place.value=f.DefaultPlace;ps.forEach(x=>{const o=document.createElement('option');o.value=x.PartnerID;o.textContent=x.PartnerName+' — Membership No. '+x.MembershipNo;o.dataset.membership=x.MembershipNo||'';o.dataset.partner=x.PartnerName||'';o.dataset.place=x.DefaultPlace||'';if(x.PartnerID===selectedId)o.selected=true;partner.appendChild(o);});updatePartnerDisplay();}
+function updatePartnerDisplay(){const o=partner.selectedOptions[0];if(!o||!o.value){partnerName.textContent='—';membership.textContent='—';return;}partnerName.textContent=o.dataset.partner||o.textContent;membership.textContent=o.dataset.membership||'—';if(o.dataset.place)place.value=o.dataset.place;}
+firm.addEventListener('change',()=>refreshPartners(firm.value));partner.addEventListener('change',updatePartnerDisplay);
+document.querySelector('input[name=report_date]').value='{{form.get('report_date','')}}'||new Date().toISOString().slice(0,10);
+{% if form.get('client_id') %}loadClient('{{form.get('client_id')}}');loadEngagements('{{form.get('client_id')}}','{{form.get('engagement_id','')}}');{% endif %}{% if form.get('firm_id') %}refreshPartners('{{form.get('firm_id')}}','{{form.get('partner_id','')}}');{% endif %}
+</script>{% endblock %}
