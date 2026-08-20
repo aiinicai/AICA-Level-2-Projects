@@ -1,275 +1,170 @@
-# Upload Your Project Folder to the AICA Level 2 Projects Repository
+# 🏛️ Bank of India — Account Opening Audit & Document Scrutiny System
 
-**Target repository:** [aiinicai/AICA-Level-2-Projects](https://github.com/aiinicai/AICA-Level-2-Projects)
+A specialized, professional **Concurrent Audit & Document Scrutiny Web Application** built with **Python**, **Streamlit**, **Pandas**, and **OpenPyXL**. 
 
-This guide explains how to contribute your complete project folder to the **AICA-Level-2-Projects** repository using GitHub’s **Fork + Pull Request** workflow.
-
-Two methods are covered:
-
-1. **Website-only method** — no software installation required.
-2. **Git command-line method** — recommended for complete project folders and projects containing many files.
+This system is designed for **training and demonstration** of Indian banking concurrent audit workflows, RBI KYC Master Direction compliance, dual officer Maker-Checker controls, and zero-tolerance approval gating for Savings and Current accounts.
 
 ---
-
-## Save your repository as -
-
-# AICA-L2-Batch-(XXX)-Name-Surname
-
-
----
-
-## Fork + Pull Request Workflow
-
-1. **Fork:** Create a personal copy of `aiinicai/AICA-Level-2-Projects` under your GitHub account.
-2. **Add your folder:** Upload or copy your project folder into your fork.
-3. **Commit:** Save the changes in your fork with a clear commit message.
-4. **Open a Pull Request:** Request the `aiinicai` account to merge your changes into the original repository.
-5. **Merge:** The repository owner reviews and accepts your Pull Request. After it is merged, your project folder will appear in the official repository.
-
----
-
-# Method 1: Website Only
-
-Use this method if:
-
-- You do not want to install Git.
-- Your project contains relatively few files.
-- You do not need to preserve the project’s earlier commit history.
 
 > [!NOTE]
-> GitHub’s web uploader generally allows up to 100 files in a single upload. If your project contains more files, upload them in batches or use the Git command-line method.
-
-## Step 1: Fork the Repository
-
-1. Log in to your GitHub account.
-2. Open the [AICA-Level-2-Projects repository](https://github.com/aiinicai/AICA-Level-2-Projects).
-3. Click **Fork** in the upper-right corner of the page.
-4. On the **Create a new fork** page, keep the default settings.
-5. Click **Create fork**.
-
-You will be redirected to your personal copy of the repository:
-
-```text
-https://github.com/YOUR-USERNAME/AICA-Level-2-Projects
-```
-
-Replace `YOUR-USERNAME` with your GitHub username.
-
-## Step 2: Upload Your Project Folder
-
-GitHub provides two ways to add a folder through the website.
-
-### Option A: Drag and Drop the Complete Folder
-
-1. Open your fork of the repository.
-2. Click **Add file** → **Upload files**.
-3. Open the parent location of your project folder in File Explorer.
-4. Drag the **complete project folder**—not only the files inside it—into GitHub’s upload area.
-5. Wait until all the files appear in the upload list.
-
-Modern browsers such as Google Chrome and Microsoft Edge generally preserve the folder structure during upload.
-
-### Option B: Create the Folder Using a File Path
-
-1. Open your fork of the repository.
-2. Click **Add file** → **Create new file**.
-3. In the filename box, enter:
-
-   ```text
-   MyProjectName/README.md
-   ```
-
-   Typing `/` in the filename automatically creates the folder.
-
-4. Add a short description of your project to the new `README.md` file.
-5. Click **Commit changes**.
-6. Open the newly created folder.
-7. Click **Add file** → **Upload files** and upload the remaining project files.
-
-Replace `MyProjectName` with the name of your project.
-
-## Step 3: Commit the Upload
-
-1. Scroll down to the **Commit changes** section.
-2. Enter a clear commit message, for example:
-
-   ```text
-   Add <Your Name> - <Project Name> project folder
-   ```
-
-3. Keep **Commit directly to the main branch** selected.
-4. Click **Commit changes**.
-
-Because this is your personal fork, committing directly to its `main` branch is acceptable for this submission workflow.
-
-## Step 4: Open a Pull Request
-
-1. Return to the main page of your fork.
-2. GitHub may display a banner stating:
-
-   ```text
-   This branch is X commits ahead of aiinicai:main
-   ```
-
-3. Click **Contribute** → **Open pull request**.
-
-Alternatively:
-
-1. Open the **Pull requests** tab.
-2. Click **New pull request**.
-
-Before creating the Pull Request, confirm the following direction:
-
-| Setting | Selection |
-| --- | --- |
-| Base repository | `aiinicai/AICA-Level-2-Projects` |
-| Base branch | `main` |
-| Head repository | `YOUR-USERNAME/AICA-Level-2-Projects` |
-| Compare branch | `main` |
-
-Then:
-
-1. Enter a clear Pull Request title, for example:
-
-   ```text
-   Add AICA Level 2 Project - <Your Name>
-   ```
-
-2. In the description, briefly explain:
-   - The purpose of your project.
-   - Its main features.
-   - Any setup or usage instructions.
-3. Click **Create pull request**.
-
-## Step 5: Wait for Review and Merge
-
-The owner of the `aiinicai/AICA-Level-2-Projects` repository will receive your Pull Request.
-
-The repository owner may:
-
-- Review your project.
-- Ask questions.
-- Suggest changes.
-- Approve and merge the Pull Request.
-
-If changes are requested, update the files in your fork and commit them. Your existing Pull Request will update automatically.
-
-After the Pull Request is merged, your project folder will become part of the official repository.
+> ### 🛡️ Synthetic Data & Privacy Assurance
+> This application operates strictly on **100% synthetic and dummy data**. No real customer bank account numbers, Aadhaar numbers, PAN cards, OTPs, passwords, or confidential banking records are used, stored, or required.
 
 ---
 
-# Method 2: Git Command Line
+## 🌟 Key Capabilities & Features
 
-This method is recommended when:
+### 1. 📄 Document Scrutiny & Verification Engine
+- **Saving Account Scrutiny (8 Mandatory Checks):**
+  1. *Aadhaar Card Verification* (Masked Aadhaar copy, UIDAI QR verification, demographic match)
+  2. *PAN Card / Finacle Verification* (PAN validation against ITD database or valid Form 60)
+  3. *CKYC Record Status* (14-digit Central KYC Registry search/upload)
+  4. *Customer Photograph* (Recent passport-size photo affixed and cross-signed)
+  5. *Officer Signature with PF Number* (OSV stamp with verifying official's 6-digit Employee/PF code)
+  6. *Customer Profile Sheet (CPS)* (Occupation, income, source of funds, AML risk grading)
+  7. *AOF Dual Officer Verification* (Account Opening Form dual check — Maker & Checker signatures)
+  8. *Customer Signature / Thumb Impression* (Specimen signature card uploaded to Finacle)
+- **Current Account Scrutiny (11 Mandatory Checks):**
+  1. *Certificate of Incorporation / Partnership Deed / Registration Certificate*
+  2. *PAN of Business Entity*
+  3. *GSTIN Registration / Udhyam Certificate / Trade License* (RBI 2-independent document rule)
+  4. *Beneficial Ownership (BO) Declaration* (>10%/25% threshold under PMLA)
+  5. *Board Resolution / Partner Mandate / Power of Attorney*
+  6. *KYC of all Authorized Signatories, Directors & Partners*
+  7. *CKYC Search & Download for Entity & Promoters*
+  8. *Pre-Opening Site / Business Inspection Report* (Physical visit with geo-tagged photo)
+  9. *Credit Facility Undertaking / NOC from Existing Bankers* (RBI circular compliance)
+  10. *Customer Profile Sheet & AML Risk Profiling* (Business turnover & transaction limits)
+  11. *Dual Officer Verification & PF Signatures* (Branch Maker-Checker sign-off)
 
-- Your project contains many files.
-- You want to upload the complete folder structure reliably.
-- You are comfortable using Git commands.
+### 2. 🚨 Automated Discrepancy Identification & Rectification Workflow
+- Instantly detects any incomplete, missing, or unverified documents.
+- Supports 5 standardized audit states:
+  `Discrepancy Found` ➡️ `Rectification Pending` ➡️ `Rectified` ➡️ `Re-check Completed` ➡️ `Passed`
+- Allows auditors and branch officials to record granular scrutiny observations and rectification action notes per checklist item.
 
-## Prerequisites
+### 3. 🛡️ Zero-Tolerance Account Opening Approval Gate
+- **Approval Blocked:** If even *one* mandatory checklist item has an active discrepancy or pending check, final approval is strictly blocked with a warning alert banner (`🚫 APPROVAL BLOCKED – DOCUMENTS/CHECKS PENDING`).
+- **Ready for Approval:** When all 8 (Saving) or 11 (Current) checks achieve 100% compliance, the system unlocks the green banner (`🟢 READY FOR ACCOUNT OPENING APPROVAL`).
+- **Official Sign-off:** The concurrent auditor enters their PF Employee Code and remarks to stamp the account with `✅ APPROVED – OFFICER MAY PROCEED WITH ACCOUNT OPENING`.
 
-Before beginning:
+### 4. 📈 Audit Summary Dashboard & Real-Time Analytics
+- Executive KPI scorecard: Total Accounts Scrutinized, Savings vs. Current breakdown, Total Discrepancies Logged, Pending vs. Rectified count, Ready for Approval, and Fully Approved accounts.
+- Interactive status breakdown bar charts and common deficiency category visualizations.
+- Searchable master audit register with filters by account type, audit status, and AML risk level.
 
-- Install [Git](https://git-scm.com/downloads).
-- Create or log in to your GitHub account.
-- Fork the [AICA-Level-2-Projects repository](https://github.com/aiinicai/AICA-Level-2-Projects) as explained in Method 1.
+### 5. 📥 Professional OpenPyXL Multi-Sheet Excel Export
+- Generates a 4-sheet formatted `.xlsx` workbook:
+  - **Sheet 1 — Executive Summary:** Executive scorecard, audit KPIs, and category deficiency breakdown.
+  - **Sheet 2 — Master Account Register:** Complete account audit ledger with compliance rates and approval states.
+  - **Sheet 3 — Checklist & Discrepancy Log:** Itemized checklist observations and branch remediation notes.
+  - **Sheet 4 — Blocked & High-Risk Accounts:** Escalation register for non-compliant cases and High AML risk accounts.
+- Styled with Bank of India corporate palette (Dark Navy `#0B2545`, Orange `#E65100`), cell borders, and status highlights.
 
-## Step 1: Clone Your Fork
-
-Open Terminal, Command Prompt, PowerShell, or Git Bash and run:
-
-```bash
-git clone https://github.com/YOUR-USERNAME/AICA-Level-2-Projects.git
-```
-
-Then open the cloned repository:
-
-```bash
-cd AICA-Level-2-Projects
-```
-
-Replace `YOUR-USERNAME` with your GitHub username.
-
-## Step 2: Copy Your Project Folder
-
-Copy your complete project folder into the cloned `AICA-Level-2-Projects` directory.
-
-Recommended folder naming format:
-
-```text
-YourName-ProjectName/
-```
-
-Example:
-
-```text
-Rahul-Sharma-AI-Invoice-Analyzer/
-```
-
-## Step 3: Review the Changes
-
-Run:
-
-```bash
-git status
-```
-
-Confirm that Git lists only the files and folders you intend to submit.
-
-## Step 4: Stage and Commit the Project
-
-Stage your project folder:
-
-```bash
-git add YourName-ProjectName/
-```
-
-Commit the changes:
-
-```bash
-git commit -m "Add <Your Name> - <Project Name> project folder"
-```
-
-## Step 5: Push the Changes to Your Fork
-
-Run:
-
-```bash
-git push origin main
-```
-
-Your project folder will now appear in your fork on GitHub.
-
-## Step 6: Open a Pull Request
-
-1. Open your fork on GitHub.
-2. Click **Contribute** → **Open pull request**.
-3. Confirm the base and compare repositories:
-
-| Setting | Selection |
-| --- | --- |
-| Base repository | `aiinicai/AICA-Level-2-Projects` |
-| Base branch | `main` |
-| Head repository | `YOUR-USERNAME/AICA-Level-2-Projects` |
-| Compare branch | `main` |
-
-4. Add a clear title and project description.
-5. Click **Create pull request**.
+### 6. 📖 Operational Guide & RBI SOP Reference
+- In-app standard operating procedures for branch auditors.
+- Explanations of RBI KYC Master Directions and statutory norms.
+- Comprehensive Banking Glossary explaining terms like *AOF*, *CKYCR*, *OSV*, *CPS*, *PF Code*, and *Maker-Checker controls*.
 
 ---
 
-## Before Submitting
+## 📁 Project Structure
 
-Please verify the following:
+```
+BOI-Audit-Project/
+├── app.py                      # Main Streamlit web application entrypoint
+├── checklists.py               # 8 Saving & 11 Current Account audit check definitions
+├── data_manager.py             # Synthetic datasets, metrics calculation, and state management
+├── excel_exporter.py           # Multi-sheet OpenPyXL Excel audit report generator
+├── views/
+│   ├── __init__.py
+│   ├── scrutiny_view.py        # Document Scrutiny, Discrepancy Tracking & Approval Gate UI
+│   ├── dashboard_view.py       # High-level Audit Summary Dashboard with KPI metrics & charts
+│   ├── export_view.py          # Interactive Excel audit report exporter and data preview
+│   └── guide_view.py           # Operational Guide, Checklist Reference & Banking SOP
+├── tests/
+│   └── test_audit_engine.py    # Unit test suite for audit logic, approval gates, and Excel output
+├── requirements.txt            # Python dependencies (streamlit, pandas, openpyxl)
+└── README.md                   # Beginner-friendly guide and documentation
+```
 
-- Your complete project is inside one clearly named folder.
-- Your folder includes a `README.md` explaining the project.
-- The project does not contain passwords, API keys, access tokens, or other confidential information.
-- Unnecessary generated files and dependency folders are excluded where applicable.
-- The project opens or runs using the instructions included in its `README.md`.
-- Your Pull Request targets `aiinicai/AICA-Level-2-Projects` on the `main` branch.
+---
 
-## Need to Update Your Submission?
+## 🚀 Beginner's Step-by-Step Setup & Run Guide
 
-If your Pull Request is still open, make the required changes in the same fork and branch, then commit and push them. GitHub will automatically add the new commits to the existing Pull Request.
+If you are a complete beginner in Python, follow these simple steps to run the application on your computer:
 
+### Step 1: Open Terminal / PowerShell
+1. On Windows, press the `Windows Key + R`, type `powershell` or `cmd`, and press **Enter**.
+2. Navigate to this project folder:
+   ```powershell
+   cd "C:\Users\akmeh\OneDrive\Desktop\BOI-Audit-Project"
+   ```
+
+### Step 2: Install Dependencies
+Run the following command to install the required libraries (`streamlit`, `pandas`, `openpyxl`):
+```powershell
+python -m pip install -r requirements.txt
+```
+
+### Step 3: Run the Streamlit Application
+Start the application by running:
+```powershell
+streamlit run app.py
+```
+
+### Step 4: Open in Your Web Browser
+Streamlit will automatically launch your default web browser and open the application at:
+```
+http://localhost:8501
+```
+*(If it doesn't open automatically, simply copy and paste the URL into Google Chrome, Microsoft Edge, or Mozilla Firefox).*
+
+To stop the application at any time, go back to your terminal window and press `Ctrl + C`.
+
+---
+
+## 🧪 Running Automated Unit Tests
+
+To verify that the audit compliance calculations, approval gating, and Excel generation are working perfectly, run:
+
+```powershell
+python tests/test_audit_engine.py
+```
+
+You should see an output showing all 7 unit tests passing:
+```
+.......
+----------------------------------------------------------------------
+Ran 7 tests in 0.234s
+
+OK
+```
+
+---
+
+## 🎯 Demonstration Scenarios for Presentations / Training
+
+The system comes pre-loaded with realistic synthetic demo accounts to illustrate every audit stage:
+
+| Account Ref ID | Dummy Customer / Entity Name | Account Type | Initial State | Demonstration Purpose |
+|---|---|---|---|---|
+| `SB-BOI-2026-001` | **Rahul Ramesh Sharma** | Saving Account (8 Checks) | **✅ Approved** | Demonstrates a 100% compliant Savings Bank account with official auditor PF stamp. |
+| `SB-BOI-2026-002` | **Sunita Devi Patel** | Saving Account (8 Checks) | **🚫 Approval Blocked** | Demonstrates active discrepancies (CKYC pending, Officer PF missing). Change status to `Passed` to see approval unlock. |
+| `CA-BOI-2026-101` | **Apex Star Logistics Pvt Ltd** | Current Account (11 Checks) | **✅ Approved** | Demonstrates a fully verified corporate account with Board Resolution, MCA verification, and Site Inspection. |
+| `CA-BOI-2026-102` | **GreenLeaf Agro Traders LLP** | Current Account (11 Checks) | **🚫 Approval Blocked** | Demonstrates missing Pre-Opening Site Inspection and non-standard Credit Facility undertaking. |
+| `SB-BOI-2026-003` | **Priya Ananya Deshmukh** | Saving Account (8 Checks) | **⏳ Rectification Pending** | Demonstrates remediated items (`Rectified` and `Re-check Completed` stages). |
+| `CA-BOI-2026-103` | **Nexus Cyber Solutions Pvt Ltd** | Current Account (11 Checks) | **❌ Discrepancy Found** | Demonstrates RBI 2-document rule violation (only GSTIN submitted; 2nd proof missing). |
+
+---
+
+## 🏛️ Built with Bank of India Visual Identity
+- **Primary Navy:** `#0B2545`
+- **Secondary Blue:** `#133E68`
+- **Star Orange:** `#E65100`
+- **Light Slate:** `#F8FAFC`
+
+---
+
+## 📜 License & Compliance Notice
+This project is built for educational, training, and demonstration purposes. It demonstrates banking audit compliance systems using only synthetic data.
