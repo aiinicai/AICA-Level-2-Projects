@@ -1,0 +1,101 @@
+name: practice-management
+
+services:
+  database:
+    image: postgres:18-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-practice_management}
+      POSTGRES_USER: practice_migrator
+      POSTGRES_PASSWORD: ${POSTGRES_MIGRATOR_PASSWORD:?Create a .env file with POSTGRES_MIGRATOR_PASSWORD}
+      POSTGRES_APP_USER: practice_app
+      POSTGRES_APP_PASSWORD: ${POSTGRES_APP_PASSWORD:?Create a .env file with POSTGRES_APP_PASSWORD}
+    ports:
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - practice-postgres-data:/var/lib/postgresql
+      - ../postgres/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+    networks: [practice-private]
+
+  migrate:
+    build:
+      context: ../..
+      dockerfile: src/Practice.Migrator/Dockerfile
+    restart: "no"
+    environment:
+      ConnectionStrings__PracticeDatabase: Host=database;Port=5432;Database=${POSTGRES_DB:-practice_management};Username=practice_migrator;Password=${POSTGRES_MIGRATOR_PASSWORD}
+    depends_on:
+      database:
+        condition: service_healthy
+    networks: [practice-private]
+
+  admin:
+    profiles: ["admin"]
+    build:
+      context: ../..
+      dockerfile: src/Practice.AdminCli/Dockerfile
+    environment:
+      ConnectionStrings__PracticeDatabase: Host=database;Port=5432;Database=${POSTGRES_DB:-practice_management};Username=practice_app;Password=${POSTGRES_APP_PASSWORD}
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    networks: [practice-private]
+
+  api:
+    build:
+      context: ../..
+      dockerfile: src/Practice.Api/Dockerfile
+    restart: unless-stopped
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ConnectionStrings__PracticeDatabase: Host=database;Port=5432;Database=${POSTGRES_DB:-practice_management};Username=practice_app;Password=${POSTGRES_APP_PASSWORD}
+      Security__DataProtectionKeyPath: /keys
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    expose: ["8080"]
+    volumes:
+      - practice-data-protection-keys:/keys
+    networks: [practice-private]
+
+  worker:
+    build:
+      context: ../..
+      dockerfile: src/Practice.Worker/Dockerfile
+    restart: unless-stopped
+    environment:
+      ConnectionStrings__PracticeDatabase: Host=database;Port=5432;Database=${POSTGRES_DB:-practice_management};Username=practice_app;Password=${POSTGRES_APP_PASSWORD}
+      # Audit rows are append-only for the application role, so the daily retention pass needs its
+      # own privileged connection. Only the worker gets it; the API never does.
+      ConnectionStrings__PracticeAuditMaintenance: Host=database;Port=5432;Database=${POSTGRES_DB:-practice_management};Username=practice_migrator;Password=${POSTGRES_MIGRATOR_PASSWORD}
+      Audit__ArchivePath: /audit-archive
+    volumes:
+      - practice-audit-archive:/audit-archive
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    networks: [practice-private]
+
+  web:
+    build:
+      context: ../..
+      dockerfile: web/Dockerfile
+    restart: unless-stopped
+    ports:
+      - "${WEB_PORT:-8088}:8080"
+    depends_on: [api]
+    networks: [practice-private]
+
+volumes:
+  practice-postgres-data:
+  practice-data-protection-keys:
+  practice-audit-archive:
+
+networks:
+  practice-private:
+    driver: bridge
