@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+
+{% block title %}{{ built.document.title }} — AuditCraft{% endblock %}
+{% block heading %}{{ built.document.title }}{% endblock %}
+
+{% block topbar_meta %}
+  {{ financial_year }} · template {{ built.document.template_version }} ·
+  {% if built.exportable %}
+    <span class="badge green">Ready to export</span>
+  {% else %}
+    <span class="badge red">{{ built.blocking_count }} blocking</span>
+  {% endif %}
+  {% if built.exceptions %}
+    <span class="badge amber">{{ built.exceptions | length }} exception(s)</span>
+  {% endif %}
+{% endblock %}
+
+{% block content %}
+<div class="preview-pane">
+
+  {% if not built.exportable %}
+  {# Chrome, not statutory text. Hidden on print by .findings (§8.8). #}
+  <section class="findings no-print">
+    <h2>Export is blocked</h2>
+    <ul>
+      {% for clause_id in built.unanswered %}
+        <li><strong>{{ clause_id }}</strong> — no answer recorded</li>
+      {% endfor %}
+      {% for clause_id in built.missing_narratives %}
+        <li><strong>{{ clause_id }}</strong> — this answer requires a narrative</li>
+      {% endfor %}
+      {% for clause_id in built.missing_rows %}
+        <li><strong>{{ clause_id }}</strong> — the table needs at least one row</li>
+      {% endfor %}
+      {% for token in built.placeholders %}
+        <li>unresolved placeholder <code>{{ token }}</code></li>
+      {% endfor %}
+    </ul>
+  </section>
+  {% endif %}
+
+  {% include "_letterhead.html" %}
+
+  {% include "_not_applicable.html" %}
+
+  {# Pre-escaped by app/render/html.py. The only `| safe` in the application,
+     and it is applied to markup this codebase generated, never to user data. #}
+  {{ document_html | safe }}
+
+  {% include "_page_footer.html" %}
+
+</div>
+{% endblock %}

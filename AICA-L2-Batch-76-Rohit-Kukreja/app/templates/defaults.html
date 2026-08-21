@@ -1,0 +1,104 @@
+{% extends "base.html" %}
+{% set nav = 'defaults' %}
+{% set csrf = request.cookies.get('auditcraft_csrf', '') %}
+
+{% block title %}Default Answers — AuditCraft{% endblock %}
+{% block heading %}Default Answers{% endblock %}
+{% block topbar_meta %}
+  <span class="badge {{ 'green' if set_count == total else 'amber' }}">
+    {{ set_count }} of {{ total }} set</span>
+  {% if saved %}<span class="badge green">Saved</span>{% endif %}
+{% endblock %}
+
+{% block content %}
+<div class="preview-pane wide">
+  {% if error %}<p class="badge red" role="alert">{{ error }}</p>{% endif %}
+
+  <section class="panel">
+    <h2>{{ firm.firm_name }} — the firm's standing answers</h2>
+    <p class="note">
+      Answer each question once here and every engagement created afterwards
+      starts with these answers already given, so a clean file does not have to
+      be answered from scratch for each client and each year.
+    </p>
+    <p class="note">
+      <strong>Any engagement can override any of them.</strong> Open the
+      dropdown in that engagement's workspace, change it and save; the change
+      applies to that report only and never comes back here.
+    </p>
+    <p class="note">
+      These are the firm's answers, not one client's. They apply to every client
+      in {{ firm.firm_name }}. A second firm in this installation keeps its own.
+    </p>
+
+    {# The two things about this screen that are not obvious from using it, and
+       that a signing partner is entitled to know before relying on it. #}
+    <div class="callout">
+      <p><strong>What saving these means.</strong></p>
+      <ul>
+        <li>An answer taken from this sheet <strong>counts as answered</strong>
+            for readiness and for the export block. An engagement nobody has
+            opened will read 100% ready and can be exported on the strength of
+            these answers alone.</li>
+        <li>It is still recorded as coming from here rather than from a person
+            looking at that client's file — the audit log and the change history
+            show the difference even though readiness no longer does.</li>
+        <li>Editing this sheet <strong>never changes an engagement that already
+            exists.</strong> A file in progress must not shift under you. To
+            bring these into an existing engagement, use the button on its
+            workspace.</li>
+      </ul>
+    </div>
+
+    {% if orphaned %}
+    <p class="badge red" role="alert">
+      {{ orphaned | length }} saved default(s) no longer match the clause
+      repository — the question or the option has been withdrawn. They are kept,
+      not deleted, and are ignored when applied:
+      {{ orphaned | join(', ') }}
+    </p>
+    {% endif %}
+
+    <form method="post" action="/admin/defaults">
+      <input type="hidden" name="csrf_token" value="{{ csrf }}">
+
+      {% for group in groups %}
+      <fieldset class="doc-group">
+        <legend>{{ group.title }}
+          <span class="muted">{{ group.set_count }} of {{ group.fields | length }} set</span>
+        </legend>
+
+        {% for field in group.fields %}
+        <div class="field {% if field.stale %}stale{% endif %}">
+          <label for="default-{{ field.key }}">{{ field.label }}</label>
+          {% if field.clause_ref %}
+          <div class="clause-ref">{{ field.clause_ref }}</div>
+          {% endif %}
+          <select id="default-{{ field.key }}" name="default:{{ field.key }}">
+            {# Blank first and selected when nothing is set, so an unanswered
+               question here reads as unanswered. This screen must not repeat
+               the mistake the workspace made: a dropdown that shows a value
+               nobody chose. Choosing the blank clears the default. #}
+            <option value="" {% if not field.value %}selected{% endif %}>
+              — no firm default —</option>
+            {% for option in field.options %}
+            <option value="{{ option.value }}"
+              {% if field.value == option.value %}selected{% endif %}>
+              {{ option.label or option.value }}</option>
+            {% endfor %}
+          </select>
+          {% if field.stale %}
+          <span class="not-saved">saved answer no longer an option</span>
+          {% endif %}
+        </div>
+        {% endfor %}
+      </fieldset>
+      {% endfor %}
+
+      <div class="actions">
+        <button type="submit">Save the firm's default answers</button>
+      </div>
+    </form>
+  </section>
+</div>
+{% endblock %}

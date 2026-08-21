@@ -1,0 +1,79 @@
+# AUTHORED from the firm's own Board's Report precedent (FY 2023-24).
+#
+# The precedent is a live client file. Wording is adapted; nothing specific
+# to that client is carried over.
+
+# NOT IN RULE 8A. Rule 8(6) -- "This rule shall not apply to One Person Company
+# or Small Company" -- and Rule 8A then prescribes a closed, exhaustive list of
+# what the abridged Board's Report shall contain. Rule 8(5)(iv) has no counterpart in
+# that list, so this paragraph is not required for an OPC or a small company.
+# Partner's decision of 20 Aug 2026: for those companies the clause is omitted
+# outright -- not defaulted, not left as a placeholder.
+
+id: bdr.subsidiaries
+document: directors_report
+order: 270
+number: ""
+title: "Subsidiaries, Joint Ventures and Associate Companies"
+clause_ref: "Rule 8(5)(iv), Companies (Accounts) Rules, 2014"
+effective_from: "2014-04-01"
+effective_to: null
+render_as: section
+
+applicability:
+  requires: [full_board_report]
+
+needs_review: false
+
+input:
+  key: bdr.subsidiaries
+  label: "Companies which became or ceased to be subsidiaries, joint ventures or associates"
+  datatype: select
+  carry_forward: prompt
+  mandatory: true
+  options:
+    - { value: "none", label: "None" }
+    - { value: "changes", label: "Changes during the year" }
+
+  # Derived, not asked. The profile already records whether the company has a
+  # subsidiary, an associate or a joint venture; where it has none, there is
+  # nothing that could have become or ceased to be one, and the nil paragraph
+  # is the only possible answer. Still overridable from the questionnaire --
+  # a default applies only where the engagement has no answer of its own.
+  defaults:
+    - { when: "not has_group_companies", value: "none" }
+
+repeating_block:
+  # The table is asked for ONLY when the answer produces one. Without this
+  # guard `min_rows: 1` applied to every answer, so choosing the nil option
+  # printed the correct paragraph and still blocked export with "the table
+  # needs at least one row" -- which is why the firm's team typed the nil
+  # sentence into a name column to get past it.
+  # 'none' prints the nil paragraph AOC-4 requires.
+  when: "value == 'changes'"
+  entity: subsidiary_change
+  min_rows: 1
+  carry_forward: never
+  columns:
+    - { key: name, label: "Name of the company", datatype: text, required: true }
+    - { key: relationship, label: "Relationship", datatype: select, required: true, options: ["Subsidiary", "Joint venture", "Associate"] }
+    - { key: change, label: "Became or ceased", datatype: select, required: true, options: ["Became", "Ceased"] }
+    - { key: change_date, label: "Date", datatype: date, required: true }
+
+variants:
+  # Firm wording.
+  - when: "value == 'none'"
+    body: >
+      Subsidiaries, Joint Ventures and Associate Companies
+
+      The Company has no subsidiary, joint venture or associate company, in India or
+      outside India, and no company has become or ceased to be a subsidiary, joint venture
+      or associate company of the Company during the year under review.
+
+  - when: "value == 'changes'"
+    body: >
+      Subsidiaries, Joint Ventures and Associate Companies
+
+      The companies which have become or ceased to be subsidiaries, joint ventures or
+      associate companies of the Company during the year under review are set out below:
+    render_block: table

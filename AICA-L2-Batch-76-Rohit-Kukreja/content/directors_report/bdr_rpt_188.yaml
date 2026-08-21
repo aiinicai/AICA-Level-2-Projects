@@ -1,0 +1,83 @@
+# AUTHORED from the firm's own Board's Report precedent (FY 2023-24).
+#
+# The precedent is a live client file. Wording is adapted; nothing specific
+# to that client is carried over.
+#
+# The precedent annexes Form AOC-2. Rule 8(2) requires the particulars to be
+# given in that form, so the annexure is right — the child table below holds
+# the AOC-2 columns.
+
+id: bdr.rpt.188
+document: directors_report
+order: 120
+number: ""
+title: "Particulars of Contracts or Arrangements with Related Parties"
+clause_ref: "s.134(3)(h); s.188(1); Rule 8(2), Companies (Accounts) Rules, 2014"
+effective_from: "2014-04-01"
+effective_to: null
+render_as: section
+
+needs_review: false
+
+input:
+  key: bdr.rpt.188
+  label: "Contracts or arrangements under section 188(1)"
+  datatype: select
+  carry_forward: prompt
+  mandatory: true
+  options:
+    - { value: "none", label: "None — Form AOC-2 is nil" }
+    - { value: "arms_length", label: "At arm's length in the ordinary course of business" }
+    - { value: "not_arms_length", label: "Not at arm's length — particulars required" }
+
+variants:
+  - when: "value == 'none'"
+    body: >
+      Particulars of Contracts or Arrangements with Related Parties
+
+      There were no contracts or arrangements entered into by the Company with related
+      parties referred to in sub-section (1) of Section 188 of the Companies Act, 2013
+      during the year. Accordingly, the disclosure in Form AOC-2 is nil.
+
+  - when: "value == 'arms_length'"
+    body: >
+      Particulars of Contracts or Arrangements with Related Parties
+
+      All contracts and arrangements entered into by the Company with related parties
+      referred to in sub-section (1) of Section 188 of the Companies Act, 2013 during the
+      year were at arm's length and in the ordinary course of business. The particulars, in
+      Form AOC-2, are set out below:
+    render_block: table
+
+  - when: "value == 'not_arms_length'"
+    body: >
+      Particulars of Contracts or Arrangements with Related Parties
+
+      The particulars of contracts or arrangements entered into by the Company with related
+      parties referred to in sub-section (1) of Section 188 of the Companies Act, 2013 which
+      were not at arm's length, in Form AOC-2, are set out below:
+    render_block: table
+    severity: exception
+
+repeating_block:
+  # The table is asked for ONLY when the answer produces one. Without this
+  # guard `min_rows: 1` applied to every answer, so choosing the nil option
+  # printed the correct paragraph and still blocked export with "the table
+  # needs at least one row" -- which is why the firm's team typed the nil
+  # sentence into a name column to get past it.
+  # Form AOC-2 has a part for each: contracts NOT at arm's length, and
+  # material contracts that are. Only 'none' produces no table. Written as
+  # "not none" rather than listing the two, so a third particulars option added
+  # later is covered rather than silently losing its table.
+  when: "value != 'none'"
+  entity: related_party_contract
+  min_rows: 1
+  carry_forward: prompt
+  columns:
+    - { key: party, label: "Name of the related party", datatype: text, required: true }
+    - { key: relationship, label: "Nature of relationship", datatype: text, required: true }
+    - { key: contract_nature, label: "Nature of contract or arrangement", datatype: longtext, required: true }
+    - { key: duration, label: "Duration", datatype: text }
+    - { key: salient_terms, label: "Salient terms, including value", datatype: longtext }
+    - { key: approval_date, label: "Date of Board approval", datatype: date }
+    - { key: advance_paid, label: "Amount paid as advance", datatype: amount }

@@ -1,0 +1,78 @@
+# AUTHORED from the firm's own Annexure B.
+#
+# SETTLED — the partner confirmed "with reference to financial statements"
+# on 16 August 2026. See docs/GATE_A_DECISIONS.md, decision 1.
+#
+# The firm's own Annexure B says "internal financial controls over financial
+# reporting" throughout, which is what section 143(3)(i) said until the
+# Companies (Amendment) Act, 2017 replaced it. The current phrase is used
+# here, consistently across this annexure, the auditor's report paragraph
+# and the engagement letter.
+#
+# The ICAI's Guidance Note keeps "Over Financial Reporting" in its own title
+# and is cited verbatim — that is the name of the document, not a statutory
+# test, and it is the only place the older phrase appears.
+
+# The table of deficiencies. Printed only where the opinion is modified —
+# a clean opinion with an empty "material weaknesses" table underneath it
+# reads as though the auditor forgot to fill it in.
+
+id: ifc.deficiencies
+document: ifc_report
+order: 90
+number: ""
+title: "Material Weaknesses and Significant Deficiencies Identified"
+clause_ref: "Guidance Note on Audit of Internal Financial Controls Over Financial Reporting"
+effective_from: "2014-04-01"
+effective_to: null
+render_as: section
+
+applicability:
+  requires: [ifc]
+
+needs_review: false
+
+input:
+  key: ifc.deficiencies
+  label: "Material weaknesses or significant deficiencies identified"
+  datatype: select
+  carry_forward: prompt
+  mandatory: true
+  options:
+    - { value: "none", label: "None identified" }
+    - { value: "identified", label: "Identified — list them" }
+
+repeating_block:
+  # The table is asked for ONLY when the answer produces one. Without this
+  # guard `min_rows: 1` applied to every answer, so choosing the nil option
+  # printed the correct paragraph and still blocked export with "the table
+  # needs at least one row" -- which is why the firm's team typed the nil
+  # sentence into a name column to get past it.
+  # A clean IFC opinion has no deficiencies to list.
+  when: "value == 'identified'"
+  entity: ifc_deficiency
+  min_rows: 1
+  carry_forward: prompt
+  columns:
+    # Column keys match the `ifc_deficiency` table, which predates this
+    # clause. They were invented here instead, so the table rendered against
+    # columns that did not exist.
+    - { key: process, label: "Process or area", datatype: text, required: true }
+    - { key: nature, label: "Description of the weakness", datatype: longtext, required: true }
+    - { key: severity, label: "Classification", datatype: select, required: true, options: ["Material weakness", "Significant deficiency"] }
+    - { key: management_response, label: "Management's response", datatype: longtext }
+
+variants:
+  - when: "value == 'none'"
+    body: >
+      No material weakness has been identified, so no schedule of deficiencies is printed.
+    omit: true
+
+  # AUTHORED — the precedent has no such schedule.
+  - when: "value == 'identified'"
+    body: >
+      Material Weaknesses Identified
+
+      The following material weaknesses have been identified as at {{ fy_end_long }}:
+    render_block: table
+    severity: exception

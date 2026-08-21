@@ -1,0 +1,403 @@
+{% extends "base.html" %}
+{% set nav = 'clients' %}
+
+{% block title %}{{ profile.company_name }} — AuditCraft{% endblock %}
+{% block heading %}{{ profile.company_name }}{% endblock %}
+{% block topbar_meta %}{{ client.client_code }} · {{ client.cin }}{% endblock %}
+
+{% block content %}
+<div class="preview-pane wide">
+
+  <nav class="tabs">
+    {% for key, label in [
+      ('overview', 'Overview'), ('master-data', 'Master Data'),
+      ('directors', 'Directors & KMP'), ('financial-years', 'Financial Years'),
+      ('history', 'Change History')] %}
+      <a href="/clients/{{ client.client_id }}?tab={{ key }}"
+         class="{% if tab == key %}active{% endif %}">{{ label }}</a>
+    {% endfor %}
+  </nav>
+
+  {% if error %}<p class="badge red" role="alert">{{ error }}</p>{% endif %}
+
+  {# ---------------------------------------------------------- Overview #}
+  {% if tab == 'overview' %}
+  <section class="panel">
+    <table class="grid kv">
+      <tr><th>Company name</th><td>{{ profile.company_name }}</td></tr>
+      <tr><th>Client code</th><td>{{ client.client_code }}</td></tr>
+      <tr><th>CIN</th><td class="mono">{{ client.cin }}</td></tr>
+      <tr><th>PAN</th><td class="mono">{{ client.pan or '—' }}</td></tr>
+      <tr><th>Incorporated</th>
+          <td>{{ client.date_of_incorp.strftime('%d-%b-%Y') if client.date_of_incorp else '—' }}</td></tr>
+      <tr><th>Company class</th><td>{{ company_type_labels.get(profile.company_type.value, profile.company_type.value) }}</td></tr>
+      <tr><th>Framework</th><td>{{ profile.framework.value }}</td></tr>
+      <tr><th>Registered address</th><td>{{ profile.registered_addr or '—' }}</td></tr>
+    </table>
+    <p class="note">
+      CIN and client code are immutable identity and cannot be edited. Everything
+      else is versioned — see Master Data.
+    </p>
+  </section>
+  {% endif %}
+
+  {# -------------------------------------------------------- Master data #}
+  {% if tab == 'master-data' %}
+  <section class="panel">
+    <h2>Master data</h2>
+    <p class="note">
+      Everything here is read by something — a document prints it, or an
+      applicability determination turns on it. A change never overwrites the
+      current record: it closes this version and opens a new one, so documents
+      already finalised keep printing what they were signed with.
+    </p>
+
+    <form method="post" action="/clients/{{ client.client_id }}/master-data" class="profile-form">
+      <input type="hidden" name="csrf_token" value="{{ request.cookies.get('auditcraft_csrf', '') }}">
+
+      {% for section in profile_sections %}
+      <fieldset class="profile-group">
+        <legend>{{ section.title }}</legend>
+        {% if section.note %}<p class="note">{{ section.note }}</p>{% endif %}
+
+        {% for f in section.fields %}
+        <div class="field">
+          <label for="f-{{ f.name }}">{{ f.label }}</label>
+
+          {% if f.kind == 'choice' %}
+          <select id="f-{{ f.name }}" name="f_{{ f.name }}">
+            {% for value, label in f.options %}
+            <option value="{{ value }}" {% if f.value == value %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+          </select>
+
+          {% elif f.kind == 'tristate' %}
+          <select id="f-{{ f.name }}" name="f_{{ f.name }}">
+            <option value="" {% if f.value is none %}selected{% endif %}>— not recorded —</option>
+            <option value="yes" {% if f.value is true %}selected{% endif %}>Yes</option>
+            <option value="no" {% if f.value is false %}selected{% endif %}>No</option>
+          </select>
+
+          {% elif f.kind == 'toggle' %}
+          <select id="f-{{ f.name }}" name="f_{{ f.name }}">
+            <option value="no" {% if not f.value %}selected{% endif %}>No</option>
+            <option value="yes" {% if f.value %}selected{% endif %}>Yes</option>
+          </select>
+
+          {% elif f.kind == 'textarea' %}
+          <textarea id="f-{{ f.name }}" name="f_{{ f.name }}" rows="3">{{ f.value or '' }}</textarea>
+
+          {% else %}
+          <input id="f-{{ f.name }}" name="f_{{ f.name }}" type="text" value="{{ f.value or '' }}">
+          {% endif %}
+
+          {% if f.help %}<p class="hint-text">{{ f.help }}</p>{% endif %}
+        </div>
+        {% endfor %}
+      </fieldset>
+      {% endfor %}
+
+      <fieldset class="profile-group">
+        <legend>Record the change</legend>
+        <div class="field">
+          <label for="effective_date">Effective from</label>
+          <input id="effective_date" name="effective_date" type="date" required>
+        </div>
+        <div class="field">
+          <label for="reason">Reason</label>
+          <input id="reason" name="reason" required
+                 placeholder="e.g. Registered office shifted, per Form INC-22">
+        </div>
+        <div class="field">
+          <label for="scope">Apply from</label>
+          <select id="scope" name="scope">
+            {% for sc in scopes %}
+            <option value="{{ sc.value }}" {% if sc.value == 'master_only' %}selected{% endif %}>
+              {% if sc.value == 'current_fy' %}This financial year only
+              {% elif sc.value == 'current_and_future' %}This and future financial years
+              {% else %}Master record only — no open engagement changes{% endif %}
+            </option>
+            {% endfor %}
+          </select>
+          <p class="hint-text">A finalised engagement is never altered, whichever you pick.</p>
+        </div>
+      </fieldset>
+
+      <button type="submit">Save changes</button>
+    </form>
+  </section>
+
+  <section class="panel">
+    <h2>Version timeline</h2>
+    <table class="grid">
+      <thead><tr><th>From</th><th>To</th><th>Name</th><th>Registered address</th>
+                 <th>Changed by</th><th>Reason</th></tr></thead>
+      <tbody>
+        {% for v in versions %}
+        <tr class="{% if v.is_current %}current-version{% endif %}">
+          <td>{{ v.valid_from.strftime('%d-%b-%Y') }}</td>
+          <td>{{ v.valid_to.strftime('%d-%b-%Y') if v.valid_to else 'current' }}</td>
+          <td>{{ v.company_name }}</td>
+          <td>{{ v.registered_addr or '—' }}</td>
+          <td>{{ v.changed_by or '—' }}</td>
+          <td>{{ v.change_reason or '—' }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </section>
+  {% endif %}
+
+  {# ------------------------------------------------------ Directors/KMP #}
+  {% if tab == 'directors' %}
+  <section class="panel">
+    <h2>Directors in office</h2>
+    <form method="get" action="/clients/{{ client.client_id }}" class="filters">
+      <input type="hidden" name="tab" value="directors">
+      <label for="as_on">As on</label>
+      <input id="as_on" name="as_on" type="date" value="{{ as_on.isoformat() }}">
+      <button type="submit">Show</button>
+    </form>
+    <table class="grid">
+      <thead><tr><th>Name</th><th>DIN</th><th>Designation</th>
+                 <th>Appointed</th><th>Ceased</th></tr></thead>
+      <tbody>
+        {% for d in directors %}
+        <tr>
+          <td>{{ d.name }}</td>
+          <td class="mono">{{ d.din }}</td>
+          <td>{{ d.designation.value.replace('_', ' ') }}</td>
+          <td>{{ d.appointment_date.strftime('%d-%b-%Y') }}</td>
+          <td>
+            {% if d.cessation_date %}{{ d.cessation_date.strftime('%d-%b-%Y') }}
+            {% else %}
+            {# Dated, never deleted: last year's signed report names the people
+               who held office then and has to go on naming them. #}
+            <form method="post" class="inline cease"
+                  action="/clients/{{ client.client_id }}/directors/{{ d.director_id }}/cease">
+              <input type="hidden" name="csrf_token" value="{{ request.cookies.get('auditcraft_csrf', '') }}">
+              <input name="cessation_date" type="date" required
+                     aria-label="Cessation date for {{ d.name }}">
+              <button type="submit" class="linkish">Record cessation</button>
+            </form>
+            {% endif %}
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="5" class="empty">No directors in office on this date.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    <p class="note">
+      Computed from the register and the date above — never a stored list. This
+      is what the Directors' Report, the s.164(2) representation and the
+      signature blocks all read from.
+    </p>
+
+    {# Decision 74. Until this form existed the register was written once, on
+       the new-client screen, and never again — so a company whose Board had
+       changed had no way to say so, and the Board's Report went on reporting
+       "no change" because that is what the frozen register said. #}
+    <details class="add-officer" {% if not directors %}open{% endif %}>
+      <summary>Appoint a director</summary>
+      <form method="post" action="/clients/{{ client.client_id }}/directors" class="row-form">
+        <input type="hidden" name="csrf_token" value="{{ request.cookies.get('auditcraft_csrf', '') }}">
+        <label><span>Name</span>
+          <input name="name" required></label>
+        <label><span>DIN</span>
+          <input name="din" required inputmode="numeric" pattern="[0-9]{8}"
+                 title="Eight digits"></label>
+        <label><span>Designation</span>
+          <select name="designation" required>
+            {% for d in designations %}
+            <option value="{{ d.value }}">{{ d.value.replace('_', ' ') | title }}</option>
+            {% endfor %}
+          </select></label>
+        <label><span>Appointed on</span>
+          <input name="appointment_date" type="date" required></label>
+        <button type="submit">Add to register</button>
+      </form>
+    </details>
+  </section>
+
+  <section class="panel">
+    <h2>Held office during {{ fy_start.strftime('%d-%b-%Y') }} to {{ fy_end.strftime('%d-%b-%Y') }}</h2>
+    <ul class="feed">
+      {% for d in directors_year %}
+      <li>{{ d.name }} ({{ d.din }})
+        {%- if d.cessation_date and d.cessation_date <= fy_end %}
+          · ceased {{ d.cessation_date.strftime('%d-%b-%Y') }}{% endif %}
+        {%- if d.appointment_date >= fy_start %}
+          · appointed {{ d.appointment_date.strftime('%d-%b-%Y') }}{% endif %}
+      </li>
+      {% else %}<li class="empty">None.</li>{% endfor %}
+    </ul>
+  </section>
+
+  <section class="panel">
+    <h2>Key Managerial Personnel</h2>
+    <table class="grid">
+      <thead><tr><th>Name</th><th>Role</th><th>Appointed</th><th>Ceased</th></tr></thead>
+      <tbody>
+        {% for k in kmps %}
+        <tr>
+          <td>{{ k.name }}</td>
+          <td>{{ k.role.value.upper() }}</td>
+          <td>{{ k.appointment_date.strftime('%d-%b-%Y') }}</td>
+          <td>
+            {% if k.cessation_date %}{{ k.cessation_date.strftime('%d-%b-%Y') }}
+            {% else %}
+            <form method="post" class="inline cease"
+                  action="/clients/{{ client.client_id }}/kmp/{{ k.kmp_id }}/cease">
+              <input type="hidden" name="csrf_token" value="{{ request.cookies.get('auditcraft_csrf', '') }}">
+              <input name="cessation_date" type="date" required
+                     aria-label="Cessation date for {{ k.name }}">
+              <button type="submit" class="linkish">Record cessation</button>
+            </form>
+            {% endif %}
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="4" class="empty">None in office on this date.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+
+    <details class="add-officer" {% if not kmps %}open{% endif %}>
+      <summary>Appoint key managerial personnel</summary>
+      <form method="post" action="/clients/{{ client.client_id }}/kmp" class="row-form">
+        <input type="hidden" name="csrf_token" value="{{ request.cookies.get('auditcraft_csrf', '') }}">
+        <label><span>Name</span><input name="name" required></label>
+        <label><span>Role</span>
+          <select name="role" required>
+            {% for r in kmp_roles %}
+            <option value="{{ r.value }}">{{ r.value.upper() }}</option>
+            {% endfor %}
+          </select></label>
+        <label><span>PAN</span><input name="pan" maxlength="10"></label>
+        <label><span>Appointed on</span>
+          <input name="appointment_date" type="date" required></label>
+        <button type="submit">Add to register</button>
+      </form>
+    </details>
+  </section>
+  {% endif %}
+
+  {# --------------------------------------------------- Financial years #}
+  {% if tab == 'financial-years' %}
+  <section class="panel">
+    {% if engagements %}
+    <table class="grid">
+      <thead><tr><th>FY</th><th>Status</th><th>Opinion</th><th>Report date</th>
+                 <th>Profile version</th><th>Delete</th></tr></thead>
+      <tbody>
+        {% for e in engagements %}
+        <tr>
+          {# The workspace was unreachable by clicking from anywhere: this
+             table and the dashboard both listed engagements as plain text,
+             and every link to /engagements/{id} lived on a page you could
+             only get to from inside one. #}
+          <td><a href="/engagements/{{ e.engagement_id }}">{{ e.fy_code }}</a></td>
+          <td>{{ e.status.value.replace('_', ' ') }}
+              {% if e.is_locked %}<span class="badge green">locked</span>{% endif %}</td>
+          <td>{{ e.opinion_type.value if e.opinion_type else '—' }}</td>
+          <td>{{ e.report_date.strftime('%d-%b-%Y') if e.report_date else '—' }}</td>
+          <td>{{ e.profile_id or '—' }}</td>
+          <td>
+            {# Deleting a year destroys its answers, tables, documents and
+               history and cannot be undone, so the FY code has to be typed:
+               a bare button beside a list of years is one misclick from a
+               year's work. A finalised year has no control at all --- the
+               service refuses it, and offering a button that always fails
+               would be a dead control. #}
+            {% if e.is_locked %}
+            <span class="muted small">issued — use Create Revision</span>
+            {% else %}
+            <form method="post" class="inline delete-fy"
+                  action="/clients/{{ client.client_id }}/engagements/{{ e.engagement_id }}/delete">
+              <input type="hidden" name="csrf_token"
+                     value="{{ request.cookies.get('auditcraft_csrf', '') }}">
+              <input name="confirm_fy" placeholder="Type {{ e.fy_code }}" size="10"
+                     aria-label="Type {{ e.fy_code }} to confirm deletion">
+              <button type="submit" class="danger">Delete year</button>
+            </form>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p class="empty">No financial years yet for this client.</p>
+    {% endif %}
+
+    {# This form was missing, and a new client was a dead end: the only way to
+       a financial year was rolling an existing one forward, so a client with
+       none could never get one. The firm's standing answers are applied when
+       the year opens, so a first-year file arrives already answered. #}
+    {# The client's usual signing partner (decision 67). On this tab because
+       this is where a year is opened and the default is used. #}
+    <form method="post" action="/clients/{{ client.client_id }}/signing-partner"
+          class="inline-form">
+      <input type="hidden" name="csrf_token"
+             value="{{ request.cookies.get('auditcraft_csrf', '') }}">
+      <h3>Usual signing partner</h3>
+      <p class="note">
+        Copied onto each new financial year as it is opened, and changeable
+        there. Changing it here moves nothing that already exists — a report
+        already signed keeps the partner who signed it.
+      </p>
+      <div class="field">
+        <label for="default_partner">Signs for this client</label>
+        <select id="default_partner" name="partner_id">
+          <option value="">— no default, choose each year —</option>
+          {% for p in signing_choices %}
+          <option value="{{ p.partner_id }}"
+            {% if client.default_partner_id == p.partner_id %}selected{% endif %}>
+            {{ p.partner_name }} (M. No. {{ p.membership_no }})
+          </option>
+          {% endfor %}
+        </select>
+      </div>
+      <button type="submit">Save</button>
+    </form>
+
+    <form method="post"
+          action="/clients/{{ client.client_id }}/engagements" class="inline-form">
+      <input type="hidden" name="csrf_token"
+             value="{{ request.cookies.get('auditcraft_csrf', '') }}">
+      <h3>Open a financial year</h3>
+      <label for="new-fy-start">From</label>
+      <input id="new-fy-start" name="fy_start" type="date"
+             value="{{ fy_start.isoformat() }}" required>
+      <label for="new-fy-end">To</label>
+      <input id="new-fy-end" name="fy_end" type="date"
+             value="{{ fy_end.isoformat() }}" required>
+      <button type="submit">Open financial year</button>
+      <p class="note">
+        Starts from the firm's
+        <a href="/admin/defaults">default answers</a>; change any of them in the
+        workspace afterwards.
+      </p>
+    </form>
+  </section>
+  {% endif %}
+
+  {# -------------------------------------------------------- History #}
+  {% if tab == 'history' %}
+  <section class="panel">
+    <ul class="feed">
+      {% for entry in history %}
+      <li>
+        <strong>{{ entry.field or entry.action }}</strong> ·
+        {{ entry.actor }} · {{ entry.at.strftime('%d-%b-%Y %H:%M') if entry.at else '' }}
+        <div class="reason">{{ entry.reason }}</div>
+        <div class="mono small">{{ entry.before_json }} → {{ entry.after_json }}</div>
+      </li>
+      {% else %}<li class="empty">No recorded changes.</li>{% endfor %}
+    </ul>
+  </section>
+  {% endif %}
+
+</div>
+{% endblock %}

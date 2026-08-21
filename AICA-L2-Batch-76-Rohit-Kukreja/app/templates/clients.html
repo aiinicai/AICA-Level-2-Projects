@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+{% set nav = 'clients' %}
+
+{% block title %}Clients — AuditCraft{% endblock %}
+{% block heading %}Client register{% endblock %}
+{% block topbar_meta %}
+  {{ page.total }} client{{ '' if page.total == 1 else 's' }}
+{% endblock %}
+
+{% block content %}
+<p class="field-foot"><a href="/clients/new" class="linkish">+ New client</a></p>
+<div class="preview-pane wide">
+
+  <form method="get" action="/clients" class="filters">
+    <input type="search" name="q" value="{{ q }}"
+           placeholder="Code, name, CIN or PAN" aria-label="Search clients">
+    <select name="type" aria-label="Company type">
+      <option value="">All types</option>
+      {% for ct in company_types %}
+      <option value="{{ ct.value }}" {% if ct.value == selected_type %}selected{% endif %}>
+        {{ ct.value.replace('_', ' ') }}
+      </option>
+      {% endfor %}
+    </select>
+    <button type="submit">Search</button>
+    {% if q or selected_type %}<a href="/clients" class="linkish">Clear</a>{% endif %}
+  </form>
+
+  <section class="panel">
+    {% if page.rows %}
+    <table class="grid">
+      <thead>
+        <tr>
+          <th>Code</th><th>Name</th><th>CIN</th><th>Type</th>
+          <th>Current FY</th><th>Status</th><th>Last activity</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in page.rows %}
+        <tr>
+          <td><a href="/clients/{{ row.client_id }}">{{ row.client_code }}</a></td>
+          <td>{{ row.company_name }}</td>
+          <td class="mono">{{ row.cin }}</td>
+          <td>{{ row.company_type.value.replace('_', ' ') }}</td>
+          <td>{{ row.current_fy or '—' }}</td>
+          <td>{{ row.status.value.replace('_', ' ') if row.status else '—' }}</td>
+          <td>{{ row.last_activity.strftime('%d-%b-%Y') if row.last_activity else '—' }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+
+    {# Server-side pagination (§8.9): the full dataset never enters the page. #}
+    <nav class="pager">
+      <span>Showing {{ page.first_index }}–{{ page.last_index }} of {{ page.total }}</span>
+      {% if page.has_prev %}
+        <a href="/clients?q={{ q }}&type={{ selected_type }}&page={{ page.page - 1 }}">Previous</a>
+      {% endif %}
+      <span>Page {{ page.page }} of {{ page.pages }}</span>
+      {% if page.has_next %}
+        <a href="/clients?q={{ q }}&type={{ selected_type }}&page={{ page.page + 1 }}">Next</a>
+      {% endif %}
+    </nav>
+    {% else %}
+    <p class="empty">No clients match this search.</p>
+    {% endif %}
+  </section>
+
+</div>
+{% endblock %}
