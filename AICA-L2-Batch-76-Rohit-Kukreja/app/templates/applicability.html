@@ -1,0 +1,116 @@
+{% extends "base.html" %}
+{% set nav = 'clients' %}
+{% set csrf = request.cookies.get('auditcraft_csrf', '') %}
+
+{% block title %}Applicability — AuditCraft{% endblock %}
+{% block heading %}Applicability · FY {{ engagement.fy_code }}{% endblock %}
+{% block topbar_meta %}
+  {% if saved %}<span class="badge green">Saved</span>{% endif %}
+  {% if engagement.is_locked %}<span class="badge green">locked</span>{% endif %}
+{% endblock %}
+
+{% block content %}
+<div class="preview-pane wide">
+  {% if error %}<p class="badge red" role="alert">{{ error }}</p>{% endif %}
+
+  <section class="panel">
+    <p class="note">
+      One determination, read by every document. The <strong>basis</strong> is
+      the reasoning that produced each answer — if it looks wrong, the threshold
+      in <span class="mono">content/applicability_rules.yaml</span> is wrong, not
+      the code.
+    </p>
+    <p class="note">
+      You can overrule any of them. An override needs a reason, is recorded in
+      the change log, and keeps the computed answer visible beside it so a
+      reviewer can see exactly what was overruled and why.
+    </p>
+  </section>
+
+  {% if not profile %}
+  <section class="panel">
+    <p class="empty">
+      This engagement has no client profile pinned, so applicability cannot be
+      computed. Assign one on the client's Master Data tab.
+    </p>
+  </section>
+  {% else %}
+
+  {% for view in views %}
+  <section class="panel">
+    <table class="grid">
+      <tr>
+        <th style="width:280px">{{ view.label }}</th>
+        <td style="width:150px">
+          {% if view.awaiting_answer %}
+            <span class="badge amber">Not stated</span>
+          {% elif view.effective.value %}
+            <span class="badge green">Applicable</span>
+          {% else %}
+            <span class="badge">Not applicable</span>
+          {% endif %}
+          {% if view.is_overridden %}<span class="badge amber">overridden</span>{% endif %}
+        </td>
+        <td>{{ view.effective.basis }}</td>
+      </tr>
+      {% if view.differs_from_computed and not view.is_declared %}
+      <tr>
+        <th>Computed answer</th>
+        <td>
+          {% if view.computed.value %}Applicable{% else %}Not applicable{% endif %}
+        </td>
+        <td class="small">{{ view.computed.basis }}</td>
+      </tr>
+      {% endif %}
+    </table>
+
+    {% if view.name in overridable and not engagement.is_locked %}
+    <form method="post" action="/engagements/{{ engagement.engagement_id }}/applicability"
+          class="filters" style="margin-top:10px">
+      <input type="hidden" name="csrf_token" value="{{ csrf }}">
+      <input type="hidden" name="flag" value="{{ view.name }}">
+      <select name="choice" aria-label="{{ view.label }} applicability">
+        {% if view.is_declared %}
+        <option value="computed" {% if view.awaiting_answer %}selected{% endif %}>
+          — not stated —
+        </option>
+        <option value="applicable"
+          {% if not view.awaiting_answer and view.effective.value %}selected{% endif %}>
+          Applicable
+        </option>
+        <option value="not_applicable"
+          {% if not view.awaiting_answer and not view.effective.value %}selected{% endif %}>
+          Not applicable
+        </option>
+        {% else %}
+        <option value="computed" {% if not view.is_overridden %}selected{% endif %}>
+          Use the computed answer
+        </option>
+        <option value="applicable"
+          {% if view.is_overridden and view.effective.value %}selected{% endif %}>
+          Applicable — override
+        </option>
+        <option value="not_applicable"
+          {% if view.is_overridden and not view.effective.value %}selected{% endif %}>
+          Not applicable — override
+        </option>
+        {% endif %}
+      </select>
+      {% if not view.is_declared %}
+      <input name="reason" placeholder="Reason for the override" style="width:44%">
+      {% endif %}
+      <button type="submit">{% if view.is_declared %}Save{% else %}Apply{% endif %}</button>
+    </form>
+    {% elif view.name not in overridable %}
+    <p class="note">
+      This flag is derived from another one and cannot be set on its own —
+      override the flag it derives from and this moves with it. Shown here
+      rather than shown as a control that would do nothing.
+    </p>
+    {% endif %}
+  </section>
+  {% endfor %}
+
+  {% endif %}
+</div>
+{% endblock %}

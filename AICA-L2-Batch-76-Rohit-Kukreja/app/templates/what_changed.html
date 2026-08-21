@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+{% set nav = 'clients' %}
+
+{% block title %}What Changed — AuditCraft{% endblock %}
+{% block heading %}What changed from FY {{ previous.fy_code }}{% endblock %}
+{% block topbar_meta %}
+  <span class="badge green">{{ summary.same }} same</span>
+  <span class="badge amber">{{ summary.changed }} changed</span>
+  <span class="badge red">{{ summary.significant }} significant</span>
+{% endblock %}
+
+{% block content %}
+<div class="preview-pane wide">
+
+  {% if unreviewed %}
+  <section class="panel">
+    <h2>{{ unreviewed | length }} carried-forward answer(s) await confirmation</h2>
+    <p class="note">
+      Every one was inherited from FY {{ previous.fy_code }} and has not been
+      verified for this year. Export is blocked until each is confirmed.
+    </p>
+    <ul class="feed">
+      {% for key in unreviewed %}<li class="mono">{{ key }}</li>{% endfor %}
+    </ul>
+    <p><a href="/engagements/{{ current.engagement_id }}">Open the workspace to confirm them</a></p>
+  </section>
+  {% endif %}
+
+  <section class="panel">
+    <table class="grid">
+      <thead>
+        <tr>
+          <th>Item</th>
+          <th>FY {{ previous.fy_code }}</th>
+          <th>FY {{ current.fy_code }}</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in rows %}
+        <tr class="sev-{{ row.severity.value }}">
+          <td>{{ row.item }}</td>
+          <td>{{ row.previous }}</td>
+          <td>{{ row.current }}</td>
+          <td>
+            {% if row.severity.value == 'significant' %}
+              <span class="badge red">Significant</span>
+            {% elif row.severity.value == 'changed' %}
+              <span class="badge amber">Changed</span>
+            {% else %}
+              <span class="badge green">Same</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    <p class="note">
+      Significant means an opinion modification, fraud, going concern, or new
+      material litigation. Those four are never shown merely as "changed".
+    </p>
+  </section>
+
+</div>
+{% endblock %}

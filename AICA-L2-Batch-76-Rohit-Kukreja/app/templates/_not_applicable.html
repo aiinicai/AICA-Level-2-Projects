@@ -1,0 +1,41 @@
+{# Why a document, or part of one, is not there.
+
+   `BuiltDocument.not_applicable` existed from the start and no template read
+   it, so an annexure whose every clause the engine ruled out rendered as a bare
+   title — the IFC annexure for an IFC-exempt company. That is the same defect
+   as a dropdown showing an answer it has not stored: the page displays a state
+   indistinguishable from a different, worse one.
+
+   Expects `built`, `exclusions` (flag -> (label, basis)) and `engagement`. #}
+
+{% if built.not_applicable %}
+<section class="findings no-print not-applicable">
+  {% if not built.has_body %}
+  <h2>This document is not produced for this engagement</h2>
+  <p>
+    Every one of its {{ built.not_applicable | length }} clauses is ruled out by
+    the applicability engine, so there is nothing below the heading. This is a
+    determination, not a failure to render.
+  </p>
+  {% else %}
+  <h2>{{ built.not_applicable | length }} clause(s) not applicable</h2>
+  {% endif %}
+
+  {% set shown = [] %}
+  <ul>
+    {% for flag, (label, basis) in exclusions.items() %}
+      {% if flag in built.excluded_by %}
+      <li><strong>{{ label }}</strong> — {{ basis }}</li>
+      {% endif %}
+    {% endfor %}
+  </ul>
+
+  <p class="note">
+    If the auditor's judgement differs, change it at
+    <a href="/engagements/{{ engagement.engagement_id }}/applicability">Applicability</a>,
+    where an override is recorded with a reason. Answering a dropdown in the
+    report does not move the flag — applicability has one source of truth, and
+    the two disagreeing is reported as a blocking finding.
+  </p>
+</section>
+{% endif %}

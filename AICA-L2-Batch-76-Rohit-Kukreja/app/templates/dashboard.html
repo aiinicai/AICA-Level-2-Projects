@@ -1,0 +1,187 @@
+{% extends "base.html" %}
+{% set nav = 'dashboard' %}
+
+{% block title %}Dashboard — AuditCraft{% endblock %}
+{% block heading %}Dashboard{% endblock %}
+
+{% block content %}
+<div class="preview-pane wide">
+
+  {# A page header rather than a logo band (decision 48). The reference layout
+     the partner showed leads with a sentence, and it reads far better than a
+     row of marks: the eyebrow says where you are, the title says what this is
+     for, and the two actions people actually arrive to do sit on the right
+     instead of being buried in a list further down. #}
+  <div class="page-head">
+    <div>
+      <div class="eyebrow">Audit document management</div>
+      <h1>Reports worth your signature.</h1>
+      <p class="lede">
+        Prepared, cross-checked and locked &mdash; then issued.
+      </p>
+    </div>
+    <div class="page-actions">
+      <a class="qa-btn secondary" href="/admin/firm">Add CA firm</a>
+      <a class="qa-btn" href="/clients/new">+ Add client</a>
+    </div>
+  </div>
+
+  {# AuditCraft's own mark beside the firm's. Kept, but demoted below the
+     header: it identifies the installation, it is not the reason anyone opened
+     the page. The firm's identity is configured, never hard-coded (decision 20). #}
+  <section class="masthead">
+    {% if active_firm and active_firm.logo_path %}
+    <img class="firm-logo" src="{{ active_firm.logo_path }}"
+         alt="{{ active_firm.firm_name }} logo">
+    {% endif %}
+    <div class="masthead-text">
+      <div class="product">AuditCraft</div>
+      <div class="tagline">Statutory audit documentation</div>
+      {% if active_firm %}
+      <div class="firm">
+        {{ active_firm.firm_name }}<span class="firm-sub">Chartered Accountants</span>
+        {% if active_firm.frn %}<span class="firm-sub">FRN {{ active_firm.frn }}</span>{% endif %}
+      </div>
+      {% else %}
+      <div class="firm">
+        <a href="/admin/firm">Set up your firm</a> to put its name and logo here.
+      </div>
+      {% endif %}
+    </div>
+  </section>
+
+  {% if active_firm and not active_firm.logo_path %}
+  <p class="note">
+    No logo yet — add one at <a href="/admin/firm">Firm &amp; Partners</a> and it
+    appears here and on every document printed on the firm's letterhead.
+  </p>
+  {% endif %}
+
+  <section class="tiles">
+    <div class="tile"><span class="n">{{ tiles.total_clients }}</span>Clients</div>
+    <div class="tile"><span class="n">{{ tiles.active_engagements }}</span>Active engagements</div>
+    <div class="tile"><span class="n">{{ tiles.awaiting_approval }}</span>Prepared, awaiting approval</div>
+    <div class="tile"><span class="n">{{ tiles.incomplete }}</span>Incomplete</div>
+    <div class="tile"><span class="n">{{ tiles.documents_this_fy }}</span>Documents generated</div>
+  </section>
+
+  {# Quick actions (decision 38). Every one of these existed and was reachable
+     only from inside something else — "Continue audit" in particular, which is
+     the commonest thing anyone does here and lived three clicks deep. #}
+  <section class="quick-actions">
+    <a class="qa primary" href="/clients/new">
+      <span class="qa-title">Create new client</span>
+      <span class="qa-sub">Master data, financials, directors and KMP</span>
+    </a>
+    {% if continue_target %}
+    <a class="qa" href="/engagements/{{ continue_target.engagement_id }}">
+      <span class="qa-title">Continue audit</span>
+      <span class="qa-sub">{{ continue_name }} · FY {{ continue_target.fy_code }}</span>
+    </a>
+    <a class="qa" href="/engagements/{{ continue_target.engagement_id }}/roll-forward">
+      <span class="qa-title">Carry forward previous year</span>
+      <span class="qa-sub">Choose what to bring into the new year</span>
+    </a>
+    <a class="qa" href="/engagements/{{ continue_target.engagement_id }}/what-changed">
+      <span class="qa-title">View previous year</span>
+      <span class="qa-sub">What changed against last year</span>
+    </a>
+    <a class="qa" href="/documents/{{ continue_target.engagement_id }}/auditors_report/preview">
+      <span class="qa-title">Preview report</span>
+      <span class="qa-sub">On the firm's letterhead, before finalising</span>
+    </a>
+    <a class="qa" href="/engagements/{{ continue_target.engagement_id }}/validation">
+      <span class="qa-title">Finalise audit</span>
+      <span class="qa-sub">Clear findings, then approve and lock</span>
+    </a>
+    {% endif %}
+    <a class="qa" href="/engagements/export/workbook">
+      <span class="qa-title">Export data</span>
+      <span class="qa-sub">The whole register as a workbook</span>
+    </a>
+  </section>
+
+  {# Two columns: what you were working on, and the practice behind it. #}
+  <div class="split">
+    <section class="card">
+      <div class="card-head">
+        <div>
+          <div class="eyebrow">Client directory</div>
+          <h2>Recent engagements</h2>
+        </div>
+        <a href="/clients">All clients →</a>
+      </div>
+
+      {% if recent %}
+      {% for engagement, name in recent %}
+      <a class="row-link" href="/engagements/{{ engagement.engagement_id }}">
+        <span class="avatar soft">{{ name[:2] | upper }}</span>
+        <span class="body">
+          <span class="title">{{ name }}</span>
+          <span class="sub">
+            FY {{ engagement.fy_code }} ·
+            {{ engagement.status.value.replace('_', ' ') }}
+            {% if engagement.opinion_type %} · {{ engagement.opinion_type.value }}{% endif %}
+          </span>
+        </span>
+        {% if engagement.is_locked %}<span class="badge green">locked</span>{% endif %}
+        <span class="chev">→</span>
+      </a>
+      {% endfor %}
+      {% else %}
+      <p class="empty">
+        No engagements yet. Open a client from
+        <a href="/clients">All Clients</a> and add a financial year to start one.
+      </p>
+      {% endif %}
+    </section>
+
+    <section class="card">
+      <div class="card-head">
+        <div>
+          <div class="eyebrow">Firm profile</div>
+          <h2>Your practice</h2>
+        </div>
+        <a href="/admin/firm">Edit →</a>
+      </div>
+
+      {% if active_firm %}
+      <a class="row-link" href="/admin/firm">
+        <span class="avatar">
+          {{ active_firm.firm_name.split() | map('first') | join | upper | truncate(2, true, '') }}
+        </span>
+        <span class="body">
+          <span class="title">{{ active_firm.firm_name }}</span>
+          <span class="sub">
+            {% if active_firm.frn %}FRN {{ active_firm.frn }}{% else %}FRN not set{% endif %}
+          </span>
+        </span>
+        <span class="chev">→</span>
+      </a>
+      {% endif %}
+
+      <div class="callout">
+        <p><strong>Local and private.</strong></p>
+        <p class="note">
+          Your clients and answers are stored in a SQLite database on this
+          computer. Nothing is sent anywhere — the application has no network
+          endpoints by design.
+        </p>
+      </div>
+
+      {% if changes %}
+      <div class="eyebrow" style="margin-top:16px">Recent changes</div>
+      <ul class="feed">
+        {% for entry in changes[:5] %}
+        <li>
+          <strong>{{ entry.entity }}</strong> · {{ entry.action }}
+          <div class="reason">{{ entry.actor }}</div>
+        </li>
+        {% endfor %}
+      </ul>
+      {% endif %}
+    </section>
+  </div>
+
+</div>
+{% endblock %}

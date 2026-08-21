@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en-IN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}AuditCraft{% endblock %}</title>
+  {# All assets vendored locally. No CDN, no webfont fetch (§1, §13).
+     Versions are pinned in the filename and their SHA-256 digests are
+     recorded in docs/VENDORED_ASSETS.md, so what is being served can be
+     checked against what was downloaded. #}
+  <link rel="stylesheet" href="{{ asset_url('app.css') }}">
+  <script src="/static/vendor/htmx-2.0.10.min.js" defer></script>
+  <script src="/static/vendor/alpine-3.16.1.min.js" defer></script>
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar no-print">
+    {# Consistent branding (decision 41): the product mark on every screen, and
+       the firm's logo beside it where one is configured — the sidebar is the
+       one place present on all of them. #}
+    <div class="brand">
+      {% if active_firm and active_firm.logo_path %}
+      <img class="brand-logo" src="{{ active_firm.logo_path }}"
+           alt="{{ active_firm.firm_name }} logo">
+      {% endif %}
+      <span class="brand-name">AuditCraft</span>
+      <span class="brand-sub">Statutory audit documentation</span>
+    </div>
+
+    {# Firm picker. Several firms may share this installation and there is no
+       login, so this chooses a working context and grants nothing — every
+       firm is visible to whoever opens the application. #}
+    {% if firms and firms | length > 1 %}
+    <form method="post" action="/admin/firms/switch" class="firm-picker">
+      <input type="hidden" name="csrf_token"
+             value="{{ request.cookies.get('auditcraft_csrf', '') }}">
+      <input type="hidden" name="next" value="{{ request.url.path }}">
+      <label for="firm-switch" class="nav-group">Working as</label>
+      <select id="firm-switch" name="firm_id" onchange="this.form.submit()">
+        {% for f in firms %}
+        <option value="{{ f.firm_id }}"
+          {% if active_firm and f.firm_id == active_firm.firm_id %}selected{% endif %}>
+          {{ f.firm_name }}</option>
+        {% endfor %}
+      </select>
+      <noscript><button type="submit">Switch</button></noscript>
+    </form>
+    {% elif active_firm %}
+    <div class="nav-group">{{ active_firm.firm_name }}</div>
+    {% endif %}
+    <nav>
+      <a href="/" class="{% if nav == 'dashboard' %}active{% endif %}">Dashboard</a>
+
+      <div class="nav-group">Clients</div>
+      <a href="/clients" class="{% if nav == 'clients' %}active{% endif %}">All Clients</a>
+
+      {# The preview route is /documents/{engagement_id}/{document_id}/preview.
+         This linked to /documents/{document_id}/preview — one segment short —
+         so every document in the sidebar 404'd and the previews could only be
+         reached by typing a URL. The engagement is needed to build the link,
+         so the group only appears on a page that has one. #}
+      {% if documents and engagement is defined and engagement %}
+      <div class="nav-group">Documents</div>
+        {% for doc_id, doc in documents.items() %}
+        <a href="/documents/{{ engagement.engagement_id }}/{{ doc_id }}/preview"
+           class="{% if doc_id == current_document %}active{% endif %}">{{ doc.title }}</a>
+        {% endfor %}
+      {% endif %}
+
+      <div class="nav-group">Admin</div>
+      <a href="/admin/firm" class="{% if nav == 'firm' %}active{% endif %}">Firm &amp; Partners</a>
+      <a href="/admin/defaults"
+         class="{% if nav == 'defaults' %}active{% endif %}">Default Answers</a>
+      <a href="/admin/needs-review"
+         class="{% if nav == 'needs-review' %}active{% endif %}">Needs-Review Clauses</a>
+      <a href="/admin/audit-log"
+         class="{% if nav == 'audit-log' %}active{% endif %}">Change Log</a>
+    </nav>
+  </aside>
+
+  <div class="main">
+    <header class="topbar no-print">
+      <h1>{% block heading %}{% endblock %}</h1>
+      <span class="meta">{% block topbar_meta %}{% endblock %}</span>
+    </header>
+    {% block content %}{% endblock %}
+  </div>
+</div>
+</body>
+</html>

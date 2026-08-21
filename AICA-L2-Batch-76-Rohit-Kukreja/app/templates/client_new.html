@@ -1,0 +1,179 @@
+{% extends "base.html" %}
+{% set csrf = request.cookies.get('auditcraft_csrf', '') %}
+
+{% block title %}New client — AuditCraft{% endblock %}
+{% block heading %}New client{% endblock %}
+
+{% block content %}
+<div class="panel">
+  {% if error %}<p class="badge red" role="alert">{{ error }}</p>{% endif %}
+
+  <p class="note">
+    Everything is captured here in one form. Only the firm, client code, CIN,
+    company name, type and framework are required — the rest can be filled in
+    later on the client screen, which versions master data properly. Nothing is
+    saved until the whole form is valid, and if it is refused your entries are
+    returned to you rather than cleared.
+  </p>
+
+  <form method="post" action="/clients/new">
+    <input type="hidden" name="csrf_token" value="{{ csrf }}">
+
+    <section>
+      <h2>Identity</h2>
+      <div class="field">
+        <label for="firm_id">Firm</label>
+        <select id="firm_id" name="firm_id" required>
+          <option value="">— choose —</option>
+          {% for f in firms %}
+          <option value="{{ f.firm_id }}"
+            {% if submitted.get('firm_id') == f.firm_id | string %}selected{% endif %}>
+            {{ f.firm_name }} (FRN {{ f.frn }})</option>
+          {% endfor %}
+        </select>
+      </div>
+      {% for name, label, required in [
+          ('client_code', 'Client code', true), ('cin', 'CIN', true),
+          ('pan', 'PAN', false)] %}
+      <div class="field">
+        <label for="{{ name }}">{{ label }}</label>
+        <input id="{{ name }}" name="{{ name }}" type="text"
+               value="{{ submitted.get(name, '') }}" {% if required %}required{% endif %}>
+      </div>
+      {% endfor %}
+      <div class="field">
+        <label for="date_of_incorp">Date of incorporation</label>
+        <input id="date_of_incorp" name="date_of_incorp" type="date"
+               value="{{ submitted.get('date_of_incorp', '') }}">
+        <div class="clause-ref">The first profile version opens on this date.</div>
+      </div>
+    </section>
+
+    <section>
+      <h2>Company</h2>
+      <div class="field">
+        <label for="company_type">Company type</label>
+        <select id="company_type" name="company_type" required>
+          {% for t in company_types %}
+          <option value="{{ t.value }}"
+            {% if submitted.get('company_type') == t.value %}selected{% endif %}>{{
+              company_type_labels.get(t.value, t.value) }}</option>
+          {% endfor %}
+        </select>
+        <div class="clause-ref">Drives CARO, IFC and secretarial audit applicability.</div>
+      </div>
+      <div class="field">
+        <label for="framework">Reporting framework</label>
+        {# Indian GAAP only (decision 50). The partner confirmed on 20 August
+           2026 that the tool does not cover Ind AS, and offering a framework it
+           does not support is a control that produces a wrong document -- the
+           team's own test client was set to Ind AS, and that is what produced
+           two of their eleven observations on the auditor's report. The Ind AS
+           variants remain in the clause repository, unreachable rather than
+           deleted, so supporting it later is a manifest change. #}
+        <select id="framework" name="framework" required>
+          {% for value, label in framework_labels.items() %}
+          <option value="{{ value }}"
+            {% if submitted.get('framework') == value %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      {% for name, label in text_fields %}
+      <div class="field">
+        <label for="{{ name }}">{{ label }}</label>
+        <input id="{{ name }}" name="{{ name }}" type="text"
+               value="{{ submitted.get(name, '') }}"
+               {% if name == 'company_name' %}required{% endif %}>
+      </div>
+      {% endfor %}
+    </section>
+
+    <section>
+    <section>
+      <h2>Group structure and industry</h2>
+      <p class="note">
+        These decide whether consolidated financial statements arise, whether
+        cost records apply, and what the Board's Report says about subsidiaries.
+        All of them can be corrected later on the client's Master Data tab.
+      </p>
+      {% for name, label, help_text in fact_fields %}
+      <div class="field check">
+        <label for="{{ name }}">
+          <input id="{{ name }}" name="{{ name }}" type="checkbox"
+                 {% if submitted.get(name) %}checked{% endif %}>
+          {{ label }}
+          <span class="hint" tabindex="0" role="note" aria-label="{{ help_text }}"
+                title="{{ help_text }}">i</span>
+        </label>
+      </div>
+      {% endfor %}
+    </section>
+
+    <section>
+      <h2>Directors</h2>
+      <p class="note">
+        Dates matter: who was in office at the year end is computed from them,
+        never typed into a document. Leave a cessation date blank for a
+        serving director. Blank rows are ignored.
+      </p>
+      <table class="grid small-grid">
+        <thead><tr>
+          <th>Name</th><th>DIN</th><th>Designation</th>
+          <th>Appointed</th><th>Ceased</th>
+        </tr></thead>
+        <tbody>
+{# Rows already entered come back on a validation failure; spares are added
+             so there is always somewhere to type. #}
+          {% for row in director_rows + [{}] * (4 - director_rows | length if director_rows | length < 4 else 1) %}
+          <tr>
+            <td><input name="director_name" type="text" value="{{ row.get('name', '') }}"></td>
+            <td><input name="director_din" type="text" maxlength="8" value="{{ row.get('din', '') }}"></td>
+            <td>
+              <select name="director_designation">
+                {% for d in designations %}
+                <option value="{{ d.value }}"
+                  {% if row.get('designation') == d.value %}selected{% endif %}>{{ d.value }}</option>
+                {% endfor %}
+              </select>
+            </td>
+            <td><input name="director_appointment_date" type="date"
+                       value="{{ row.get('appointment_date', '') }}"></td>
+            <td><input name="director_cessation_date" type="date"
+                       value="{{ row.get('cessation_date', '') }}"></td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>Key Managerial Personnel</h2>
+      <table class="grid small-grid">
+        <thead><tr><th>Name</th><th>Role</th><th>Appointed</th></tr></thead>
+        <tbody>
+          {% for row in kmp_rows + [{}] * (3 - kmp_rows | length if kmp_rows | length < 3 else 1) %}
+          <tr>
+            <td><input name="kmp_name" type="text" value="{{ row.get('name', '') }}"></td>
+            <td>
+              <select name="kmp_role">
+                {% for r in kmp_roles %}
+                <option value="{{ r.value }}"
+                  {% if row.get('role') == r.value %}selected{% endif %}>{{ r.value }}</option>
+                {% endfor %}
+              </select>
+            </td>
+            <td><input name="kmp_appointment_date" type="date"
+                       value="{{ row.get('appointment_date', '') }}"></td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </section>
+
+    <div class="field-foot">
+      <button type="submit">Create client</button>
+      <a href="/clients" class="linkish">Cancel</a>
+    </div>
+  </form>
+</div>
+{% endblock %}

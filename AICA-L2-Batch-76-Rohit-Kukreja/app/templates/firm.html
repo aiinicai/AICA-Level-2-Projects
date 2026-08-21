@@ -1,0 +1,255 @@
+{% extends "base.html" %}
+{% set nav = 'firm' %}
+{% set csrf = request.cookies.get('auditcraft_csrf', '') %}
+
+{% block title %}Firm &amp; Partners — AuditCraft{% endblock %}
+{% block heading %}Firm &amp; Partners{% endblock %}
+{% block topbar_meta %}{% if saved %}<span class="badge green">Saved</span>{% endif %}{% endblock %}
+
+{% block content %}
+<div class="preview-pane wide">
+  {% if removed %}
+  <p class="badge green" role="status">Removed {{ removed }}.</p>
+  {% endif %}
+  {% if error %}<p class="badge red" role="alert">{{ error }}</p>{% endif %}
+
+  <section class="panel">
+    <h2>Firm details</h2>
+    <p class="note">
+      Nothing about the firm is hard-coded. These values drive the letterhead,
+      the signature blocks and the document footers, so any firm can point the
+      tool at its own details without touching code.
+    </p>
+
+    {% if firm %}
+    <form method="post" action="/admin/firm">
+      <input type="hidden" name="csrf_token" value="{{ csrf }}">
+      {% for name, label in fields %}
+      <p>
+        <label for="f-{{ name }}">{{ label }}</label><br>
+        {% if name in ('address', 'doc_header', 'doc_footer') %}
+        <textarea id="f-{{ name }}" name="{{ name }}" rows="2" style="width:100%">{{ firm[name] or '' }}</textarea>
+        {% elif name == 'logo_path' %}
+        {# A choice, not a typed path (decision 50). The ICAI Chartered
+           Accountant mark ships with the application and is the default; a firm
+           with its own artwork puts it in app/static and names it here.
+
+           Offered rather than fixed: the mark is ICAI's and its use is governed
+           by ICAI's guidelines for members, so whether it appears over a given
+           firm's name is that firm's judgement, not this tool's default. #}
+        <select id="f-{{ name }}" name="{{ name }}" style="width:100%">
+          <option value="{{ icai_logo }}" {% if firm[name] == icai_logo %}selected{% endif %}>
+            ICAI Chartered Accountant logo (supplied)</option>
+          <option value="" {% if not firm[name] %}selected{% endif %}>
+            No logo</option>
+          {% if firm[name] and firm[name] != icai_logo %}
+          <option value="{{ firm[name] }}" selected>{{ firm[name] }} (the firm's own)</option>
+          {% endif %}
+        </select>
+        {% elif name == 'doc_font' %}
+        {# A dropdown, not free text: a misspelled face is substituted silently
+           by Word and the page breaks of a signed report move with it. #}
+        <select id="f-{{ name }}" name="{{ name }}" style="width:100%">
+          {% for face in document_fonts %}
+          <option value="{{ face }}" {% if firm[name] == face %}selected{% endif %}
+                  style="font-family: '{{ face }}', serif">{{ face }}</option>
+          {% endfor %}
+          {% if firm[name] and firm[name] not in document_fonts %}
+          {# Whatever was typed before this became a list, so a firm's existing
+             choice is never silently changed to something else. #}
+          <option value="{{ firm[name] }}" selected>{{ firm[name] }} (not in the list)</option>
+          {% endif %}
+        </select>
+        {% else %}
+        <input id="f-{{ name }}" name="{{ name }}" value="{{ firm[name] or '' }}" style="width:100%">
+        {% endif %}
+      </p>
+      {% endfor %}
+      <button type="submit">Save firm details</button>
+    </form>
+    {% else %}
+    <p class="empty">No firm record. Run <code>python scripts/seed.py</code> first.</p>
+    {% endif %}
+  </section>
+
+  {% if firm and firm.logo_path %}
+  <section class="panel">
+    <h2>Letterhead logo</h2>
+    <img src="{{ firm.logo_path }}" alt="Firm logo" style="max-height:90px">
+    <p class="note">Stored locally and embedded in generated documents — never hot-linked (§11.1).</p>
+  </section>
+  {% endif %}
+
+  <section class="panel">
+    <h2>Firms</h2>
+    <p class="note">
+      Several firms can share this installation. <strong>There is no login</strong>,
+      so choosing a firm in the sidebar selects which clients you are working
+      with — it does not restrict anyone. Every firm's clients and audit files
+      remain visible to whoever opens this application. If that is not
+      acceptable, run a separate copy per firm.
+    </p>
+    <table class="grid">
+      <thead><tr><th>Firm</th><th>FRN</th><th>Clients</th><th>Remove</th></tr></thead>
+      <tbody>
+        {% for f in firms %}
+        <tr {% if active_firm and f.firm_id == active_firm.firm_id %}class="active"{% endif %}>
+          <td>{{ f.firm_name }}</td>
+          <td class="mono">{{ f.frn }}</td>
+          <td>{{ f.client_count }}</td>
+          <td>
+            {% if f.blockers %}
+            <span class="held">Held by
+              {% for what, count in f.blockers.items() %}{% if not loop.first %}, {% endif %}{%
+                if what.startswith('—') %}{{ what[2:] }}{% else %}{{ count }} {{ what }}{%
+                endif %}{% endfor %}</span>
+            {% else %}
+            <form method="post" action="/admin/firms/{{ f.firm_id }}/delete" class="inline-delete">
+              <input type="hidden" name="csrf_token" value="{{ csrf }}">
+              <input name="confirm_name" type="text" required
+                     placeholder="Type {{ f.firm_name }}" aria-label="Confirm firm name">
+              <button type="submit" class="danger">Remove</button>
+            </form>
+            {% endif %}
+          </td>
+        </tr>
+        {% else %}<tr><td colspan="4" class="empty">None recorded.</td></tr>{% endfor %}
+      </tbody>
+    </table>
+    <p class="note">
+      A firm can be removed only once nothing of its own remains: no clients, no
+      user accounts, and no partner named on a document already issued. Its
+      partners and its standing default answers go with it, because neither
+      means anything without the firm. The last firm on an installation stays.
+    </p>
+
+    <h3>Add a firm</h3>
+    <form method="post" action="/admin/firms">
+      <input type="hidden" name="csrf_token" value="{{ csrf }}">
+      <div class="field">
+        <label for="new_firm_name">Firm name</label>
+        <input id="new_firm_name" name="firm_name" type="text" required>
+        <div class="clause-ref">
+          The name only — every signature block adds "Chartered Accountants"
+          on its own line.
+        </div>
+      </div>
+      <div class="field">
+        <label for="new_frn">Firm Registration Number</label>
+        <input id="new_frn" name="frn" type="text" class="mono" required>
+      </div>
+      <div class="field">
+        <label for="new_address">Address</label>
+        <input id="new_address" name="address" type="text">
+      </div>
+      <div class="field">
+        <label for="new_default_place">Default place of signature</label>
+        <input id="new_default_place" name="default_place" type="text">
+      </div>
+      <div class="field-foot"><button type="submit">Add firm</button></div>
+    </form>
+  </section>
+
+  <section class="panel">
+    <h2>Partners</h2>
+    <p class="note">
+      The signing partner's name and membership number appear on every document
+      this tool issues. Someone who leaves the firm is normally <b>retired</b> —
+      clear "Still with the firm" — so a report already signed still names a
+      partner who can be found. Removal is offered only where nothing points at
+      them at all.
+    </p>
+
+    {# A card per partner, not a table row (decision 67).
+
+       Each row used to put two <form> elements inside one <tr>, which is
+       invalid: a <tr> may contain only <td> and <th>, so a browser is entitled
+       to hoist the forms out of the table and leave the controls behind. It
+       worked in the browsers tested, and nothing about it was guaranteed to
+       keep working. A card holds its own forms legitimately, and reads better
+       on a narrow window than a six-column table ever did. #}
+    <div class="partner-list">
+      {% for p in partners %}
+      <div class="partner-card">
+        <form method="post" action="/admin/partners/{{ p.partner_id }}" class="partner-edit">
+          <input type="hidden" name="csrf_token" value="{{ csrf }}">
+
+          <div class="field">
+            <label for="pn-{{ p.partner_id }}">Name</label>
+            <input id="pn-{{ p.partner_id }}" name="partner_name" type="text"
+                   value="{{ p.partner_name }}" required>
+          </div>
+
+          <div class="field">
+            <label for="pm-{{ p.partner_id }}">Membership number</label>
+            <input id="pm-{{ p.partner_id }}" name="membership_no" type="text" class="mono"
+                   value="{{ p.membership_no }}" required>
+          </div>
+
+          <div class="field check">
+            <label for="ps-{{ p.partner_id }}">
+              <input id="ps-{{ p.partner_id }}" name="is_signing" type="checkbox"
+                     {% if p.is_signing %}checked{% endif %}>
+              May sign reports
+            </label>
+          </div>
+
+          <div class="field check">
+            <label for="pa-{{ p.partner_id }}">
+              <input id="pa-{{ p.partner_id }}" name="active" type="checkbox"
+                     {% if p.active %}checked{% endif %}>
+              Still with the firm
+            </label>
+          </div>
+
+          <div class="partner-actions">
+            <button type="submit">Save</button>
+          </div>
+        </form>
+
+        <div class="partner-remove">
+          {% if p.blockers %}
+          <span class="held">
+            Cannot be removed — held by
+            {% for what, count in p.blockers.items() %}{% if not loop.first %}, {% endif %}{{ count }} {{ what }}{% endfor %}.
+            Clear <b>Still with the firm</b> to retire them instead.
+          </span>
+          {% else %}
+          <form method="post" action="/admin/partners/{{ p.partner_id }}/delete"
+                class="inline-delete">
+            <input type="hidden" name="csrf_token" value="{{ csrf }}">
+            <label class="sr-only" for="pd-{{ p.partner_id }}">Confirm partner name</label>
+            <input id="pd-{{ p.partner_id }}" name="confirm_name" type="text" required
+                   placeholder="Type {{ p.partner_name }} to remove">
+            <button type="submit" class="danger">Remove</button>
+          </form>
+          {% endif %}
+        </div>
+      </div>
+      {% else %}
+      <p class="empty">No partners recorded.</p>
+      {% endfor %}
+    </div>
+
+    <h3>Add a partner</h3>
+    <form method="post" action="/admin/partners">
+      <input type="hidden" name="csrf_token" value="{{ csrf }}">
+      <div class="field">
+        <label for="new_partner_name">Name</label>
+        <input id="new_partner_name" name="partner_name" type="text" required>
+      </div>
+      <div class="field">
+        <label for="new_membership_no">Membership number</label>
+        <input id="new_membership_no" name="membership_no" type="text" class="mono" required>
+        <div class="clause-ref">Six digits, as issued by the ICAI.</div>
+      </div>
+      <div class="field">
+        <label for="new_is_signing">
+          <input id="new_is_signing" name="is_signing" type="checkbox"> Signing partner
+        </label>
+      </div>
+      <div class="field-foot"><button type="submit">Add partner</button></div>
+    </form>
+  </section>
+</div>
+{% endblock %}

@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% set nav = 'clients' %}
+{% set csrf = request.cookies.get('auditcraft_csrf', '') %}
+
+{% block title %}Roll forward — AuditCraft{% endblock %}
+{% block heading %}Roll forward from FY {{ engagement.fy_code }}{% endblock %}
+
+{% block content %}
+<div class="preview-pane wide">
+  {% if error %}<p class="badge red" role="alert">{{ error }}</p>{% endif %}
+
+  <section class="panel">
+    <p class="note">
+      Master data and judgmental answers are copied. Amounts, dates, the
+      opinion, the report date and every narrative are not — they start blank.
+      Copied answers arrive flagged for confirmation, and export stays blocked
+      until each has been confirmed for the new year.
+    </p>
+
+    <form method="post" action="/engagements/{{ engagement.engagement_id }}/roll-forward">
+      <input type="hidden" name="csrf_token" value="{{ csrf }}">
+
+      <p>
+        <label for="fy_start">New financial year begins</label><br>
+        <input id="fy_start" name="fy_start" type="date" value="{{ next_start.isoformat() }}" required>
+      </p>
+      <p>
+        <label for="fy_end">and ends</label><br>
+        <input id="fy_end" name="fy_end" type="date" value="{{ next_end.isoformat() }}" required>
+      </p>
+
+      <fieldset>
+        <legend>Carry forward</legend>
+        {% for value, label in categories %}
+        <label><input type="checkbox" name="category" value="{{ value }}" checked> {{ label }}</label><br>
+        {% endfor %}
+      </fieldset>
+
+      <button type="submit">Roll forward</button>
+    </form>
+  </section>
+</div>
+{% endblock %}

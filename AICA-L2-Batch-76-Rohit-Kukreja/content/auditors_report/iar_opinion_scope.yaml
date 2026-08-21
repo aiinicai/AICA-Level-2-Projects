@@ -1,0 +1,90 @@
+# AUTHORED from the firm's own report format.
+#
+# NOT PRODUCED BY THE SCAFFOLDER. `scripts/scaffold_clauses.py` carries a
+# hand-written clause table rather than reading the approved register, and
+# this row was never transcribed into it — so the document simply had no
+# such paragraph. tests/test_register_reconciliation.py now fails if any
+# approved row is missing.
+
+# NEW CLAUSE, NOT IN THE REGISTER — flagged for Gate A.
+# The register has one row, `iar.opinion.body`, covering both the sentence
+# that identifies the financial statements audited and the sentence that
+# gives the opinion. They vary independently: the first changes with the
+# reporting framework (an Ind AS company has a Statement of Changes in
+# Equity and Other Comprehensive Income), the second changes with the type
+# of opinion. Held in one clause that is a cross product of eight
+# near-identical bodies, and a reviewer reading them at Gate A would have to
+# spot the one word that differs between two of them. Split in two, each
+# body is short enough to read.
+
+id: iar.opinion.scope
+document: auditors_report
+order: 45
+number: ""
+title: "Identification of the Financial Statements Audited"
+clause_ref: "SA 700 para 24(a)-(c)"
+effective_from: "2014-04-01"
+effective_to: null
+
+needs_review: false
+
+# CASH FLOW STATEMENT, added 20 August 2026 (decision 49).
+# Section 2(40) first proviso: a One Person Company, a small company, a dormant
+# company and a start-up private company need not include a cash flow statement
+# in their financial statements. The partner confirmed this tool is used for
+# small companies and OPCs.
+#
+# The `cash_flow_required` variant comes FIRST, so the fuller wording is what a
+# company of unknown type receives -- a document must not silently lose a
+# statement because nobody set the company type.
+
+variants:
+  # AUTHORED — SA 705 para 20 replaces "We have audited" with "We were
+  # engaged to audit" when the opinion is disclaimed, because the auditor is
+  # not asserting that an audit was completed.
+  - when: "opinion_type == 'disclaimer' and framework == 'indas'"
+    body: >
+      We were engaged to audit the accompanying financial statements of {{ company_name }}
+      ("the Company"), which comprise the Balance Sheet as at {{ fy_end_long }}, the
+      Statement of Profit and Loss (including Other Comprehensive Income), the Statement
+      of Changes in Equity and the Statement of Cash Flows for the year then ended, and
+      notes to the financial statements, including a summary of material accounting
+      policies and other explanatory information.
+
+  # AUTHORED — not sourced.
+  - when: "opinion_type == 'disclaimer'"
+    body: >
+      We were engaged to audit the accompanying financial statements of {{ company_name }}
+      ("the Company"), which comprise the Balance Sheet as at {{ fy_end_long }}, the
+      Statement of Profit and Loss and the Statement of Cash Flows for the year then
+      ended, and notes to the financial statements, including a summary of significant
+      accounting policies and other explanatory information.
+
+  # AUTHORED — the firm's precedent is an Accounting Standards company and
+  # does not name the two additional statements an Ind AS company must file.
+  - when: "framework == 'indas'"
+    body: >
+      We have audited the accompanying financial statements of {{ company_name }} ("the
+      Company"), which comprise the Balance Sheet as at {{ fy_end_long }}, the Statement
+      of Profit and Loss (including Other Comprehensive Income), the Statement of Changes
+      in Equity and the Statement of Cash Flows for the year then ended, and notes to the
+      financial statements, including a summary of material accounting policies and other
+      explanatory information.
+
+  # Firm wording. The precedent hard-codes "31st March 2022"; the date is
+  # interpolated from the engagement's typed FY end column here.
+  - when: "cash_flow_required"
+    body: >
+      We have audited the financial statements of {{ company_name }} ("the Company"),
+      which comprise the Balance Sheet as at {{ fy_end_long }}, and the Statement of
+      Profit and Loss, and the Statement of Cash Flows for the year then ended, and notes
+      to the financial statements, including a summary of significant accounting policies
+      and other explanatory information.
+
+  # A small company or OPC: no cash flow statement (s.2(40) proviso).
+  - body: >
+      We have audited the financial statements of {{ company_name }} ("the Company"),
+      which comprise the Balance Sheet as at {{ fy_end_long }} and the Statement of
+      Profit and Loss for the year then ended, and notes to the financial statements,
+      including a summary of significant accounting policies and other explanatory
+      information.

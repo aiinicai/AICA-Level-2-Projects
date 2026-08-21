@@ -1,0 +1,48 @@
+[project]
+name = "auditcraft"
+version = "0.1.0"
+description = "Statutory audit document generation for a Chartered Accountancy firm"
+requires-python = ">=3.12"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+addopts = "-q --strict-markers"
+asyncio_mode = "auto"
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "UP", "B", "S", "C4", "SIM", "RUF"]
+# S101 (assert) is the idiom in pytest; allowed in tests only, below.
+ignore = ["S101"]
+
+[tool.ruff.lint.per-file-ignores]
+"alembic/*" = ["N999", "F401"]
+# E402: the seed script inserts the project root on sys.path before importing
+# app modules, so it can be run directly. S105: DEFAULT_PASSWORD is a
+# development credential printed to the console, not a secret.
+"scripts/seed.py" = ["E402", "S105"]
+# S105/S106: test fixtures pass literal development passwords and deliberately
+# forged CSRF tokens. That is the point of the tests.
+"tests/*" = ["S105", "S106"]
+
+[tool.black]
+line-length = 100
+target-version = ["py312"]
+
+[tool.mypy]
+python_version = "3.12"
+warn_unused_configs = true
+ignore_missing_imports = true
+
+# --strict is required on these packages by §1. Everything else is looser
+# until the phase that builds it lands.
+[[tool.mypy.overrides]]
+module = ["app.core.*", "app.clauses.*", "app.render.*"]
+strict = true
+
+[tool.coverage.run]
+source = ["app/core", "app/clauses", "app/render"]
