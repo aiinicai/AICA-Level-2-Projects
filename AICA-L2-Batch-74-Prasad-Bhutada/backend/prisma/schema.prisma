@@ -1,0 +1,199 @@
+// ============================================================================
+// CA Office Document Automation System - Database Schema
+// Engine: SQLite (file-based, zero-admin, ideal for LAN single-server deploy)
+// ============================================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ---------------------------------------------------------------------------
+// Module 1: Template Management
+// ---------------------------------------------------------------------------
+model Category {
+  id        String     @id @default(cuid())
+  name      String     @unique
+  isSystem  Boolean    @default(false) // seeded defaults (Income Tax, GST, ...) cannot be deleted
+  createdAt DateTime   @default(now())
+  templates Template[]
+}
+
+model Template {
+  id            String   @id @default(cuid())
+  name          String
+  categoryId    String
+  category      Category @relation(fields: [categoryId], references: [id])
+  keywords      String? // comma-separated tokens, indexed via TemplateKeyword for search
+  description   String?
+  fileLocation  String // relative path under TEMPLATE_FOLDER, e.g. templates/{id}.docx
+  originalName  String
+  status        String   @default("Active") // Active | Deleted
+  version       Int      @default(1)
+  fileSizeBytes Int      @default(0)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  deletedAt     DateTime?
+
+  placeholders        TemplatePlaceholder[]
+  keywordEntries       TemplateKeyword[]
+  generationHistoryRows GenerationHistoryTemplate[]
+
+  @@index([status])
+  @@index([categoryId])
+  @@index([name])
+}
+
+// One row per (template, keyword) pair -> enables fast full-text style search
+model TemplateKeyword {
+  id         String   @id @default(cuid())
+  templateId String
+  template   Template @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  keyword    String
+
+  @@index([keyword])
+}
+
+// ---------------------------------------------------------------------------
+// Module 2/3: Placeholder Detection + Mapping
+// ---------------------------------------------------------------------------
+model Placeholder {
+  id             String   @id @default(cuid())
+  name           String   @unique // "Client Name" (stored WITHOUT surrounding #)
+  validationType String   @default("Text") // Text | Email | PAN | GSTIN | Mobile | PinCode | Date | Image
+  isImage        Boolean  @default(false)
+  createdAt      DateTime @default(now())
+
+  templates TemplatePlaceholder[]
+  mapping   PlaceholderMapping?
+}
+
+// Many-to-many: which templates use which placeholders
+model TemplatePlaceholder {
+  id            String      @id @default(cuid())
+  templateId    String
+  placeholderId String
+  template      Template    @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  placeholder   Placeholder @relation(fields: [placeholderId], references: [id], onDelete: Cascade)
+
+  @@unique([templateId, placeholderId])
+}
+
+// Maps a placeholder to a Client Master field (system column or custom field)
+model PlaceholderMapping {
+  id            String      @id @default(cuid())
+  placeholderId String      @unique
+  placeholder   Placeholder @relation(fields: [placeholderId], references: [id], onDelete: Cascade)
+  clientFieldKey String     // matches ClientField.fieldKey, e.g. "name", "custom_pan"
+  updatedAt     DateTime    @updatedAt
+}
+
+// ---------------------------------------------------------------------------
+// Module 4: Client Management (expandable master)
+// ---------------------------------------------------------------------------
+// Core columns kept for query performance; ClientField/ClientCustomValue allow
+// adding new fields at runtime with zero code changes (EAV pattern).
+model Client {
+  id            String   @id @default(cuid())
+  name          String
+  addressLine1  String?
+  addressLine2  String?
+  clientType    String?
+  mobile        String?
+  email         String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  customValues     ClientCustomValue[]
+  generationHistory GenerationHistory[]
+
+  @@index([name])
+}
+
+// Definition of a dynamic/custom client-master field, configurable by admin
+model ClientField {
+  id         String   @id @default(cuid())
+  fieldKey   String   @unique // stable key used in mappings, e.g. "custom_pan"
+  label      String // display label, e.g. "PAN Number"
+  fieldType  String   @default("Text") // Text | Email | Mobile | Date | PAN | GSTIN | PinCode
+  isSystem   Boolean  @default(false) // true for name/address1/address2/clientType/mobile/email
+  isRequired Boolean  @default(false)
+  sortOrder  Int      @default(0)
+  createdAt  DateTime @default(now())
+
+  values ClientCustomValue[]
+}
+
+model ClientCustomValue {
+  id        String      @id @default(cuid())
+  clientId  String
+  fieldId   String
+  client    Client      @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  field     ClientField @relation(fields: [fieldId], references: [id], onDelete: Cascade)
+  value     String?
+
+  @@unique([clientId, fieldId])
+}
+
+// ---------------------------------------------------------------------------
+// Module 10: Generation History
+// ---------------------------------------------------------------------------
+model GenerationHistory {
+  id                String   @id @default(cuid())
+  clientId          String?
+  client            Client?  @relation(fields: [clientId], references: [id])
+  clientNameSnapshot String  // preserved even if client later renamed/deleted
+  placeholderValuesJson String // JSON: { "Client Name": "ABC Pvt Ltd", ... }
+  outputFolder      String
+  generatedAt       DateTime @default(now())
+
+  templates GenerationHistoryTemplate[]
+
+  @@index([generatedAt])
+  @@index([clientId])
+}
+
+model GenerationHistoryTemplate {
+  id                  String             @id @default(cuid())
+  generationHistoryId String
+  templateId          String
+  generatedFileName   String
+  generationHistory   GenerationHistory  @relation(fields: [generationHistoryId], references: [id], onDelete: Cascade)
+  template            Template           @relation(fields: [templateId], references: [id])
+}
+
+// ---------------------------------------------------------------------------
+// Module 11: Application Settings (key/value, no hardcoded config)
+// ---------------------------------------------------------------------------
+model Setting {
+  key       String   @id
+  value     String
+  updatedAt DateTime @updatedAt
+}
+
+// ---------------------------------------------------------------------------
+// Admin auth for "Manage Formats" (Template Management password gate)
+// ---------------------------------------------------------------------------
+model AdminUser {
+  id           String   @id @default(cuid())
+  username     String   @unique
+  passwordHash String
+  role         String   @default("admin")
+  createdAt    DateTime @default(now())
+}
+
+// ---------------------------------------------------------------------------
+// Application audit log (who changed what - lightweight, no user login system)
+// ---------------------------------------------------------------------------
+model AuditLog {
+  id        String   @id @default(cuid())
+  action    String // e.g. "TEMPLATE_DELETE", "TEMPLATE_RESTORE", "SETTINGS_UPDATE"
+  entityType String
+  entityId  String?
+  detail    String?
+  createdAt DateTime @default(now())
+}

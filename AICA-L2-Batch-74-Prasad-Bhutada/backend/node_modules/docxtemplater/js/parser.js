@@ -1,0 +1,211 @@
+"use strict";
+
+function _typeof(o) { "@babel/helpers - typeof"; return _typeof = "function" == typeof Symbol && "symbol" == typeof Symbol.iterator ? function (o) { return typeof o; } : function (o) { return o && "function" == typeof Symbol && o.constructor === Symbol && o !== Symbol.prototype ? "symbol" : typeof o; }, _typeof(o); }
+function ownKeys(e, r) { var t = Object.keys(e); if (Object.getOwnPropertySymbols) { var o = Object.getOwnPropertySymbols(e); r && (o = o.filter(function (r) { return Object.getOwnPropertyDescriptor(e, r).enumerable; })), t.push.apply(t, o); } return t; }
+function _objectSpread(e) { for (var r = 1; r < arguments.length; r++) { var t = null != arguments[r] ? arguments[r] : {}; r % 2 ? ownKeys(Object(t), !0).forEach(function (r) { _defineProperty(e, r, t[r]); }) : Object.getOwnPropertyDescriptors ? Object.defineProperties(e, Object.getOwnPropertyDescriptors(t)) : ownKeys(Object(t)).forEach(function (r) { Object.defineProperty(e, r, Object.getOwnPropertyDescriptor(t, r)); }); } return e; }
+function _defineProperty(e, r, t) { return (r = _toPropertyKey(r)) in e ? Object.defineProperty(e, r, { value: t, enumerable: !0, configurable: !0, writable: !0 }) : e[r] = t, e; }
+function _toPropertyKey(t) { var i = _toPrimitive(t, "string"); return "symbol" == _typeof(i) ? i : i + ""; }
+function _toPrimitive(t, r) { if ("object" != _typeof(t) || !t) return t; var e = t[Symbol.toPrimitive]; if (void 0 !== e) { var i = e.call(t, r || "default"); if ("object" != _typeof(i)) return i; throw new TypeError("@@toPrimitive must return a primitive value."); } return ("string" === r ? String : Number)(t); }
+function _slicedToArray(r, e) { return _arrayWithHoles(r) || _iterableToArrayLimit(r, e) || _unsupportedIterableToArray(r, e) || _nonIterableRest(); }
+function _nonIterableRest() { throw new TypeError("Invalid attempt to destructure non-iterable instance.\nIn order to be iterable, non-array objects must have a [Symbol.iterator]() method."); }
+function _unsupportedIterableToArray(r, a) { if (r) { if ("string" == typeof r) return _arrayLikeToArray(r, a); var t = {}.toString.call(r).slice(8, -1); return "Object" === t && r.constructor && (t = r.constructor.name), "Map" === t || "Set" === t ? Array.from(r) : "Arguments" === t || /^(?:Ui|I)nt(?:8|16|32)(?:Clamped)?Array$/.test(t) ? _arrayLikeToArray(r, a) : void 0; } }
+function _arrayLikeToArray(r, a) { (null == a || a > r.length) && (a = r.length); for (var e = 0, n = Array(a); e < a; e++) n[e] = r[e]; return n; }
+function _iterableToArrayLimit(r, l) { var t = null == r ? null : "undefined" != typeof Symbol && r[Symbol.iterator] || r["@@iterator"]; if (null != t) { var e, n, i, u, a = [], f = !0, o = !1; try { if (i = (t = t.call(r)).next, 0 === l) { if (Object(t) !== t) return; f = !1; } else for (; !(f = (e = i.call(t)).done) && (a.push(e.value), a.length !== l); f = !0); } catch (r) { o = !0, n = r; } finally { try { if (!f && null != t["return"] && (u = t["return"](), Object(u) !== u)) return; } finally { if (o) throw n; } } return a; } }
+function _arrayWithHoles(r) { if (Array.isArray(r)) return r; }
+var _require = require("./doc-utils.js"),
+  wordToUtf8 = _require.wordToUtf8,
+  pushArray = _require.pushArray,
+  isParagraphStart = _require.isParagraphStart,
+  isBreakTag = _require.isBreakTag;
+var _require2 = require("./prefix-matcher.js"),
+  match = _require2.match,
+  getValue = _require2.getValue,
+  getValues = _require2.getValues;
+function getMatchers(modules, options) {
+  var allMatchers = [];
+  for (var _i2 = 0; _i2 < modules.length; _i2++) {
+    var _module = modules[_i2];
+    if (_module.matchers) {
+      var matchers = _module.matchers(options);
+      if (!(matchers instanceof Array)) {
+        throw new Error("module matcher returns a non array");
+      }
+      pushArray(allMatchers, matchers);
+    }
+  }
+  return allMatchers;
+}
+function getMatches(matchers, placeHolderContent, options) {
+  var matches = [];
+  for (var _i4 = 0; _i4 < matchers.length; _i4++) {
+    var matcher = matchers[_i4];
+    var _matcher = _slicedToArray(matcher, 2),
+      prefix = _matcher[0],
+      _module2 = _matcher[1];
+    var properties = matcher[2] || {};
+    if (options.match(prefix, placeHolderContent)) {
+      var values = options.getValues(prefix, placeHolderContent);
+      if (typeof properties === "function") {
+        properties = properties(values);
+      }
+      if (!properties.value) {
+        var _values = _slicedToArray(values, 2);
+        properties.value = _values[1];
+      }
+      matches.push(_objectSpread({
+        type: "placeholder",
+        prefix: prefix,
+        module: _module2,
+        onMatch: properties.onMatch,
+        priority: properties.priority
+      }, properties));
+    }
+  }
+  return matches;
+}
+function moduleParse(placeHolderContent, options) {
+  var modules = options.modules,
+    startOffset = options.startOffset;
+  var endLindex = options.lIndex;
+  var moduleParsed;
+  options.offset = startOffset;
+  options.match = match;
+  options.getValue = getValue;
+  options.getValues = getValues;
+  var matchers = getMatchers(modules, options);
+  var matches = getMatches(matchers, placeHolderContent, options);
+  if (matches.length > 0) {
+    var bestMatch = null;
+    for (var _i6 = 0; _i6 < matches.length; _i6++) {
+      var _match = matches[_i6];
+      _match.priority || (_match.priority = -_match.value.length);
+      if (!bestMatch || _match.priority > bestMatch.priority) {
+        bestMatch = _match;
+      }
+    }
+    bestMatch.offset = startOffset;
+    delete bestMatch.priority;
+    bestMatch.endLindex = endLindex;
+    bestMatch.lIndex = endLindex;
+    bestMatch.raw = placeHolderContent;
+    if (bestMatch.onMatch) {
+      bestMatch.onMatch(bestMatch);
+    }
+    delete bestMatch.onMatch;
+    delete bestMatch.prefix;
+    return bestMatch;
+  }
+  for (var _i8 = 0; _i8 < modules.length; _i8++) {
+    var _module3 = modules[_i8];
+    moduleParsed = _module3.parse(placeHolderContent, options);
+    if (moduleParsed) {
+      moduleParsed.offset = startOffset;
+      moduleParsed.endLindex = endLindex;
+      moduleParsed.lIndex = endLindex;
+      moduleParsed.raw = placeHolderContent;
+      return moduleParsed;
+    }
+  }
+  return {
+    type: "placeholder",
+    value: placeHolderContent,
+    offset: startOffset,
+    endLindex: endLindex,
+    lIndex: endLindex
+  };
+}
+var parser = {
+  preparse: function preparse(parsed, modules, options) {
+    function preparse(parsed, options) {
+      for (var _i0 = 0; _i0 < modules.length; _i0++) {
+        var _module4 = modules[_i0];
+        parsed = _module4.preparse(parsed, options) || parsed;
+      }
+      return parsed;
+    }
+    return preparse(parsed, options);
+  },
+  parse: function parse(lexed, modules, options) {
+    var inPlaceHolder = false;
+    var placeHolderContent = "";
+    var startOffset;
+    var tailParts = [];
+    var droppedTags = options.fileTypeConfig.droppedTagsInsidePlaceholder || [];
+    return lexed.reduce(function (parsed, token) {
+      if (token.type === "delimiter") {
+        inPlaceHolder = token.position === "start";
+        if (token.position === "end") {
+          options.parse = function (placeHolderContent) {
+            return moduleParse(placeHolderContent, _objectSpread(_objectSpread(_objectSpread({}, options), token), {}, {
+              startOffset: startOffset,
+              modules: modules
+            }));
+          };
+          parsed.push(options.parse(wordToUtf8(placeHolderContent)));
+          pushArray(parsed, tailParts);
+          tailParts = [];
+        }
+        if (token.position === "start") {
+          tailParts = [];
+          startOffset = token.offset;
+        }
+        placeHolderContent = "";
+        return parsed;
+      }
+      if (!inPlaceHolder) {
+        parsed.push(token);
+        return parsed;
+      }
+      if (token.type !== "content" || token.position !== "insidetag") {
+        if (options.syntax.preserveNewlinesInTags && (isBreakTag(token) || isParagraphStart(token))) {
+          placeHolderContent += "\n";
+        }
+        if (droppedTags.indexOf(token.tag) !== -1) {
+          return parsed;
+        }
+        tailParts.push(token);
+        return parsed;
+      }
+      placeHolderContent += token.value;
+      return parsed;
+    }, []);
+  },
+  postparse: function postparse(postparsed, modules, options) {
+    function getTraits(traitName, postparsed, options) {
+      var result = [];
+      for (var _i10 = 0; _i10 < modules.length; _i10++) {
+        var _module5 = modules[_i10];
+        result.push(_module5.getTraits(traitName, postparsed, options));
+      }
+      return result;
+    }
+    var errors = [];
+    function _postparse(postparsed, options) {
+      var newPostparsed = postparsed;
+      for (var _i12 = 0; _i12 < modules.length; _i12++) {
+        var _module6 = modules[_i12];
+        var postparseResult = _module6.postparse(newPostparsed, _objectSpread(_objectSpread({}, options), {}, {
+          postparse: function postparse(parsed, opts) {
+            return _postparse(parsed, _objectSpread(_objectSpread({}, options), opts));
+          },
+          getTraits: getTraits
+        }));
+        if (postparseResult == null) {
+          continue;
+        }
+        if (postparseResult.errors) {
+          pushArray(errors, postparseResult.errors);
+          newPostparsed = postparseResult.postparsed;
+          continue;
+        }
+        newPostparsed = postparseResult;
+      }
+      return newPostparsed;
+    }
+    return {
+      postparsed: _postparse(postparsed, options),
+      errors: errors
+    };
+  }
+};
+module.exports = parser;

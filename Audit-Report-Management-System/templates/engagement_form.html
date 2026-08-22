@@ -1,0 +1,27 @@
+{% extends 'base.html' %}{% block content %}
+<h1>{% if edit_mode %}Edit Engagement{% elif carry_from %}Create Next-Year Engagement{% else %}Add Engagement{% endif %}</h1>
+{% if carry_from %}<div class="recommend">Carrying forward from <strong>{{carry_from.FinancialYear}}</strong>. Review every field before saving. The previous engagement is auto-populated for traceability and remains editable if required. Review every field before saving.</div>{% endif %}
+<form method="post" action="{{ url_for('engagement_new') if carry_from else (url_for('engagement_edit', engagement_id=engagement.EngagementID) if edit_mode else url_for('engagement_new')) }}" class="card">
+<div class="grid">
+<label>Engagement ID<input name="EngagementID" value="{{engagement.EngagementID if engagement else ''}}" {% if edit_mode %}readonly{% endif %}></label>
+<label>Client*<select name="ClientID" required {% if edit_mode %}disabled{% endif %}>{% for c in clients %}<option value="{{c.ClientID}}" {% if (engagement and engagement.ClientID==c.ClientID) or (carry_from and carry_from.ClientID==c.ClientID) %}selected{% endif %}>{{c.ClientName}}{% if c.CIN %} — {{c.CIN}}{% endif %}</option>{% endfor %}</select>{% if edit_mode %}<input type="hidden" name="ClientID" value="{{engagement.ClientID}}">{% endif %}</label>
+<label>Financial Year*<input name="FinancialYear" value="{{engagement.FinancialYear if engagement else ('2026-27' if carry_from else '')}}" required></label>
+<label>Year Ending*<input name="YearEnding" value="{{engagement.YearEnding if engagement else ('31st March, 2027' if carry_from else '')}}" required></label>
+<label>Entity Type*<select name="EntityType" required>{% for k,v in entity_options.items() %}<option value="{{k}}" {% if (engagement and engagement.EntityType==k) or (carry_from and carry_from.EntityType==k) %}selected{% endif %}>{{v}}</option>{% endfor %}</select></label>
+<label>Small Company*<select name="SmallCompany" required><option value="No" {% if (not engagement and not carry_from) or (engagement and engagement.SmallCompany!='Yes') or (carry_from and carry_from.SmallCompany!='Yes') %}selected{% endif %}>No</option><option value="Yes" {% if (engagement and engagement.SmallCompany=='Yes') or (carry_from and carry_from.SmallCompany=='Yes') %}selected{% endif %}>Yes</option></select></label>
+<label>Opinion*<select name="Opinion" required>{% for k,v in opinion_options.items() %}<option value="{{k}}" {% if (engagement and engagement.Opinion==k) or (carry_from and carry_from.Opinion==k) %}selected{% endif %}>{{v}}</option>{% endfor %}</select></label>
+<label>CA Firm*<select name="FirmID" id="firm_id" required>{% for f in firms %}<option value="{{f.FirmID}}" {% if (engagement and engagement.FirmID==f.FirmID) or (carry_from and carry_from.FirmID==f.FirmID) %}selected{% endif %}>{{f.FirmName}} — {{f.FRN}}</option>{% endfor %}</select></label>
+<label>Signing Partner*<select name="PartnerID" id="partner_id" required>{% for p in partners %}<option value="{{p.PartnerID}}" {% if (engagement and engagement.PartnerID==p.PartnerID) or (carry_from and carry_from.PartnerID==p.PartnerID) %}selected{% endif %}>{{p.PartnerName}} — {{p.MembershipNo}}</option>{% endfor %}</select></label>
+<label>Place<input name="Place" value="{{engagement.Place if engagement else (carry_from.Place if carry_from else '')}}"></label>
+<label>Status<select name="Status"><option value="Active" {% if not engagement or engagement.Status=='Active' %}selected{% endif %}>Active</option><option value="Closed" {% if engagement and engagement.Status=='Closed' %}selected{% endif %}>Closed</option></select></label>
+<label>Previous Engagement ID<input name="PreviousEngagementID" value="{{engagement.PreviousEngagementID if engagement else (carry_from.EngagementID if carry_from else '')}}" {% if carry_from %}title="Auto-populated from the prior engagement; editable if professional judgement requires a different reference."{% endif %}></label>
+<label style="grid-column:1/-1">Notes<textarea name="Notes" rows="3">{{engagement.Notes if engagement else ''}}</textarea></label>
+</div>
+<div class="actions"><button type="submit">{% if edit_mode %}Update Engagement{% else %}Save Engagement{% endif %}</button><a class="button secondary" href="{{url_for('engagements')}}">Cancel</a></div>
+</form>
+<script>
+const f=document.getElementById('firm_id'),p=document.getElementById('partner_id');
+async function refresh(){const selected=p.value; p.innerHTML='<option value="">Select Partner</option>'; if(!f.value)return; const ps=await (await fetch('/api/partners/'+encodeURIComponent(f.value))).json(); ps.forEach(x=>{let o=document.createElement('option');o.value=x.PartnerID;o.textContent=x.PartnerName+' — '+x.MembershipNo;if(x.PartnerID===selected)o.selected=true;p.appendChild(o);});}
+f.addEventListener('change',refresh);
+</script>
+{% endblock %}

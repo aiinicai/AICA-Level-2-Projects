@@ -1,0 +1,58 @@
+
+PuruNiti Smart Billing Suite
+
+Create a professional, offline-first Python desktop application named "PuruNiti Smart Billing Suite" designed for small taxpayers, consultants, lawyers, and professionals. The system must streamline invoicing, timesheet logging, client registries (CRM), analytics, and accounting exports (Tally Prime / GSTR-1).
+
+## 🛠️ Technical Stack & Architecture
+*   **Frontend GUI**: Built using Python PyQt5 with a clean, modern stylesheet (white, slate-blue, and red accents) and real-time input validations.
+*   **Database Layer**: Structured SQLite3 relational database with automated schema creation, column migrations, and transactional safety.
+*   **PDF Generation**: ReportLab engine utilizing vector layouts and custom page numbers (Page X of Y) for invoices.
+*   **Spreadsheet Parsing**: openpyxl to compile official GSTR-1 return reports and Excel timesheet logs.
+*   **Word Processor**: python-docx to generate editable Microsoft Word timesheet summaries.
+*   **Distribution**: Enforce absolute portability by building a single, standalone Windows executable (.exe) via PyInstaller.
+
+---
+
+## ✅ Core Functional & Interface Modules
+
+### 1. Invoicing & Billing Engine (Goods vs. Services Mode)
+*   **Dual Invoicing Modes**:
+    *   **Goods Mode (Qty/Rate)**: Includes columns and fields for Quantity, Rate, Taxable Value, GST %, Cess %, and Cess Amount.
+    *   **Services Mode (Amount Only)**: Dynamically hides/suppresses the Qty, Rate, Cess %, and Cess Amount columns from the line items grid, hides the Cess % input from the form, and hides the "Cess Total" row from the bottom summary. Automatically renames the input labels from "Rate" to "Amount".
+*   **Automated GST Tax Computations**:
+    *   Auto-calculates Subtotal, CGST, SGST, IGST, Round-off, and Grand Total.
+    *   Autodetects CGST/SGST vs. IGST states dynamically by comparing the first 2 digits of the Supplier's and Customer's GSTINs.
+*   **Outward Reverse Charge (RCM)**:
+    *   Toggle option for "RCM Applicable".
+    *   When enabled, it displays a highlighted warning on the preview and automatically balances ledger credits for Tally XML exports (excluding tax lines from the customer's billable total).
+
+### 2. Interactive Analytics Dashboard & GSTR-1 Reports
+*   **Live Metrics Panel**: Displays total taxable sales, CGST, SGST, IGST, and Cess collections for selected date ranges.
+*   **Compliance Reports**:
+    *   **Excel GSTR-1**: Compiles GSTR-1 returns into structured B2B (registered clients) and B2CS (unregistered consumer sales) spreadsheet templates ready for portal upload.
+    *   **PDF GSTR-1**: Generates a professional tax summaries document for audits.
+
+### 3. CRM & Client Registry with Legacy Importer
+*   **Contacts Directory Manager**: Search, save, edit, or delete customer cards (Name, Mobile, Email, Address, GSTIN, PAN, PIN Code, State).
+*   **Validation Styling**: Real-time regex matching that highlights GSTIN, PAN, and PIN fields with green (valid) or red (invalid) borders.
+*   **Legacy Import Engine**: 
+    *   Allows importing client directories from Excel (.xlsx) or JSON files.
+    *   **Smart Merging (Upsert)**: Automatically updates fields in-place if a contact matches a name, mobile, or GSTIN already in the database.
+    *   **State Auto-Detect**: Extracts the state code prefix from GSTIN headers if the State field is left blank.
+
+### 4. Timesheets & Billing Automation
+*   **Log Book**: Add activity logs (Date, Activity Description, Hours, Rate, Line Total) under draft timesheets.
+*   **Multi-Format Exporters**: Exports timesheet registers in professional PDF, openpyxl Excel sheet formats, or python-docx MS Word files.
+*   **Timesheet-to-Invoice Converter**: A single-button pipeline that converts a saved timesheet into a service invoice draft (populating customer details from CRM and setting the service line description and total automatically).
+
+### 5. Vector PDF Customizer (3 Layout Presets)
+Allow selecting from 3 invoice print template styles:
+*   **Classic Elegant**: A formal double-bordered layout using deep navy blue accents, standard tables, and formal spacing.
+*   **Modern Minimalist**: Sans-serif headings, a borderless table layout with light teal accent banners, and modern typography.
+*   **Professional Compact**: Designed to maximize line entries on a single sheet. Compress margins, padding, row heights, and text sizing dynamically.
+
+### 6. Tally Prime XML Sync Engine
+*   **Split Exports**: Automatically generates a package containing two XML files:
+    1.  `tally_masters.xml`: Compiles and pre-creates required Ledger accounts (Sales, CGST, SGST, IGST, Cess, Round-Off, Customer Ledgers).
+    2.  `tally_vouchers.xml`: Maps transactions under the Sales register with custom voucher numbers (bypassing Tally sequence overrides) and detailed item descriptions in the Narration node.
+```

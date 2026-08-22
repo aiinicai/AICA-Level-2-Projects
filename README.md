@@ -11,13 +11,6 @@ Two methods are covered:
 
 ---
 
-## Save your repository as -
-
-# AICA-L2-Batch-(XXX)-Name-Surname
-
-
----
-
 ## Fork + Pull Request Workflow
 
 1. **Fork:** Create a personal copy of `aiinicai/AICA-Level-2-Projects` under your GitHub account.
