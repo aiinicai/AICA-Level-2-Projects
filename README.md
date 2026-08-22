@@ -1,268 +1,687 @@
-# Upload Your Project Folder to the AICA Level 2 Projects Repository
+# PO Compliance Dashboard
 
-**Target repository:** [aiinicai/AICA-Level-2-Projects](https://github.com/aiinicai/AICA-Level-2-Projects)
+Role
 
-This guide explains how to contribute your complete project folder to the **AICA-Level-2-Projects** repository using GitHub’s **Fork + Pull Request** workflow.
+Act as a senior Internal Auditor, Procurement Control Specialist, Data Analyst, and full-stack application architect.
 
-Two methods are covered:
+I want to build a professional PO Compliance Dashboard for an audit/finance use case.
 
-1. **Website-only method** — no software installation required.
-2. **Git command-line method** — recommended for complete project folders and projects containing many files.
+The objective is to analyse Purchase Order data, automatically perform predefined audit and compliance tests, identify exceptions, assign risk scores, and present the results through an interactive management dashboard.
 
----
+1. Project Objective
 
-## Fork + Pull Request Workflow
+Build a web-based PO Compliance Audit & Risk Analytics System that helps an auditor answer:
 
-1. **Fork:** Create a personal copy of `aiinicai/AICA-Level-2-Projects` under your GitHub account.
-2. **Add your folder:** Upload or copy your project folder into your fork.
-3. **Commit:** Save the changes in your fork with a clear commit message.
-4. **Open a Pull Request:** Request the `aiinicai` account to merge your changes into the original repository.
-5. **Merge:** The repository owner reviews and accepts your Pull Request. After it is merged, your project folder will appear in the official repository.
+Are POs being created according to procurement procedures?
 
----
+Are POs properly approved?
 
-# Method 1: Website Only
+Are POs being created before invoices/GRNs?
 
-Use this method if:
+Are there potential cases of purchase splitting?
 
-- You do not want to install Git.
-- Your project contains relatively few files.
-- You do not need to preserve the project’s earlier commit history.
+Are POs being modified unusually?
 
-> [!NOTE]
-> GitHub’s web uploader generally allows up to 100 files in a single upload. If your project contains more files, upload them in batches or use the Git command-line method.
+Are POs expired or remaining open for excessive periods?
 
-## Step 1: Fork the Repository
+Are mandatory PO fields complete?
 
-1. Log in to your GitHub account.
-2. Open the [AICA-Level-2-Projects repository](https://github.com/aiinicai/AICA-Level-2-Projects).
-3. Click **Fork** in the upper-right corner of the page.
-4. On the **Create a new fork** page, keep the default settings.
-5. Click **Create fork**.
+Are there unusual vendor/PO patterns?
 
-You will be redirected to your personal copy of the repository:
+Which POs require immediate audit attention?
 
-```text
-https://github.com/YOUR-USERNAME/AICA-Level-2-Projects
-```
+The system must support an audit-by-exception approach, allowing an auditor to focus on high-risk transactions rather than manually reviewing the entire population.
 
-Replace `YOUR-USERNAME` with your GitHub username.
+2. Target Users
 
-## Step 2: Upload Your Project Folder
+Primary users:
 
-GitHub provides two ways to add a folder through the website.
+Internal Auditors
 
-### Option A: Drag and Drop the Complete Folder
+Finance & Accounts teams
 
-1. Open your fork of the repository.
-2. Click **Add file** → **Upload files**.
-3. Open the parent location of your project folder in File Explorer.
-4. Drag the **complete project folder**—not only the files inside it—into GitHub’s upload area.
-5. Wait until all the files appear in the upload list.
+Procurement teams
 
-Modern browsers such as Google Chrome and Microsoft Edge generally preserve the folder structure during upload.
+Management
 
-### Option B: Create the Folder Using a File Path
+Compliance teams
 
-1. Open your fork of the repository.
-2. Click **Add file** → **Create new file**.
-3. In the filename box, enter:
+The interface should be professional and suitable for CFO and top management.
 
-   ```text
-   MyProjectName/README.md
-   ```
+3. Data Sources
 
-   Typing `/` in the filename automatically creates the folder.
+Design the application to accept CSV/XLSX files.
 
-4. Add a short description of your project to the new `README.md` file.
-5. Click **Commit changes**.
-6. Open the newly created folder.
-7. Click **Add file** → **Upload files** and upload the remaining project files.
+Primary PO Register fields may include:
 
-Replace `MyProjectName` with the name of your project.
+PO Number
 
-## Step 3: Commit the Upload
+PO Date
 
-1. Scroll down to the **Commit changes** section.
-2. Enter a clear commit message, for example:
+Vendor Code
 
-   ```text
-   Add <Your Name> - <Project Name> project folder
-   ```
+Vendor Name
 
-3. Keep **Commit directly to the main branch** selected.
-4. Click **Commit changes**.
+Material/Service Description
 
-Because this is your personal fork, committing directly to its `main` branch is acceptable for this submission workflow.
+Category
 
-## Step 4: Open a Pull Request
+Quantity
 
-1. Return to the main page of your fork.
-2. GitHub may display a banner stating:
+Unit Rate
 
-   ```text
-   This branch is X commits ahead of aiinicai:main
-   ```
+PO Value
 
-3. Click **Contribute** → **Open pull request**.
+Currency (INR)
 
-Alternatively:
+Department
 
-1. Open the **Pull requests** tab.
-2. Click **New pull request**.
+Cost Centre
 
-Before creating the Pull Request, confirm the following direction:
+Plant
 
-| Setting | Selection |
-| --- | --- |
-| Base repository | `aiinicai/AICA-Level-2-Projects` |
-| Base branch | `main` |
-| Head repository | `YOUR-USERNAME/AICA-Level-2-Projects` |
-| Compare branch | `main` |
+Requester
 
-Then:
+Approver
 
-1. Enter a clear Pull Request title, for example:
+Approval Level
 
-   ```text
-   Add AICA Level 2 Project - <Your Name>
-   ```
+Required Approval Level
 
-2. In the description, briefly explain:
-   - The purpose of your project.
-   - Its main features.
-   - Any setup or usage instructions.
-3. Click **Create pull request**.
+Approval Date
 
-## Step 5: Wait for Review and Merge
+Valid From
 
-The owner of the `aiinicai/AICA-Level-2-Projects` repository will receive your Pull Request.
+Valid To
 
-The repository owner may:
+Delivery Date
 
-- Review your project.
-- Ask questions.
-- Suggest changes.
-- Approve and merge the Pull Request.
+Payment Terms
 
-If changes are requested, update the files in your fork and commit them. Your existing Pull Request will update automatically.
+PO Status
 
-After the Pull Request is merged, your project folder will become part of the official repository.
+Modification Date
 
----
+Original PO Value
 
-# Method 2: Git Command Line
+Invoice Date
 
-This method is recommended when:
+GRN Date
 
-- Your project contains many files.
-- You want to upload the complete folder structure reliably.
-- You are comfortable using Git commands.
+Other supporting datasets:
 
-## Prerequisites
+Vendor Master
 
-Before beginning:
+Vendor Code
 
-- Install [Git](https://git-scm.com/downloads).
-- Create or log in to your GitHub account.
-- Fork the [AICA-Level-2-Projects repository](https://github.com/aiinicai/AICA-Level-2-Projects) as explained in Method 1.
+Vendor Name
 
-## Step 1: Clone Your Fork
+GSTIN
 
-Open Terminal, Command Prompt, PowerShell, or Git Bash and run:
+PAN
 
-```bash
-git clone https://github.com/YOUR-USERNAME/AICA-Level-2-Projects.git
-```
+Vendor Status
 
-Then open the cloned repository:
+Vendor Category
 
-```bash
-cd AICA-Level-2-Projects
-```
+UDIN (MSME vendor)
 
-Replace `YOUR-USERNAME` with your GitHub username.
+Vendor Creation Date
 
-## Step 2: Copy Your Project Folder
+Invoice Register
 
-Copy your complete project folder into the cloned `AICA-Level-2-Projects` directory.
+Invoice Number
 
-Recommended folder naming format:
+Invoice Date
 
-```text
-YourName-ProjectName/
-```
+PO Number
+
+Vendor Code
+
+Vendor Name
+
+Base Invoice Amount
+
+GST Amount
+
+Total Invoice Value
+
+GRN Register
+
+GRN Number
+
+GRN Date
+
+PO Number
+
+Vendor Code
+
+Vendor Name
+
+Received Quantity
+
+Received Value
+
+If some fields are unavailable in excel, the application must clearly state as Not Applicable and identify the corresponding audit test as "Not Tested" rather than inventing data.
+
+4. Audit Rules Engine
+
+Implement configurable audit rules.
+
+A. PO Process Compliance
+
+Rule 1 — PO Created After Invoice
+
+Flag when Invoice Date < PO Date.
+
+Risk: HIGH
+
+Rule 2 — PO Created After GRN
+
+Flag when GRN Date < PO Date.
+
+Risk: HIGH
+
+Rule 3 — Missing Approval
+
+Flag when required approval information is missing.
+
+Risk: HIGH
+
+Rule 4 — Approval Level Exception
+
+Compare Actual Approval Level against Required Approval Level.
+
+Flag when Actual Approval Level is lower than Required Approval Level.
+
+Risk: CRITICAL
+
+Rule 5 — Missing Mandatory Fields
+
+Check configurable mandatory fields such as:
+
+Vendor
+
+PO value
+
+Approval
+
+Payment terms
+
+Cost centre
+
+Delivery date
+
+Risk: MEDIUM
+
+Rule 6 — Expired PO
+
+Flag open POs where Valid To is before the current date.
+
+Risk: MEDIUM
+
+Rule 7 — Long-Open PO
+
+Flag open POs exceeding configurable aging thresholds:
+
+30 days - OKAY
+
+90 days -MEDIUM
+
+180 days - HIGH
+
+365 days - HIGH
+
+Risk: MEDIUM/HIGH depending on aging.
+
+5. Purchase Splitting Detection
+
+Create an analytical rule to identify potential purchase splitting.
+
+Look for multiple POs:
+
+For the same vendor
+
+Within a configurable number of days
+
+In the same/similar category
+
+With individual values close to an approval threshold
 
 Example:
 
-```text
-Rahul-Sharma-AI-Invoice-Analyzer/
+PO 1 = ₹4.8 lakh
+PO 2 = ₹4.7 lakh
+PO 3 = ₹4.9 lakh
+
+If the approval threshold is ₹5 lakh, flag the combined transaction pattern for review.
+
+Important:
+Do NOT label this as confirmed fraud or misconduct.
+
+Use wording such as:
+
+"Potential Purchase Splitting — Requires Audit Review."
+
+6. PO Value and Modification Analytics
+
+Identify:
+
+PO value exceeding approval thresholds
+
+Significant PO modifications
+
+PO value increasing materially after initial approval
+
+Unusual PO values
+
+Repeated modifications
+
+Large deviations from original PO value
+
+Calculate:
+
+Modification % =
+(Current PO Value - Original PO Value) / Original PO Value × 100
+
+Create configurable thresholds, for example:
+
+10% = Review
+
+25% = High Risk
+
+50% = Critical Review
+
+7. Vendor-Level Analytics
+
+Provide vendor-level analysis including:
+
+Number of POs
+
+Total PO value
+
+Average PO value
+
+Number of exceptions
+
+High-risk POs
+
+Modification frequency
+
+Potential split-PO patterns
+
+Open PO value
+
+Expired PO value
+
+Allow the auditor to click a vendor and drill down into its PO history.
+
+8. Risk Scoring
+
+Create a transparent, rule-based risk score.
+
+Example:
+
+Critical approval exception: +40
+
+PO after invoice: +30
+
+PO after GRN: +30
+
+Potential purchase splitting: +35
+
+Significant PO modification: +20
+
+Expired PO: +15
+
+Missing mandatory information: +10
+
+Long-open PO: +10
+
+Cap the score at 100.
+
+Risk categories:
+
+0–29 = LOW
+30–59 = MEDIUM
+60–79 = HIGH
+80–100 = CRITICAL
+
+Display both:
+
+Overall risk score
+
+Individual reasons contributing to the score
+
+The system must never present the risk score as proof of fraud. It is an audit prioritisation mechanism.
+
+9. Dashboard
+
+Create a professional executive dashboard.
+
+Top KPI cards:
+
+Total POs
+
+Total PO Value
+
+Compliant POs
+
+Exception POs
+
+Compliance %
+
+High/Critical Risk POs
+
+Open PO Value
+
+Potential Financial Exposure
+
+Charts:
+
+Compliance vs Exceptions
+
+Risk Distribution
+
+Exceptions by Audit Rule
+
+PO Value by Department
+
+PO Value by Vendor
+
+Monthly PO Trend
+
+Open PO Aging
+
+High-Risk Vendors
+
+Use professional finance/audit colours:
+
+Green = Compliant
+
+Amber = Medium Risk
+
+Orange = High Risk
+
+Red = Critical Risk
+
+Blue = Neutral/Information
+
+Avoid excessive decorative graphics.
+
+10. Exception Register
+
+Create a detailed audit exception table containing:
+
+PO Number
+
+PO Date
+
+Vendor
+
+PO Value
+
+Department
+
+Audit Rule
+
+Exception Description
+
+Risk Score
+
+Risk Category
+
+Financial Impact/Exposure
+
+Status
+
+Recommended Action
+
+Allow filtering by:
+
+Risk
+
+Vendor
+
+Department
+
+Date
+
+PO value
+
+Audit rule
+
+Status
+
+Provide search and sorting.
+
+11. PO Drill-Down
+
+When a user selects a PO, show:
+
+PO Information
+
+Vendor, amount, date, department, status, approver.
+
+Compliance Tests
+
+Show each test as:
+
+PASS
+FAIL
+NOT TESTED
+
+Exception Explanation
+
+Clearly explain why the PO was flagged.
+
+Risk Score
+
+Show the score and contributing rules.
+
+Audit Recommendation
+
+Provide a concise suggested audit action.
+
+12. Audit Report
+
+Allow the user to export an audit-ready exception report.
+
+The report should contain:
+
+Executive summary
+
+Population analysed
+
+Total PO value
+
+Compliance rate
+
+Number of exceptions
+
+High/Critical risk items
+
+Exception categories
+
+Top risky vendors
+
+Key observations
+
+Recommended actions
+
+Do not make unsupported claims such as "fraud detected."
+
+Use professional audit language:
+
+"Exception identified"
+
+"Potential control weakness"
+
+"Requires management review"
+
+"Requires further audit verification"
+
+13. Data Quality
+
+Before analysing data, perform validation for:
+
+Missing values
+
+Duplicate PO numbers
+
+Invalid dates
+
+Negative values
+
+Incorrect data types
+
+Missing vendor codes
+
+Inconsistent vendor names
+
+Invalid approval levels
+
+Display a separate Data Quality Summary.
+
+14. Configurable Audit Parameters
+
+Do not hard-code business rules unnecessarily.
+
+Provide an Audit Settings section where an administrator can configure:
+
+Approval thresholds
+
+PO aging thresholds
+
+Purchase splitting time window
+
+PO modification percentage
+
+Mandatory fields
+
+Risk scoring weights
+
+Don’t generate any illustrative things.
+
+Clearly state that these thresholds are illustrative and should be replaced by the organisation's actual procurement policy.
+
+15. User Experience
+
+Design a modern, clean and professional interface suitable for:
+
+CFO/Finance Head
+
+Internal Audit Head
+
+Procurement Head
+
+Navigation:
+
+Dashboard
+
+PO Analysis
+
+Exception Register
+
+Vendor Risk
+
+Aging Analysis
+
+Data Quality
+
+Audit Rules
+
+Settings
+
+Reports
+
+Include:
+
+Responsive design
+
+Search
+
+Filters
+
+Sorting
+
+Drill-down
+
+Export functionality
+
+Clear legends
+
+Tooltips explaining audit rules
+
+16. Important Audit Principles
+
+The application must distinguish between:
+
+Fact
+and
+Audit inference
+
+For example:
+
+Do NOT say:
+"Vendor committed fraud."
+
+Say:
+"Transaction exhibits indicators requiring further audit investigation."
+
+Every exception should show the underlying data and rule that caused the exception.
+
+17. Final Deliverable
+
+Build a fully functional prototype rather than a static mock-up.
+
+Prioritise:
+
+Correct audit logic
+
+Transparent calculations
+
+Useful exception identification
+
+Professional dashboard
+
+Easy drill-down
+
+Audit-ready reporting
+
+Data privacy and security
+
+ 
+
+The final product name should be:
+
+PO-COMPLIANCE DASHBOARD
+
+Purchase Order Compliance & Audit Risk Analytics
+
+Include a subtitle:
+
+"From Transaction Data to Audit Exceptions."
+
+This project was built with [Lovable](https://lovable.dev).
+
+**Live app**: https://pocompliancedashboard.lovable.app
+
+## Build with Lovable
+
+Continue developing this project in the [Lovable editor](https://lovable.dev/projects/b7cc2c9f-fea7-4c1f-ab32-b31b4c5c1199).
+
+- **Ship faster**: describe what you want to build and Lovable handles the code.
+- **Stay in sync**: every change made in Lovable is committed straight to this repository.
+- **Full ownership**: this code is yours. Push to `main` on GitHub and your changes sync back into Lovable, ready for your next prompt.
+
+## Development
+
+Prefer working locally? You need Node.js and npm — [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating).
+
+```sh
+git clone <this-repository-url>
+cd <repository-name>
+npm i
+npm run dev
 ```
-
-## Step 3: Review the Changes
-
-Run:
-
-```bash
-git status
-```
-
-Confirm that Git lists only the files and folders you intend to submit.
-
-## Step 4: Stage and Commit the Project
-
-Stage your project folder:
-
-```bash
-git add YourName-ProjectName/
-```
-
-Commit the changes:
-
-```bash
-git commit -m "Add <Your Name> - <Project Name> project folder"
-```
-
-## Step 5: Push the Changes to Your Fork
-
-Run:
-
-```bash
-git push origin main
-```
-
-Your project folder will now appear in your fork on GitHub.
-
-## Step 6: Open a Pull Request
-
-1. Open your fork on GitHub.
-2. Click **Contribute** → **Open pull request**.
-3. Confirm the base and compare repositories:
-
-| Setting | Selection |
-| --- | --- |
-| Base repository | `aiinicai/AICA-Level-2-Projects` |
-| Base branch | `main` |
-| Head repository | `YOUR-USERNAME/AICA-Level-2-Projects` |
-| Compare branch | `main` |
-
-4. Add a clear title and project description.
-5. Click **Create pull request**.
-
----
-
-## Before Submitting
-
-Please verify the following:
-
-- Your complete project is inside one clearly named folder.
-- Your folder includes a `README.md` explaining the project.
-- The project does not contain passwords, API keys, access tokens, or other confidential information.
-- Unnecessary generated files and dependency folders are excluded where applicable.
-- The project opens or runs using the instructions included in its `README.md`.
-- Your Pull Request targets `aiinicai/AICA-Level-2-Projects` on the `main` branch.
-
-## Need to Update Your Submission?
-
-If your Pull Request is still open, make the required changes in the same fork and branch, then commit and push them. GitHub will automatically add the new commits to the existing Pull Request.
-
