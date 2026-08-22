@@ -1,268 +1,185 @@
-# Upload Your Project Folder to the AICA Level 2 Projects Repository
+# 📄 All Things PDF
 
-**Target repository:** [aiinicai/AICA-Level-2-Projects](https://github.com/aiinicai/AICA-Level-2-Projects)
-
-This guide explains how to contribute your complete project folder to the **AICA-Level-2-Projects** repository using GitHub’s **Fork + Pull Request** workflow.
-
-Two methods are covered:
-
-1. **Website-only method** — no software installation required.
-2. **Git command-line method** — recommended for complete project folders and projects containing many files.
+A fully offline, professional PDF utility desktop app built with Python and tkinter.  
+Inspired by iLovePDF. Green & white design based on DPS Family colour scheme.  
+No internet required. No browser. No server. Just run and use.
 
 ---
 
-## Fork + Pull Request Workflow
+## 🚀 Quick Start
 
-1. **Fork:** Create a personal copy of `aiinicai/AICA-Level-2-Projects` under your GitHub account.
-2. **Add your folder:** Upload or copy your project folder into your fork.
-3. **Commit:** Save the changes in your fork with a clear commit message.
-4. **Open a Pull Request:** Request the `aiinicai` account to merge your changes into the original repository.
-5. **Merge:** The repository owner reviews and accepts your Pull Request. After it is merged, your project folder will appear in the official repository.
+### Option 1 — Run as Python script (IDLE or CMD)
+```cmd
+python "All Things PDF.py"
+```
+
+### Option 2 — Build as .exe (no Python needed to run)
+```cmd
+pip install pyinstaller
+pyinstaller --onefile --noconsole --name "All Things PDF" "All Things PDF.py"
+```
+Your `.exe` will appear in the `dist\` folder.
 
 ---
 
-# Method 1: Website Only
+## 📦 Requirements
 
-Use this method if:
+Install once in CMD before first run:
 
-- You do not want to install Git.
-- Your project contains relatively few files.
-- You do not need to preserve the project’s earlier commit history.
-
-> [!NOTE]
-> GitHub’s web uploader generally allows up to 100 files in a single upload. If your project contains more files, upload them in batches or use the Git command-line method.
-
-## Step 1: Fork the Repository
-
-1. Log in to your GitHub account.
-2. Open the [AICA-Level-2-Projects repository](https://github.com/aiinicai/AICA-Level-2-Projects).
-3. Click **Fork** in the upper-right corner of the page.
-4. On the **Create a new fork** page, keep the default settings.
-5. Click **Create fork**.
-
-You will be redirected to your personal copy of the repository:
-
-```text
-https://github.com/YOUR-USERNAME/AICA-Level-2-Projects
+```cmd
+pip install pypdf pymupdf pillow
 ```
 
-Replace `YOUR-USERNAME` with your GitHub username.
+| Library | Version | Purpose |
+|---------|---------|---------|
+| pypdf | latest | Merge, split, encrypt, decrypt |
+| pymupdf | latest | Compress, watermark, redact, page numbers, grayscale |
+| pillow | latest | Image processing for compression |
+| tkinter | built-in | GUI (comes with Python) |
 
-## Step 2: Upload Your Project Folder
-
-GitHub provides two ways to add a folder through the website.
-
-### Option A: Drag and Drop the Complete Folder
-
-1. Open your fork of the repository.
-2. Click **Add file** → **Upload files**.
-3. Open the parent location of your project folder in File Explorer.
-4. Drag the **complete project folder**—not only the files inside it—into GitHub’s upload area.
-5. Wait until all the files appear in the upload list.
-
-Modern browsers such as Google Chrome and Microsoft Edge generally preserve the folder structure during upload.
-
-### Option B: Create the Folder Using a File Path
-
-1. Open your fork of the repository.
-2. Click **Add file** → **Create new file**.
-3. In the filename box, enter:
-
-   ```text
-   MyProjectName/README.md
-   ```
-
-   Typing `/` in the filename automatically creates the folder.
-
-4. Add a short description of your project to the new `README.md` file.
-5. Click **Commit changes**.
-6. Open the newly created folder.
-7. Click **Add file** → **Upload files** and upload the remaining project files.
-
-Replace `MyProjectName` with the name of your project.
-
-## Step 3: Commit the Upload
-
-1. Scroll down to the **Commit changes** section.
-2. Enter a clear commit message, for example:
-
-   ```text
-   Add <Your Name> - <Project Name> project folder
-   ```
-
-3. Keep **Commit directly to the main branch** selected.
-4. Click **Commit changes**.
-
-Because this is your personal fork, committing directly to its `main` branch is acceptable for this submission workflow.
-
-## Step 4: Open a Pull Request
-
-1. Return to the main page of your fork.
-2. GitHub may display a banner stating:
-
-   ```text
-   This branch is X commits ahead of aiinicai:main
-   ```
-
-3. Click **Contribute** → **Open pull request**.
-
-Alternatively:
-
-1. Open the **Pull requests** tab.
-2. Click **New pull request**.
-
-Before creating the Pull Request, confirm the following direction:
-
-| Setting | Selection |
-| --- | --- |
-| Base repository | `aiinicai/AICA-Level-2-Projects` |
-| Base branch | `main` |
-| Head repository | `YOUR-USERNAME/AICA-Level-2-Projects` |
-| Compare branch | `main` |
-
-Then:
-
-1. Enter a clear Pull Request title, for example:
-
-   ```text
-   Add AICA Level 2 Project - <Your Name>
-   ```
-
-2. In the description, briefly explain:
-   - The purpose of your project.
-   - Its main features.
-   - Any setup or usage instructions.
-3. Click **Create pull request**.
-
-## Step 5: Wait for Review and Merge
-
-The owner of the `aiinicai/AICA-Level-2-Projects` repository will receive your Pull Request.
-
-The repository owner may:
-
-- Review your project.
-- Ask questions.
-- Suggest changes.
-- Approve and merge the Pull Request.
-
-If changes are requested, update the files in your fork and commit them. Your existing Pull Request will update automatically.
-
-After the Pull Request is merged, your project folder will become part of the official repository.
+> **Python 3.9 or higher required.**  
+> tkinter is included with all standard Python Windows installers.
 
 ---
 
-# Method 2: Git Command Line
+## 🛠️ All Tools
 
-This method is recommended when:
+### 📂 Organize PDF
+| Tool | What it does |
+|------|-------------|
+| **Merge PDF** | Combine 2 or more PDFs into one, in the order you select |
+| **Split PDF** | Split into individual pages, or by custom page ranges (e.g. 1-3, 4-6) |
+| **Organise Pages** | Visual thumbnail grid — rotate ↺↻, delete ✕, drag to reorder |
 
-- Your project contains many files.
-- You want to upload the complete folder structure reliably.
-- You are comfortable using Git commands.
+### ⚡ Optimize PDF
+| Tool | What it does |
+|------|-------------|
+| **Compress PDF** | Reduces file size using image downsampling + stream deflation. Low / Medium / High levels. Works on scanned PDFs |
+| **Repair PDF** | Rebuilds corrupt xref table, removes damaged objects |
+| **Remove Metadata** | Strips author name, creation date, software info and GPS data |
+| **Grayscale PDF** | Converts all pages to black & white — reduces size 60–80% |
+| **Flatten PDF** | Bakes annotations and form fields into static content |
+| **Remove Blank Pages** | Auto-detects and removes empty or near-blank scanned pages |
 
-## Prerequisites
+### ✏️ Edit PDF
+| Tool | What it does |
+|------|-------------|
+| **Rotate PDF** | Rotate pages 90°, 180° or 270° — all pages or specific ones |
+| **Watermark** | Stamp text over pages — set position, opacity, font size, colour, rotation |
+| **Image Watermark** | Overlay a PNG/JPG image as watermark |
+| **Page Numbers** | Add page numbers with 3×3 position grid, colour swatches, from/to page range |
+| **Crop PDF** | Draw a rectangle directly on a page preview — crop current page or all pages |
 
-Before beginning:
-
-- Install [Git](https://git-scm.com/downloads).
-- Create or log in to your GitHub account.
-- Fork the [AICA-Level-2-Projects repository](https://github.com/aiinicai/AICA-Level-2-Projects) as explained in Method 1.
-
-## Step 1: Clone Your Fork
-
-Open Terminal, Command Prompt, PowerShell, or Git Bash and run:
-
-```bash
-git clone https://github.com/YOUR-USERNAME/AICA-Level-2-Projects.git
-```
-
-Then open the cloned repository:
-
-```bash
-cd AICA-Level-2-Projects
-```
-
-Replace `YOUR-USERNAME` with your GitHub username.
-
-## Step 2: Copy Your Project Folder
-
-Copy your complete project folder into the cloned `AICA-Level-2-Projects` directory.
-
-Recommended folder naming format:
-
-```text
-YourName-ProjectName/
-```
-
-Example:
-
-```text
-Rahul-Sharma-AI-Invoice-Analyzer/
-```
-
-## Step 3: Review the Changes
-
-Run:
-
-```bash
-git status
-```
-
-Confirm that Git lists only the files and folders you intend to submit.
-
-## Step 4: Stage and Commit the Project
-
-Stage your project folder:
-
-```bash
-git add YourName-ProjectName/
-```
-
-Commit the changes:
-
-```bash
-git commit -m "Add <Your Name> - <Project Name> project folder"
-```
-
-## Step 5: Push the Changes to Your Fork
-
-Run:
-
-```bash
-git push origin main
-```
-
-Your project folder will now appear in your fork on GitHub.
-
-## Step 6: Open a Pull Request
-
-1. Open your fork on GitHub.
-2. Click **Contribute** → **Open pull request**.
-3. Confirm the base and compare repositories:
-
-| Setting | Selection |
-| --- | --- |
-| Base repository | `aiinicai/AICA-Level-2-Projects` |
-| Base branch | `main` |
-| Head repository | `YOUR-USERNAME/AICA-Level-2-Projects` |
-| Compare branch | `main` |
-
-4. Add a clear title and project description.
-5. Click **Create pull request**.
+### 🔒 PDF Security
+| Tool | What it does |
+|------|-------------|
+| **Protect PDF** | Password-protect with user and/or owner password. Set print/copy permissions |
+| **Unlock PDF** | Remove password from an encrypted PDF |
+| **Redact Text** | Permanently black out text by keyword — irreversible |
+| **Redact Regions** | Permanently black out custom rectangular areas by page |
 
 ---
 
-## Before Submitting
+## 🖥️ How to Use
 
-Please verify the following:
+1. **Open the app** — run `All Things PDF.py` in IDLE (press F5) or in CMD
+2. **Click a tool card** on the home screen — the app navigates to the tool page
+3. **Browse your PDF** using the file picker (dropzone)
+4. **Set options** as needed (compression level, rotation, passwords etc.)
+5. **Click the action button** (e.g. "Compress PDF") — a Save As dialog appears
+6. **Choose where to save** — processing starts immediately after
+7. **Status bar** at the bottom shows progress and result
 
-- Your complete project is inside one clearly named folder.
-- Your folder includes a `README.md` explaining the project.
-- The project does not contain passwords, API keys, access tokens, or other confidential information.
-- Unnecessary generated files and dependency folders are excluded where applicable.
-- The project opens or runs using the instructions included in its `README.md`.
-- Your Pull Request targets `aiinicai/AICA-Level-2-Projects` on the `main` branch.
+All output files are also saved to:
+```
+C:\Users\YourName\AllThingsPDF_Output\
+```
 
-## Need to Update Your Submission?
+---
 
-If your Pull Request is still open, make the required changes in the same fork and branch, then commit and push them. GitHub will automatically add the new commits to the existing Pull Request.
+## 📁 File Structure
 
+```
+All Things PDF.py     ← the entire app in one file
+README.md             ← this file
+```
+
+All output files go to `~/AllThingsPDF_Output/`  
+Temporary files go to `~/AllThingsPDF_Temp/` (auto-cleaned)
+
+---
+
+## 🔒 Privacy
+
+- **100% offline** — no data leaves your computer, ever
+- No telemetry, no analytics, no internet connection required
+- Files are processed locally and saved wherever you choose
+
+---
+
+## ⚙️ Building the .exe
+
+```cmd
+pip install pyinstaller
+pyinstaller --onefile --noconsole --name "All Things PDF" "All Things PDF.py"
+```
+
+| Flag | Effect |
+|------|--------|
+| `--onefile` | Everything bundled into a single `.exe` |
+| `--noconsole` | No black CMD window on launch |
+| `--name "All Things PDF"` | Names the output file |
+
+The `.exe` will be at:
+```
+dist\All Things PDF.exe
+```
+
+Copy it anywhere — Desktop, Documents, USB drive. No Python needed to run it.
+
+> **Note:** First launch of the `.exe` may take 5–10 seconds as it unpacks.  
+> Windows Defender may flag it — this is a known PyInstaller false positive. Click "Allow" or add an exclusion.
+
+---
+
+## 🐛 Troubleshooting
+
+| Problem | Fix |
+|---------|-----|
+| `ModuleNotFoundError: pymupdf` | Run `pip install pymupdf` |
+| `ModuleNotFoundError: pypdf` | Run `pip install pypdf` |
+| `ModuleNotFoundError: PIL` | Run `pip install pillow` |
+| App opens but compress shows 0% smaller | The PDF is already fully compressed — try High level |
+| Compress is slow / not responding | Normal for very large scanned PDFs (80MB+). Wait for it to finish |
+| `.exe` flagged by antivirus | Known PyInstaller false positive — click Allow or add exclusion |
+| Scroll doesn't work with trackpad | Known tkinter limitation on Windows — use the scrollbar on the right |
+
+---
+
+## 📋 Keyboard Shortcuts
+
+| Shortcut | Action |
+|----------|--------|
+| `F5` in IDLE | Run the script |
+| Mouse wheel | Scroll within tool panels |
+| `Esc` / Back button | Return to home screen |
+
+---
+
+## 🏗️ Tech Stack
+
+| Component | Technology |
+|-----------|-----------|
+| Language | Python 3.9+ |
+| GUI | tkinter (built-in) |
+| PDF reading/writing | pypdf |
+| Advanced PDF ops | PyMuPDF (fitz) |
+| Image processing | Pillow (PIL) |
+| Packaging | PyInstaller |
+
+---
+
+## 📄 License
+
+Free to use for personal and professional purposes.  
+Built with open-source libraries — pypdf, PyMuPDF, Pillow.
