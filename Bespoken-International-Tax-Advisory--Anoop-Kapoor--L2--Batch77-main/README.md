@@ -30,4 +30,5 @@ Open Command Prompt and run:
   streamlit run app.py
 
 ## App opens at:
-  http://localhost:8501
+https://uzowssdyb5vokcval65ali.streamlit.app/
+  
