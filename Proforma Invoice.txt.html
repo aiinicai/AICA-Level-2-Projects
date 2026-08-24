@@ -1,0 +1,656 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Proforma Invoice - Advanced GST System</title>
+    <!-- SheetJS Library for Excel Export -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <style>
+        * { box-sizing: border-box; font-family: 'Segoe UI', Arial, sans-serif; margin: 0; padding: 0; }
+        body { background-color: #f1f5f9; padding: 20px; color: #1e293b; }
+        .invoice-card { max-width: 900px; margin: 0 auto; background: #fff; padding: 35px; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.08); }
+        
+        /* Header & Logo Styling */
+        .header-container { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #0f172a; padding-bottom: 15px; margin-bottom: 20px; }
+        .company-logo { max-height: 110px; max-width: 380px; object-fit: contain; }
+        .header-title-box { text-align: right; }
+        .header-title-box h1 { font-size: 24px; text-transform: uppercase; letter-spacing: 1px; color: #0f172a; margin: 0; }
+        .header-title-box p { font-size: 10px; color: #64748b; margin-top: 4px; font-weight: 600; max-width: 320px; }
+        
+        .top-bar-controls { display: flex; justify-content: space-between; background: #f8fafc; padding: 10px; border-radius: 6px; margin-bottom: 15px; border: 1px solid #e2e8f0; }
+        
+        .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px; }
+        .section-box { border: 1px solid #cbd5e1; padding: 12px; border-radius: 6px; background-color: #fafafa; position: relative; }
+        .section-box h3 { font-size: 13px; text-transform: uppercase; border-bottom: 1px solid #e2e8f0; padding-bottom: 4px; margin-bottom: 8px; color: #334155; display: flex; justify-content: space-between; align-items: center; }
+        
+        .form-group { margin-bottom: 6px; display: flex; align-items: center; }
+        .form-group label { font-size: 11px; width: 100px; font-weight: 600; color: #475569; }
+        .form-group input, .form-group select, .form-group textarea { flex: 1; padding: 5px; font-size: 11px; border: 1px solid #cbd5e1; border-radius: 4px; }
+        
+        table { width: 100%; border-collapse: collapse; margin: 15px 0; }
+        th, td { border: 1px solid #cbd5e1; padding: 8px; font-size: 11px; }
+        th { background-color: #f1f5f9; font-weight: 600; color: #334155; }
+        .text-right { text-align: right; }
+        .text-center { text-align: center; }
+        input.table-input { width: 100%; padding: 4px; border: 1px solid #e2e8f0; border-radius: 3px; font-size: 11px; }
+        
+        .summary-container { display: flex; justify-content: space-between; gap: 15px; margin-top: 15px; }
+        .bank-details { width: 50%; border: 1px solid #cbd5e1; padding: 12px; border-radius: 6px; font-size: 11px; line-height: 1.5; }
+        .totals-table { width: 48%; }
+        .totals-table td { padding: 4px 8px; }
+        .grand-total { font-weight: bold; background-color: #f1f5f9; font-size: 12px; }
+        .balance-due { font-weight: bold; background-color: #fee2e2; color: #991b1b; font-size: 12px; }
+        
+        .words-box { border: 1px solid #cbd5e1; padding: 8px; border-radius: 4px; font-size: 11px; margin-top: 12px; background-color: #f8fafc; }
+        
+        /* Terms & Signature Section */
+        .footer-declaration-grid { display: grid; grid-template-columns: 1.2fr 0.8fr; gap: 15px; margin-top: 15px; border-top: 1px solid #cbd5e1; padding-top: 15px; }
+        .terms-box { font-size: 10px; color: #475569; line-height: 1.4; }
+        .terms-box h4 { font-size: 11px; text-transform: uppercase; margin-bottom: 4px; color: #1e293b; }
+        .signature-box { text-align: center; border: 1px dashed #cbd5e1; padding: 10px; border-radius: 4px; background: #fafafa; display: flex; flex-direction: column; justify-content: space-between; }
+        .signature-title { font-size: 11px; font-weight: bold; color: #334155; }
+        .computer-generated-tag { font-size: 10px; font-style: italic; color: #64748b; margin-top: 25px; border-top: 1px solid #e2e8f0; padding-top: 4px; }
+
+        .btn { background-color: #2563eb; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 11px; font-weight: 600; margin: 2px; }
+        .btn-green { background-color: #10b981; }
+        .btn-slate { background-color: #475569; }
+        .btn-amber { background-color: #d97706; }
+        .btn-danger { background-color: #ef4444; padding: 2px 6px; font-size: 10px; }
+        .actions { text-align: center; margin-top: 20px; }
+
+        /* Modal Styles */
+        .modal { display: none; position: fixed; z-index: 10; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5); }
+        .modal-content { background-color: #fff; margin: 10% auto; padding: 20px; border-radius: 8px; width: 500px; box-shadow: 0 4px 20px rgba(0,0,0,0.2); }
+
+        /* PRINT STYLES */
+        @media print {
+            body { background: none; padding: 0; }
+            .invoice-card { box-shadow: none; padding: 0; width: 100%; max-width: 100%; }
+            .actions, .btn-add, .top-bar-controls, .btn-danger, .master-btn, .profile-select-group { display: none !important; }
+            input, select, textarea { border: none !important; background: transparent !important; appearance: none; resize: none; }
+            .section-box, .signature-box { background: none !important; }
+            .signature-box { border: none !important; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="invoice-card">
+    
+    <!-- Top Controls -->
+    <div class="top-bar-controls">
+        <div>
+            <label style="font-size: 11px; font-weight: 600;">Document Type:</label>
+            <select id="docType" onchange="updateDocType()" style="font-size: 11px; padding: 3px;">
+                <option value="PROFORMA INVOICE">Proforma Invoice</option>
+                <option value="TAX INVOICE">Tax Invoice</option>
+                <option value="QUOTATION">Quotation</option>
+            </select>
+        </div>
+        <div>
+            <button class="btn btn-slate" onclick="openMasterModal('seller')">Seller Master</button>
+            <button class="btn btn-slate" onclick="openMasterModal('customer')">Customer Master</button>
+        </div>
+    </div>
+
+    <!-- Header with Logo -->
+    <div class="header-container">
+        <img src="https://www.corrtech.in/wp-content/uploads/2020/11/GIGL.jpg" alt="GSPL India Gasnet Limited Logo" class="company-logo">
+        <div class="header-title-box">
+            <h1 id="headerTitle">PROFORMA INVOICE</h1>
+            <p id="headerSub">THIS IS A COMMERCIAL ESTIMATE, NOT A TAX INVOICE. ITC CANNOT BE CLAIMED ON THIS DOCUMENT.</p>
+        </div>
+    </div>
+
+    <!-- Party Details -->
+    <div class="grid-2">
+        <div class="section-box">
+            <h3>
+                Supplier (Seller) Details
+                <button class="btn master-btn" onclick="saveCurrentAsMaster('seller')" style="padding: 2px 6px; font-size: 9px;">+ Save to Master</button>
+            </h3>
+            <div class="form-group profile-select-group">
+                <label>Select Profile:</label>
+                <select id="sellerSelect" onchange="loadSellerProfile()"><option value="">-- Custom Profile --</option></select>
+            </div>
+            <div class="form-group"><label>Name:</label><input type="text" id="supplierName" value="GSPL INDIA GASNET LIMITED (Gujarat)"></div>
+            <div class="form-group"><label>PAN No:</label><input type="text" id="supplierPAN" value="AAECG4433G" readonly style="font-weight: bold; background-color: #f8fafc;"></div>
+            <div class="form-group"><label>GSTIN:</label><input type="text" id="supplierGSTIN" value="24AAECG4433G1ZX" oninput="calculateGST()"></div>
+            <div class="form-group"><label>State:</label><input type="text" id="supplierState" readonly placeholder="Auto-detected"></div>
+            <div class="form-group"><label>Address:</label><input type="text" id="supplierAddress" value="Ground Floor, North Wing, GSPL Bhavan, Plot No E-18, GIDC Electronic Estate,, Nr. K7 Circle, Sector-26, Gandhinagar"></div>
+        </div>
+
+        <div class="section-box">
+            <h3>
+                Buyer (Customer) Details
+                <button class="btn master-btn" onclick="saveCurrentAsMaster('customer')" style="padding: 2px 6px; font-size: 9px;">+ Save to Master</button>
+            </h3>
+            <div class="form-group profile-select-group">
+                <label>Select Profile:</label>
+                <select id="customerSelect" onchange="loadCustomerProfile()"><option value="">-- Custom Profile --</option></select>
+            </div>
+            <div class="form-group"><label>Name:</label><input type="text" id="buyerName" value="XYZ Enterprises"></div>
+            <div class="form-group"><label>PAN No:</label><input type="text" id="buyerPAN" placeholder="Auto-extracted from GSTIN" readonly style="background-color: #f8fafc;"></div>
+            <div class="form-group"><label>GSTIN:</label><input type="text" id="buyerGSTIN" value="27BBBCB1111B1Z2" oninput="calculateGST()"></div>
+            <div class="form-group"><label>State:</label><input type="text" id="buyerState" readonly placeholder="Auto-detected"></div>
+            <div class="form-group"><label>Address:</label><input type="text" id="buyerAddress" value="Andheri East, Mumbai, Maharashtra"></div>
+        </div>
+    </div>
+
+    <!-- Metadata & Supply -->
+    <div class="grid-2">
+        <div class="section-box">
+            <h3>Document Details</h3>
+            <div class="form-group"><label>Invoice No:</label><input type="text" id="invNo" value="GIGL/GUJ/26-27/001"></div>
+            <div class="form-group"><label>Issue Date:</label><input type="date" id="invoiceDate"></div>
+            <div class="form-group"><label>Valid Until:</label><input type="date" id="validityDate"></div>
+        </div>
+        <div class="section-box">
+            <h3>Tax & Supply Details</h3>
+            <div class="form-group"><label>Place of Supply:</label><input type="text" id="placeOfSupply" readonly placeholder="Auto-detected"></div>
+            <div class="form-group"><label>GST Rate (%):</label><input type="number" id="gstRate" value="18" oninput="calculateGST()"></div>
+            <div class="form-group"><label>Tax Nature:</label><input type="text" id="taxType" readonly style="font-weight: bold; color: #2563eb;"></div>
+        </div>
+    </div>
+
+    <!-- Items Table -->
+    <table>
+        <thead>
+            <tr>
+                <th style="width: 32%;">Item / Service Description</th>
+                <th style="width: 12%;">HSN/SAC</th>
+                <th style="width: 8%;" class="text-right">Qty</th>
+                <th style="width: 12%;" class="text-right">Rate (₹)</th>
+                <th style="width: 10%;" class="text-right">Disc (%)</th>
+                <th style="width: 16%;" class="text-right">Taxable (₹)</th>
+                <th style="width: 10%;" class="text-center btn-add">Action</th>
+            </tr>
+        </thead>
+        <tbody id="itemsBody">
+            <tr>
+                <td><input type="text" class="table-input" value="Natural Gas Transportation Services"></td>
+                <td><input type="text" class="table-input" value="996519"></td>
+                <td><input type="number" class="table-input text-right qty" value="1" oninput="calculateGST()"></td>
+                <td><input type="number" class="table-input text-right rate" value="50000" oninput="calculateGST()"></td>
+                <td><input type="number" class="table-input text-right disc" value="0" oninput="calculateGST()"></td>
+                <td class="text-right line-total">50000.00</td>
+                <td class="text-center btn-add"><button class="btn btn-danger" onclick="removeRow(this)">X</button></td>
+            </tr>
+        </tbody>
+    </table>
+
+    <button class="btn btn-green btn-add" onclick="addRow()">+ Add Line Item</button>
+
+    <!-- Summary & Bank Info -->
+    <div class="summary-container">
+        <div class="bank-details">
+            <h3 style="margin-bottom: 6px; font-size: 12px; text-transform: uppercase;">Bank Transfer & Payment Info</h3>
+            <p><strong>Bank:</strong> HDFC Bank</p>
+            <p><strong>A/C Name:</strong> GSPL INDIA GASNET LIMITED</p>
+            <p><strong>A/C No:</strong> 50200012345678</p>
+            <p><strong>IFSC:</strong> HDFC0001234</p>
+            <p><strong>PAN No:</strong> AAECG4433G</p>
+            <p><strong>UPI ID:</strong> gigl@hdfcbank</p>
+        </div>
+
+        <table class="totals-table">
+            <tr><td>Taxable Value:</td><td class="text-right" id="taxableValue">₹ 0.00</td></tr>
+            <tr id="cgstRow"><td>CGST:</td><td class="text-right" id="cgstAmount">₹ 0.00</td></tr>
+            <tr id="sgstRow"><td>SGST:</td><td class="text-right" id="sgstAmount">₹ 0.00</td></tr>
+            <tr id="igstRow"><td>IGST:</td><td class="text-right" id="igstAmount">₹ 0.00</td></tr>
+            <tr class="grand-total"><td>Grand Total:</td><td class="text-right" id="grandTotal">₹ 0.00</td></tr>
+            <tr>
+                <td>Advance Received (₹):</td>
+                <td class="text-right"><input type="number" id="advancePaid" value="0" class="table-input text-right" oninput="calculateGST()"></td>
+            </tr>
+            <tr class="balance-due"><td>Balance Payable:</td><td class="text-right" id="balanceDue">₹ 0.00</td></tr>
+        </table>
+    </div>
+
+    <!-- Amount in Words -->
+    <div class="words-box">
+        <strong>Balance Payable in Words:</strong> <span id="amountInWords">Zero Rupees Only</span>
+    </div>
+
+    <!-- Terms and Computer Generated Declaration -->
+    <div class="footer-declaration-grid">
+        <div class="terms-box">
+            <h4>Terms & Conditions</h4>
+            <ol style="padding-left: 14px;">
+                <li>Goods/Services once supplied will be billed under the final Tax Invoice.</li>
+                <li>Advance payment is required to process order execution.</li>
+                <li>Payment due within 15 days of proforma date.</li>
+                <li>Subject to local legal jurisdiction.</li>
+            </ol>
+        </div>
+
+        <div class="signature-box">
+            <div class="signature-title" id="sigTitle">For GSPL INDIA GASNET LIMITED</div>
+            <div class="computer-generated-tag">
+                This is a computer-generated document and does not require a physical signature.
+            </div>
+        </div>
+    </div>
+
+    <div class="actions">
+        <button class="btn" onclick="window.print()">Print / Export PDF</button>
+        <button class="btn btn-green" onclick="exportCurrentInvoiceToExcel()">Export Invoice Excel</button>
+        <button class="btn btn-amber" onclick="saveToSalesRegisterAndExport()">Save & Export Sales Register</button>
+    </div>
+</div>
+
+<!-- Master Modal -->
+<div id="masterModal" class="modal">
+    <div class="modal-content">
+        <h2 id="modalTitle">Manage Masters</h2>
+        <div id="modalBody"></div>
+        <div style="text-align: right; margin-top: 15px;">
+            <button class="btn btn-slate" onclick="closeMasterModal()">Close</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    const gstStateCodes = {
+        "01": "Jammu & Kashmir", "02": "Himachal Pradesh", "03": "Punjab", "04": "Chandigarh",
+        "05": "Uttarakhand", "06": "Haryana", "07": "Delhi", "08": "Rajasthan", "09": "Uttar Pradesh",
+        "10": "Bihar", "11": "Sikkim", "12": "Arunachal Pradesh", "13": "Nagaland", "14": "Manipur",
+        "15": "Mizoram", "16": "Tripura", "17": "Meghalaya", "18": "Assam", "19": "West Bengal",
+        "20": "Jharkhand", "21": "Odisha", "22": "Chhattisgarh", "23": "Madhya Pradesh", "24": "Gujarat",
+        "25": "Daman & Diu", "26": "Dadra & Nagar Haveli", "27": "Maharashtra", "28": "Andhra Pradesh",
+        "29": "Karnataka", "30": "Goa", "31": "Lakshadweep", "32": "Kerala", "33": "Tamil Nadu",
+        "34": "Puducherry", "35": "Andaman & Nicobar", "36": "Telangana", "37": "Andhra Pradesh (New)", "38": "Ladakh"
+    };
+
+    const defaultSellers = [
+        { 
+            code: "GUJ",
+            name: "GSPL INDIA GASNET LIMITED (Gujarat)", 
+            pan: "AAECG4433G", 
+            gstin: "24AAECG4433G1ZX", 
+            address: "Ground Floor, North Wing, GSPL Bhavan, Plot No E-18, GIDC Electronic Estate,, Nr. K7 Circle, Sector-26, Gandhinagar" 
+        },
+        { 
+            code: "RAJ",
+            name: "GSPL INDIA GASNET LIMITED (Rajasthan)", 
+            pan: "AAECG4433G", 
+            gstin: "08AAECG4433G1ZR", 
+            address: "D-8, INCOME TAX EXTENSION COLONY,, DURGAPUR, JAIPUR, Jaipur, Rajasthan, 302018" 
+        },
+        { 
+            code: "HAR",
+            name: "GSPL INDIA GASNET LIMITED (Haryana)", 
+            pan: "AAECG4433G", 
+            gstin: "06AAECG4433G1ZV", 
+            address: "Survey no. 44//21/1, 44//21/2, 44//22/1 and 50//1/1, Village Kahani 7.5, Rohtak, Rohtak, Haryana, 124303" 
+        },
+        { 
+            code: "PUN",
+            name: "GSPL INDIA GASNET LIMITED (Punjab)", 
+            pan: "AAECG4433G", 
+            gstin: "03AAECG4433G1Z1", 
+            address: "Survey No.51//4-5-6-7, Hadbast No.254, Tehsil Amritsar-1, Village Fatehpur Rajputan, Amritsar, Punjab, 143113" 
+        }
+    ];
+
+    const today = new Date();
+    document.getElementById('invoiceDate').valueAsDate = today;
+    const validUntil = new Date();
+    validUntil.setDate(today.getDate() + 30);
+    document.getElementById('validityDate').valueAsDate = validUntil;
+
+    window.onload = function() {
+        localStorage.setItem('seller_masters', JSON.stringify(defaultSellers));
+        populateDropdowns();
+        calculateGST();
+        generateStateInvoiceNumber();
+    };
+
+    function getMasters(type) {
+        return JSON.parse(localStorage.getItem(type + '_masters') || '[]');
+    }
+
+    function saveMasters(type, data) {
+        localStorage.setItem(type + '_masters', JSON.stringify(data));
+        populateDropdowns();
+    }
+
+    function populateDropdowns() {
+        const sellers = getMasters('seller');
+        const customers = getMasters('customer');
+
+        const sellerSel = document.getElementById('sellerSelect');
+        sellerSel.innerHTML = '<option value="">-- Custom / Manual Entry --</option>';
+        sellers.forEach((s, i) => sellerSel.innerHTML += `<option value="${i}">${s.name}</option>`);
+
+        const custSel = document.getElementById('customerSelect');
+        custSel.innerHTML = '<option value="">-- Custom / Manual Entry --</option>';
+        customers.forEach((c, i) => custSel.innerHTML += `<option value="${i}">${c.name}</option>`);
+    }
+
+    function getStateCode() {
+        const sellerGST = document.getElementById('supplierGSTIN').value.substring(0, 2);
+        if (sellerGST === "24") return "GUJ";
+        if (sellerGST === "08") return "RAJ";
+        if (sellerGST === "06") return "HAR";
+        if (sellerGST === "03") return "PUN";
+        return "GEN";
+    }
+
+    function generateStateInvoiceNumber() {
+        const stateCode = getStateCode();
+        let counters = JSON.parse(localStorage.getItem('invoice_counters') || '{}');
+        const currentCount = counters[stateCode] || 1;
+        const paddedCount = String(currentCount).padStart(3, '0');
+        document.getElementById('invNo').value = `GIGL/${stateCode}/26-27/${paddedCount}`;
+    }
+
+    function incrementStateInvoiceCounter() {
+        const stateCode = getStateCode();
+        let counters = JSON.parse(localStorage.getItem('invoice_counters') || '{}');
+        counters[stateCode] = (counters[stateCode] || 1) + 1;
+        localStorage.setItem('invoice_counters', JSON.stringify(counters));
+        generateStateInvoiceNumber();
+    }
+
+    function saveCurrentAsMaster(type) {
+        const isSeller = type === 'seller';
+        const name = document.getElementById(isSeller ? 'supplierName' : 'buyerName').value;
+        const pan = document.getElementById(isSeller ? 'supplierPAN' : 'buyerPAN').value;
+        const gstin = document.getElementById(isSeller ? 'supplierGSTIN' : 'buyerGSTIN').value;
+        const address = document.getElementById(isSeller ? 'supplierAddress' : 'buyerAddress').value;
+
+        if (!name || !gstin) return alert("Please provide Name and GSTIN");
+
+        const list = getMasters(type);
+        list.push({ name, pan, gstin, address });
+        saveMasters(type, list);
+        alert(`${isSeller ? 'Seller' : 'Customer'} saved to Master!`);
+    }
+
+    function loadSellerProfile() {
+        const idx = document.getElementById('sellerSelect').value;
+        if (idx === "") return;
+        const profile = getMasters('seller')[idx];
+        document.getElementById('supplierName').value = profile.name;
+        document.getElementById('supplierPAN').value = profile.pan || extractPAN(profile.gstin);
+        document.getElementById('supplierGSTIN').value = profile.gstin;
+        document.getElementById('supplierAddress').value = profile.address;
+        document.getElementById('sigTitle').innerText = "For " + profile.name.split('(')[0].trim();
+        calculateGST();
+        generateStateInvoiceNumber();
+    }
+
+    function loadCustomerProfile() {
+        const idx = document.getElementById('customerSelect').value;
+        if (idx === "") return;
+        const profile = getMasters('customer')[idx];
+        document.getElementById('buyerName').value = profile.name;
+        document.getElementById('buyerPAN').value = profile.pan || extractPAN(profile.gstin);
+        document.getElementById('buyerGSTIN').value = profile.gstin;
+        document.getElementById('buyerAddress').value = profile.address;
+        calculateGST();
+    }
+
+    function extractPAN(gstin) {
+        if (gstin && gstin.length >= 12) {
+            return gstin.substring(2, 12);
+        }
+        return '';
+    }
+
+    function openMasterModal(type) {
+        const modal = document.getElementById('masterModal');
+        document.getElementById('modalTitle').innerText = type === 'seller' ? 'Seller Master Profiles' : 'Customer Master Profiles';
+        const list = getMasters(type);
+        let html = '<ul style="list-style: none; max-height: 250px; overflow-y: auto;">';
+        list.forEach((item, index) => {
+            html += `<li style="padding: 8px 0; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center;">
+                <span style="font-size: 11px;">
+                    <strong>${item.name}</strong><br>
+                    <small>PAN: ${item.pan || extractPAN(item.gstin)} | GSTIN: ${item.gstin}</small><br>
+                    <small style="color: #64748b;">${item.address}</small>
+                </span>
+                <button class="btn btn-danger" onclick="deleteMaster('${type}', ${index})">Delete</button>
+            </li>`;
+        });
+        html += '</ul>';
+        document.getElementById('modalBody').innerHTML = html;
+        modal.style.display = 'block';
+    }
+
+    function deleteMaster(type, index) {
+        const list = getMasters(type);
+        list.splice(index, 1);
+        saveMasters(type, list);
+        openMasterModal(type);
+    }
+
+    function closeMasterModal() {
+        document.getElementById('masterModal').style.display = 'none';
+    }
+
+    function updateDocType() {
+        const val = document.getElementById('docType').value;
+        document.getElementById('headerTitle').innerText = val;
+        document.getElementById('headerSub').innerText = (val === "TAX INVOICE") ? "ORIGINAL FOR RECIPIENT - STATUTORY GST TAX INVOICE" : "THIS IS A COMMERCIAL ESTIMATE, NOT A TAX INVOICE. ITC CANNOT BE CLAIMED ON THIS DOCUMENT.";
+    }
+
+    function addRow() {
+        const tbody = document.getElementById('itemsBody');
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td><input type="text" class="table-input" value="Consulting Services"></td>
+            <td><input type="text" class="table-input" value="9983"></td>
+            <td><input type="number" class="table-input text-right qty" value="1" oninput="calculateGST()"></td>
+            <td><input type="number" class="table-input text-right rate" value="1000" oninput="calculateGST()"></td>
+            <td><input type="number" class="table-input text-right disc" value="0" oninput="calculateGST()"></td>
+            <td class="text-right line-total">1000.00</td>
+            <td class="text-center btn-add"><button class="btn btn-danger" onclick="removeRow(this)">X</button></td>
+        `;
+        tbody.appendChild(tr);
+        calculateGST();
+    }
+
+    function removeRow(btn) {
+        btn.closest('tr').remove();
+        calculateGST();
+    }
+
+    function calculateGST() {
+        const suppGSTIN = document.getElementById('supplierGSTIN').value.trim();
+        const buyGSTIN = document.getElementById('buyerGSTIN').value.trim();
+        const gstRate = parseFloat(document.getElementById('gstRate').value) || 0;
+        const advancePaid = parseFloat(document.getElementById('advancePaid').value) || 0;
+
+        document.getElementById('supplierPAN').value = extractPAN(suppGSTIN);
+        document.getElementById('buyerPAN').value = extractPAN(buyGSTIN);
+
+        const suppCode = suppGSTIN.substring(0, 2);
+        const buyCode = buyGSTIN.substring(0, 2);
+
+        document.getElementById('supplierState').value = gstStateCodes[suppCode] ? `${gstStateCodes[suppCode]} (${suppCode})` : 'Unknown State';
+        document.getElementById('buyerState').value = gstStateCodes[buyCode] ? `${gstStateCodes[buyCode]} (${buyCode})` : 'Unknown State';
+        document.getElementById('placeOfSupply').value = gstStateCodes[buyCode] ? `${gstStateCodes[buyCode]} (${buyCode})` : 'N/A';
+
+        let taxableSubtotal = 0;
+        document.querySelectorAll('#itemsBody tr').forEach(row => {
+            const qty = parseFloat(row.querySelector('.qty').value) || 0;
+            const rate = parseFloat(row.querySelector('.rate').value) || 0;
+            const disc = parseFloat(row.querySelector('.disc').value) || 0;
+            const rawTotal = qty * rate;
+            const lineTaxable = rawTotal - (rawTotal * (disc / 100));
+            row.querySelector('.line-total').innerText = lineTaxable.toFixed(2);
+            taxableSubtotal += lineTaxable;
+        });
+
+        const isInterstate = (suppCode !== buyCode) || !suppCode || !buyCode;
+        let cgst = 0, sgst = 0, igst = 0;
+        const totalTax = (taxableSubtotal * gstRate) / 100;
+
+        if (isInterstate) {
+            igst = totalTax;
+            document.getElementById('taxType').value = `IGST (${gstRate}%)`;
+            document.getElementById('cgstRow').style.display = 'none';
+            document.getElementById('sgstRow').style.display = 'none';
+            document.getElementById('igstRow').style.display = 'table-row';
+        } else {
+            cgst = totalTax / 2;
+            sgst = totalTax / 2;
+            document.getElementById('taxType').value = `CGST+SGST (${gstRate/2}%)`;
+            document.getElementById('cgstRow').style.display = 'table-row';
+            document.getElementById('sgstRow').style.display = 'table-row';
+            document.getElementById('igstRow').style.display = 'none';
+        }
+
+        const grandTotal = taxableSubtotal + totalTax;
+        const balanceDue = grandTotal - advancePaid;
+
+        document.getElementById('taxableValue').innerText = `₹ ${taxableSubtotal.toFixed(2)}`;
+        document.getElementById('cgstAmount').innerText = `₹ ${cgst.toFixed(2)}`;
+        document.getElementById('sgstAmount').innerText = `₹ ${sgst.toFixed(2)}`;
+        document.getElementById('igstAmount').innerText = `₹ ${igst.toFixed(2)}`;
+        document.getElementById('grandTotal').innerText = `₹ ${grandTotal.toFixed(2)}`;
+        document.getElementById('balanceDue').innerText = `₹ ${balanceDue.toFixed(2)}`;
+        
+        document.getElementById('amountInWords').innerText = convertNumberToIndianWords(Math.max(0, Math.round(balanceDue))) + " Rupees Only";
+    }
+
+    function convertNumberToIndianWords(num) {
+        if (num === 0) return "Zero";
+        const a = ['', 'One ', 'Two ', 'Three ', 'Four ', 'Five ', 'Six ', 'Seven ', 'Eight ', 'Nine ', 'Ten ', 'Eleven ', 'Twelve ', 'Thirteen ', 'Fourteen ', 'Fifteen ', 'Sixteen ', 'Seventeen ', 'Eighteen ', 'Nineteen '];
+        const b = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
+
+        function inWords(n) {
+            if (n < 20) return a[n];
+            let digit = n % 10;
+            return b[Math.floor(n / 10)] + (digit ? " " + a[digit] : " ");
+        }
+
+        let str = "";
+        str += (Math.floor(num / 10000000) > 0) ? inWords(Math.floor(num / 10000000)) + "Crore " : "";
+        num %= 10000000;
+        str += (Math.floor(num / 100000) > 0) ? inWords(Math.floor(num / 100000)) + "Lakh " : "";
+        num %= 100000;
+        str += (Math.floor(num / 1000) > 0) ? inWords(Math.floor(num / 1000)) + "Thousand " : "";
+        num %= 1000;
+        str += (Math.floor(num / 100) > 0) ? inWords(Math.floor(num / 100)) + "Hundred " : "";
+        num %= 100;
+        if (num > 0) str += (str !== "" ? "and " : "") + inWords(num);
+        return str.trim();
+    }
+
+    /* EXCEL EXPORT FEATURES */
+
+    function exportCurrentInvoiceToExcel() {
+        const docType = document.getElementById('docType').value;
+        const invNo = document.getElementById('invNo').value;
+        const date = document.getElementById('invoiceDate').value;
+        const seller = document.getElementById('supplierName').value;
+        const sellerGST = document.getElementById('supplierGSTIN').value;
+        const buyer = document.getElementById('buyerName').value;
+        const buyerGST = document.getElementById('buyerGSTIN').value;
+        const taxable = document.getElementById('taxableValue').innerText;
+        const cgst = document.getElementById('cgstAmount').innerText;
+        const sgst = document.getElementById('sgstAmount').innerText;
+        const igst = document.getElementById('igstAmount').innerText;
+        const grandTotal = document.getElementById('grandTotal').innerText;
+
+        const data = [
+            ["DOCUMENT DETAILS"],
+            ["Document Type", docType],
+            ["Invoice/Proforma No", invNo],
+            ["Issue Date", date],
+            [],
+            ["PARTY DETAILS"],
+            ["Seller Name", seller],
+            ["Seller GSTIN", sellerGST],
+            ["Buyer Name", buyer],
+            ["Buyer GSTIN", buyerGST],
+            [],
+            ["ITEM DETAILS"],
+            ["Item Description", "HSN/SAC", "Qty", "Rate (₹)", "Disc (%)", "Taxable Amount (₹)"]
+        ];
+
+        document.querySelectorAll('#itemsBody tr').forEach(row => {
+            data.push([
+                row.cells[0].querySelector('input').value,
+                row.cells[1].querySelector('input').value,
+                row.cells[2].querySelector('input').value,
+                row.cells[3].querySelector('input').value,
+                row.cells[4].querySelector('input').value,
+                row.cells[5].innerText
+            ]);
+        });
+
+        data.push([]);
+        data.push(["TAX BREAKDOWN & TOTALS"]);
+        data.push(["Taxable Subtotal", taxable]);
+        data.push(["CGST", cgst]);
+        data.push(["SGST", sgst]);
+        data.push(["IGST", igst]);
+        data.push(["Grand Total", grandTotal]);
+
+        const wb = XLSX.utils.book_new();
+        const ws = XLSX.utils.aoa_to_sheet(data);
+        XLSX.utils.book_append_sheet(wb, ws, "Invoice Details");
+
+        const fileName = `${docType.replace(/\s+/g, '_')}_${invNo.replace(/[/\\?%*:|"<>]/g, '-')}.xlsx`;
+        XLSX.writeFile(wb, fileName);
+    }
+
+    function saveToSalesRegisterAndExport() {
+        const invNo = document.getElementById('invNo').value;
+        const docType = document.getElementById('docType').value;
+        const date = document.getElementById('invoiceDate').value;
+        const seller = document.getElementById('supplierName').value;
+        const sellerGST = document.getElementById('supplierGSTIN').value;
+        const buyer = document.getElementById('buyerName').value;
+        const buyerGST = document.getElementById('buyerGSTIN').value;
+        const pos = document.getElementById('placeOfSupply').value;
+        const taxable = parseFloat(document.getElementById('taxableValue').innerText.replace(/[^0-9.-]+/g,"")) || 0;
+        const cgst = parseFloat(document.getElementById('cgstAmount').innerText.replace(/[^0-9.-]+/g,"")) || 0;
+        const sgst = parseFloat(document.getElementById('sgstAmount').innerText.replace(/[^0-9.-]+/g,"")) || 0;
+        const igst = parseFloat(document.getElementById('igstAmount').innerText.replace(/[^0-9.-]+/g,"")) || 0;
+        const grandTotal = parseFloat(document.getElementById('grandTotal').innerText.replace(/[^0-9.-]+/g,"")) || 0;
+
+        let salesRegister = JSON.parse(localStorage.getItem('sales_register') || '[]');
+
+        const existingIdx = salesRegister.findIndex(item => item.invNo === invNo);
+        const record = { invNo, docType, date, seller, sellerGST, buyer, buyerGST, pos, taxable, cgst, sgst, igst, grandTotal };
+
+        if (existingIdx >= 0) {
+            salesRegister[existingIdx] = record;
+        } else {
+            salesRegister.push(record);
+        }
+
+        localStorage.setItem('sales_register', JSON.stringify(salesRegister));
+
+        // Generate Master Sales Register Spreadsheet
+        const registerData = [
+            ["SALES / PROFORMA REGISTER LOG"],
+            ["Invoice No", "Document Type", "Date", "Seller Name", "Seller GSTIN", "Buyer Name", "Buyer GSTIN", "Place of Supply", "Taxable Value (₹)", "CGST (₹)", "SGST (₹)", "IGST (₹)", "Grand Total (₹)"]
+        ];
+
+        salesRegister.forEach(r => {
+            registerData.push([
+                r.invNo, r.docType, r.date, r.seller, r.sellerGST, r.buyer, r.buyerGST, r.pos, r.taxable, r.cgst, r.sgst, r.igst, r.grandTotal
+            ]);
+        });
+
+        const wb = XLSX.utils.book_new();
+        const ws = XLSX.utils.aoa_to_sheet(registerData);
+        XLSX.utils.book_append_sheet(wb, ws, "Sales Register");
+
+        XLSX.writeFile(wb, "Sales_Register_Master.xlsx");
+
+        // Increment sequence for the next invoice
+        incrementStateInvoiceCounter();
+        
+        alert(`Invoice ${invNo} saved! Counter updated to next document number automatically.`);
+    }
+</script>
+</body>
+</html>

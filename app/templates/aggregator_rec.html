@@ -1,0 +1,466 @@
+{% extends "base.html" %}
+
+{% block page_title %}Aggregator Reconciliation{% endblock %}
+{% block page_kicker %}Zomato, Swiggy, and Dineout payout breakup{% endblock %}
+
+{% block content %}
+{% include "partials/import_aggregator.html" %}
+<!-- Filter Toolbar -->
+<div class="filter-toolbar">
+    <div class="form-group">
+        <label class="form-label">Aggregator</label>
+        <select id="aggSelect" class="form-select" onchange="loadPayoutBreakup()">
+            <option value="">All Aggregators</option>
+            {% for a in aggregators %}
+            <option value="{{ a.id }}">{{ a.name }}</option>
+            {% endfor %}
+        </select>
+    </div>
+    <div class="form-group">
+        <label class="form-label">Branch (Worksheet Auto-Detect)</label>
+        <select id="aggBranch" class="form-select" onchange="loadPayoutBreakup()">
+            <option value="">All Branches</option>
+            {% for b in branches %}
+            <option value="{{ b.id }}">{{ b.name }}</option>
+            {% endfor %}
+        </select>
+    </div>
+    {% with period_prefix='agg', period_reload='loadPayoutBreakup' %}
+    {% include "partials/period_filter.html" %}
+    {% endwith %}
+    <div class="form-group" style="margin-left: auto; flex-direction: row; gap: 0.5rem; align-items: flex-end;">
+        <a id="btnExportAggExcel" href="/api/reports/export/aggregator/excel" class="btn btn-outline-excel"><i class="fa-solid fa-file-excel"></i> Export Excel</a>
+        <a id="btnExportAggPdf" href="/api/reports/export/aggregator/pdf" target="_blank" class="btn btn-outline-pdf"><i class="fa-solid fa-file-pdf"></i> Export PDF</a>
+    </div>
+</div>
+
+<!-- Dynamic Date Cycle Tabs Header -->
+<div id="cycleTabsContainer" style="display: flex; gap: 0.5rem; margin-bottom: 1.25rem; border-bottom: 2px solid var(--border-color); padding-bottom: 0.5rem; overflow-x: auto;">
+    <button class="cycle-tab active" onclick="switchCycleTab('SUMMARY', this)"><i class="fa-solid fa-table-columns"></i> Date Cycles Matrix</button>
+    <button class="cycle-tab" onclick="switchCycleTab('BATCHES', this)"><i class="fa-solid fa-list-check"></i> Batch Breakdown</button>
+</div>
+
+<!-- Aggregator Reconciliation Table -->
+<div class="glass-card">
+    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem;">
+        <h3 style="font-size: 1.1rem; font-weight: 700;" id="matrixTitle">
+            <i class="fa-solid fa-scale-balanced" style="color: var(--primary);"></i> Sale Made vs Payment Received Reconciliation Matrix
+        </h3>
+        <span style="font-size: 0.82rem; color: var(--text-muted);" id="matrixSub">Auto-fetched from Worksheet 1 metadata & Worksheet 2 data</span>
+    </div>
+
+    <div class="payout-scroll-wrap">
+        <div class="payout-scroll-hint">
+            <span>More branches to the right</span>
+            <button type="button" class="btn btn-secondary btn-xs" onclick="scrollPayout(-360)" title="Scroll left"><i class="fa-solid fa-arrow-left"></i></button>
+            <button type="button" class="btn btn-secondary btn-xs" onclick="scrollPayout(360)" title="Scroll right"><i class="fa-solid fa-arrow-right"></i></button>
+        </div>
+        <div class="payout-scroll" id="payoutScroll">
+        <table class="data-table payout-matrix" id="matrixTable">
+            <thead id="matrixHead">
+                <tr>
+                    <th style="width: 60px;">S.No.</th>
+                    <th>Particulars</th>
+                    <th>Cycle Amount</th>
+                    <th>Total</th>
+                </tr>
+            </thead>
+            <tbody id="matrixBody">
+                <tr><td colspan="4" style="text-align: center;">Loading Aggregator Reconciliation Data...</td></tr>
+            </tbody>
+        </table>
+        </div>
+    </div>
+</div>
+
+<!-- Manual Edit Settlement Batch Modal -->
+<div class="modal-backdrop" id="editBatchModal">
+    <div class="modal-card" style="max-width: 650px; width: 95%;">
+        <div class="modal-header">
+            <h3 style="font-size: 1.15rem;"><i class="fa-solid fa-pen-to-square" style="color: var(--primary);"></i> Edit Settlement Batch Financial Data</h3>
+            <button class="modal-close" onclick="closeModal('editBatchModal')">&times;</button>
+        </div>
+        <form id="editBatchForm" onsubmit="submitEditBatch(event)">
+            <input type="hidden" id="editBatchId">
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
+                <div class="form-group">
+                    <label class="form-label">Commissionable Value / Sales Made (₹)</label>
+                    <input type="number" step="0.01" id="editGrossSales" class="form-control" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Payout / Net Amount Received (₹)</label>
+                    <input type="number" step="0.01" id="editPayout" class="form-control" required>
+                </div>
+            </div>
+
+            <h4 style="font-size: 0.95rem; font-weight: 700; margin-bottom: 0.75rem; color: var(--text-main);">Deductions & Adjustments</h4>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; margin-bottom: 1rem;">
+                <div class="form-group">
+                    <label class="form-label">Online Platform Charges</label>
+                    <input type="number" step="0.01" id="editCommission" class="form-control" value="0.00">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Business Promotion (Ads)</label>
+                    <input type="number" step="0.01" id="editPromotion" class="form-control" value="0.00">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">TCS</label>
+                    <input type="number" step="0.01" id="editTcs" class="form-control" value="0.00">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">TDS Receivable</label>
+                    <input type="number" step="0.01" id="editTds" class="form-control" value="0.00">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">GST Section 9(5)</label>
+                    <input type="number" step="0.01" id="editGst95" class="form-control" value="0.00">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Miscellaneous / Refunds</label>
+                    <input type="number" step="0.01" id="editMisc" class="form-control" value="0.00">
+                </div>
+            </div>
+
+            <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--border-color); padding-top: 1rem;">
+                <button type="button" class="btn btn-outline-pdf" id="btnModalDeleteBatch" onclick="deleteCurrentBatchFromModal()">
+                    <i class="fa-solid fa-trash"></i> Delete Batch
+                </button>
+                <div style="display: flex; gap: 0.75rem;">
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('editBatchModal')">Cancel</button>
+                    <button type="submit" class="btn btn-primary"><i class="fa-solid fa-save"></i> Save Financials & Recalculate</button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/js/imports.js?v=multi1"></script>
+<style>
+    .cycle-tab {
+        background: transparent;
+        border: none;
+        padding: 0.6rem 1.1rem;
+        font-size: 0.88rem;
+        font-weight: 600;
+        color: var(--text-muted);
+        border-radius: var(--radius-sm);
+        cursor: pointer;
+        transition: all 0.2s ease;
+        white-space: nowrap;
+    }
+    .cycle-tab:hover {
+        background: rgba(37, 99, 235, 0.08);
+        color: var(--primary);
+    }
+    .cycle-tab.active {
+        background: var(--primary);
+        color: #ffffff;
+        box-shadow: 0 4px 12px rgba(37, 99, 235, 0.25);
+    }
+</style>
+
+<script>
+    let currentMatrixData = null;
+    let activeTab = 'SUMMARY';
+
+    document.addEventListener('DOMContentLoaded', () => {
+        initPeriodFilter('agg');
+        loadPayoutBreakup();
+    });
+
+    function scrollPayout(delta) {
+        const sc = document.getElementById('payoutScroll');
+        if (sc) sc.scrollBy({ left: delta, behavior: 'smooth' });
+    }
+
+    function switchCycleTab(tabKey, btnEl) {
+        document.querySelectorAll('.cycle-tab').forEach(b => b.classList.remove('active'));
+        if (btnEl) btnEl.classList.add('active');
+        activeTab = tabKey;
+        renderMatrixTable();
+    }
+
+    function currentQuery() {
+        const aggId = document.getElementById('aggSelect').value;
+        const branchId = document.getElementById('aggBranch').value;
+        const { start, end } = periodRange('agg');
+        const params = new URLSearchParams();
+        if (aggId) params.append('aggregator_id', aggId);
+        if (branchId) params.append('branch_id', branchId);
+        if (start) params.append('start_date', start);
+        if (end) params.append('end_date', end);
+        const q = params.toString() ? '?' + params.toString() : '';
+        return q;
+    }
+
+    async function loadPayoutBreakup() {
+        const q = currentQuery();
+        document.getElementById('btnExportAggExcel').href = `/api/reports/export/aggregator/excel${q}`;
+        document.getElementById('btnExportAggPdf').href = `/api/reports/export/aggregator/pdf${q}`;
+
+        const data = await apiFetch(`/api/aggregators/payout-breakup${q}`);
+        if (!data) return;
+
+        currentMatrixData = data;
+        const monthEl = document.getElementById('aggMonth');
+        if (monthEl && !monthEl.value && data.available_months && data.available_months.length) {
+            monthEl.value = data.available_months[data.available_months.length - 1];
+            return loadPayoutBreakup();
+        }
+        renderCycleTabs();
+        renderMatrixTable();
+    }
+
+    function renderCycleTabs() {
+        if (!currentMatrixData || !currentMatrixData.cycle_columns) return;
+        const container = document.getElementById('cycleTabsContainer');
+        
+        let html = `<button class="cycle-tab ${activeTab === 'SUMMARY' ? 'active' : ''}" onclick="switchCycleTab('SUMMARY', this)"><i class="fa-solid fa-table-columns"></i> Date Cycles Matrix Summary</button>`;
+        
+        // Render dynamic cycle tabs for each imported date period
+        currentMatrixData.cycle_columns.forEach(c => {
+            if (c.key !== 'total') {
+                html += `<button class="cycle-tab ${activeTab === c.key ? 'active' : ''}" onclick="switchCycleTab('${c.key}', this)">Cycle: ${c.label}</button>`;
+            }
+        });
+
+        html += `<button class="cycle-tab ${activeTab === 'BATCHES' ? 'active' : ''}" onclick="switchCycleTab('BATCHES', this)"><i class="fa-solid fa-list-check"></i> Individual Batches</button>`;
+        container.innerHTML = html;
+    }
+
+    function openEditBatchModal(batchId) {
+        if (!currentMatrixData || !currentMatrixData.rows) return;
+        const colKey = `batch_${batchId}`;
+        const rowMap = {};
+        currentMatrixData.rows.forEach(r => rowMap[r.code] = r[colKey] || 0.0);
+
+        document.getElementById('editBatchId').value = batchId;
+        document.getElementById('editGrossSales').value = rowMap['TOTAL_SALE'] || 0.0;
+        document.getElementById('editPayout').value = rowMap['PAYOUT'] || 0.0;
+        document.getElementById('editCommission').value = rowMap['COMMISSION'] || 0.0;
+        document.getElementById('editPromotion').value = rowMap['PROMOTION'] || 0.0;
+        document.getElementById('editTcs').value = rowMap['TCS'] || 0.0;
+        document.getElementById('editTds').value = rowMap['TDS'] || 0.0;
+        document.getElementById('editGst95').value = rowMap['GST_9_5'] || 0.0;
+        document.getElementById('editMisc').value = rowMap['MISC'] || 0.0;
+
+        openModal('editBatchModal');
+    }
+
+    async function submitEditBatch(e) {
+        e.preventDefault();
+        const batchId = document.getElementById('editBatchId').value;
+        const payload = {
+            gross_sales: parseFloat(document.getElementById('editGrossSales').value || 0),
+            payout: parseFloat(document.getElementById('editPayout').value || 0),
+            commission: parseFloat(document.getElementById('editCommission').value || 0),
+            promotion: parseFloat(document.getElementById('editPromotion').value || 0),
+            tcs: parseFloat(document.getElementById('editTcs').value || 0),
+            tds: parseFloat(document.getElementById('editTds').value || 0),
+            gst_9_5: parseFloat(document.getElementById('editGst95').value || 0),
+            misc: parseFloat(document.getElementById('editMisc').value || 0)
+        };
+
+        const res = await apiFetch(`/api/aggregators/batch/${batchId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+
+        if (res) {
+            showToast('Settlement Batch Financials updated & recalculated!', 'success');
+            closeModal('editBatchModal');
+            loadPayoutBreakup();
+        }
+    }
+
+    async function deleteSettlementBatch(batchId, batchLabel) {
+        if (!confirm(`Are you sure you want to delete settlement batch: "${batchLabel}"?\n\nThis will remove all associated financial deductions and batch reconciliation logs.`)) return;
+
+        const res = await apiFetch(`/api/aggregators/batch/${batchId}`, { method: 'DELETE' });
+        if (res) {
+            showToast(`Settlement Batch deleted successfully!`, 'success');
+            loadPayoutBreakup();
+        }
+    }
+
+    async function deleteCurrentBatchFromModal() {
+        const batchId = document.getElementById('editBatchId').value;
+        if (!batchId) return;
+        closeModal('editBatchModal');
+        await deleteSettlementBatch(batchId, `Batch #${batchId}`);
+    }
+
+    function rowClass(r) {
+        const classes = [];
+        if (r.s_no === 3 || r.s_no === 9 || r.code === 'DIFFERENCE' || r.code === 'TOTAL_DEDUCTIONS') classes.push('row-theme');
+        if (r.s_no === 10 || r.code === 'DIFFERENCE_ADJUSTMENT') classes.push('row-theme', 'row-bold');
+        return [...new Set(classes)].join(' ');
+    }
+
+    function particularCell(r) {
+        const text = r.particular || '';
+        if (r.s_no === 10 || r.code === 'DIFFERENCE_ADJUSTMENT') {
+            return `<td class="sticky-col particular"><strong>${text}</strong></td>`;
+        }
+        return `<td class="sticky-col particular">${text}</td>`;
+    }
+
+    function amountCell(val, extraClass) {
+        const cls = [ 'amount-num', val < 0 ? 'amount-negative' : '', extraClass || '' ].filter(Boolean).join(' ');
+        return `<td class="${cls}">${formatINR(val)}</td>`;
+    }
+
+    function renderMatrixTable() {
+        if (!currentMatrixData) return;
+        const head = document.getElementById('matrixHead');
+        const body = document.getElementById('matrixBody');
+        head.innerHTML = '';
+        body.innerHTML = '';
+
+        const data = currentMatrixData;
+        const groups = data.branch_groups && data.branch_groups.length ? data.branch_groups : [{
+            branch_name: 'All Branches',
+            cycle_columns: data.cycle_columns || [],
+            rows: data.rows || [],
+            columns: data.columns || []
+        }];
+
+        if (activeTab === 'SUMMARY') {
+            document.getElementById('matrixTitle').innerHTML = `<i class="fa-solid fa-scale-balanced" style="color: var(--primary);"></i> Branch-wise Payout Breakup`;
+            const monthLabel = periodLabel('agg');
+            document.getElementById('matrixSub').textContent = monthLabel
+                ? `Worksheet view · ${monthLabel} · branches side by side`
+                : 'Worksheet view · all imported cycles';
+
+            const trBranch = document.createElement('tr');
+            let bHtml = `<th class="sticky-col sno" rowspan="2">S.No.</th><th class="sticky-col particular" rowspan="2">Particular</th>`;
+            groups.forEach((g, gi) => {
+                const span = (g.cycle_columns || []).length || 1;
+                bHtml += `<th class="branch-head branch-${gi % 4}" colspan="${span}">${g.branch_name}</th>`;
+            });
+            trBranch.innerHTML = bHtml;
+            head.appendChild(trBranch);
+
+            const trCycle = document.createElement('tr');
+            let cHtml = '';
+            groups.forEach((g, gi) => {
+                (g.cycle_columns || []).forEach(c => {
+                    const isTotal = c.key === 'total';
+                    cHtml += `<th class="${isTotal ? 'col-total' : 'cycle-head'} branch-tone-${gi % 4}">${isTotal ? 'Total' : c.label}</th>`;
+                });
+            });
+            trCycle.innerHTML = cHtml;
+            head.appendChild(trCycle);
+
+            const templateRows = (groups[0] && groups[0].rows) || data.rows || [];
+            templateRows.forEach((template, ri) => {
+                const tr = document.createElement('tr');
+                tr.className = rowClass(template);
+                let html = `<td class="sticky-col sno">${template.s_no}</td>${particularCell(template)}`;
+                groups.forEach((g, gi) => {
+                    const src = (g.rows || [])[ri] || {};
+                    (g.cycle_columns || []).forEach(c => {
+                        html += amountCell(src[c.key] || 0, c.key === 'total' ? `col-total branch-tone-${gi % 4}` : `branch-tone-${gi % 4}`);
+                    });
+                });
+                tr.innerHTML = html;
+                body.appendChild(tr);
+            });
+
+        } else if (activeTab === 'BATCHES') {
+            document.getElementById('matrixTitle').innerHTML = `<i class="fa-solid fa-list-check" style="color: var(--primary);"></i> Individual Settlement Batches`;
+            document.getElementById('matrixSub').textContent = 'Grouped by branch · edit or delete a cycle';
+
+            const trBranch = document.createElement('tr');
+            let bHtml = `<th class="sticky-col sno" rowspan="2">S.No.</th><th class="sticky-col particular" rowspan="2">Particular</th>`;
+            groups.forEach((g, gi) => {
+                const span = (g.columns || []).length || 1;
+                bHtml += `<th class="branch-head branch-${gi % 4}" colspan="${span}">${g.branch_name}</th>`;
+            });
+            trBranch.innerHTML = bHtml;
+            head.appendChild(trBranch);
+
+            const trBatch = document.createElement('tr');
+            let cHtml = '';
+            groups.forEach((g, gi) => {
+                if (!g.columns || !g.columns.length) {
+                    cHtml += `<th class="branch-tone-${gi % 4}">No batches</th>`;
+                    return;
+                }
+                g.columns.forEach(col => {
+                    const badge = col.status === 'RECONCILED'
+                        ? '<span class="badge badge-reconciled">Reconciled</span>'
+                        : '<span class="badge badge-difference">Difference</span>';
+                    cHtml += `<th class="batch-head branch-tone-${gi % 4}">
+                        <div class="batch-head-top">
+                            <span>${col.label}</span>
+                            <span>
+                                <button class="btn btn-secondary btn-xs" onclick="openEditBatchModal(${col.batch_id})"><i class="fa-solid fa-pen-to-square"></i></button>
+                                <button class="btn btn-outline-pdf btn-xs" onclick="deleteSettlementBatch(${col.batch_id}, '${col.label}')"><i class="fa-solid fa-trash"></i></button>
+                            </span>
+                        </div>
+                        <small>${col.aggregator} · ${badge}</small>
+                    </th>`;
+                });
+            });
+            trBatch.innerHTML = cHtml;
+            head.appendChild(trBatch);
+
+            const templateRows = (groups[0] && groups[0].rows) || data.rows || [];
+            templateRows.forEach((template, ri) => {
+                const tr = document.createElement('tr');
+                tr.className = rowClass(template);
+                let html = `<td class="sticky-col sno">${template.s_no}</td>${particularCell(template)}`;
+                groups.forEach((g, gi) => {
+                    if (!g.columns || !g.columns.length) {
+                        html += amountCell(0, `branch-tone-${gi % 4}`);
+                        return;
+                    }
+                    const src = (g.rows || [])[ri] || {};
+                    g.columns.forEach(col => {
+                        html += amountCell(src[col.key] || 0, `branch-tone-${gi % 4}`);
+                    });
+                });
+                tr.innerHTML = html;
+                body.appendChild(tr);
+            });
+
+        } else {
+            const cycleCols = data.cycle_columns || [];
+            const selCol = cycleCols.find(c => c.key === activeTab);
+            const cycleTitle = selCol ? selCol.label : activeTab;
+            document.getElementById('matrixTitle').innerHTML = `<i class="fa-solid fa-calendar-days" style="color: var(--primary);"></i> Cycle ${cycleTitle} by branch`;
+            document.getElementById('matrixSub').textContent = 'Same cycle compared across outlets';
+
+            const trHead = document.createElement('tr');
+            let h = `<th class="sno">S.No.</th><th class="particular">Particular</th>`;
+            groups.forEach((g, gi) => {
+                h += `<th class="branch-head branch-${gi % 4}">${g.branch_name}</th>`;
+            });
+            h += `<th class="col-total">Total</th>`;
+            trHead.innerHTML = h;
+            head.appendChild(trHead);
+
+            const templateRows = (groups[0] && groups[0].rows) || data.rows || [];
+            templateRows.forEach((template, ri) => {
+                const tr = document.createElement('tr');
+                tr.className = rowClass(template);
+                let html = `<td class="sno">${template.s_no}</td>${particularCell(template).replace('sticky-col particular', 'particular')}`;
+                let total = 0;
+                groups.forEach((g, gi) => {
+                    const src = (g.rows || [])[ri] || {};
+                    const val = src[activeTab] || 0;
+                    total += val;
+                    html += amountCell(val, `branch-tone-${gi % 4}`);
+                });
+                html += amountCell(total, 'col-total');
+                tr.innerHTML = html;
+                body.appendChild(tr);
+            });
+        }
+    }
+</script>
+{% endblock %}

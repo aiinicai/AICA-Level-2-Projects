@@ -1,0 +1,285 @@
+{% extends "base.html" %}
+
+{% block page_title %}Reports & Analytics{% endblock %}
+{% block page_kicker %}Downloadable books and visual settlement summaries{% endblock %}
+
+{% block content %}
+<!-- Global Reports Filter Toolbar -->
+<div class="filter-toolbar">
+    <div class="form-group">
+        <label class="form-label">Select Branch</label>
+        <select id="rptBranch" class="form-select" onchange="updateReportLinks()">
+            <option value="">All Branches</option>
+            {% for b in branches %}
+            <option value="{{ b.id }}">{{ b.name }}</option>
+            {% endfor %}
+        </select>
+    </div>
+    <div class="form-group">
+        <label class="form-label">Start Date</label>
+        <input type="date" id="rptStart" class="form-control" onchange="updateReportLinks()">
+    </div>
+    <div class="form-group">
+        <label class="form-label">End Date</label>
+        <input type="date" id="rptEnd" class="form-control" onchange="updateReportLinks()">
+    </div>
+    <div class="form-group" style="margin-left: auto;">
+        <button onclick="updateReportLinks()" class="btn btn-primary"><i class="fa-solid fa-sync"></i> Refresh Report Data</button>
+    </div>
+</div>
+
+<!-- Interactive Visual Reports Charts Grid -->
+<div class="charts-grid">
+    <!-- Chart 1: Revenue by Payment Channel -->
+    <div class="chart-card">
+        <div class="chart-header">
+            <div class="chart-title"><i class="fa-solid fa-chart-pie" style="color: var(--primary);"></i> Revenue Share by Channel</div>
+            <span style="font-size: 0.8rem; color: var(--text-muted);">Channel distribution</span>
+        </div>
+        <div class="chart-body">
+            <canvas id="rptChannelChart"></canvas>
+        </div>
+    </div>
+
+    <!-- Chart 2: Branch Revenue Comparison Bar Chart -->
+    <div class="chart-card">
+        <div class="chart-header">
+            <div class="chart-title"><i class="fa-solid fa-store" style="color: var(--status-green);"></i> Branch Sales Comparison</div>
+            <span style="font-size: 0.8rem; color: var(--text-muted);">Comparative branch sales</span>
+        </div>
+        <div class="chart-body">
+            <canvas id="rptBranchChart"></canvas>
+        </div>
+    </div>
+</div>
+
+<!-- Downloadable Export Reports Catalog -->
+<div class="glass-card" style="margin-bottom: 2rem;">
+    <h3 style="margin-bottom: 1.25rem; font-size: 1.15rem; font-weight: 700;"><i class="fa-solid fa-file-export" style="color: var(--primary);"></i> Official Downloadable Accounting Reports</h3>
+
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 1.5rem;">
+        <!-- Card 1: Day Book -->
+        <div style="background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 1.5rem; display: flex; flex-direction: column; justify-content: space-between;">
+            <div>
+                <h4 style="margin-bottom: 0.5rem; font-size: 1.05rem; display: flex; align-items: center; gap: 0.6rem;">
+                    <i class="fa-solid fa-book-journal-whills" style="color: var(--primary);"></i> Consolidated Day Book Report
+                </h4>
+                <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 1.25rem; line-height: 1.4;">
+                    Complete multi-branch sales breakdown including cash, card/QR, Zomato, Swiggy, and Dineout sales.
+                </p>
+            </div>
+            <div style="display: flex; gap: 0.75rem;">
+                <a id="btnDaybookExcel" href="/api/reports/export/daybook/excel" class="btn btn-outline-excel" style="flex: 1;"><i class="fa-solid fa-file-excel"></i> Excel (.xlsx)</a>
+                <a id="btnDaybookPdf" href="/api/reports/export/daybook/pdf" target="_blank" class="btn btn-outline-pdf" style="flex: 1;"><i class="fa-solid fa-file-pdf"></i> PDF (.pdf)</a>
+            </div>
+        </div>
+
+        <!-- Card 2: Cash Rec -->
+        <div style="background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 1.5rem; display: flex; flex-direction: column; justify-content: space-between;">
+            <div>
+                <h4 style="margin-bottom: 0.5rem; font-size: 1.05rem; display: flex; align-items: center; gap: 0.6rem;">
+                    <i class="fa-solid fa-money-bill-wave" style="color: var(--status-green);"></i> Physical Cash Reconciliation
+                </h4>
+                <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 1.25rem; line-height: 1.4;">
+                    Daily store cash register summary, opening balances, site expenses, salary advance buckets & register variances.
+                </p>
+            </div>
+            <div style="display: flex; gap: 0.75rem;">
+                <a id="btnCashExcel" href="/api/reports/export/cash-rec/excel" class="btn btn-outline-excel" style="flex: 1;"><i class="fa-solid fa-file-excel"></i> Excel (.xlsx)</a>
+                <a id="btnCashPdf" href="/api/reports/export/cash-rec/pdf" target="_blank" class="btn btn-outline-pdf" style="flex: 1;"><i class="fa-solid fa-file-pdf"></i> PDF (.pdf)</a>
+            </div>
+        </div>
+
+        <!-- Card 3: Card / QR Rec -->
+        <div style="background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 1.5rem; display: flex; flex-direction: column; justify-content: space-between;">
+            <div>
+                <h4 style="margin-bottom: 0.5rem; font-size: 1.05rem; display: flex; align-items: center; gap: 0.6rem;">
+                    <i class="fa-solid fa-credit-card" style="color: var(--accent);"></i> Card & QR Settlement Audit
+                </h4>
+                <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 1.25rem; line-height: 1.4;">
+                    EDC card machine sales matched against actual bank statement settlement receipts.
+                </p>
+            </div>
+            <div style="display: flex; gap: 0.75rem;">
+                <a id="btnCardQrExcel" href="/api/reports/export/card-qr/excel" class="btn btn-outline-excel" style="flex: 1;"><i class="fa-solid fa-file-excel"></i> Excel (.xlsx)</a>
+                <a id="btnCardQrPdf" href="/api/reports/export/card-qr/pdf" target="_blank" class="btn btn-outline-pdf" style="flex: 1;"><i class="fa-solid fa-file-pdf"></i> PDF (.pdf)</a>
+            </div>
+        </div>
+
+        <!-- Card 4: Aggregators -->
+        <div style="background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 1.5rem; display: flex; flex-direction: column; justify-content: space-between;">
+            <div>
+                <h4 style="margin-bottom: 0.5rem; font-size: 1.05rem; display: flex; align-items: center; gap: 0.6rem;">
+                    <i class="fa-solid fa-motorcycle" style="color: var(--status-amber);"></i> Aggregator Payout Breakup
+                </h4>
+                <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 1.25rem; line-height: 1.4;">
+                    Multi-batch breakdown of Zomato, Swiggy & Dineout net payouts, commission fees, and deductions.
+                </p>
+            </div>
+            <div style="display: flex; gap: 0.75rem;">
+                <a id="btnAggregatorExcel" href="/api/reports/export/aggregator/excel" class="btn btn-outline-excel" style="flex: 1;"><i class="fa-solid fa-file-excel"></i> Excel (.xlsx)</a>
+                <a id="btnAggregatorPdf" href="/api/reports/export/aggregator/pdf" target="_blank" class="btn btn-outline-pdf" style="flex: 1;"><i class="fa-solid fa-file-pdf"></i> PDF (.pdf)</a>
+            </div>
+        </div>
+
+        <div style="background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 1.5rem; display: flex; flex-direction: column; justify-content: space-between;">
+            <div>
+                <h4 style="margin-bottom: 0.5rem; font-size: 1.05rem; display: flex; align-items: center; gap: 0.6rem;">
+                    <i class="fa-solid fa-file-invoice" style="color: #d97706;"></i> GST Payable Report
+                </h4>
+                <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 1.25rem; line-height: 1.4;">
+                    Inclusive GST @ 5% on restaurant sales, with Section 9(5) Zomato / Swiggy paid by the aggregator.
+                </p>
+            </div>
+            <div style="display: flex; gap: 0.75rem;">
+                <a id="btnGstPdf" href="/api/reports/export/gst/pdf" target="_blank" class="btn btn-outline-pdf" style="flex: 1;"><i class="fa-solid fa-file-pdf"></i> PDF (.pdf)</a>
+            </div>
+        </div>
+
+        <div style="background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 1.5rem; display: flex; flex-direction: column; justify-content: space-between;">
+            <div>
+                <h4 style="margin-bottom: 0.5rem; font-size: 1.05rem; display: flex; align-items: center; gap: 0.6rem;">
+                    <i class="fa-solid fa-clipboard-user" style="color: var(--status-green);"></i> Attendance Register
+                </h4>
+                <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 1.25rem; line-height: 1.4;">
+                    Monthly kitchen and staff attendance grid with present, absent, and weekly-off totals.
+                </p>
+            </div>
+            <div style="display: flex; gap: 0.75rem;">
+                <a id="btnAttPdf" href="/api/reports/export/attendance/pdf" target="_blank" class="btn btn-outline-pdf" style="flex: 1;"><i class="fa-solid fa-file-pdf"></i> PDF (.pdf)</a>
+            </div>
+        </div>
+
+        <!-- Card 5: Audit Logs -->
+        {% if user and user.role.name == 'Administrator' %}
+        <div style="background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 1.5rem; display: flex; flex-direction: column; justify-content: space-between;">
+            <div>
+                <h4 style="margin-bottom: 0.5rem; font-size: 1.05rem; display: flex; align-items: center; gap: 0.6rem;">
+                    <i class="fa-solid fa-shield-halved" style="color: #a855f7;"></i> System Audit Trail Logs
+                </h4>
+                <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 1.25rem; line-height: 1.4;">
+                    Comprehensive security activity log of user logins, data imports, edits, and match operations.
+                </p>
+            </div>
+            <div style="display: flex; gap: 0.75rem;">
+                <a id="btnAuditExcel" href="/api/reports/export/audit/excel" class="btn btn-outline-excel" style="flex: 1;"><i class="fa-solid fa-file-excel"></i> Excel (.xlsx)</a>
+                <a id="btnAuditPdf" href="/api/reports/export/audit/pdf" target="_blank" class="btn btn-outline-pdf" style="flex: 1;"><i class="fa-solid fa-file-pdf"></i> PDF (.pdf)</a>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    let rptChannelChartInstance = null;
+    let rptBranchChartInstance = null;
+
+    document.addEventListener('DOMContentLoaded', () => {
+        updateReportLinks();
+    });
+
+    async function updateReportLinks() {
+        const branchId = document.getElementById('rptBranch').value;
+        const start = document.getElementById('rptStart').value;
+        const end = document.getElementById('rptEnd').value;
+
+        let params = new URLSearchParams();
+        if (branchId) params.append('branch_id', branchId);
+        if (start) params.append('start_date', start);
+        if (end) params.append('end_date', end);
+        const q = params.toString() ? '?' + params.toString() : '';
+
+        let paramsAudit = new URLSearchParams();
+        if (start) paramsAudit.append('start_date', start);
+        if (end) paramsAudit.append('end_date', end);
+        const qAudit = paramsAudit.toString() ? '?' + paramsAudit.toString() : '';
+
+        // Update link URLs dynamically
+        document.getElementById('btnDaybookExcel').href = `/api/reports/export/daybook/excel${q}`;
+        document.getElementById('btnDaybookPdf').href = `/api/reports/export/daybook/pdf${q}`;
+
+        document.getElementById('btnCashExcel').href = `/api/reports/export/cash-rec/excel${q}`;
+        document.getElementById('btnCashPdf').href = `/api/reports/export/cash-rec/pdf${q}`;
+
+        document.getElementById('btnCardQrExcel').href = `/api/reports/export/card-qr/excel${q}`;
+        document.getElementById('btnCardQrPdf').href = `/api/reports/export/card-qr/pdf${q}`;
+
+        document.getElementById('btnAggregatorExcel').href = `/api/reports/export/aggregator/excel${q}`;
+        document.getElementById('btnAggregatorPdf').href = `/api/reports/export/aggregator/pdf${q}`;
+
+        const btnGstPdf = document.getElementById('btnGstPdf');
+        if (btnGstPdf) btnGstPdf.href = `/api/reports/export/gst/pdf${q}`;
+
+        const btnAuditExcel = document.getElementById('btnAuditExcel');
+        if (btnAuditExcel) btnAuditExcel.href = `/api/reports/export/audit/excel${qAudit}`;
+        const btnAuditPdf = document.getElementById('btnAuditPdf');
+        if (btnAuditPdf) btnAuditPdf.href = `/api/reports/export/audit/pdf${qAudit}`;
+
+        const monthSource = start || new Date().toISOString().slice(0, 10);
+        const attYear = monthSource.slice(0, 4);
+        const attMonth = monthSource.slice(5, 7);
+        let attParams = new URLSearchParams();
+        if (branchId) attParams.append('branch_id', branchId);
+        attParams.append('year', attYear);
+        attParams.append('month', String(parseInt(attMonth, 10)));
+        const btnAttPdf = document.getElementById('btnAttPdf');
+        if (btnAttPdf) btnAttPdf.href = `/api/reports/export/attendance/pdf?${attParams.toString()}`;
+
+        // Fetch & Render Charts
+        const analytics = await apiFetch(`/api/reports/analytics?${q}`);
+        if (!analytics) return;
+
+        // Render Channel Pie Chart
+        const channelCtx = document.getElementById('rptChannelChart').getContext('2d');
+        if (rptChannelChartInstance) rptChannelChartInstance.destroy();
+        rptChannelChartInstance = new Chart(channelCtx, {
+            type: 'pie',
+            data: {
+                labels: analytics.channel_distribution.labels,
+                datasets: [{
+                    data: analytics.channel_distribution.data,
+                    backgroundColor: ['#059669', '#2563eb', '#dc2626', '#d97706', '#7c3aed', '#475569'],
+                    borderWidth: 2,
+                    borderColor: '#ffffff'
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { position: 'right', labels: { color: '#0f172a', font: { family: 'Inter', weight: '600' } } }
+                }
+            }
+        });
+
+        // Render Branch Performance Bar Chart
+        const branchCtx = document.getElementById('rptBranchChart').getContext('2d');
+        if (rptBranchChartInstance) rptBranchChartInstance.destroy();
+        rptBranchChartInstance = new Chart(branchCtx, {
+            type: 'bar',
+            data: {
+                labels: analytics.branch_performance.labels.length > 0 ? analytics.branch_performance.labels : ['No Branches'],
+                datasets: [{
+                    label: 'Branch Sales (₹)',
+                    data: analytics.branch_performance.data.length > 0 ? analytics.branch_performance.data : [0],
+                    backgroundColor: 'rgba(22, 163, 74, 0.85)',
+                    borderColor: '#16a34a',
+                    borderWidth: 1.5,
+                    borderRadius: 6
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { display: false } },
+                scales: {
+                    x: { grid: { color: 'rgba(0, 0, 0, 0.05)' }, ticks: { color: '#475569', font: { family: 'Inter', weight: '600' } } },
+                    y: { grid: { color: 'rgba(0, 0, 0, 0.05)' }, ticks: { color: '#475569', font: { family: 'Inter' } } }
+                }
+            }
+        });
+    }
+</script>
+{% endblock %}

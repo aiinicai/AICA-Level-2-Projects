@@ -1,0 +1,349 @@
+{% extends "base.html" %}
+
+{% block page_title %}Cash Reconciliation{% endblock %}
+{% block page_kicker %}Till close, expenses, and cash difference{% endblock %}
+
+{% block content %}
+<div class="filter-toolbar">
+    <div class="form-group">
+        <label class="form-label">Branch</label>
+        <select id="cashBranch" class="form-select" onchange="loadCashRec()">
+            {% for b in branches %}
+            <option value="{{ b.id }}">{{ b.name }}</option>
+            {% endfor %}
+        </select>
+    </div>
+    {% with period_prefix='cash', period_reload='loadCashRec' %}
+    {% include "partials/period_filter.html" %}
+    {% endwith %}
+    <div class="form-group" style="margin-left: auto; flex-direction: row; gap: 0.5rem; align-items: flex-end;">
+        <button onclick="openCashModal()" class="btn btn-primary" data-perm="cash_rec.enter"><i class="fa-solid fa-plus"></i> Entry / Edit Cash Rec</button>
+        <a id="btnExportCash" href="/api/reports/export/cash-rec/excel" class="btn btn-outline-excel"><i class="fa-solid fa-file-excel"></i> Export Excel</a>
+        <a id="btnExportCashPdf" href="/api/reports/export/cash-rec/pdf" target="_blank" class="btn btn-outline-pdf"><i class="fa-solid fa-file-pdf"></i> Export PDF</a>
+    </div>
+</div>
+
+<div class="glass-card">
+    <div class="table-responsive">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Date</th>
+                    <th>Branch</th>
+                    <th>Opening Bal</th>
+                    <th>Cash Sale</th>
+                    <th>Exp (Inv Recv)</th>
+                    <th>Exp (Inv Not Recv)</th>
+                    <th>Adv (1-5)</th>
+                    <th>Adv (6-15)</th>
+                    <th>Adv (16-31)</th>
+                    <th>Base Kitchen</th>
+                    <th>Service Chg</th>
+                    <th>Expected Closing</th>
+                    <th>Actual Closing</th>
+                    <th>Difference</th>
+                    <th>Status</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody id="cashTbody">
+                <tr><td colspan="16" style="text-align: center;">Loading Cash Reconciliation...</td></tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Modal Dialog for Cash Rec Entry -->
+<div class="modal-backdrop" id="cashModal">
+    <div class="modal-card" style="max-height: 90vh; overflow-y: auto;">
+        <div class="modal-header">
+            <h3 style="font-size: 1.1rem;"><i class="fa-solid fa-calculator"></i> <span id="cashModalTitle">Enter / Reconcile Daily Cash</span></h3>
+            <button class="modal-close" onclick="closeModal('cashModal')">&times;</button>
+        </div>
+        <form id="cashForm" onsubmit="saveCashRec(event)">
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
+                <div class="form-group">
+                    <label class="form-label">Branch</label>
+                    <select id="mBranchId" class="form-select" required onchange="refreshCashAdvanceMap()">
+                        {% for b in branches %}
+                        <option value="{{ b.id }}">{{ b.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Date</label>
+                    <input type="date" id="mRecDate" class="form-control" required>
+                </div>
+            </div>
+
+            <div class="form-group" style="margin-bottom: 1rem;">
+                <label class="form-label">Opening balance (₹)</label>
+                <input type="number" step="0.01" id="mOpeningBal" class="form-control" placeholder="Leave blank to use previous closing">
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
+                <div class="form-group">
+                    <label class="form-label">Site Exp (Inv Received)</label>
+                    <input type="number" step="0.01" id="mExpInvRec" class="form-control" value="0.00">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Site Exp (Inv NOT Recv)</label>
+                    <input type="number" step="0.01" id="mExpInvNotRec" class="form-control" value="0.00">
+                </div>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0.75rem; margin-bottom: 1rem;">
+                <div class="form-group">
+                    <label class="form-label">Adv Salary (1st-5th)</label>
+                    <input type="number" step="0.01" id="mAdv1_5" class="form-control" value="0.00" oninput="onCashAdvanceChanged()">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Adv Salary (6th-15th)</label>
+                    <input type="number" step="0.01" id="mAdv6_15" class="form-control" value="0.00" oninput="onCashAdvanceChanged()">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Adv Salary (16th-31st)</label>
+                    <input type="number" step="0.01" id="mAdv16_31" class="form-control" value="0.00" oninput="onCashAdvanceChanged()">
+                </div>
+            </div>
+
+            <div id="cashAdvanceMap" style="display: none; margin-bottom: 1rem; padding: 0.65rem 0.7rem; border: 1px solid var(--line); border-radius: 10px; background: #f8faf9;">
+                <div style="display: flex; justify-content: space-between; align-items: center; gap: 0.5rem; margin-bottom: 0.45rem;">
+                    <p class="field-source" style="margin: 0;">Map this advance to staff in Staff Master.</p>
+                    <button type="button" class="btn btn-secondary btn-sm" onclick="addCashAdvanceRow()">Add staff</button>
+                </div>
+                <div id="cashAdvanceRows"></div>
+                <p class="field-source" id="cashAdvanceHint" style="margin-top: 0.4rem;"></p>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
+                <div class="form-group">
+                    <label class="form-label">Transfer to Base Kitchen</label>
+                    <input type="number" step="0.01" id="mTransferBase" class="form-control" value="0.00">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Service Charge</label>
+                    <input type="number" step="0.01" id="mServiceCharge" class="form-control" value="0.00">
+                </div>
+            </div>
+
+            <div class="form-group" style="margin-bottom: 1.25rem;">
+                <label class="form-label">Actual Day Book Closing Balance (Counted Cash)</label>
+                <input type="number" step="0.01" id="mActualClosing" class="form-control" required placeholder="0.00" style="font-size: 1.1rem; font-weight: 700;">
+            </div>
+
+            <div class="form-group" style="margin-bottom: 1.25rem;">
+                <label class="form-label">Remarks</label>
+                <input type="text" id="mRemarks" class="form-control" placeholder="Reason for difference or comments">
+            </div>
+
+            <div style="display: flex; justify-content: flex-end; gap: 0.75rem;">
+                <button type="button" class="btn btn-secondary" onclick="closeModal('cashModal')">Cancel</button>
+                <button type="submit" class="btn btn-primary"><i class="fa-solid fa-check"></i> Save Cash Rec</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    let cashRows = [];
+    let cashAdvanceStaff = [];
+    let cashAdvanceSplits = [];
+    let cashEditOriginal = null;
+
+    document.addEventListener('DOMContentLoaded', () => {
+        initPeriodFilter('cash');
+        loadCashRec();
+    });
+
+    async function loadCashRec() {
+        const branchId = document.getElementById('cashBranch').value;
+        const { start, end } = periodRange('cash');
+
+        let url = `/api/cash-rec?`;
+        if (branchId) url += `branch_id=${branchId}&`;
+        if (start) url += `start_date=${start}&`;
+        if (end) url += `end_date=${end}&`;
+
+        let params = new URLSearchParams();
+        if (branchId) params.append('branch_id', branchId);
+        if (start) params.append('start_date', start);
+        if (end) params.append('end_date', end);
+        const q = params.toString() ? '?' + params.toString() : '';
+
+        document.getElementById('btnExportCash').href = `/api/reports/export/cash-rec/excel${q}`;
+        document.getElementById('btnExportCashPdf').href = `/api/reports/export/cash-rec/pdf${q}`;
+
+        const data = await apiFetch(url);
+        if (!data) return;
+
+        const tbody = document.getElementById('cashTbody');
+        tbody.innerHTML = '';
+
+        if (data.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="16" style="text-align: center; color: var(--text-muted);">No records found. Click 'Entry / Edit Cash Rec' to create one.</td></tr>`;
+            return;
+        }
+
+        cashRows = data;
+        data.forEach((r, idx) => {
+            let statusBadge = r.status === 'RECONCILED' ? '<span class="badge badge-reconciled">Reconciled</span>' :
+                              '<span class="badge badge-difference">Difference</span>';
+
+            let diffClass = r.difference === 0 ? '' : (r.difference > 0 ? 'amount-positive' : 'amount-negative');
+
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td>${r.rec_date}</td>
+                <td><strong>${r.branch_name}</strong></td>
+                <td class="amount-num">${formatINR(r.opening_balance)}</td>
+                <td class="amount-num">${formatINR(r.cash_sale)}</td>
+                <td class="amount-num">${formatINR(r.site_expenses_inv_rec)}</td>
+                <td class="amount-num">${formatINR(r.site_expenses_inv_not_rec)}</td>
+                <td class="amount-num">${formatINR(r.advance_salary_1_5)}</td>
+                <td class="amount-num">${formatINR(r.advance_salary_6_15)}</td>
+                <td class="amount-num">${formatINR(r.advance_salary_16_31)}</td>
+                <td class="amount-num">${formatINR(r.transfer_base_kitchen)}</td>
+                <td class="amount-num">${formatINR(r.service_charge)}</td>
+                <td class="amount-num">${formatINR(r.expected_closing_balance)}</td>
+                <td class="amount-num"><strong>${formatINR(r.actual_closing_balance)}</strong></td>
+                <td class="amount-num ${diffClass}"><strong>${formatINR(r.difference)}</strong></td>
+                <td>${statusBadge}</td>
+                <td>${typeof canDo === 'function' && (canDo('cash_rec', 'enter') || canDo('cash_rec', 'edit_saved')) ? `<button type="button" class="btn btn-secondary btn-sm" onclick="openCashModal(${idx})">Edit</button>` : ''}</td>
+            `;
+            tbody.appendChild(tr);
+        });
+    }
+
+    function openCashModal(idx) {
+        const row = typeof idx === 'number' ? cashRows[idx] : null;
+        document.getElementById('cashModalTitle').innerText = row ? 'Edit Cash Rec' : 'Enter / Reconcile Daily Cash';
+        document.getElementById('mRecDate').value = row && row.rec_date ? row.rec_date : new Date().toISOString().split('T')[0];
+        if (row && row.branch_id) document.getElementById('mBranchId').value = row.branch_id;
+        document.getElementById('mOpeningBal').value = row && row.opening_balance != null ? row.opening_balance : '';
+        document.getElementById('mExpInvRec').value = row ? (row.site_expenses_inv_rec || 0) : 0;
+        document.getElementById('mExpInvNotRec').value = row ? (row.site_expenses_inv_not_rec || 0) : 0;
+        document.getElementById('mAdv1_5').value = row ? (row.advance_salary_1_5 || 0) : 0;
+        document.getElementById('mAdv6_15').value = row ? (row.advance_salary_6_15 || 0) : 0;
+        document.getElementById('mAdv16_31').value = row ? (row.advance_salary_16_31 || 0) : 0;
+        document.getElementById('mTransferBase').value = row ? (row.transfer_base_kitchen || 0) : 0;
+        document.getElementById('mServiceCharge').value = row ? (row.service_charge || 0) : 0;
+        document.getElementById('mActualClosing').value = row ? (row.actual_closing_balance || 0) : '';
+        document.getElementById('mRemarks').value = row && row.remarks ? row.remarks : '';
+        cashAdvanceSplits = (row && row.salary_advance_splits) ? row.salary_advance_splits.slice() : [];
+        cashEditOriginal = row ? { branch_id: row.branch_id, rec_date: row.rec_date } : null;
+        openModal('cashModal');
+        refreshCashAdvanceMap();
+    }
+
+    function cashAdvanceTotal() {
+        return (
+            parseFloat(document.getElementById('mAdv1_5').value || 0) +
+            parseFloat(document.getElementById('mAdv6_15').value || 0) +
+            parseFloat(document.getElementById('mAdv16_31').value || 0)
+        );
+    }
+
+    function collectCashAdvanceSplits() {
+        const splits = [];
+        document.querySelectorAll('#cashAdvanceRows .sal-adv-row').forEach((row) => {
+            const employeeId = parseInt((row.querySelector('.sal-adv-emp') || {}).value || 0, 10);
+            const amount = parseFloat((row.querySelector('.sal-adv-amt') || {}).value || 0);
+            if (employeeId && amount > 0) splits.push({ employee_id: employeeId, amount });
+        });
+        return splits;
+    }
+
+    function updateCashAdvanceHint() {
+        const hint = document.getElementById('cashAdvanceHint');
+        if (!hint) return;
+        const mapped = collectCashAdvanceSplits().reduce((sum, row) => sum + row.amount, 0);
+        const left = Math.round((cashAdvanceTotal() - mapped) * 100) / 100;
+        hint.textContent = left === 0
+            ? 'All of this advance is mapped to staff.'
+            : `Unmapped: ${typeof formatINR === 'function' ? formatINR(left) : left}`;
+    }
+
+    function addCashAdvanceRow(employeeId, amount) {
+        const wrap = document.getElementById('cashAdvanceRows');
+        if (!wrap) return;
+        const row = document.createElement('div');
+        row.className = 'sal-adv-row';
+        row.style.cssText = 'display:grid;grid-template-columns:1fr 110px 36px;gap:0.4rem;margin-bottom:0.4rem;align-items:center;';
+        const options = [`<option value="">Select staff</option>`].concat(
+            cashAdvanceStaff.map((s) => `<option value="${s.id}">${s.name}${s.rank ? ' · ' + s.rank : ''}</option>`)
+        ).join('');
+        row.innerHTML = `
+            <select class="form-select sal-adv-emp">${options}</select>
+            <input type="number" step="0.01" class="form-control sal-adv-amt" value="${amount || ''}" oninput="updateCashAdvanceHint()">
+            <button type="button" class="btn btn-secondary btn-sm" onclick="this.closest('.sal-adv-row').remove(); updateCashAdvanceHint();">&times;</button>
+        `;
+        wrap.appendChild(row);
+        if (employeeId) row.querySelector('.sal-adv-emp').value = String(employeeId);
+        updateCashAdvanceHint();
+    }
+
+    async function refreshCashAdvanceMap() {
+        const box = document.getElementById('cashAdvanceMap');
+        const wrap = document.getElementById('cashAdvanceRows');
+        if (!box || !wrap) return;
+        const total = cashAdvanceTotal();
+        if (!(total > 0)) {
+            box.style.display = 'none';
+            wrap.innerHTML = '';
+            return;
+        }
+        box.style.display = 'block';
+        const branchId = document.getElementById('mBranchId').value || '';
+        const current = collectCashAdvanceSplits();
+        const preset = current.length ? current : cashAdvanceSplits;
+        const rows = await apiFetch(`/api/attendance/staff${branchId ? `?branch_id=${branchId}` : ''}`);
+        cashAdvanceStaff = rows || [];
+        wrap.innerHTML = '';
+        if (preset.length) preset.forEach((row) => addCashAdvanceRow(row.employee_id, row.amount));
+        else addCashAdvanceRow('', total);
+        updateCashAdvanceHint();
+    }
+
+    function onCashAdvanceChanged() {
+        refreshCashAdvanceMap();
+    }
+
+    async function saveCashRec(e) {
+        e.preventDefault();
+        const payload = {
+            branch_id: parseInt(document.getElementById('mBranchId').value),
+            rec_date: document.getElementById('mRecDate').value,
+            site_expenses_inv_rec: parseFloat(document.getElementById('mExpInvRec').value || 0),
+            site_expenses_inv_not_rec: parseFloat(document.getElementById('mExpInvNotRec').value || 0),
+            advance_salary_1_5: parseFloat(document.getElementById('mAdv1_5').value || 0),
+            advance_salary_6_15: parseFloat(document.getElementById('mAdv6_15').value || 0),
+            advance_salary_16_31: parseFloat(document.getElementById('mAdv16_31').value || 0),
+            transfer_base_kitchen: parseFloat(document.getElementById('mTransferBase').value || 0),
+            service_charge: parseFloat(document.getElementById('mServiceCharge').value || 0),
+            actual_closing_balance: parseFloat(document.getElementById('mActualClosing').value || 0),
+            opening_balance: document.getElementById('mOpeningBal').value === '' ? null : parseFloat(document.getElementById('mOpeningBal').value),
+            remarks: document.getElementById('mRemarks').value,
+            salary_advance_splits: collectCashAdvanceSplits()
+        };
+        if (cashEditOriginal) {
+            payload.original_branch_id = cashEditOriginal.branch_id;
+            payload.original_rec_date = cashEditOriginal.rec_date;
+        }
+
+        const res = await apiFetch('/api/cash-rec', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+
+        if (res) {
+            showToast('Cash Reconciliation saved successfully!', 'success');
+            closeModal('cashModal');
+            loadCashRec();
+        }
+    }
+</script>
+{% endblock %}

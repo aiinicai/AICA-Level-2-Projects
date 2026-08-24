@@ -1,0 +1,198 @@
+{% extends "base.html" %}
+
+{% block page_title %}Client Database{% endblock %}
+{% block page_kicker %}Each client has its own separate books. Name, address and GSTIN print on every PDF{% endblock %}
+
+{% block content %}
+<div class="glass-card">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; gap: 1rem; flex-wrap: wrap;">
+        <div>
+            <h3 style="font-size: 1.1rem;"><i class="fa-solid fa-address-book"></i> Clients</h3>
+            <p class="field-source" id="clientStorageHint">Each client has its own folder on this PC: C:\HARSH'S RESTRORECO\DATA\&lt;client name&gt;. Name, address and GSTIN appear on every PDF. Backup a ZIP before you delete.</p>
+        </div>
+        <button type="button" class="btn btn-primary" onclick="openClientForm()"><i class="fa-solid fa-plus"></i> Add client</button>
+    </div>
+    <div class="table-responsive">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>GSTIN</th>
+                    <th>Address</th>
+                    <th>Status</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody id="clientTbody">
+                <tr><td colspan="5" style="text-align:center;">Loading…</td></tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div class="modal-backdrop" id="clientFormModal" onclick="if (event.target === this) closeClientForm()">
+    <div class="modal-card" style="max-width: 480px;">
+        <div class="modal-header">
+            <h3 id="clientFormTitle">Add client</h3>
+            <button type="button" class="modal-close" onclick="closeClientForm()"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+        <form onsubmit="saveClientForm(event)">
+            <input type="hidden" id="clientFormId" value="">
+            <div class="form-group">
+                <label class="form-label">Client name</label>
+                <input type="text" id="clientFormName" class="form-control" required minlength="2" autocomplete="off">
+            </div>
+            <div class="form-group" style="margin-top:0.75rem;">
+                <label class="form-label">GSTIN</label>
+                <input type="text" id="clientFormGstin" class="form-control" maxlength="15" placeholder="22AAAAA0000A1Z5" autocomplete="off">
+            </div>
+            <div class="form-group" style="margin-top:0.75rem;">
+                <label class="form-label">Address</label>
+                <textarea id="clientFormAddress" class="form-control" rows="3" placeholder="Registered address"></textarea>
+            </div>
+            <div style="display:flex; gap:0.5rem; justify-content:flex-end; margin-top:1rem;">
+                <button type="button" class="btn btn-secondary" onclick="closeClientForm()">Cancel</button>
+                <button type="submit" id="clientFormSave" class="btn btn-primary">Save</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="modal-backdrop" id="clientDeleteModal" onclick="if (event.target === this) closeDeleteClient()">
+    <div class="modal-card" style="max-width: 480px;">
+        <div class="modal-header">
+            <h3><i class="fa-solid fa-triangle-exclamation" style="color:#9f1c14;"></i> Delete client?</h3>
+            <button type="button" class="modal-close" onclick="closeDeleteClient()"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+        <div class="warn-box">
+            <strong id="clientDeleteName">This client</strong>
+            <p>Deleting removes this client’s entire books from this PC — Day Book, cash, card/QR, aggregators, and reports. This cannot be undone.</p>
+            <p><strong>Download a ZIP backup first</strong> if you may need this data again.</p>
+        </div>
+        <div style="display:flex; gap:0.5rem; justify-content:flex-end; margin-top:1rem;">
+            <button type="button" class="btn btn-secondary" onclick="closeDeleteClient()">Cancel</button>
+            <button type="button" class="btn btn-danger" id="clientDeleteConfirm" onclick="confirmDeleteClient()">Delete client</button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    async function loadClientTable() {
+        const tbody = document.getElementById('clientTbody');
+        const data = await fetch('/api/clients').then((r) => r.json());
+        const rows = data.clients || [];
+        const hint = document.getElementById('clientStorageHint');
+        if (hint && data.storage_root) {
+            hint.textContent = `Each client has its own folder on this PC. Books are saved only in ${data.storage_root}\\<client name>. Name, address and GSTIN appear on every PDF. Backup a ZIP before you delete.`;
+        }
+        if (!rows.length) {
+            tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;">No clients yet.</td></tr>';
+            return;
+        }
+        tbody.innerHTML = rows.map((c) => `
+            <tr>
+                <td>
+                    <strong>${esc(c.name)}</strong>
+                    ${c.data_path ? `<div class="field-source">${esc(c.data_path)}</div>` : ''}
+                </td>
+                <td>${esc(c.gstin || '—')}</td>
+                <td>${esc(c.address || '—')}</td>
+                <td>${c.is_active ? '<span style="color:#15803d;font-weight:700;">Selected</span>' : ''}</td>
+                <td style="white-space:nowrap; text-align:right;">
+                    <button type="button" class="btn btn-secondary btn-sm" onclick='editClient(${JSON.stringify(c)})'>Edit</button>
+                    <button type="button" class="btn btn-outline-excel btn-sm" onclick="window.location.href='/api/clients/${encodeURIComponent(c.id)}/backup'">ZIP</button>
+                    <button type="button" class="btn btn-secondary btn-sm" data-client-id="${esc(c.id)}" data-client-name="${esc(c.name)}" onclick="deleteClientRow(this.dataset.clientId, this.dataset.clientName)" ${rows.length < 2 ? 'disabled' : ''}>Delete</button>
+                </td>
+            </tr>
+        `).join('');
+    }
+    function esc(value) {
+        return String(value || '').replace(/[&<>"']/g, (ch) => ({
+            '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+        }[ch]));
+    }
+    function openClientForm(client) {
+        document.getElementById('clientFormId').value = client ? client.id : '';
+        document.getElementById('clientFormName').value = client ? (client.name || '') : '';
+        document.getElementById('clientFormGstin').value = client ? (client.gstin || '') : '';
+        document.getElementById('clientFormAddress').value = client ? (client.address || '') : '';
+        document.getElementById('clientFormTitle').textContent = client ? 'Edit client' : 'Add client';
+        document.getElementById('clientFormModal').classList.add('active');
+        document.getElementById('clientFormName').focus();
+    }
+    function editClient(client) { openClientForm(client); }
+    function closeClientForm() {
+        document.getElementById('clientFormModal').classList.remove('active');
+    }
+    async function saveClientForm(event) {
+        event.preventDefault();
+        const id = document.getElementById('clientFormId').value;
+        const payload = {
+            name: document.getElementById('clientFormName').value.trim(),
+            gstin: document.getElementById('clientFormGstin').value.trim(),
+            address: document.getElementById('clientFormAddress').value.trim(),
+        };
+        const btn = document.getElementById('clientFormSave');
+        btn.disabled = true;
+        try {
+            const res = await fetch(id ? `/api/clients/${encodeURIComponent(id)}` : '/api/clients/create', {
+                method: id ? 'PUT' : 'POST',
+                credentials: 'same-origin',
+                headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+                body: JSON.stringify(payload),
+            });
+            const body = await res.json().catch(() => ({}));
+            if (!res.ok) {
+                showToast(body.detail || 'Could not save client', 'error');
+                return;
+            }
+            showToast(id ? 'Client details saved' : `Client "${body.name}" added`, 'success');
+            closeClientForm();
+            if (!id) {
+                window.location.reload();
+                return;
+            }
+            await loadClientTable();
+            if (typeof loadClientSwitcher === 'function') await loadClientSwitcher();
+        } finally {
+            btn.disabled = false;
+        }
+    }
+    let pendingDelete = { id: '', name: '' };
+
+    function deleteClientRow(id, name) {
+        pendingDelete = { id: id || '', name: name || 'this client' };
+        document.getElementById('clientDeleteName').textContent = pendingDelete.name;
+        document.getElementById('clientDeleteModal').classList.add('active');
+    }
+    function closeDeleteClient() {
+        pendingDelete = { id: '', name: '' };
+        document.getElementById('clientDeleteModal').classList.remove('active');
+    }
+    async function confirmDeleteClient() {
+        const id = pendingDelete.id;
+        if (!id) return;
+        const btn = document.getElementById('clientDeleteConfirm');
+        btn.disabled = true;
+        try {
+            const res = await fetch(`/api/clients/${encodeURIComponent(id)}`, {
+                method: 'DELETE',
+                credentials: 'same-origin',
+                headers: { 'Accept': 'application/json' },
+            });
+            const body = await res.json().catch(() => ({}));
+            if (!res.ok) {
+                showToast(body.detail || 'Could not delete client', 'error');
+                return;
+            }
+            showToast('Client deleted', 'success');
+            window.location.reload();
+        } finally {
+            btn.disabled = false;
+        }
+    }
+    document.addEventListener('DOMContentLoaded', loadClientTable);
+</script>
+{% endblock %}

@@ -5,6 +5,11 @@ A specialized, professional **Concurrent Audit & Document Scrutiny Web Applicati
 This system is designed for **training and demonstration** of Indian banking concurrent audit workflows, RBI KYC Master Direction compliance, dual officer Maker-Checker controls, and zero-tolerance approval gating for Savings and Current accounts.
 
 ---
+# Upload Your Project Folder to the AICA Level 2 Projects Repository
+
+**Target repository:** [aiinicai/AICA-Level-2-Projects](https://github.com/aiinicai/AICA-Level-2-Projects)
+
+This guide explains how to contribute your complete project folder to the **AICA-Level-2-Projects** repository using GitHub’s **Fork + Pull Request** workflow.
 
 > [!NOTE]
 > ### 🛡️ Synthetic Data & Privacy Assurance
