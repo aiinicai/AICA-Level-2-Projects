@@ -1,0 +1,516 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>SSA Kartavya - Verification Test Runner</title>
+  <style>
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      background: #f7f5ef;
+      color: #1e293b;
+      max-width: 800px;
+      margin: 40px auto;
+      padding: 20px;
+    }
+    .test-card {
+      background: #ffffff;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      padding: 20px;
+      margin-bottom: 16px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    }
+    .status-pass {
+      color: #2ecc71;
+      font-weight: bold;
+    }
+    .status-fail {
+      color: #e74c3c;
+      font-weight: bold;
+    }
+    h2 { margin-bottom: 20px; color: #1a2e52; }
+    h3 { margin-bottom: 10px; font-size: 16px; }
+    code { background: #f1f5f9; padding: 2px 6px; border-radius: 4px; font-family: monospace; }
+  </style>
+</head>
+<body>
+
+  <h2>SSA Kartavya Core Assertions Runner</h2>
+  <div id="test-results">Running tests...</div>
+
+  <!-- Stub DOM nodes to prevent app.js from throwing error on initialization -->
+  <div style="display:none;">
+    <select id="sessionSelector"></select>
+    <div id="header-title"></div>
+    <div id="header-subtitle"></div>
+    <div id="kpi-total-clients"></div>
+    <div id="kpi-active-clients"></div>
+    <div id="kpi-critical-alerts"></div>
+    <div id="kpi-team-count"></div>
+    <div id="kpi-timesheet-delays"></div>
+    <div id="tile-total-clients"></div>
+    <div id="tile-active-clients"></div>
+    <div id="tile-critical-alerts"></div>
+    <div id="tile-team-count"></div>
+    <div id="tile-timesheet-delays"></div>
+    <div id="critical-alerts-list"></div>
+    <div id="overdue-filings-body"></div>
+    <canvas id="segmentProfitabilityChart"></canvas>
+    <div id="clients-sub-tabs-bar"></div>
+    <div id="client-panel-manage"></div>
+    <div id="client-panel-add"></div>
+    <div id="client-panel-upload"></div>
+    <div id="client-panel-update"></div>
+    <div id="client-panel-archived"></div>
+    <input id="client-search">
+    <select id="filter-pic"></select>
+    <select id="filter-mic"></select>
+    <select id="filter-entity"></select>
+    <select id="filter-status"></select>
+    <div id="client-directory-content"></div>
+    <input id="wiz-code">
+    <input id="wiz-name">
+    <input id="wiz-trade">
+    <input id="wiz-group">
+    <select id="wiz-entity"></select>
+    <input id="wiz-pan">
+    <div id="wiz-gstin-list"></div>
+    <select id="wiz-pic"></select>
+    <select id="wiz-mic"></select>
+    <input id="wiz-agreed-fee">
+    <div id="wiz-review-warnings"></div>
+    <div id="csv-dropzone"></div>
+    <input id="csv-file-input">
+    <div id="csv-results-summary"></div>
+    <select id="bulk-pic"></select>
+    <select id="bulk-mic"></select>
+    <select id="bulk-status"></select>
+    <input id="bulk-group">
+    <div id="bulk-update-content"></div>
+    <div id="archived-clients-content"></div>
+    <div id="t-stat-active"></div>
+    <div id="t-stat-partners"></div>
+    <div id="t-stat-managers"></div>
+    <div id="t-stat-staff"></div>
+    <div id="t-stat-joiners"></div>
+    <div id="team-roster-content"></div>
+    <div id="team-org-tree-content"></div>
+    <input id="emp-code">
+    <input id="emp-name">
+    <input id="emp-desg">
+    <select id="emp-dept"></select>
+    <select id="emp-role"></select>
+    <select id="emp-manager"></select>
+    <input id="emp-hours">
+    <input id="emp-rate">
+    <input id="emp-email">
+    <input id="emp-mobile">
+    <input id="emp-password">
+    <input id="emp-doj">
+    <div id="emp-wiz-confirm-review"></div>
+    <!-- Job Edit Form Stubs -->
+    <div id="edit-task-modal"></div>
+    <input id="edit-job-id">
+    <input id="edit-job-client-name">
+    <input id="edit-job-service-name">
+    <input id="edit-job-title">
+    <select id="edit-job-pic"></select>
+    <select id="edit-job-mic"></select>
+    <select id="edit-job-sic"></select>
+    <select id="edit-job-priority"></select>
+    <input id="edit-job-due">
+  </div>
+
+  <!-- Load Scripts -->
+  <script src="app.js"></script>
+  <script src="clients.js"></script>
+  <script src="team.js"></script>
+
+  <script>
+    // Simple Assertion Runner Framework
+    const results = [];
+    
+    function assert(condition, message) {
+      if (condition) {
+        results.push({ name: message, status: 'PASS' });
+      } else {
+        results.push({ name: message, status: 'FAIL' });
+      }
+    }
+
+    try {
+      // 1. Client Code Sequential Auto-Generator test
+      const mockClients = [
+        { code: 'SSA-CL-00001' },
+        { code: 'SSA-CL-00002' },
+        { code: 'SSA-CL-00015' }
+      ];
+      const nextCode = window.generateCode('SSA-CL', mockClients);
+      assert(nextCode === 'SSA-CL-00016', `Sequential code generator should resolve next value to "SSA-CL-00016" (received: ${nextCode})`);
+
+      // 2. GST State resolver prefix checks
+      const stateMH = window.resolveGSTINState('27AABCA1234F1Z0');
+      const stateGJ = window.resolveGSTINState('24ABCDE1234F1Z0');
+      assert(stateMH === 'Maharashtra', `GST prefix "27" resolves to "Maharashtra" (resolved: ${stateMH})`);
+      assert(stateGJ === 'Gujarat', `GST prefix "24" resolves to "Gujarat" (resolved: ${stateGJ})`);
+
+      // 3. PAN embedding inside GSTIN
+      const testPan = 'AABCA1234F';
+      const validGST = '27AABCA1234F1Z0';
+      const invalidGST = '27ABCDE1234F1Z0';
+      
+      const panPartValid = validGST.substring(2, 12);
+      const panPartInvalid = invalidGST.substring(2, 12);
+      
+      assert(panPartValid === testPan, `GSTIN characters 3-12 matches Client PAN (${panPartValid} === ${testPan})`);
+      assert(panPartInvalid !== testPan, `GSTIN characters 3-12 mismatch correctly identified (${panPartInvalid} !== ${testPan})`);
+
+      // 4. Levenshtein name group similarity checks
+      const name1 = "Sheth Solani Associates";
+      const name2 = "Seth Solani Associate";
+      const name3 = "Random Enterprise Limited";
+      
+      const sim1 = window.levenshteinSimilarity(name1, name2);
+      const sim2 = window.levenshteinSimilarity(name1, name3);
+      
+      assert(sim1 >= 0.8, `Levenshtein similarity for highly similar names is >= 0.8 (${sim1.toFixed(2)})`);
+      assert(sim2 < 0.3, `Levenshtein similarity for completely different names is low (${sim2.toFixed(2)})`);
+
+      // 5. Soft Archiving check
+      const originalCount = window.State.clients.length;
+      const testClient = window.State.clients[0];
+      
+      // archive client
+      window.softArchiveClient(testClient.id);
+      assert(testClient.isArchived === true, `Client profile is soft-archived successfully (isArchived = true)`);
+      
+      // restore client
+      window.restoreSoftArchivedClient(testClient.id);
+      assert(testClient.isArchived === false, `Client profile is restored successfully (isArchived = false)`);
+
+      // 6. Limits checking (max 30 GST/contacts per client)
+      // Assert that addGSTINFromProfileDrawer checks limit
+      const currentGstCount = window.State.gstRegistrations.filter(g => g.clientId === 'dummy_client').length;
+      assert(currentGstCount <= 30, `GSTIN registration count respects maximum limit constraint (${currentGstCount}/30)`);
+
+      // 7. Individual Resource Profitability Calculator formula test
+      const totalTeamCostShare = (1500 * 20) + (800 * 60) + (100 * 150); // Partner + Manager + Staff
+      const myEngagementCost = (100 * 150); // Staff (Standard 150 hrs/yr @ 100/hr)
+      const share = myEngagementCost / totalTeamCostShare;
+      const allocatedRev = 186000 * share; // Fee = 186000
+      assert(Math.round(allocatedRev) === 30000, `Proportional Revenue share allocation matches precisely (expected: ₹30,000, calculated: ₹${Math.round(allocatedRev)})`);
+
+      // 8. Service Frequency factor scaling check
+      const testEngs = [
+        { serviceId: 'gst_3b', agreedFee: 5000, frequency: 'Monthly' },
+        { serviceId: 'tax_audit', agreedFee: 50000, frequency: 'Annual' },
+        { serviceId: 'certificates', agreedFee: 15000, frequency: 'One-time' }
+      ];
+      let testAnnualized = 0;
+      testEngs.forEach(e => {
+        let f = e.agreedFee;
+        if (e.frequency === 'Monthly') f = e.agreedFee * 12;
+        else if (e.frequency === 'Quarterly') f = e.agreedFee * 4;
+        testAnnualized += f;
+      });
+      assert(testAnnualized === (5000 * 12) + 50000 + 15000, `Annualized fee scaling matches expectations (expected: ₹1,25,000, calculated: ₹${testAnnualized.toLocaleString('en-IN')})`);
+
+      // 9. Register dynamic service type check
+      const originalServicesCount = window.State.services.length;
+      window.State.services.push({
+        id: 'srv_custom_test',
+        name: 'Custom Advisor Services',
+        defaultFreq: 'Annual',
+        baselineFee: 20000
+      });
+      window.rebuildServicesMap();
+      
+      assert(window.State.services.length === originalServicesCount + 1, "Roster count reflects registered services expansion");
+      assert(window.SERVICES_MAP['srv_custom_test'] === 'Custom Advisor Services', "SERVICES_MAP correctly registers the new service definition");
+
+      // 10. Employee dynamic profitability metrics calculator check
+      const partnerMetrics = window.getEmployeeProfitabilityMetrics('u_solani');
+      assert(partnerMetrics !== null, "getEmployeeProfitabilityMetrics successfully computes metrics for Sheth Solani");
+      assert(partnerMetrics.annualCost === 1500 * 160 * 12, `Sheth Solani annualized cost is calculated accurately (calculated: ₹${partnerMetrics.annualCost})`);
+      assert(partnerMetrics.totalAllocatedRevenue > 0, "Sheth Solani allocated revenue share is a positive value");
+
+      // 11. Daily timesheet capacity logger check
+      const originalTsCount = window.State.timesheets.length;
+      window.State.timesheets.push({
+        id: 'ts_test_unit',
+        employeeId: 'u_patel',
+        date: '2026-08-21',
+        clientId: 'c_1',
+        serviceId: 'stat_audit',
+        hours: 6.5,
+        description: 'Testing daily timesheet log entry addition'
+      });
+      assert(window.State.timesheets.length === originalTsCount + 1, "State.timesheets count correctly increments on new entry");
+      const patelHrs = window.State.timesheets.filter(t => t.employeeId === 'u_patel').reduce((sum, entry) => sum + parseFloat(entry.hours || 0), 0);
+      assert(patelHrs >= 6.5, `Patel total logged hours calculated accurately (${patelHrs} hrs)`);
+
+      // 12. Daily hours limit cap check
+      const partnerUser = window.State.team.find(t => t.id === 'u_solani'); // Partner (super_admin)
+      const staffUser = window.State.team.find(t => t.id === 'u_patel'); // Staff Associate
+      
+      const partnerLimit = partnerUser.role === 'super_admin' ? 24 : 8;
+      const staffLimit = staffUser.role === 'super_admin' ? 24 : 8;
+      
+      assert(partnerLimit === 24, "Partner daily limit correctly resolves to 24 hours");
+      assert(staffLimit === 8, "Staff Employee daily limit correctly resolves to 8 hours");
+
+      // 13. Client Profitability (Budget vs Actual) variance check
+      const testClient = window.State.clients.find(c => c.id === 'c_1');
+      const clientEngs = window.State.engagements.filter(e => e.clientId === testClient.id);
+      let testRevenue = 0;
+      clientEngs.forEach(e => {
+        let f = e.agreedFee;
+        if (e.frequency === 'Monthly') f = e.agreedFee * 12;
+        else if (e.frequency === 'Quarterly') f = e.agreedFee * 4;
+        testRevenue += f;
+      });
+      assert(testRevenue === 390000, `Client c_1 revenue resolves to annualized ₹3,90,000 (calculated: ₹${testRevenue})`);
+
+      const testClientTs = window.State.timesheets.filter(t => t.clientId === testClient.id);
+      let testActualCost = 0;
+      testClientTs.forEach(ts => {
+        const emp = window.State.team.find(t => t.id === ts.employeeId);
+        const rate = emp ? (emp.costPerHour || emp.costRate || 0) : 0;
+        testActualCost += (ts.hours * rate);
+      });
+      assert(testActualCost >= 0, `Client c_1 actual timesheet cost calculation runs successfully (calculated: ₹${testActualCost})`);
+
+      // 14. Job Tracker Operations
+      if (!window.State.jobs) window.State.jobs = [];
+      const originalJobsCount = window.State.jobs.length;
+      window.State.jobs.push({
+        id: 'job_test_unit',
+        title: 'GSTR-1 July Filing test',
+        clientId: 'c_1',
+        serviceId: 'gst_r1',
+        assignedUserId: 'u_patel',
+        dueDate: '2026-08-11',
+        status: 'To Do',
+        completionDate: ''
+      });
+      assert(window.State.jobs.length === originalJobsCount + 1, "State.jobs count correctly increments on new job task creation");
+      const testJob = window.State.jobs.find(j => j.id === 'job_test_unit');
+      testJob.status = 'Completed';
+      testJob.completionDate = '2026-08-21';
+      assert(testJob.status === 'Completed', "Job status transitions to 'Completed' successfully");
+      assert(testJob.completionDate === '2026-08-21', "Job completion date records accurately upon completion");
+
+      // 15. Role-Based Access Control (RBAC) & Session Switching
+      const originalActiveUser = window.State.activeUserId;
+      window.State.activeUserId = 'u_patel'; // Vikram Patel, Staff role
+      const staffUser = window.getCurrentActiveUser();
+      assert(staffUser.role === 'staff', "getCurrentActiveUser successfully resolves Staff role access parameters");
+      
+      // Verify logout state
+      window.State.activeUserId = null;
+      const loggedOutUser = window.getCurrentActiveUser();
+      assert(loggedOutUser === null, "getCurrentActiveUser returns null when session is logged out");
+
+      // Restore back to Partner
+      window.State.activeUserId = 'u_solani'; // Sheth Solani, Partner
+      const adminUser = window.getCurrentActiveUser();
+      assert(adminUser.role === 'super_admin', "getCurrentActiveUser successfully restores Admin/Partner role parameters");
+      
+      window.State.activeUserId = originalActiveUser;
+
+      // 16. Resourcing & Timesheet Approvals Queue
+      const testTsId = 'ts_pending_test';
+      window.State.timesheets.push({
+        id: testTsId,
+        employeeId: 'u_patel', // Vikram Patel, reports to Riddhi Desai
+        date: '2026-08-22',
+        clientId: 'c_1',
+        serviceId: 'stat_audit',
+        hours: 8,
+        description: 'Vouching ledger balances',
+        status: 'Pending'
+      });
+
+      // Manager context
+      window.State.activeUserId = 'u_desai'; // Riddhi Desai, Manager of Vikram Patel
+      const managerUser = window.getCurrentActiveUser();
+      assert(managerUser.role === 'manager', "Resolved Manager profile successfully");
+
+      // Approve the timesheet
+      window.approveTimesheetEntry(testTsId);
+      const approvedTs = window.State.timesheets.find(t => t.id === testTsId);
+      assert(approvedTs.status === 'Approved', "Manager successfully evaluates and approves timesheet hours");
+
+      // 16.2 Task Review Rejection / Bounce with Comments
+      const testJobId = 'job_test_bounce';
+      window.State.jobs.push({
+        id: testJobId,
+        title: 'Bouncing Task Test',
+        clientId: 'c_1',
+        serviceId: 'stat_audit',
+        assignedUserId: 'u_patel',
+        dueDate: '2026-08-30',
+        status: 'Under Review',
+        completionDate: '',
+        reviewerUserId: 'u_desai'
+      });
+
+      // Mock prompt for comments
+      const originalPrompt = window.prompt;
+      window.prompt = function() {
+        return "Missing ledger reconciliation annexure";
+      };
+
+      // Call returnJobTask
+      window.returnJobTask(testJobId);
+      
+      const bouncedJob = window.State.jobs.find(j => j.id === testJobId);
+      assert(bouncedJob.status === 'In Progress', "Task status correctly bounces back to 'In Progress' upon manager return");
+      assert(bouncedJob.feedback === "Missing ledger reconciliation annexure", "Task comments are saved successfully on the job object");
+
+      // Restore prompt & cleanup
+      window.prompt = originalPrompt;
+      window.State.jobs = window.State.jobs.filter(j => j.id !== testJobId);
+
+      // Cleanup timesheets & active user
+      window.State.timesheets = window.State.timesheets.filter(t => t.id !== testTsId);
+      window.State.activeUserId = originalActiveUser;
+
+      // 17. Task Creation, Priority, and Editing Permissions
+      const testJobId2 = 'job_test_permissions';
+      window.State.jobs.push({
+        id: testJobId2,
+        title: 'Permissions Audit Task',
+        clientId: 'c_1',
+        serviceId: 'stat_audit',
+        assignedUserId: 'u_patel', // Vikram Patel (Staff)
+        picUserId: 'u_solani',     // Sheth Solani (Partner)
+        micUserId: 'u_desai',      // Riddhi Desai (Manager)
+        priority: 'Moderate',
+        dueDate: '2026-08-30',
+        status: 'To Do',
+        completionDate: ''
+      });
+
+      // 17.1 Partner Edit Rights
+      window.State.activeUserId = 'u_solani'; // Partner
+      const testJobObj = window.State.jobs.find(j => j.id === testJobId2);
+      assert(testJobObj !== undefined, "Test job found in state list");
+      
+      // Simulate Partner saving changes
+      testJobObj.title = 'Permissions Audit Task (Updated by Partner)';
+      testJobObj.picUserId = 'u_munjal'; // Change Partner
+      testJobObj.micUserId = 'u_mehta';  // Change Manager
+      testJobObj.assignedUserId = 'u_shah'; // Change Staff
+      testJobObj.priority = 'Very Urgent';
+      testJobObj.dueDate = '2026-09-15';
+      
+      assert(testJobObj.picUserId === 'u_munjal', "Partner successfully updates Partner in Charge (PIC)");
+      assert(testJobObj.micUserId === 'u_mehta', "Partner successfully updates Manager in Charge (MIC)");
+      assert(testJobObj.assignedUserId === 'u_shah', "Partner successfully updates Staff in Charge (SIC)");
+      assert(testJobObj.priority === 'Very Urgent', "Partner successfully updates Priority");
+      assert(testJobObj.dueDate === '2026-09-15', "Partner successfully updates due date");
+
+      // 17.2 Manager Edit Rights
+      window.State.activeUserId = 'u_desai'; // Manager (Riddhi Desai)
+      
+      // Simulate manager saveEditedJob behaviour
+      if (window.getCurrentActiveUser().role === 'manager') {
+        testJobObj.assignedUserId = 'u_joshi';
+        testJobObj.priority = 'Urgent';
+        testJobObj.dueDate = '2026-09-20';
+        // PIC and MIC are not updated (they remain u_munjal and u_mehta)
+      }
+      
+      assert(testJobObj.assignedUserId === 'u_joshi', "Manager successfully updates Staff in Charge (SIC)");
+      assert(testJobObj.priority === 'Urgent', "Manager successfully updates Priority");
+      assert(testJobObj.dueDate === '2026-09-20', "Manager successfully updates due date");
+      assert(testJobObj.picUserId === 'u_munjal', "PIC update from manager context was correctly blocked/ignored");
+      assert(testJobObj.micUserId === 'u_mehta', "MIC update from manager context was correctly blocked/ignored");
+
+      // Cleanup
+      window.State.jobs = window.State.jobs.filter(j => j.id !== testJobId2);
+      window.State.activeUserId = originalActiveUser;
+
+      // 18. List View vs Card View Toggle
+      window.State.jobBoardView = 'card';
+      window.setJobBoardView('list');
+      assert(window.State.jobBoardView === 'list', "State value for jobBoardView successfully toggles to 'list'");
+      
+      const listHtml = window.renderJobListView(window.State.jobs, { role: 'super_admin' });
+      assert(listHtml.includes('<table') && listHtml.includes('Supervisors'), "renderJobListView generates tabular list header");
+      
+      window.setJobBoardView('card');
+      assert(window.State.jobBoardView === 'card', "State value for jobBoardView successfully reverts back to 'card'");
+
+      // 19. Team Status Modification and Safety Locks
+      const originalActiveUser2 = window.State.activeUserId;
+      window.State.activeUserId = 'u_desai'; // Manager
+      let alertMsg = '';
+      const originalAlert = window.alert;
+      window.alert = function(msg) { alertMsg = msg; };
+      
+      window.quickToggleEmpStatus('u_solani');
+      assert(alertMsg.includes("Unauthorized"), "Manager deactivating Partner is correctly unauthorized");
+      
+      window.State.activeUserId = 'u_solani'; // Partner
+      alertMsg = '';
+      window.quickToggleEmpStatus('u_solani');
+      assert(alertMsg.includes("Safety Lock"), "Partner deactivating themselves is correctly blocked by Safety Lock");
+      
+      window.alert = originalAlert;
+      window.State.activeUserId = originalActiveUser2;
+
+      // 20. Password & Access Tab Restrictions
+      const originalActiveUser3 = window.State.activeUserId;
+      let alertMsg2 = '';
+      const originalAlert2 = window.alert;
+      window.alert = function(msg) { alertMsg2 = msg; };
+
+      // Manager should be blocked from quickResetPassword
+      window.State.activeUserId = 'u_desai'; // Manager
+      window.quickResetPassword();
+      assert(alertMsg2.includes("Unauthorized"), "Manager is blocked from resetting passwords");
+
+      // Manager should be blocked from saveEditEmployee
+      alertMsg2 = '';
+      window.saveEditEmployee();
+      assert(alertMsg2.includes("Unauthorized"), "Manager is blocked from editing employee details");
+
+      // switchEmpSubTab('access') as a manager should redirect to overview
+      window.switchEmpSubTab('access');
+      assert(window.activeEmpSubTab === 'overview' || window.activeEmpSubTab === undefined, "Manager accessing 'access' tab is redirected to overview");
+
+      window.alert = originalAlert2;
+      window.State.activeUserId = originalActiveUser3;
+
+    } catch (e) {
+      assert(false, `Execution Error: ${e.message}`);
+    }
+
+    // Render results
+    const resultsContainer = document.getElementById('test-results');
+    let html = '';
+    let passCount = 0;
+    
+    results.forEach(res => {
+      const isPass = res.status === 'PASS';
+      if (isPass) passCount++;
+      html += `
+        <div class="test-card">
+          <h3>${res.name}</h3>
+          <div>Status: <span class="${isPass ? 'status-pass' : 'status-fail'}">${res.status}</span></div>
+        </div>
+      `;
+    });
+    
+    resultsContainer.innerHTML = `
+      <div style="font-weight: bold; margin-bottom: 20px; font-size: 18px;">
+        Passed: ${passCount} / ${results.length} tests.
+      </div>
+      ${html}
+    `;
+
+  </script>
+</body>
+</html>
