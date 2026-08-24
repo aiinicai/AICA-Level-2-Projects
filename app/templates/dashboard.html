@@ -1,0 +1,376 @@
+{% extends "base.html" %}
+
+{% block page_title %}Control Tower{% endblock %}
+{% block page_kicker %}Live sales, cash close, and settlement health{% endblock %}
+
+{% block content %}
+{% set issues = (cash_diffs or 0) + (card_diffs or 0) + (online_diffs or 0) %}
+{% set pending = pending_card or 0 %}
+{% set score = 100 if issues == 0 else ([0, 100 - issues * 8]|max) %}
+{% set score_label = 'Very Good' if score >= 90 else ('Good' if score >= 75 else ('Needs attention' if score >= 50 else 'Critical')) %}
+{% set online_sales = (totals.zomato or 0) + (totals.swiggy or 0) + (totals.dineout or 0) %}
+
+<div class="overview-row">
+    <div class="score-card">
+        <div class="score-ring" style="--p: {{ score }};">
+            <div class="score-ring-inner">
+                <div class="score-num">{{ score }}</div>
+                <div class="score-den">/ 100</div>
+            </div>
+        </div>
+        <div class="score-label">Reconciliation Score</div>
+        <div class="score-status">{{ score_label }}</div>
+    </div>
+
+    <div class="kpi-grid">
+        <div class="kpi-card green">
+            <span class="kpi-title">Total Sales</span>
+            <span class="kpi-value amount-num" id="kpiTotalSales">₹ {{ "{:,.2f}".format(totals.total_sales) }}</span>
+            <span class="kpi-sub">All channels, selected period</span>
+            <div class="spark spark-green"></div>
+        </div>
+        <div class="kpi-card">
+            <span class="kpi-title">Cash Sales</span>
+            <span class="kpi-value amount-num" id="kpiCash">₹ {{ "{:,.2f}".format(totals.cash) }}</span>
+            <span class="kpi-sub">Physical till collections</span>
+            <div class="spark spark-green"></div>
+        </div>
+        <div class="kpi-card">
+            <span class="kpi-title">Card / QR Sales</span>
+            <span class="kpi-value amount-num" id="kpiCard">₹ {{ "{:,.2f}".format(totals.card_qr) }}</span>
+            <span class="kpi-sub">Bank settlement track</span>
+            <div class="spark spark-blue"></div>
+        </div>
+        <div class="kpi-card">
+            <span class="kpi-title">Aggregator Sales</span>
+            <span class="kpi-value amount-num" id="kpiOnline">₹ {{ "{:,.2f}".format(online_sales) }}</span>
+            <span class="kpi-sub">Zomato · Swiggy · Dineout</span>
+            <div class="spark spark-orange"></div>
+        </div>
+        <div class="kpi-card green">
+            <span class="kpi-title">Closing Balance{% if closing_date %} · {{ closing_date.strftime('%d %b') }}{% endif %}</span>
+            <span class="kpi-value amount-num" id="kpiClosing">₹ {{ "{:,.2f}".format(closing_balance) }}</span>
+            <span class="kpi-sub">Latest cash close</span>
+            <div class="spark spark-green"></div>
+        </div>
+        <div class="kpi-card {% if issues > 0 %}red{% else %}green{% endif %}">
+            <span class="kpi-title">Unresolved Differences</span>
+            <span class="kpi-value" id="kpiIssues">{{ issues }}</span>
+            <span class="kpi-sub">{{ pending }} card match(es) pending</span>
+            <div class="spark {% if issues > 0 %}spark-red{% else %}spark-green{% endif %}"></div>
+        </div>
+    </div>
+</div>
+
+<span id="kpiZomato" hidden>₹ {{ "{:,.2f}".format(totals.zomato) }}</span>
+<span id="kpiSwiggy" hidden>₹ {{ "{:,.2f}".format(totals.swiggy) }}</span>
+<span id="kpiDineout" hidden>₹ {{ "{:,.2f}".format(totals.dineout) }}</span>
+
+<div class="filter-toolbar">
+    <div class="form-group">
+        <label class="form-label">Branch</label>
+        <select id="filterBranch" class="form-select" onchange="applyDashboardFilter()">
+            <option value="">All Branches</option>
+            {% for b in branches %}
+            <option value="{{ b.id }}">{{ b.name }}</option>
+            {% endfor %}
+        </select>
+    </div>
+    <div class="form-group">
+        <label class="form-label">Date From</label>
+        <input type="date" id="filterStart" class="form-control" onchange="applyDashboardFilter()">
+    </div>
+    <div class="form-group">
+        <label class="form-label">Date To</label>
+        <input type="date" id="filterEnd" class="form-control" onchange="applyDashboardFilter()">
+    </div>
+    <div class="form-group" style="margin-left: auto; flex-direction: row; gap: 0.5rem; align-items: flex-end;">
+        <button onclick="applyDashboardFilter()" class="btn btn-secondary"><i class="fa-solid fa-filter"></i> Apply</button>
+        <a id="dashExportExcel" href="/api/reports/export/daybook/excel" class="btn btn-outline-excel"><i class="fa-solid fa-file-excel"></i> Export Excel</a>
+        <a id="dashExportPdf" href="/api/reports/export/daybook/pdf" target="_blank" class="btn btn-outline-pdf"><i class="fa-solid fa-file-pdf"></i> Export PDF</a>
+    </div>
+</div>
+
+<div class="dash-grid">
+    <div class="chart-card">
+        <div class="chart-header">
+            <div class="chart-title"><i class="fa-solid fa-chart-line" style="color: var(--green);"></i> Daily Sales Trend</div>
+            <span style="font-size: 0.78rem; color: var(--text-muted);">Consolidated revenue</span>
+        </div>
+        <div class="chart-body">
+            <canvas id="salesTrendChart"></canvas>
+        </div>
+    </div>
+
+    <div class="chart-card">
+        <div class="chart-header">
+            <div class="chart-title"><i class="fa-solid fa-bell" style="color: var(--status-amber);"></i> Attention Queue</div>
+            <span style="font-size: 0.78rem; color: var(--text-muted);">Open exceptions</span>
+        </div>
+        <div class="alert-list">
+            <div class="alert-item">
+                <span class="tag {% if cash_diffs %}badge-difference{% else %}badge-reconciled{% endif %}">{% if cash_diffs %}Critical{% else %}Clear{% endif %}</span>
+                <p><strong>{{ cash_diffs }}</strong> cash difference{{ 's' if cash_diffs != 1 else '' }} on physical till close. <a href="/cash-reconciliation">Review cash rec</a></p>
+            </div>
+            <div class="alert-item">
+                <span class="tag {% if card_diffs %}badge-difference{% else %}badge-pending{% endif %}">{% if card_diffs %}High risk{% else %}Watch{% endif %}</span>
+                <p><strong>{{ card_diffs }}</strong> card/QR mismatch{{ 'es' if card_diffs != 1 else '' }} · <strong>{{ pending }}</strong> pending bank match{{ 'es' if pending != 1 else '' }}. <a href="/card-qr-reconciliation">Open card rec</a></p>
+            </div>
+            <div class="alert-item">
+                <span class="tag {% if online_diffs %}badge-amber{% else %}badge-reconciled{% endif %}">{% if online_diffs %}Aggregator{% else %}Settled{% endif %}</span>
+                <p><strong>{{ online_diffs }}</strong> unresolved aggregator batch{{ 'es' if online_diffs != 1 else '' }}. <a href="/aggregator-reconciliation">Open payouts</a></p>
+            </div>
+        </div>
+        <div class="chart-header" style="margin-top: 1.1rem;">
+            <div class="chart-title"><i class="fa-solid fa-chart-pie" style="color: var(--green);"></i> Channel share</div>
+        </div>
+        <div class="chart-body" style="height: 200px;">
+            <canvas id="channelShareChart"></canvas>
+        </div>
+    </div>
+</div>
+
+<div class="charts-grid">
+    <div class="chart-card chart-wide">
+        <div class="chart-header">
+            <div class="chart-title"><i class="fa-solid fa-square-poll-vertical" style="color: var(--green);"></i> Reconciliation Status</div>
+            <span style="font-size: 0.78rem; color: var(--text-muted);">Matched vs discrepancy</span>
+        </div>
+        <div class="chart-body" style="height: 220px;">
+            <canvas id="reconStatusChart"></canvas>
+        </div>
+    </div>
+</div>
+
+<div class="glass-card">
+    <div class="section-head">
+        <h3><i class="fa-solid fa-clock-rotate-left" style="color: var(--green);"></i> Recent Day Book Entries</h3>
+        <a href="/daybook" class="btn btn-secondary btn-sm">Open Day Book</a>
+    </div>
+    <div class="table-responsive">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Date</th>
+                    <th>Branch</th>
+                    <th>Cash</th>
+                    <th>Card / QR</th>
+                    <th>Zomato</th>
+                    <th>Swiggy</th>
+                    <th>Dineout</th>
+                    <th>Total Sales</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody id="dashboardTableBody">
+                {% for row in daybook_data %}
+                <tr>
+                    <td>{{ row.date.strftime('%Y-%m-%d') }}</td>
+                    <td><strong>{{ row.branch_name }}</strong></td>
+                    <td class="amount-num">₹ {{ "{:,.2f}".format(row.cash) }}</td>
+                    <td class="amount-num">₹ {{ "{:,.2f}".format(row.card_qr) }}</td>
+                    <td class="amount-num">₹ {{ "{:,.2f}".format(row.zomato) }}</td>
+                    <td class="amount-num">₹ {{ "{:,.2f}".format(row.swiggy) }}</td>
+                    <td class="amount-num">₹ {{ "{:,.2f}".format(row.dineout) }}</td>
+                    <td class="amount-num"><strong>₹ {{ "{:,.2f}".format(row.total_sales) }}</strong></td>
+                    <td>
+                        {% if row.status == 'RECONCILED' %}
+                        <span class="badge badge-reconciled">Reconciled</span>
+                        {% elif row.status == 'DIFFERENCE' %}
+                        <span class="badge badge-difference">Difference</span>
+                        {% else %}
+                        <span class="badge badge-pending">Pending</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="9" style="text-align: center; color: var(--text-muted);">No sales data available. Import daily sales to view dashboard.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    let trendChartInstance = null;
+    let channelChartInstance = null;
+    let reconChartInstance = null;
+
+    document.addEventListener('DOMContentLoaded', () => {
+        loadAnalyticsCharts();
+    });
+
+    async function applyDashboardFilter() {
+        const branchId = document.getElementById('filterBranch').value;
+        const start = document.getElementById('filterStart').value;
+        const end = document.getElementById('filterEnd').value;
+
+        let params = new URLSearchParams();
+        if (branchId) params.append('branch_id', branchId);
+        if (start) params.append('start_date', start);
+        if (end) params.append('end_date', end);
+        const q = params.toString() ? '?' + params.toString() : '';
+
+        document.getElementById('dashExportExcel').href = `/api/reports/export/daybook/excel${q}`;
+        document.getElementById('dashExportPdf').href = `/api/reports/export/daybook/pdf${q}`;
+
+        let url = `/api/daybook/consolidated?`;
+        if (branchId) url += `branch_id=${branchId}&`;
+        if (start) url += `start_date=${start}&`;
+        if (end) url += `end_date=${end}&`;
+
+        const data = await apiFetch(url);
+        if (!data) return;
+
+        const tbody = document.getElementById('dashboardTableBody');
+        tbody.innerHTML = '';
+
+        if (data.rows.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="9" style="text-align: center; color: var(--text-muted);">No records found.</td></tr>`;
+        } else {
+            data.rows.slice(0, 10).forEach(r => {
+                let statusBadge = r.status === 'RECONCILED' ? '<span class="badge badge-reconciled">Reconciled</span>' :
+                                  r.status === 'DIFFERENCE' ? '<span class="badge badge-difference">Difference</span>' :
+                                  '<span class="badge badge-pending">Pending</span>';
+
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td>${r.date}</td>
+                    <td><strong>${r.branch_name}</strong></td>
+                    <td class="amount-num">${formatINR(r.cash)}</td>
+                    <td class="amount-num">${formatINR(r.card_qr)}</td>
+                    <td class="amount-num">${formatINR(r.zomato)}</td>
+                    <td class="amount-num">${formatINR(r.swiggy)}</td>
+                    <td class="amount-num">${formatINR(r.dineout)}</td>
+                    <td class="amount-num"><strong>${formatINR(r.total_sales)}</strong></td>
+                    <td>${statusBadge}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        document.getElementById('kpiTotalSales').innerText = formatINR(data.totals.total_sales);
+        document.getElementById('kpiCash').innerText = formatINR(data.totals.cash);
+        document.getElementById('kpiCard').innerText = formatINR(data.totals.card_qr);
+        document.getElementById('kpiZomato').innerText = formatINR(data.totals.zomato);
+        document.getElementById('kpiSwiggy').innerText = formatINR(data.totals.swiggy);
+        document.getElementById('kpiDineout').innerText = formatINR(data.totals.dineout);
+        const online = (Number(data.totals.zomato) || 0) + (Number(data.totals.swiggy) || 0) + (Number(data.totals.dineout) || 0);
+        const onlineEl = document.getElementById('kpiOnline');
+        if (onlineEl) onlineEl.innerText = formatINR(online);
+
+        loadAnalyticsCharts();
+    }
+
+    async function loadAnalyticsCharts() {
+        const branchId = document.getElementById('filterBranch').value;
+        const start = document.getElementById('filterStart').value;
+        const end = document.getElementById('filterEnd').value;
+
+        let url = `/api/reports/analytics?`;
+        if (branchId) url += `branch_id=${branchId}&`;
+        if (start) url += `start_date=${start}&`;
+        if (end) url += `end_date=${end}&`;
+
+        const analytics = await apiFetch(url);
+        if (!analytics) return;
+
+        const fontFamily = 'Inter';
+        const trendCtx = document.getElementById('salesTrendChart').getContext('2d');
+        if (trendChartInstance) trendChartInstance.destroy();
+
+        trendChartInstance = new Chart(trendCtx, {
+            type: 'line',
+            data: {
+                labels: analytics.sales_trend.labels.length > 0 ? analytics.sales_trend.labels : ['No Data'],
+                datasets: [{
+                    label: 'Total Revenue (₹)',
+                    data: analytics.sales_trend.data.length > 0 ? analytics.sales_trend.data : [0],
+                    borderColor: '#16a34a',
+                    backgroundColor: 'rgba(22, 163, 74, 0.10)',
+                    fill: true,
+                    tension: 0.35,
+                    borderWidth: 2.5,
+                    pointBackgroundColor: '#15803d',
+                    pointRadius: 3
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { title: { display: false }, legend: { display: false } },
+                scales: {
+                    x: {
+                        grid: { color: 'rgba(15, 23, 42, 0.05)' },
+                        ticks: { color: '#64748b', font: { family: fontFamily, weight: '600' } }
+                    },
+                    y: {
+                        grid: { color: 'rgba(15, 23, 42, 0.05)' },
+                        ticks: { color: '#64748b', font: { family: fontFamily } }
+                    }
+                }
+            }
+        });
+
+        const channelCtx = document.getElementById('channelShareChart').getContext('2d');
+        if (channelChartInstance) channelChartInstance.destroy();
+
+        channelChartInstance = new Chart(channelCtx, {
+            type: 'doughnut',
+            data: {
+                labels: analytics.channel_distribution.labels,
+                datasets: [{
+                    data: analytics.channel_distribution.data,
+                    backgroundColor: ['#16a34a', '#2563eb', '#ef4444', '#f59e0b', '#7c3aed', '#64748b'],
+                    borderWidth: 2,
+                    borderColor: '#ffffff'
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                cutout: '68%',
+                plugins: {
+                    title: { display: false },
+                    legend: {
+                        position: 'right',
+                        labels: { color: '#0f172a', font: { family: fontFamily, size: 11, weight: '600' } }
+                    }
+                }
+            }
+        });
+
+        const reconCtx = document.getElementById('reconStatusChart').getContext('2d');
+        if (reconChartInstance) reconChartInstance.destroy();
+
+        reconChartInstance = new Chart(reconCtx, {
+            type: 'doughnut',
+            data: {
+                labels: analytics.reconciliation_status.labels,
+                datasets: [{
+                    data: analytics.reconciliation_status.data,
+                    backgroundColor: ['#16a34a', '#ef4444', '#f59e0b'],
+                    borderWidth: 2,
+                    borderColor: '#ffffff'
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                cutout: '68%',
+                plugins: {
+                    title: { display: false },
+                    legend: {
+                        position: 'right',
+                        labels: { color: '#0f172a', font: { family: fontFamily, size: 11, weight: '600' } }
+                    }
+                }
+            }
+        });
+    }
+</script>
+{% endblock %}

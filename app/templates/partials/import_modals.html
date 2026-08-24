@@ -1,0 +1,169 @@
+<!-- Image Import Preview & Confirm Modal -->
+<div class="modal-backdrop" id="imagePreviewModal">
+    <div class="modal-card" style="max-width: 1000px; width: 95%;">
+        <div class="modal-header">
+            <h3 style="font-size: 1.15rem;">Check figures</h3>
+            <div style="display: flex; gap: 0.5rem; align-items: center;">
+                <button type="button" class="btn btn-secondary" style="padding: 0.35rem 0.75rem; font-size: 0.8rem;" onclick="openOcrDetailsDrawer()">Details</button>
+                <button class="modal-close" onclick="closeModal('imagePreviewModal')">&times;</button>
+            </div>
+        </div>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem; max-height: 75vh; overflow-y: auto;">
+            <div>
+                <div id="imgSourceStrip" class="img-source-strip"></div>
+                <div style="background: #0b1120; padding: 0.75rem; border-radius: var(--radius-md); border: 1px solid var(--border-color); display: flex; align-items: center; justify-content: center;">
+                    <img id="imgPreviewPic" src="" alt="Day book photo" style="max-width: 100%; max-height: 460px; object-fit: contain; border-radius: 6px; background: #111827;">
+                </div>
+            </div>
+
+            <form id="imageConfirmForm" onsubmit="submitConfirmedImageImport(event)">
+                <input type="hidden" id="imgConfirmAuditId" value="">
+
+                <div id="imgTotalMismatchBanner" style="display: none; background: rgba(239, 68, 68, 0.12); border: 1px solid rgba(239, 68, 68, 0.3); border-radius: 6px; padding: 0.5rem 0.7rem; margin-bottom: 0.75rem; font-size: 0.82rem; color: #f87171;">
+                    <span id="imgTotalMismatchText">Sheet total does not match. Please check figures.</span>
+                </div>
+                <div id="imgVerifyBanner" style="display: none; background: rgba(16, 185, 129, 0.10); border: 1px solid rgba(16, 185, 129, 0.28); border-radius: 6px; padding: 0.5rem 0.7rem; margin-bottom: 0.75rem; font-size: 0.82rem; color: #166534;">
+                    <span id="imgVerifyText"></span>
+                </div>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.65rem; margin-bottom: 0.65rem;">
+                    <div class="form-group">
+                        <label class="form-label">Branch</label>
+                        <select id="imgConfirmBranch" class="form-select" required onchange="refreshSalaryAdvanceMap()">
+                            {% for b in branches %}
+                            <option value="{{ b.id }}">{{ b.name }} ({{ b.code }})</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Date</label>
+                        <input type="date" id="imgConfirmDate" class="form-control" required>
+                        <small class="field-source" id="srcDate"></small>
+                    </div>
+                </div>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.65rem; margin-bottom: 0.65rem;">
+                    <div class="form-group">
+                        <label class="form-label">Cash (₹)</label>
+                        <input type="number" step="0.01" id="imgConfirmCash" class="form-control" oninput="calcModalSalesTotal()" required>
+                        <small class="field-source" id="srcCash"></small>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Card (₹)</label>
+                        <input type="number" step="0.01" id="imgConfirmCard" class="form-control" oninput="calcModalSalesTotal()" required>
+                        <small class="field-source" id="srcCard"></small>
+                    </div>
+                </div>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0.5rem; margin-bottom: 0.65rem;">
+                    <div class="form-group">
+                        <label class="form-label">Zomato (₹)</label>
+                        <input type="number" step="0.01" id="imgConfirmZomato" class="form-control" oninput="calcModalSalesTotal()" required>
+                        <small class="field-source" id="srcZomato"></small>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Swiggy (₹)</label>
+                        <input type="number" step="0.01" id="imgConfirmSwiggy" class="form-control" oninput="calcModalSalesTotal()">
+                        <small class="field-source" id="srcSwiggy"></small>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Dineout (₹)</label>
+                        <input type="number" step="0.01" id="imgConfirmDineout" class="form-control" oninput="calcModalSalesTotal()">
+                        <small class="field-source" id="srcDineout"></small>
+                    </div>
+                </div>
+
+                <div style="background: rgba(16, 185, 129, 0.08); border: 1px solid rgba(16, 185, 129, 0.25); border-radius: var(--radius-sm); padding: 0.5rem 0.75rem; margin-bottom: 0.75rem; display: flex; align-items: center; justify-content: space-between;">
+                    <span style="font-size: 0.85rem; font-weight: 600; color: var(--status-green);">Total</span>
+                    <span id="imgConfirmTotalSalesBar" style="font-size: 1.05rem; font-weight: 800; color: var(--status-green);">₹ 0.00</span>
+                </div>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 0.5rem; margin-bottom: 1rem;">
+                    <div class="form-group">
+                        <label class="form-label">Opening (₹)</label>
+                        <input type="number" step="0.01" id="imgConfirmOpening" class="form-control" oninput="calcModalSalesTotal()">
+                        <small class="field-source" id="srcOpening"></small>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Closing (₹)</label>
+                        <input type="number" step="0.01" id="imgConfirmClosing" class="form-control">
+                        <small class="field-source" id="srcClosing"></small>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Expenses (₹)</label>
+                        <input type="number" step="0.01" id="imgConfirmExpenses" class="form-control" oninput="calcModalSalesTotal()">
+                        <small class="field-source" id="srcExpenses"></small>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Salary adv. (₹)</label>
+                        <input type="number" step="0.01" id="imgConfirmSalaryAdv" class="form-control" oninput="onSalaryAdvanceChanged()">
+                        <small class="field-source" id="srcSalary"></small>
+                    </div>
+                </div>
+
+                <div id="salaryAdvanceMap" style="display: none; margin-bottom: 1rem; padding: 0.65rem 0.7rem; border: 1px solid var(--line); border-radius: 10px; background: #f8faf9;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; gap: 0.5rem; margin-bottom: 0.45rem;">
+                        <p class="field-source" style="margin: 0;">Map this advance to staff in Staff Master.</p>
+                        <button type="button" class="btn btn-secondary btn-sm" onclick="addSalaryAdvanceRow()">Add staff</button>
+                    </div>
+                    <div id="salaryAdvanceRows"></div>
+                    <p class="field-source" id="salaryAdvanceHint" style="margin-top: 0.4rem;"></p>
+                </div>
+
+                <div style="display: flex; justify-content: flex-end; gap: 0.75rem;">
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('imagePreviewModal')">Cancel</button>
+                    <button type="submit" class="btn btn-success">Save</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- OCR Details Inspection Drawer Modal -->
+<div class="modal-backdrop" id="ocrDetailsModal">
+    <div class="modal-card" style="max-width: 950px; width: 95%;">
+        <div class="modal-header">
+            <h3 style="font-size: 1.15rem;"><i class="fa-solid fa-microscope" style="color: var(--primary);"></i> Raw OCR Response & Field Mapping Audit</h3>
+            <button class="modal-close" onclick="closeModal('ocrDetailsModal')">&times;</button>
+        </div>
+        <div style="max-height: 75vh; overflow-y: auto; padding-right: 0.5rem;">
+            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
+                <div style="background: #0b1120; padding: 0.5rem; border-radius: 6px; text-align: center;">
+                    <p style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 0.3rem;"><i class="fa-solid fa-layer-group"></i> Row Bounding Boxes</p>
+                    <img id="ocrDetailsBoxesImg" src="" style="max-width: 100%; max-height: 240px; object-fit: contain; border-radius: 4px; border: 1px solid var(--border-color);">
+                </div>
+                <div style="background: #0b1120; padding: 0.5rem; border-radius: 6px; text-align: center;">
+                    <p style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 0.3rem;"><i class="fa-solid fa-adjust"></i> Contrast Normalized</p>
+                    <img id="ocrDetailsPrepImg" src="" style="max-width: 100%; max-height: 240px; object-fit: contain; border-radius: 4px; border: 1px solid var(--border-color);">
+                </div>
+                <div style="background: #0b1120; padding: 0.5rem; border-radius: 6px; text-align: center;">
+                    <p style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 0.3rem;"><i class="fa-solid fa-crop-simple"></i> Cropped Amount Column</p>
+                    <img id="ocrDetailsCropImg" src="" style="max-width: 100%; max-height: 240px; object-fit: contain; border-radius: 4px; border: 1px solid var(--border-color);">
+                </div>
+            </div>
+
+            <h4 style="font-size: 0.95rem; margin-bottom: 0.5rem;"><i class="fa-solid fa-table-list"></i> Reconstructed Physical Table Rows & Amount-Column Consensus</h4>
+            <div class="table-responsive" style="margin-bottom: 1rem;">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Row #</th>
+                            <th>Description</th>
+                            <th>Amount Crop</th>
+                            <th>Extracted Amount</th>
+                            <th>Candidates & Reasoning</th>
+                            <th>Numeric Validation</th>
+                            <th>Status</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody id="ocrDetailsRowsTbody">
+                    </tbody>
+                </table>
+            </div>
+
+            <h4 style="font-size: 0.95rem; margin-bottom: 0.5rem;"><i class="fa-solid fa-code"></i> Extraction Trace JSON Log</h4>
+            <pre id="ocrDetailsRawJson" style="background: #090d16; color: #38bdf8; padding: 0.75rem; border-radius: 6px; font-size: 0.75rem; overflow-x: auto; max-height: 220px;"></pre>
+        </div>
+    </div>
+</div>

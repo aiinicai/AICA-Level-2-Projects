@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block page_title %}Dashboard{% endblock %} · HARSH's RestroReco</title>
+    <link rel="icon" type="image/png" href="/static/img/hsa-logo.png">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,400;0,14..32,500;0,14..32,600;0,14..32,700;0,14..32,800;1,14..32,400&family=Playfair+Display:wght@700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/css/style.css?v=fresh24">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <aside class="sidebar">
+        <div class="brand-header">
+            <img class="brand-mark" src="/static/img/hsa-logo.png" alt="Harsh Singhal &amp; Associates">
+            <div class="brand-copy">
+                <span class="brand-title">HARSH's</span>
+                <span class="brand-product">RestroReco</span>
+            </div>
+        </div>
+
+        <ul class="nav-list">
+            <li class="nav-section">Control</li>
+            <li class="nav-item {% if request.url.path == '/dashboard' or request.url.path == '/' %}active{% endif %}">
+                <a href="/dashboard"><i class="fa-solid fa-gauge-high nav-icon"></i> Control Tower</a>
+            </li>
+            {% if user_can(user, 'daybook', 'view') %}
+            <li class="nav-item {% if request.url.path == '/daybook' %}active{% endif %}">
+                <a href="/daybook"><i class="fa-solid fa-book-open nav-icon"></i> Day Book</a>
+            </li>
+            {% endif %}
+            <li class="nav-section">Reconciliation</li>
+            {% if user_can(user, 'cash_rec', 'view') %}
+            <li class="nav-item {% if request.url.path == '/cash-reconciliation' %}active{% endif %}">
+                <a href="/cash-reconciliation"><i class="fa-solid fa-money-bill-wave nav-icon"></i> Cash Rec</a>
+            </li>
+            {% endif %}
+            {% if user_can(user, 'card_qr', 'view') %}
+            <li class="nav-item {% if request.url.path == '/card-qr-reconciliation' %}active{% endif %}">
+                <a href="/card-qr-reconciliation"><i class="fa-solid fa-credit-card nav-icon"></i> Card / QR Rec</a>
+            </li>
+            {% endif %}
+            {% if user_can(user, 'aggregators', 'view') %}
+            <li class="nav-item {% if request.url.path == '/aggregator-reconciliation' %}active{% endif %}">
+                <a href="/aggregator-reconciliation"><i class="fa-solid fa-motorcycle nav-icon"></i> Aggregators</a>
+            </li>
+            {% endif %}
+            <li class="nav-section">Reports</li>
+            {% if user_can(user, 'reports', 'view') %}
+            <li class="nav-item {% if request.url.path == '/reports' %}active{% endif %}">
+                <a href="/reports"><i class="fa-solid fa-chart-column nav-icon"></i> Reports &amp; Analytics</a>
+            </li>
+            {% endif %}
+            {% if user_can(user, 'gst_report', 'view') %}
+            <li class="nav-item {% if request.url.path == '/gst-payable-report' %}active{% endif %}">
+                <a href="/gst-payable-report"><i class="fa-solid fa-file-invoice nav-icon"></i> GST Payable Report</a>
+            </li>
+            {% endif %}
+            {% if user_can(user, 'attendance', 'view') %}
+            <li class="nav-item {% if request.url.path == '/attendance-reconciliation' %}active{% endif %}">
+                <a href="/attendance-reconciliation"><i class="fa-solid fa-clipboard-user nav-icon"></i> Attendance Rec</a>
+            </li>
+            {% endif %}
+            {% if user and user.role.name == 'Administrator' %}
+            <li class="nav-section">Admin</li>
+            <li class="nav-item {% if request.url.path == '/masters' %}active{% endif %}">
+                <a href="/masters"><i class="fa-solid fa-sliders nav-icon"></i> Masters</a>
+            </li>
+            <li class="nav-item {% if request.url.path == '/audit' %}active{% endif %}">
+                <a href="/audit"><i class="fa-solid fa-shield-halved nav-icon"></i> Audit Trail</a>
+            </li>
+            <li class="nav-item {% if request.url.path == '/users' %}active{% endif %}">
+                <a href="/users"><i class="fa-solid fa-user-shield nav-icon"></i> Users &amp; Rights</a>
+            </li>
+            <li class="nav-item {% if request.url.path == '/clients' %}active{% endif %}">
+                <a href="/clients"><i class="fa-solid fa-address-book nav-icon"></i> Client Database</a>
+            </li>
+            <li class="nav-item {% if request.url.path == '/settings' %}active{% endif %}">
+                <a href="/settings"><i class="fa-solid fa-gear nav-icon"></i> Settings</a>
+            </li>
+            {% endif %}
+        </ul>
+
+        <div class="sidebar-cta">
+            <strong>Photo import</strong>
+            <p>Read handwritten day-book photos and post sales in one step.</p>
+            <a href="/daybook">Open Day Book <i class="fa-solid fa-arrow-right"></i></a>
+        </div>
+
+        <div class="user-profile">
+            <div class="user-avatar">{{ (user.full_name[:1] if user and user.full_name else 'G')|upper }}</div>
+            <div class="user-info">
+                <span class="user-name">{{ user.full_name if user else 'Guest' }}</span>
+                <span class="user-role">{{ user.role.name if user else 'Viewer' }}</span>
+            </div>
+            <button class="btn-logout" onclick="logoutUser()" title="Logout"><i class="fa-solid fa-right-from-bracket"></i></button>
+        </div>
+        <div class="sidebar-legal">
+            <img src="/static/img/hsa-logo.png" alt="" width="18" height="18">
+            <p>This Software is property of Harsh Singhal &amp; Associates©2026. All Rights Reserved.</p>
+        </div>
+    </aside>
+
+    <div class="main-wrapper">
+        <header class="top-header">
+            <div>
+                <h1 class="page-title">{{ self.page_title() }}</h1>
+                <div class="page-kicker">{% block page_kicker %}Restaurant sales &amp; settlement control{% endblock %}</div>
+            </div>
+            <div class="header-actions">
+                <div class="client-switcher" id="clientSwitcher">
+                    <label class="client-switcher-label" for="clientSelect"><i class="fa-solid fa-building"></i> Client</label>
+                    <select id="clientSelect" class="form-select client-select" onchange="switchClient(this.value)"></select>
+                    {% if user and user.role and user.role.name == 'Administrator' %}
+                    <button type="button" class="btn btn-secondary btn-sm" onclick="openNewClientModal()" title="Add client"><i class="fa-solid fa-plus"></i> Add</button>
+                    <button type="button" class="btn btn-outline-excel btn-sm" onclick="downloadClientBackup()" title="Backup this client ZIP"><i class="fa-solid fa-file-zipper"></i></button>
+                    <label class="btn btn-outline-excel btn-sm" title="Restore client ZIP" style="margin:0;">
+                        <i class="fa-solid fa-file-import"></i>
+                        <input type="file" id="clientRestoreZip" accept=".zip" hidden onchange="restoreClientBackup(this)">
+                    </label>
+                    {% endif %}
+                </div>
+                <span class="date-chip"><i class="fa-regular fa-calendar"></i> <span id="headerToday"></span></span>
+                {% block header_actions %}{% endblock %}
+            </div>
+        </header>
+
+        <main class="content-body">
+            {% block content %}{% endblock %}
+        </main>
+
+        <footer class="app-footer">
+            <img src="/static/img/hsa-logo.png" alt="Harsh Singhal &amp; Associates" width="18" height="18">
+            <span>This Software is property of <strong>Harsh Singhal &amp; Associates</strong>©2026. All Rights Reserved.</span>
+        </footer>
+    </div>
+
+    <script src="/static/js/app.js?v=fy1"></script>
+    <script>
+        window.APP_USER = {
+            id: {{ user.id if user else 0 }},
+            role: {{ (user.role.name if user and user.role else '')|tojson }},
+            permissions: {{ user_perms(user)|tojson }}
+        };
+        function canDo(module, action) {
+            if (window.APP_USER && window.APP_USER.role === 'Administrator') return true;
+            const row = (window.APP_USER && window.APP_USER.permissions && window.APP_USER.permissions[module]) || {};
+            return !!row[action];
+        }
+        document.addEventListener('DOMContentLoaded', () => {
+            document.querySelectorAll('[data-perm]').forEach((el) => {
+                const parts = String(el.getAttribute('data-perm') || '').split('.');
+                if (parts.length === 2 && !canDo(parts[0], parts[1])) {
+                    el.style.display = 'none';
+                }
+            });
+        });
+    </script>
+    <script>
+        (function () {
+            const el = document.getElementById('headerToday');
+            if (el) {
+                el.textContent = new Date().toLocaleDateString('en-IN', {
+                    day: '2-digit', month: 'short', year: 'numeric'
+                });
+            }
+        })();
+        async function logoutUser() {
+            await fetch('/api/auth/logout', { method: 'POST' });
+            window.location.href = '/login';
+        }
+        async function loadClientSwitcher() {
+            const select = document.getElementById('clientSelect');
+            if (!select) return;
+            try {
+                const data = await fetch('/api/clients').then((r) => r.json());
+                const clients = data.clients || [];
+                select.innerHTML = clients.map((c) =>
+                    `<option value="${c.id}" ${c.is_active ? 'selected' : ''}>${c.name}</option>`
+                ).join('');
+                if (!clients.length) {
+                    select.innerHTML = '<option value="">Default Client</option>';
+                }
+            } catch (err) {
+                console.error(err);
+            }
+        }
+        async function switchClient(id) {
+            if (!id) return;
+            const res = await fetch('/api/clients/select', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ id }),
+            });
+            if (res.ok) window.location.reload();
+        }
+        function openNewClientModal() {
+            const modal = document.getElementById('newClientModal');
+            const input = document.getElementById('newClientName');
+            if (!modal || !input) return;
+            input.value = '';
+            const gstin = document.getElementById('newClientGstin');
+            const address = document.getElementById('newClientAddress');
+            if (gstin) gstin.value = '';
+            if (address) address.value = '';
+            modal.classList.add('active');
+            setTimeout(() => input.focus(), 50);
+        }
+        function closeNewClientModal() {
+            const modal = document.getElementById('newClientModal');
+            if (modal) modal.classList.remove('active');
+        }
+        async function submitNewClient(event) {
+            event.preventDefault();
+            const input = document.getElementById('newClientName');
+            const btn = document.getElementById('newClientSave');
+            const name = (input && input.value || '').trim();
+            if (name.length < 2) {
+                showToast('Enter a client name', 'error');
+                return;
+            }
+            if (btn) {
+                btn.disabled = true;
+                btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Creating...';
+            }
+            try {
+                const res = await fetch('/api/clients/create', {
+                    method: 'POST',
+                    credentials: 'same-origin',
+                    headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+                    body: JSON.stringify({
+                        name,
+                        gstin: (document.getElementById('newClientGstin') || {}).value || '',
+                        address: (document.getElementById('newClientAddress') || {}).value || '',
+                    }),
+                });
+                const body = await res.json().catch(() => ({}));
+                if (!res.ok) {
+                    showToast(body.detail || 'Could not create client', 'error');
+                    return;
+                }
+                showToast(`Client "${body.name || name}" added`, 'success');
+                closeNewClientModal();
+                window.location.reload();
+            } catch (err) {
+                showToast(err.message || 'Could not create client', 'error');
+            } finally {
+                if (btn) {
+                    btn.disabled = false;
+                    btn.innerHTML = '<i class="fa-solid fa-plus"></i> Create client';
+                }
+            }
+        }
+        function downloadClientBackup() {
+            const id = document.getElementById('clientSelect').value;
+            if (!id) return;
+            window.location.href = `/api/clients/${encodeURIComponent(id)}/backup`;
+        }
+        async function restoreClientBackup(input) {
+            const file = input.files && input.files[0];
+            input.value = '';
+            if (!file) return;
+            const form = new FormData();
+            form.append('file', file);
+            const res = await fetch('/api/clients/restore', { method: 'POST', body: form });
+            if (res.ok) window.location.reload();
+            else {
+                const body = await res.json().catch(() => ({}));
+                alert(body.detail || 'Restore failed. Use a RestroReco client ZIP only.');
+            }
+        }
+        document.addEventListener('DOMContentLoaded', loadClientSwitcher);
+    </script>
+    {% block scripts %}{% endblock %}
+    <div id="newClientModal" class="modal-backdrop" onclick="if (event.target === this) closeNewClientModal()">
+        <div class="modal-card" style="max-width: 480px;">
+            <div class="modal-header">
+                <h3>Add client</h3>
+                <button type="button" class="modal-close" onclick="closeNewClientModal()"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <form onsubmit="submitNewClient(event)">
+                <div class="form-group">
+                    <label class="form-label">Client name</label>
+                    <input type="text" id="newClientName" class="form-control" placeholder="e.g. ABC Restaurant" required minlength="2" autocomplete="off">
+                </div>
+                <div class="form-group" style="margin-top:0.75rem;">
+                    <label class="form-label">GSTIN</label>
+                    <input type="text" id="newClientGstin" class="form-control" maxlength="15" placeholder="22AAAAA0000A1Z5" autocomplete="off">
+                </div>
+                <div class="form-group" style="margin-top:0.75rem;">
+                    <label class="form-label">Address</label>
+                    <textarea id="newClientAddress" class="form-control" rows="2" placeholder="Registered address"></textarea>
+                </div>
+                <div style="display:flex; gap:0.5rem; justify-content:flex-end; margin-top:1rem;">
+                    <button type="button" class="btn btn-secondary" onclick="closeNewClientModal()">Cancel</button>
+                    <button type="submit" id="newClientSave" class="btn btn-primary"><i class="fa-solid fa-plus"></i> Create client</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</body>
+</html>

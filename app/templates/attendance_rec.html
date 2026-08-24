@@ -1,0 +1,403 @@
+{% extends "base.html" %}
+
+{% block page_title %}Attendance Reconciliation{% endblock %}
+{% block page_kicker %}Kitchen and staff register — daily, weekly, or monthly photos{% endblock %}
+
+{% block content %}
+<div class="import-panel" data-perm="attendance.enter">
+    <h3><i class="fa-solid fa-clipboard-user"></i> Upload attendance register</h3>
+    <form id="attUploadForm" class="import-grid" onsubmit="uploadAttendance(event)">
+        <div class="form-group">
+            <label class="form-label">Branch</label>
+            <select id="attImpBranch" class="form-select" required>
+                {% for b in branches %}
+                <option value="{{ b.id }}">{{ b.name }} ({{ b.code }})</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="form-group">
+            <label class="form-label">Photos (1–5 same month)</label>
+            <input type="file" id="attFile" class="form-control" accept=".png, .jpg, .jpeg, .bmp, .webp" multiple required>
+            <p class="field-source" style="margin-top: 0.35rem;">Day, week, or full month. Left + right pages can go together. New names are added automatically.</p>
+            <input type="password" id="attGeminiKey" class="form-control" placeholder="Gemini API key (paste once)" autocomplete="off" style="margin-top: 0.45rem; display: none;">
+        </div>
+        <button type="submit" class="btn btn-primary"><i class="fa-solid fa-upload"></i> Read register</button>
+    </form>
+</div>
+
+<div class="filter-toolbar">
+    <div class="form-group">
+        <label class="form-label">Branch</label>
+        <select id="attBranch" class="form-select" onchange="loadAttendance()">
+            {% for b in branches %}
+            <option value="{{ b.id }}">{{ b.name }}</option>
+            {% endfor %}
+        </select>
+    </div>
+    <div class="form-group">
+        <label class="form-label">Month</label>
+        <input type="month" id="attMonth" class="form-control" onchange="loadAttendance()">
+    </div>
+    <div class="form-group" style="margin-left: auto; flex-direction: row; gap: 0.5rem; align-items: flex-end;">
+        <a id="btnExportAttPdf" href="/api/reports/export/attendance/pdf" target="_blank" class="btn btn-outline-pdf"><i class="fa-solid fa-file-pdf"></i> Export PDF</a>
+        <button type="button" class="btn btn-secondary" onclick="loadAttendance()"><i class="fa-solid fa-rotate"></i> Refresh</button>
+    </div>
+</div>
+
+<div class="att-kpi-row" id="attKpis"></div>
+
+<div class="glass-card">
+    <div class="table-responsive">
+        <table class="data-table att-grid" id="attTable">
+            <thead id="attHead"></thead>
+            <tbody id="attBody">
+                <tr><td colspan="40" style="text-align: center;">Loading attendance…</td></tr>
+            </tbody>
+        </table>
+    </div>
+    <p class="field-source" style="margin-top: 0.6rem;">Marks: P Present, A Absent, WO Weekly Off, L Leave. Each staff member may take 2 leaves in a month; a third L is blocked. Gross = monthly salary × (P + WO + L) ÷ days in the month. Cash Advance comes from Day Book / Cash Rec mapping. Type Bank Advance on the row. Net = Gross − Cash Advance − Bank Advance.</p>
+</div>
+
+<div class="modal-backdrop" id="attPreviewModal">
+    <div class="modal-card" style="max-width: 1100px; width: 96%;">
+        <div class="modal-header">
+            <h3 style="font-size: 1.15rem;">Check attendance figures</h3>
+            <button class="modal-close" onclick="closeModal('attPreviewModal')">&times;</button>
+        </div>
+        <form id="attConfirmForm" onsubmit="confirmAttendance(event)">
+            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0.75rem; margin-bottom: 0.85rem;">
+                <div class="form-group">
+                    <label class="form-label">Branch</label>
+                    <select id="attConfirmBranch" class="form-select" required>
+                        {% for b in branches %}
+                        <option value="{{ b.id }}">{{ b.name }} ({{ b.code }})</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Year</label>
+                    <input type="number" id="attConfirmYear" class="form-control" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Month</label>
+                    <select id="attConfirmMonth" class="form-select" required>
+                        <option value="1">January</option>
+                        <option value="2">February</option>
+                        <option value="3">March</option>
+                        <option value="4">April</option>
+                        <option value="5">May</option>
+                        <option value="6">June</option>
+                        <option value="7">July</option>
+                        <option value="8">August</option>
+                        <option value="9">September</option>
+                        <option value="10">October</option>
+                        <option value="11">November</option>
+                        <option value="12">December</option>
+                    </select>
+                </div>
+            </div>
+            <div id="attNewBanner" style="display: none; background: rgba(16, 185, 129, 0.10); border: 1px solid rgba(16, 185, 129, 0.28); border-radius: 6px; padding: 0.5rem 0.7rem; margin-bottom: 0.75rem; font-size: 0.82rem; color: #166534;"></div>
+            <p class="field-source" style="margin-bottom: 0.45rem;">Use the day dropdown to set P / A / O / H / L before you save.</p>
+            <div class="table-responsive" style="max-height: 52vh; overflow: auto;">
+                <table class="data-table att-grid">
+                    <thead id="attPreviewHead"></thead>
+                    <tbody id="attPreviewBody"></tbody>
+                </table>
+            </div>
+            <div style="display: flex; justify-content: flex-end; gap: 0.75rem; margin-top: 1rem;">
+                <button type="button" class="btn btn-secondary" onclick="closeModal('attPreviewModal')">Cancel</button>
+                <button type="submit" class="btn btn-success">Save attendance</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    let attPreviewData = null;
+    const ATT_CYCLE = ['P', 'A', 'WO', 'L'];
+    const ATT_LEAVE_LIMIT = 2;
+
+    document.addEventListener('DOMContentLoaded', () => {
+        const now = new Date();
+        const monthEl = document.getElementById('attMonth');
+        monthEl.value = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+        hideAttGeminiKey();
+        loadAttendance();
+    });
+
+    async function hideAttGeminiKey() {
+        const el = document.getElementById('attGeminiKey');
+        if (!el) return;
+        try {
+            const st = await apiFetch('/api/imports/ai-ocr-status');
+            el.style.display = (st && st.configured) ? 'none' : 'block';
+        } catch (e) {
+            el.style.display = 'none';
+        }
+    }
+
+    function attPeriod() {
+        const raw = document.getElementById('attMonth').value || '';
+        const [year, month] = raw.split('-').map(Number);
+        return { year, month };
+    }
+
+    function titleCaseLabel(value) {
+        return String(value || '')
+            .trim()
+            .split(/\s+/)
+            .filter(Boolean)
+            .map((part) => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())
+            .join(' ');
+    }
+
+    function markSelectHtml(mark, onchangeAttr, canChange) {
+        const current = mark || '';
+        const opts = [['', ''], ['P', 'P'], ['A', 'A'], ['WO', 'WO'], ['L', 'L']];
+        const disabled = canChange === false ? 'disabled' : '';
+        return `<select class="att-mark-select ${current}" title="P Present · A Absent · WO Weekly Off · L Leave" ${onchangeAttr} ${disabled}>${
+            opts.map(([value, label]) =>
+                `<option value="${value}" ${value === current ? 'selected' : ''}>${label}</option>`
+            ).join('')
+        }</select>`;
+    }
+
+    function previewMark(emp, day) {
+        if (!emp || !emp.marks) return '';
+        return emp.marks[String(day)] || emp.marks[day] || '';
+    }
+
+    function applyPreviewTitleCase(data) {
+        (data.employees || []).forEach((emp) => {
+            emp.name = titleCaseLabel(emp.name);
+            emp.rank = titleCaseLabel(emp.rank);
+            emp.team = titleCaseLabel(emp.team);
+        });
+        return data;
+    }
+
+    function renderAttendancePreview() {
+        const data = attPreviewData || { employees: [] };
+        const days = 31;
+        renderHead(document.getElementById('attPreviewHead'), days, false);
+        const body = document.getElementById('attPreviewBody');
+        body.innerHTML = (data.employees || []).map((emp, idx) => {
+            let cells = '';
+            let p = 0, a = 0, wo = 0, leave = 0;
+            for (let d = 1; d <= days; d++) {
+                const mark = previewMark(emp, d);
+                if (mark === 'P') p += 1;
+                if (mark === 'A') a += 1;
+                if (mark === 'WO') wo += 1;
+                if (mark === 'L') leave += 1;
+                cells += `<td class="att-day">${markSelectHtml(mark, `onchange="setPreviewMark(${idx}, ${d}, this)"`)}</td>`;
+            }
+            return `<tr>
+                <td><strong>${emp.name || ''}</strong></td>
+                <td>${emp.rank || ''}</td>
+                <td>${emp.team || ''}</td>
+                ${cells}
+                <td>${p}</td><td>${a}</td><td>${wo}</td><td>${leave}/${ATT_LEAVE_LIMIT}</td>
+                <td>${emp.notes || ''}</td>
+            </tr>`;
+        }).join('') || `<tr><td colspan="38" style="text-align:center;">No staff rows found.</td></tr>`;
+    }
+
+    function setPreviewMark(empIdx, day, el) {
+        if (!attPreviewData || !attPreviewData.employees || !attPreviewData.employees[empIdx]) return;
+        const emp = attPreviewData.employees[empIdx];
+        if (!emp.marks) emp.marks = {};
+        let value = el.value || '';
+        if (value === 'L') {
+            const used = Object.entries(emp.marks).filter(([key, mark]) => String(key) !== String(day) && mark === 'L').length;
+            if (used >= ATT_LEAVE_LIMIT) {
+                value = 'A';
+                el.value = 'A';
+                showToast('Only 2 leaves are allowed in a month.', 'error');
+            }
+        }
+        if (value) emp.marks[String(day)] = value;
+        else delete emp.marks[String(day)];
+        el.className = `att-mark-select ${value}`;
+        renderAttendancePreview();
+    }
+
+    function renderHead(el, days, withSalary) {
+        let daysHtml = '';
+        for (let d = 1; d <= days; d++) daysHtml += `<th class="att-day">${d}</th>`;
+        const salary = withSalary === false
+            ? ''
+            : `<th>Gross</th><th>Cash Advance</th><th>Bank Advance</th><th>Net</th>`;
+        const notes = withSalary === false ? '<th>Notes</th>' : '<th>Notes</th>';
+        el.innerHTML = `<tr>
+            <th>Name</th><th>Rank</th><th>Team</th>${daysHtml}
+            <th>P</th><th>A</th><th title="Weekly Off">WO</th><th title="Leave (2 / month)">L</th>${salary}${notes}
+        </tr>`;
+    }
+
+    async function loadAttendance() {
+        const branchId = document.getElementById('attBranch').value;
+        const { year, month } = attPeriod();
+        if (!branchId || !year || !month) return;
+        const pdfBtn = document.getElementById('btnExportAttPdf');
+        if (pdfBtn) {
+            pdfBtn.href = `/api/reports/export/attendance/pdf?branch_id=${branchId}&year=${year}&month=${month}`;
+        }
+        const data = await apiFetch(`/api/attendance/matrix?branch_id=${branchId}&year=${year}&month=${month}`);
+        if (!data) return;
+        const s = data.summary || {};
+        document.getElementById('attKpis').innerHTML = `
+            <div class="att-kpi"><strong>${s.staff || 0}</strong><span>Staff</span></div>
+            <div class="att-kpi"><strong>${s.new_staff || 0}</strong><span>New this month</span></div>
+            <div class="att-kpi att-kpi-p"><strong>${s.present || 0}</strong><span>Present marks</span></div>
+            <div class="att-kpi att-kpi-a"><strong>${s.absent || 0}</strong><span>Absent</span></div>
+            <div class="att-kpi att-kpi-o"><strong>${s.weekly_off || s.off || 0}</strong><span>Weekly offs</span></div>
+            <div class="att-kpi"><strong>${s.leave || 0}</strong><span>Leaves (max ${s.leave_allowed || ATT_LEAVE_LIMIT})</span></div>
+        `;
+        renderHead(document.getElementById('attHead'), data.days);
+        const tbody = document.getElementById('attBody');
+        if (!data.employees.length) {
+            tbody.innerHTML = `<tr><td colspan="${data.days + 12}" style="text-align:center;color:var(--muted,#64748b);">No attendance yet. Upload a register photo to start.</td></tr>`;
+            return;
+        }
+        const canEnter = typeof canDo === 'function' && canDo('attendance', 'enter');
+        const canEditSaved = typeof canDo === 'function' && canDo('attendance', 'edit_saved');
+        const canEditBank = canEnter || canEditSaved;
+        tbody.innerHTML = data.employees.map((emp) => {
+            let days = '';
+            for (let d = 1; d <= data.days; d++) {
+                const mark = (emp.marks && emp.marks[String(d)]) || '';
+                const canChange = mark ? canEditSaved : canEnter;
+                days += `<td class="att-day">${markSelectHtml(mark, `onchange="saveAttMark(${emp.id}, ${year}, ${month}, ${d}, this)"`, canChange)}</td>`;
+            }
+            const badge = emp.is_new ? ' <span class="badge badge-reconciled">New</span>' : '';
+            const cashAdv = emp.cash_advance != null ? emp.cash_advance : (emp.advance || 0);
+            const bankAdv = emp.bank_advance || 0;
+            const bankInput = canEditBank
+                ? `<input type="number" step="0.01" class="form-control att-bank-input" value="${bankAdv}" data-gross="${emp.gross_salary || 0}" data-cash="${cashAdv}" onchange="saveBankAdvance(${emp.id}, ${year}, ${month}, this)">`
+                : formatINR(bankAdv);
+            return `<tr>
+                <td><strong>${emp.name}</strong>${badge}</td>
+                <td>${emp.rank || ''}</td>
+                <td>${emp.team || ''}</td>
+                ${days}
+                <td class="amount-num">${emp.present}</td>
+                <td class="amount-num">${emp.absent}</td>
+                <td class="amount-num">${emp.weekly_off || emp.off || 0}</td>
+                <td class="amount-num">${emp.leave || 0}/${emp.leave_allowed || ATT_LEAVE_LIMIT}</td>
+                <td class="amount-num">${formatINR(emp.gross_salary || 0)}</td>
+                <td class="amount-num">${formatINR(cashAdv)}</td>
+                <td class="amount-num">${bankInput}</td>
+                <td class="amount-num att-net"><strong>${formatINR(emp.net_salary || 0)}</strong></td>
+                <td>${emp.notes || ''}</td>
+            </tr>`;
+        }).join('');
+    }
+
+    async function saveBankAdvance(employeeId, year, month, el) {
+        const amount = parseFloat(el.value || 0);
+        const res = await apiFetch('/api/attendance/bank-advance', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ employee_id: employeeId, year, month, amount })
+        });
+        if (!res) return;
+        const gross = parseFloat(el.dataset.gross || 0);
+        const cash = parseFloat(el.dataset.cash || 0);
+        const netEl = el.closest('tr').querySelector('.att-net');
+        if (netEl) netEl.innerHTML = `<strong>${formatINR(gross - cash - amount)}</strong>`;
+        showToast('Bank advance saved', 'success');
+    }
+
+    async function saveAttMark(employeeId, year, month, day, el) {
+        const mark = el.value || '';
+        el.className = `att-mark-select ${mark}`;
+        const workDate = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+        try {
+            await apiFetch('/api/attendance/mark', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ employee_id: employeeId, work_date: workDate, mark })
+            });
+        } catch (e) {
+            loadAttendance();
+            return;
+        }
+        loadAttendance();
+    }
+
+    async function uploadAttendance(e) {
+        e.preventDefault();
+        const files = Array.from(document.getElementById('attFile').files || []);
+        if (!files.length) return;
+        if (files.length > 5) {
+            showToast('Upload at most 5 photos of the same month.', 'error');
+            return;
+        }
+        const submitBtn = e.target.querySelector('button[type="submit"]');
+        const orig = submitBtn.innerHTML;
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Reading ${files.length} photo${files.length > 1 ? 's' : ''}...`;
+        try {
+            const geminiKey = (document.getElementById('attGeminiKey') || {}).value || '';
+            if (geminiKey.trim()) {
+                await apiFetch('/api/imports/ai-ocr-key', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ key: geminiKey.trim() })
+                });
+                document.getElementById('attGeminiKey').value = '';
+                document.getElementById('attGeminiKey').style.display = 'none';
+            }
+            const formData = new FormData();
+            files.forEach((f) => formData.append('files', f));
+            showToast('Reading the attendance register…', 'info');
+            const data = await apiFetch('/api/attendance/preview', { method: 'POST', body: formData });
+            if (!data || data.status === 'ERROR') {
+                showToast(data && data.error_detail ? data.error_detail : 'Could not read the register', 'error');
+                if (data && (data.last_step || '').includes('not configured')) {
+                    document.getElementById('attGeminiKey').style.display = 'block';
+                }
+                return;
+            }
+            attPreviewData = applyPreviewTitleCase(data);
+            document.getElementById('attConfirmBranch').value = document.getElementById('attImpBranch').value;
+            document.getElementById('attConfirmYear').value = data.year || '';
+            document.getElementById('attConfirmMonth').value = String(data.month || '');
+            renderAttendancePreview();
+            const banner = document.getElementById('attNewBanner');
+            banner.style.display = 'block';
+            banner.innerText = `${(data.employees || []).length} staff row(s) read. Names not already on this branch will be added when you save.`;
+            openModal('attPreviewModal');
+        } finally {
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = orig;
+        }
+    }
+
+    async function confirmAttendance(e) {
+        e.preventDefault();
+        if (!attPreviewData) return;
+        const payload = {
+            branch_id: parseInt(document.getElementById('attConfirmBranch').value, 10),
+            year: parseInt(document.getElementById('attConfirmYear').value, 10),
+            month: parseInt(document.getElementById('attConfirmMonth').value, 10),
+            employees: attPreviewData.employees || [],
+            filename: 'Attendance_Register'
+        };
+        const res = await apiFetch('/api/attendance/confirm', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+        if (!res) return;
+        showToast(res.message || 'Attendance saved', 'success');
+        closeModal('attPreviewModal');
+        document.getElementById('attBranch').value = String(payload.branch_id);
+        document.getElementById('attMonth').value = `${payload.year}-${String(payload.month).padStart(2, '0')}`;
+        loadAttendance();
+    }
+</script>
+{% endblock %}

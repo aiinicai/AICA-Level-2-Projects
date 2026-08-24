@@ -1,0 +1,170 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AI Memory Governance &amp; Audit Layer</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <header class="page-header">
+    <div>
+      <p class="eyebrow">Capstone Demonstration · Synthetic Data</p>
+      <h1>AI Memory Governance &amp; Audit Layer</h1>
+      <p>Watch facts move through independent controls, persist across fresh sessions, and remain accountable.</p>
+    </div>
+    <!-- Chain status and session identity sit together: both answer "what state
+         is this system in right now", and neither belongs in the action bar. -->
+    <div class="header-status">
+      <div id="chain-summary" class="chain-summary pending">Chain not checked</div>
+      <p class="session-line">Session <code id="session-id" aria-label="Session id">Starting…</code></p>
+      <span id="budget-status" class="budget-status">Budget 0/100</span>
+      <p id="session-note" class="fresh-session-note" role="status" aria-live="polite">
+        New session started - it carries zero conversation history.
+      </p>
+    </div>
+  </header>
+
+  <section id="status-bar" class="status-bar" aria-label="Demo status and setup">
+    <span id="live-view-status" class="live-view-status" role="status" hidden>
+      <span class="live-view-dot" aria-hidden="true"></span>
+      <span>LIVE VIEW</span>
+    </span>
+    <button id="provider-status" class="provider-indicator provider-unknown" type="button"
+            data-provider-state="unknown" title="Loading provider status…">
+      <span class="provider-dot" aria-hidden="true"></span>
+      <span id="provider-status-label">Loading</span>
+    </button>
+    <button id="new-session" type="button"
+            title="Starts a session with zero carried-over conversation history.">↻ New Session</button>
+    <button id="open-settings" type="button">⚙ AI Keys</button>
+    <button id="reset" type="button">Reset Database</button>
+  </section>
+
+  <main class="dashboard">
+    <aside class="column controls-column" aria-label="Scripted scenarios">
+      <section class="panel">
+        <h2>Scripted Evidence</h2>
+        <div class="scenario-list">
+          {% for scenario in scenarios %}
+          <button class="scenario-button" data-scenario="{{ scenario.id }}">
+            <strong>{{ scenario.id }}</strong> {{ scenario.title }}
+          </button>
+          {% endfor %}
+        </div>
+        <button id="run-all" class="primary wide">Run All 9 Scenarios</button>
+        <div id="scenario-result" class="result-box" aria-live="polite"></div>
+      </section>
+    </aside>
+
+    <section class="column pipeline-column" aria-label="Conversation and write pipeline">
+      <section class="panel">
+        <h2>Conversation Turn</h2>
+        <label for="turn-text">Direct User Text — the maker sees only this box</label>
+        <textarea id="turn-text" rows="4" placeholder="e.g. I work as a financial controller at Northwind Textiles."></textarea>
+        <button id="send-turn" class="primary">Send Through Governed Write Path</button>
+        <div id="pipeline" class="pipeline-empty">
+          Send a turn to see Maker → Checker → Provenance → Contradiction → Write.
+        </div>
+      </section>
+
+      <section class="panel">
+        <h2>Ask a Question <span class="cap-badge">hard cap: 6</span></h2>
+        <label for="query-text">Contextual Retrieval — never a full export</label>
+        <div class="inline-form">
+          <input id="query-text" type="text" placeholder="e.g. Where do I work?">
+          <button id="run-query">Retrieve</button>
+        </div>
+        <div id="query-result" class="result-box" aria-live="polite"></div>
+      </section>
+
+      <section class="panel">
+        <h2>Full Export Gate</h2>
+        <label for="passphrase">Fixed Session Passphrase</label>
+        <div class="inline-form">
+          <input id="passphrase" type="password" autocomplete="off" placeholder="Passphrase">
+          <button id="run-export">Request Complete Record</button>
+        </div>
+        <div id="export-result" class="result-box" aria-live="polite"></div>
+      </section>
+    </section>
+
+    <aside class="column evidence-column" aria-label="Memory store and audit log">
+      <section class="panel evidence-panel">
+        <div id="evidence-tabs" class="evidence-tabs" role="tablist" aria-label="Evidence views">
+          <button id="memory-tab" class="evidence-tab" type="button" role="tab"
+                  aria-selected="true" aria-controls="memory-pane" tabindex="0">
+            <span class="tab-label">Memory Store</span>
+            <span id="memory-count" class="count-badge" aria-label="0 memories">0</span>
+          </button>
+          <button id="audit-tab" class="evidence-tab" type="button" role="tab"
+                  aria-selected="false" aria-controls="audit-pane" tabindex="-1">
+            <span class="tab-label">Tamper-Evident Audit</span>
+            <span id="audit-count" class="count-badge" aria-label="0 audit rows">0</span>
+          </button>
+        </div>
+
+        <div id="memory-pane" class="evidence-pane" role="tabpanel"
+             aria-labelledby="memory-tab" tabindex="0">
+          <!-- No heading here: the tab label already names this pane. Repeating
+               it wastes vertical space and reads as a duplicate. The pane is
+               announced to screen readers via aria-labelledby="memory-tab". -->
+          <div class="panel-heading pane-actions">
+            <button id="refresh-memories" class="small">Refresh</button>
+          </div>
+          <p class="note">Operator display via direct SQLite; not an assistant retrieval endpoint.</p>
+          <div id="memory-table" class="table-scroll"></div>
+        </div>
+
+        <div id="audit-pane" class="evidence-pane" role="tabpanel"
+             aria-labelledby="audit-tab" tabindex="0" hidden>
+          <!-- No heading here either: the tab label names this pane, and it is
+               announced via aria-labelledby="audit-tab". -->
+          <div class="panel-heading pane-actions">
+            <button id="verify-chain" class="small primary">Verify Chain</button>
+          </div>
+          <div class="tamper-actions">
+            <button id="tamper" class="danger">Tamper Test</button>
+            <!-- Repair sits beside Tamper test deliberately: after a tamper the
+                 presenter is looking at the red "chain broken" status above,
+                 so the undo stays in the same evidence view and eyeline. -->
+            <button id="repair" class="danger hidden" type="button">Repair (Reset)</button>
+          </div>
+          <div id="audit-table" class="audit-list"></div>
+        </div>
+      </section>
+    </aside>
+  </main>
+
+  <dialog id="settings-dialog" class="settings-dialog" aria-labelledby="settings-title">
+    <div class="dialog-heading">
+      <h2 id="settings-title">AI Provider Settings</h2>
+    </div>
+    <p id="settings-mode" class="settings-mode">Loading provider mode…</p>
+    <p id="fallback-notice" class="notice hidden"></p>
+    <p class="warning-note"><strong>Important:</strong> Your keys are stored in plain text locally. This capstone demo is not a credential manager.</p>
+    <label for="gemini-key">Your Gemini API Key</label>
+    <input id="gemini-key" type="password" autocomplete="off" placeholder="Not configured">
+    <p id="gemini-key-state" class="note"></p>
+    <label for="voyage-key">Your Voyage API Key</label>
+    <input id="voyage-key" type="password" autocomplete="off" placeholder="Not configured">
+    <p id="voyage-key-state" class="note"></p>
+    <label for="gemini-model">Gemini Model</label>
+    <input id="gemini-model" type="text" value="gemini-3.5-flash">
+    <p class="note">Saving a blank key removes that provider's stored key.</p>
+    <div class="settings-secondary-actions">
+      <button id="test-settings" type="button">Test Connection</button>
+      <button id="clear-settings" class="danger" type="button">Clear Keys and Return to Offline</button>
+    </div>
+    <div class="settings-actions">
+      <button id="save-settings" class="primary" type="button">Save</button>
+      <button id="save-settings-close" class="primary" type="button">Save and Close</button>
+      <button id="cancel-settings" type="button">Cancel</button>
+    </div>
+    <div id="settings-result" class="result-box" aria-live="polite"></div>
+  </dialog>
+
+  <div id="toast" role="status" aria-live="polite"></div>
+  <script src="/static/app.js" defer></script>
+</body>
+</html>

@@ -1,0 +1,226 @@
+{% extends "base.html" %}
+
+{% block page_title %}GST Payable Report{% endblock %}
+{% block page_kicker %}Restaurant GST @ 5% inclusive, with Section 9(5) aggregator sales{% endblock %}
+
+{% block content %}
+<div class="filter-toolbar">
+    <div class="form-group">
+        <label class="form-label">Branch</label>
+        <select id="gstBranch" class="form-select" onchange="loadGstReport()">
+            <option value="">All Branches</option>
+            {% for b in branches %}
+            <option value="{{ b.id }}">{{ b.name }}</option>
+            {% endfor %}
+        </select>
+    </div>
+    <div class="form-group">
+        <label class="form-label">Month</label>
+        <input type="month" id="gstMonth" class="form-control" onchange="loadGstReport()">
+    </div>
+    <div class="form-group" style="margin-left: auto; flex-direction: row; gap: 0.5rem; align-items: flex-end;">
+        <button type="button" class="btn btn-secondary" onclick="loadGstReport()"><i class="fa-solid fa-rotate"></i> Apply</button>
+        <a id="btnGstB2cs" href="/api/gst-report/export/b2cs" class="btn btn-outline-excel"><i class="fa-solid fa-file-csv"></i> B2CS CSV</a>
+        <a id="btnGstHsn" href="/api/gst-report/export/hsn-b2cs" class="btn btn-outline-excel"><i class="fa-solid fa-file-csv"></i> HSN (B2C) CSV</a>
+        <a id="btnGstTable14" href="/api/gst-report/export/table14" class="btn btn-outline-excel"><i class="fa-solid fa-file-csv"></i> Table 14 CSV</a>
+        <a id="btnGstPdf" href="/api/gst-report/export/pdf" target="_blank" class="btn btn-outline-pdf"><i class="fa-solid fa-file-pdf"></i> Export PDF</a>
+    </div>
+</div>
+
+<div class="gst-kpi-row" id="gstKpis"></div>
+
+<div class="glass-card">
+    <div class="table-responsive">
+        <table class="data-table gst-table">
+            <thead>
+                <tr>
+                    <th rowspan="2" class="gst-date-head">Date</th>
+                    <th colspan="3" class="gst-group-own">Normal sales — GST payable by restaurant</th>
+                    <th colspan="2" class="gst-group-agg">Section 9(5) — GST paid by aggregator</th>
+                </tr>
+                <tr>
+                    <th class="gst-group-own">Cash</th>
+                    <th class="gst-group-own">Card / QR Code</th>
+                    <th class="gst-group-own">Dineout</th>
+                    <th class="gst-group-agg">Zomato</th>
+                    <th class="gst-group-agg">Swiggy</th>
+                </tr>
+            </thead>
+            <tbody id="gstBody">
+                <tr><td colspan="6" style="text-align:center;">Loading GST payable report…</td></tr>
+            </tbody>
+        </table>
+    </div>
+    <p class="field-source" style="margin-top: 0.7rem;">
+        Daily Zomato / Swiggy sales stay under Section 9(5). Their Adjustment and Net Sales use Packing Charges from Aggregator Rec (row 12). Tax to be deposited = Cash + Card / QR + Dineout + Zomato + Swiggy on the Tax @ 5% row.
+    </p>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    const GST_CHANNELS = ['cash', 'card_qr', 'dineout', 'zomato', 'swiggy'];
+    let gstData = null;
+    let gstSaveTimer = null;
+
+    document.addEventListener('DOMContentLoaded', () => {
+        const monthEl = document.getElementById('gstMonth');
+        if (monthEl && !monthEl.value) {
+            const now = new Date();
+            monthEl.value = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+        }
+        loadGstReport();
+    });
+
+    function gstMonthRange() {
+        const raw = (document.getElementById('gstMonth') || {}).value || '';
+        const [year, month] = raw.split('-').map(Number);
+        if (!year || !month) return { start: '', end: '' };
+        const last = new Date(year, month, 0).getDate();
+        return {
+            start: `${year}-${String(month).padStart(2, '0')}-01`,
+            end: `${year}-${String(month).padStart(2, '0')}-${String(last).padStart(2, '0')}`
+        };
+    }
+
+    function gstQuery() {
+        const { start, end } = gstMonthRange();
+        const params = new URLSearchParams();
+        const branchId = document.getElementById('gstBranch').value;
+        if (branchId) params.append('branch_id', branchId);
+        if (start) params.append('start_date', start);
+        if (end) params.append('end_date', end);
+        return params;
+    }
+
+    function gstAmt(val) {
+        return `<span class="gst-num">${formatINR(val)}</span>`;
+    }
+
+    function gstChannelCells(amounts) {
+        return GST_CHANNELS.map((key) => `<td class="num">${gstAmt(amounts[key])}</td>`).join('');
+    }
+
+    function gstInput(id, value) {
+        const readonly = !canDo('gst_report', 'enter') && !canDo('gst_report', 'edit_saved');
+        return `<input type="number" step="0.01" min="0" id="${id}" class="form-control gst-input" value="${Number(value || 0).toFixed(2)}" ${readonly ? 'disabled' : ''} onchange="queueGstSave()">`;
+    }
+
+    async function loadGstReport() {
+        const q = gstQuery();
+        const query = q.toString();
+        const qSuffix = query ? '?' + query : '';
+        document.getElementById('btnGstB2cs').href = `/api/gst-report/export/b2cs${qSuffix}`;
+        document.getElementById('btnGstHsn').href = `/api/gst-report/export/hsn-b2cs${qSuffix}`;
+        document.getElementById('btnGstTable14').href = `/api/gst-report/export/table14${qSuffix}`;
+        document.getElementById('btnGstPdf').href = `/api/gst-report/export/pdf${qSuffix}`;
+        const data = await apiFetch(`/api/gst-report${query ? '?' + query : ''}`);
+        if (!data) return;
+        gstData = data;
+        renderGstReport(data);
+    }
+
+    function renderGstReport(data) {
+        const body = document.getElementById('gstBody');
+        const rows = data.rows || [];
+        let html = '';
+        rows.forEach((row) => {
+            html += `<tr>
+                <td>${row.date}</td>
+                <td class="num">${gstAmt(row.cash)}</td>
+                <td class="num">${gstAmt(row.card_qr)}</td>
+                <td class="num">${gstAmt(row.dineout)}</td>
+                <td class="num">${gstAmt(row.zomato)}</td>
+                <td class="num">${gstAmt(row.swiggy)}</td>
+            </tr>`;
+        });
+        if (!rows.length) {
+            html += `<tr><td colspan="6" style="text-align:center;">No Day Book sales in this period.</td></tr>`;
+        }
+
+        const adj = data.adjustment || {};
+        const canEdit = canDo('gst_report', 'enter') || canDo('gst_report', 'edit_saved');
+        html += `<tr class="gst-total">
+            <td>Total</td>
+            ${gstChannelCells(data.totals)}
+        </tr>`;
+        html += `<tr class="gst-adj">
+            <td>
+                <div class="gst-adj-label">Adjustment</div>
+                <select id="gstAdjMode" class="form-select gst-mode" ${canEdit ? '' : 'disabled'} onchange="queueGstSave()">
+                    <option value="less" ${adj.mode === 'add' ? '' : 'selected'}>Less</option>
+                    <option value="add" ${adj.mode === 'add' ? 'selected' : ''}>Add</option>
+                </select>
+            </td>
+            ${GST_CHANNELS.map((key) => {
+                if (key === 'zomato' || key === 'swiggy') {
+                    return `<td class="num"><div class="gst-adj-label">Packing</div>${gstAmt(adj[key])}</td>`;
+                }
+                return `<td>${gstInput('gstAdj_' + key, adj[key])}</td>`;
+            }).join('')}
+        </tr>`;
+        html += `<tr class="gst-net">
+            <td>Net Sales</td>
+            ${gstChannelCells(data.net)}
+        </tr>`;
+        html += `<tr class="gst-tax">
+            <td>Tax @ 5%</td>
+            ${gstChannelCells(data.tax)}
+        </tr>`;
+        html += `<tr class="gst-basic">
+            <td>Basic</td>
+            ${gstChannelCells(data.basic)}
+        </tr>`;
+        html += `<tr class="gst-deposit">
+            <td>Tax to be deposited</td>
+            <td class="num" colspan="5">${gstAmt(data.tax_to_deposit)}</td>
+        </tr>`;
+        html += `<tr class="gst-balance">
+            <td>Available Balance</td>
+            <td colspan="5">${gstInput('gstAvailable', data.available_balance)}</td>
+        </tr>`;
+        html += `<tr class="gst-need">
+            <td>Additional Requirement</td>
+            <td class="num" colspan="5">${gstAmt(data.additional_requirement)}</td>
+        </tr>`;
+        body.innerHTML = html;
+
+        document.getElementById('gstKpis').innerHTML = `
+            <div class="gst-kpi"><span>Tax to be deposited</span><strong>${formatINR(data.tax_to_deposit)}</strong></div>
+            <div class="gst-kpi"><span>Available balance</span><strong>${formatINR(data.available_balance)}</strong></div>
+            <div class="gst-kpi gst-kpi-need"><span>Additional requirement</span><strong>${formatINR(data.additional_requirement)}</strong></div>
+            <div class="gst-kpi"><span>Period</span><strong>${data.period_label || document.getElementById('gstMonth').value}</strong></div>
+        `;
+    }
+
+    function queueGstSave() {
+        if (!canDo('gst_report', 'enter') && !canDo('gst_report', 'edit_saved')) return;
+        clearTimeout(gstSaveTimer);
+        gstSaveTimer = setTimeout(saveGstAdjustments, 350);
+    }
+
+    async function saveGstAdjustments() {
+        const { start, end } = gstMonthRange();
+        if (!start || !end) return;
+        const branchId = document.getElementById('gstBranch').value;
+        const payload = {
+            branch_id: branchId ? Number(branchId) : null,
+            start_date: start,
+            end_date: end,
+            mode: (document.getElementById('gstAdjMode') || {}).value || 'less',
+            cash: Number((document.getElementById('gstAdj_cash') || {}).value || 0),
+            card_qr: Number((document.getElementById('gstAdj_card_qr') || {}).value || 0),
+            dineout: Number((document.getElementById('gstAdj_dineout') || {}).value || 0),
+            available_balance: Number((document.getElementById('gstAvailable') || {}).value || 0),
+        };
+        const data = await apiFetch('/api/gst-report/adjustments', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+        });
+        if (!data) return;
+        gstData = data;
+        renderGstReport(data);
+    }
+</script>
+{% endblock %}
