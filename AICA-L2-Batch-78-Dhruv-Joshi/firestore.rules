@@ -1,0 +1,46 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Allow users to read and write their own user documents (always allowed for basic profile operations)
+    match /users/{userId} {
+      allow read: if request.auth != null && request.auth.uid == userId;
+      allow write: if request.auth != null && request.auth.uid == userId;
+    }
+    
+    // Allow access to payment submissions (for submitting payment details)
+    match /payment_submissions/{docId} {
+      allow create: if request.auth != null && request.resource.data.uid == request.auth.uid;
+      allow read: if request.auth != null && resource.data.uid == request.auth.uid;
+    }
+    
+    // Allow users to read/write their usage logs
+    match /usage_logs/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+    
+    // Allow users to access their profile subcollections
+    match /profiles/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+    
+    match /profiles/{userId}/{document=**} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+    
+    // Allow users to read/write their reconciliation data (Now free for everyone)
+    match /reconciliations/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+    
+    // Allow users to access reconciliation subcollections
+    match /reconciliations/{userId}/{document=**} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+    
+    // Deny all other access
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
