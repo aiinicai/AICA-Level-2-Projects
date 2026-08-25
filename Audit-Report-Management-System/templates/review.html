@@ -1,0 +1,38 @@
+{% extends 'base.html' %}{% block content %}
+<h1>Review Before Generate</h1>
+<div class="card"><h2>System Recommendation</h2>
+<div class="recommend">{{data.classification_label}} • {{data.opinion_label}}<br>
+<strong>{{data.template_name}}</strong><br><span class="muted">Template Version: {{data.template_version}}</span></div>
+<p class="muted">The system recommends the template based on the selections. Final professional judgement remains with the CA.</p></div>
+<div class="card"><h2>Firm & Partner Master Resolution</h2><table class="kv">
+<tr><th>Firm</th><td>{{data.firm_name}}</td></tr><tr><th>FRN</th><td>{{data.frn}}</td></tr>
+<tr><th>Signing CA</th><td>{{data.partner_name}}</td></tr><tr><th>Membership No.</th><td>{{data.membership_no}}</td></tr>
+<tr><th>Place</th><td>{{data.place}}</td></tr><tr><th>Date</th><td>{{data.report_date_formatted}}</td></tr></table></div>
+<div class="card"><h2>Template Population</h2><table><tr><th>Field</th><th>Value</th></tr>
+{%for p in data.placeholders%}<tr><td><code>{{p}}</code></td><td>{{data.replacement_map.get(p,'')}}</td></tr>{%endfor%}</table>
+{%if data.unmapped%}<div class="warning">Unmapped placeholders: {{data.unmapped|join(', ')}}</div>{%else%}<div class="success">All detected placeholders have controlled mappings.</div>{%endif%}</div>
+<form method="post" action="{{url_for('generate')}}" class="actions" id="generateForm">
+<input type="hidden" name="client_id" value="{{data.get('client_id','')}}">
+<input type="hidden" name="engagement_id" value="{{data.get('engagement_id','')}}">
+<input type="hidden" name="client_name" value="{{data.client_name}}">
+<input type="hidden" name="cin" value="{{data.cin}}">
+<input type="hidden" name="city" value="{{data.city}}">
+<input type="hidden" name="financial_year" value="{{data.financial_year}}">
+<input type="hidden" name="year_ending" value="{{data.year_ending}}">
+<input type="hidden" name="place" value="{{data.place}}">
+<input type="hidden" name="entity_type" value="{{data.entity_type}}">
+<input type="hidden" name="small_company" value="{% if data.small_company %}yes{% else %}no{% endif %}">
+<input type="hidden" name="opinion" value="{{data.opinion}}">
+<input type="hidden" name="firm_id" value="{{data.firm_id}}">
+<input type="hidden" name="partner_id" value="{{data.partner_id}}">
+<input type="hidden" name="report_date" value="{{data.report_date}}">
+<input type="hidden" name="udin" value="{{data.get('udin','')}}">
+<button type="submit" id="generateButton">Generate Word</button>
+<a class="button secondary" href="{{url_for('index')}}">Back / Edit</a>
+</form>
+<script>
+document.getElementById('generateForm').addEventListener('submit',function(){
+  const b=document.getElementById('generateButton'); b.disabled=true; b.textContent='Generating Word…';
+});
+</script>
+{%endblock%}

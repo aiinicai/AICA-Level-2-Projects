@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+
+{% block page_title %}Settings{% endblock %}
+{% block page_kicker %}Matching tolerances and application defaults{% endblock %}
+
+{% block content %}
+<div class="glass-card" style="max-width: 700px;">
+    <h3 style="margin-bottom: 1.25rem; font-size: 1.1rem;"><i class="fa-solid fa-gears"></i> System Tolerances & Rules</h3>
+
+    <form id="settingsForm" onsubmit="saveSetting(event)">
+        <div class="form-group" style="margin-bottom: 1rem;">
+            <label class="form-label">Bank Matching Date Tolerance (Days)</label>
+            <input type="number" id="sTolerance" class="form-control" value="3" required>
+            <small style="color: var(--text-muted);">Number of days variance allowed when matching Card/QR bank statement receipts.</small>
+        </div>
+
+        <div class="form-group" style="margin-bottom: 1rem;">
+            <label class="form-label">Default Currency Symbol</label>
+            <input type="text" id="sCurrency" class="form-control" value="INR" required>
+        </div>
+
+        <div class="form-group" style="margin-bottom: 1.5rem;">
+            <label class="form-label">Decimal Precision</label>
+            <input type="number" id="sPrecision" class="form-control" value="2" required>
+        </div>
+
+        <button type="submit" class="btn btn-primary"><i class="fa-solid fa-floppy-disk"></i> Save Settings</button>
+    </form>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    async function saveSetting(e) {
+        e.preventDefault();
+        const tol = document.getElementById('sTolerance').value;
+        const cur = document.getElementById('sCurrency').value;
+
+        await apiFetch('/api/settings', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ key: 'DEFAULT_DATE_TOLERANCE_DAYS', value: tol })
+        });
+
+        await apiFetch('/api/settings', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ key: 'DEFAULT_CURRENCY', value: cur })
+        });
+
+        showToast('Settings updated successfully!', 'success');
+    }
+</script>
+{% endblock %}

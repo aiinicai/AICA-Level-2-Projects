@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+
+{% block page_title %}Audit Trail{% endblock %}
+{% block page_kicker %}Logins, imports, and configuration changes{% endblock %}
+{% block content %}
+<div class="filter-toolbar">
+    <div style="margin-left: auto; display: flex; gap: 0.5rem;">
+        <a href="/api/reports/export/audit/excel" class="btn btn-outline-excel"><i class="fa-solid fa-file-excel"></i> Export Excel</a>
+        <a href="/api/reports/export/audit/pdf" target="_blank" class="btn btn-outline-pdf"><i class="fa-solid fa-file-pdf"></i> Export PDF</a>
+    </div>
+</div>
+
+<div class="glass-card">
+    <div class="table-responsive">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Timestamp</th>
+                    <th>User</th>
+                    <th>Action</th>
+                    <th>Entity</th>
+                    <th>Entity ID</th>
+                    <th>IP Address</th>
+                </tr>
+            </thead>
+            <tbody id="auditTbody">
+                <tr><td colspan="7" style="text-align: center;">Loading Audit Logs...</td></tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        loadAuditLogs();
+    });
+
+    async function loadAuditLogs() {
+        const logs = await apiFetch('/api/audit');
+        if (!logs) return;
+
+        const tbody = document.getElementById('auditTbody');
+        tbody.innerHTML = '';
+
+        if (logs.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; color: var(--text-muted);">No audit events logged yet.</td></tr>`;
+            return;
+        }
+
+        logs.forEach(l => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td>#${l.id}</td>
+                <td>${new Date(l.timestamp).toLocaleString()}</td>
+                <td><strong>${l.username || 'System'}</strong></td>
+                <td><span class="badge badge-amber">${l.action}</span></td>
+                <td><small>${l.entity_name}</small></td>
+                <td><code>${l.entity_id || '-'}</code></td>
+                <td>${l.ip_address || 'local'}</td>
+            `;
+            tbody.appendChild(tr);
+        });
+    }
+</script>
+{% endblock %}

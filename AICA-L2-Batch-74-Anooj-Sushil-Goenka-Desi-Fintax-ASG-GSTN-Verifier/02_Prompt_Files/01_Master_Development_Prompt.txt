@@ -1,0 +1,892 @@
+Below is the complete Codex prompt incorporating GSTIN deduplication, invoice-wise aggregation, GSTR-2A upload, shorter PDF filenames, browser-assisted CAPTCHA verification, Excel/PDF reporting, and EXE deployment.
+
+Act as a senior Python application developer and build a complete, production-ready Windows desktop application named:
+
+ASG GST Supplier Verifier
+
+The application is intended for Chartered Accountants handling GST scrutiny, ITC verification, supplier compliance checking, and GST litigation.
+
+The application must verify supplier GST registration status and GSTR-3B filing status for a selected financial year using data imported from GSTR-2A, Excel, PDF, pasted GSTINs, or manually entered GSTINs.
+
+The final application must run:
+
+1. Through Python source code.
+2. As a standalone Windows EXE without requiring Python installation.
+3. Through a Windows installer created using PyInstaller and Inno Setup.
+4. Offline except when connecting to the official GST Portal or an authorised GST API provider.
+
+Use the following technology:
+
+* Python 3.12 or compatible stable version
+* PySide6 for the desktop interface
+* SQLite for the local database
+* pandas and openpyxl for Excel handling
+* PyMuPDF for PDF extraction and generation
+* ReportLab where required for formatted reports
+* Playwright with Microsoft Edge for GST Portal browser automation
+* pytesseract only as an optional OCR fallback for scanned PDFs
+* cryptography or Windows Credential Manager for secure storage of API credentials
+* PyInstaller for EXE packaging
+
+Do not use Tkinter.
+
+## 1. Main Objective
+
+The application must:
+
+* Import supplier GSTINs.
+* Remove duplicate GSTINs automatically.
+* Aggregate invoice values GSTIN-wise.
+* Verify each unique GSTIN only once.
+* Check supplier registration status.
+* Check legal name and trade name.
+* Check registration date.
+* Check cancellation date, where applicable.
+* Check current registration status.
+* Check GSTR-3B filing frequency for the selected financial year.
+* Check whether applicable GSTR-3B returns were filed.
+* Identify monthly and quarterly filers correctly.
+* Identify delayed filing.
+* Display all results inside the application.
+* Export results to Excel and PDF.
+* Save GST Portal evidence as PDF.
+* Maintain project-wise verification history.
+
+## 2. Input Methods
+
+Provide the following input options:
+
+### A. Manual GSTIN Entry
+
+Allow entry of one GSTIN at a time.
+
+### B. Bulk Paste
+
+Allow GSTINs to be pasted using:
+
+* New line
+* Comma
+* Semicolon
+* Space
+* Tab
+
+### C. Excel Import
+
+Allow import of any Excel file containing GSTIN and invoice-related data.
+
+Provide a downloadable Excel template with these columns:
+
+* Sr No
+* Supplier GSTIN
+* Supplier Name
+* Invoice Number
+* Invoice Date
+* Taxable Value
+* IGST
+* CGST
+* SGST
+* Cess
+* Total GST
+* Invoice Value
+* Notice Amount
+* Remarks
+
+Only Supplier GSTIN should be compulsory.
+
+The application must allow the user to map imported Excel columns where column headings differ.
+
+### D. Direct GSTR-2A Excel Upload
+
+The application must directly accept GST Portal downloaded GSTR-2A Excel files.
+
+It must automatically identify relevant columns such as:
+
+* Supplier GSTIN
+* Supplier name
+* Invoice number
+* Invoice date
+* Taxable value
+* IGST
+* CGST
+* SGST
+* Cess
+* Invoice value
+
+Do not require the user to manually prepare a separate file where the standard GST Portal Excel structure can be detected.
+
+### E. PDF Import
+
+Allow upload of:
+
+* Searchable PDF
+* Scanned PDF
+* Notice annexure PDF
+* GSTR-2A PDF
+* Supplier list PDF
+
+Extract GSTINs using GSTIN pattern matching.
+
+Use OCR only where normal PDF text extraction fails.
+
+Display extracted GSTINs for user review before verification.
+
+## 3. Mandatory GSTIN Deduplication
+
+The application must never verify the same GSTIN repeatedly within the same project.
+
+Example:
+
+If one GSTIN appears in 100 invoices, it must:
+
+* Appear only once in the verification queue.
+* Be searched on the GST Portal only once.
+* Have all invoice values aggregated under that GSTIN.
+* Show the invoice count as 100.
+* Show GSTIN-wise total taxable value.
+* Show GSTIN-wise total IGST.
+* Show GSTIN-wise total CGST.
+* Show GSTIN-wise total SGST.
+* Show GSTIN-wise total Cess.
+* Show GSTIN-wise total GST.
+* Show GSTIN-wise total invoice value.
+* Show GSTIN-wise total notice amount, where provided.
+
+Keep the original invoice-level data separately for reconciliation and evidence.
+
+Use GSTIN as the unique key after:
+
+* Removing spaces
+* Converting to uppercase
+* Removing invalid symbols
+* Validating the 15-character GSTIN format
+
+Where the same GSTIN appears in multiple uploaded files, merge and aggregate it instead of creating duplicate records.
+
+## 4. GSTIN Validation
+
+Before portal verification, validate:
+
+* Exactly 15 characters
+* First two characters are numeric
+* PAN portion follows the GSTIN format
+* Fourteenth character is Z
+* GSTIN checksum, where practical
+* Duplicate GSTIN
+* Blank GSTIN
+* Invalid characters
+
+Invalid GSTINs must be shown separately and excluded from the portal search queue.
+
+## 5. Project Management
+
+Allow creation of verification projects with:
+
+* Client name
+* Client GSTIN
+* Financial year
+* Tax period
+* Notice type
+* Notice reference number
+* Notice date
+* Department or jurisdiction
+* Project remarks
+* Verification date
+
+Example project name:
+
+JEVT FY22-23 Supplier Check
+
+Use project-wise folders for reports and evidence.
+
+## 6. Financial Year Logic
+
+Provide financial year options such as:
+
+* Current financial year
+* Previous financial year
+* FY 2022-23
+* FY 2023-24
+* FY 2024-25
+* FY 2025-26
+* Custom financial year
+* No financial year selected
+
+Where no financial year is selected, check:
+
+* Current supplier status
+* Current filing frequency
+* Current financial year’s available GSTR-3B filing details
+
+Where a financial year is selected, check that specific year.
+
+The application must support historical filing frequency.
+
+Do not assume that a taxpayer currently filing monthly was also monthly during the selected earlier year.
+
+## 7. Monthly and Quarterly Filing Logic
+
+The application must correctly distinguish monthly and quarterly GSTR-3B filing.
+
+For a monthly filer, expected periods are:
+
+* April
+* May
+* June
+* July
+* August
+* September
+* October
+* November
+* December
+* January
+* February
+* March
+
+For a quarterly filer, expected periods are:
+
+* April-June
+* July-September
+* October-December
+* January-March
+
+Do not mark April and May as not filed separately where the supplier was filing quarterly for April-June.
+
+Where filing frequency changed during the year, store the frequency period-wise.
+
+Example:
+
+* April-June: Quarterly
+* July-March: Monthly
+
+Create a filing expectation engine that determines the correct applicable GSTR-3B period.
+
+## 8. GST Portal Verification Mode
+
+Use the official GST taxpayer search portal through Playwright and Microsoft Edge.
+
+The portal URL should be configurable, with the official search page used by default.
+
+The application must:
+
+1. Open the GST search page.
+2. Enter GSTIN automatically.
+3. Display the browser to the user.
+4. Allow the user to enter CAPTCHA manually.
+5. Submit the search.
+6. Read the result after successful CAPTCHA.
+7. Capture taxpayer details.
+8. Scroll to return filing information.
+9. Select the relevant financial year.
+10. Read GSTR-3B filing details.
+11. Save portal evidence.
+12. Move to the next GSTIN.
+
+Do not attempt to bypass or automatically solve CAPTCHA.
+
+The workflow must support:
+
+* CAPTCHA Pending
+* Invalid CAPTCHA
+* Retry CAPTCHA
+* Skip GSTIN
+* Pause Batch
+* Resume Batch
+* Recheck GSTIN
+* Portal Timeout
+* Portal Data Not Available
+
+Do not assume one CAPTCHA will work for the entire batch.
+
+## 9. Authorised API Mode
+
+Create a provider-neutral API architecture.
+
+Use a base interface such as:
+
+GSTDataProvider
+
+with the following implementations:
+
+* PortalBrowserProvider
+* ManualEntryProvider
+* AuthorisedGSPProvider
+
+The application must allow future integration with an authorised GSP or GST API provider without rewriting the main application.
+
+Provide an API settings screen for:
+
+* Provider name
+* API base URL
+* Client ID
+* Client secret
+* Username
+* Password or authentication token
+* Encryption key
+* Test connection
+
+Do not reverse-engineer undocumented GST Portal APIs.
+
+Do not use browser cookies or internal GST Portal tokens as an unofficial bulk API.
+
+## 10. Data to Capture
+
+Capture the following taxpayer details:
+
+* GSTIN
+* Legal name
+* Trade name
+* Registration status
+* Registration date
+* Effective cancellation date
+* Taxpayer type
+* Constitution of business
+* State jurisdiction
+* Centre jurisdiction
+* Nature of business
+* Principal state
+* Verification date and time
+* Verification source
+
+Capture return details:
+
+* Financial year
+* Return type
+* Tax period
+* Filing frequency
+* Due date
+* Filing status
+* Actual filing date
+* Delay in days
+* ARN, where publicly available
+* Portal remarks
+* Manual remarks
+
+## 11. Supplier-Wise Aggregated Results
+
+The main results table must show one row per GSTIN.
+
+Suggested columns:
+
+* Sr No
+* GSTIN
+* Supplier Name from Input
+* Legal Name from Portal
+* Trade Name
+* Current Status
+* Registration Date
+* Cancellation Date
+* Selected FY
+* Filing Frequency
+* Invoice Count
+* Total Taxable Value
+* Total IGST
+* Total CGST
+* Total SGST
+* Total Cess
+* Total GST
+* Total Invoice Value
+* Total Notice Amount
+* Expected GSTR-3B Count
+* Filed GSTR-3B Count
+* Not Filed Count
+* Delayed Filing Count
+* Verification Status
+* Evidence Available
+* Remarks
+
+The results grid must be:
+
+* Scrollable
+* Sortable
+* Searchable
+* Filterable
+* Resizable
+* Exportable
+
+Provide filters for:
+
+* Active suppliers
+* Cancelled suppliers
+* Suspended suppliers
+* Invalid GSTIN
+* All GSTR-3B filed
+* GSTR-3B not filed
+* Delayed filers
+* Portal verification failed
+* Manual review required
+* Quarterly filers
+* Monthly filers
+
+## 12. Invoice-Level Details
+
+Keep a separate invoice-level table with:
+
+* GSTIN
+* Supplier name
+* Invoice number
+* Invoice date
+* Taxable value
+* IGST
+* CGST
+* SGST
+* Cess
+* Total GST
+* Invoice value
+* Notice amount
+* Source file
+* Source sheet
+* Row number
+
+Allow the user to open invoice-level details by double-clicking the GSTIN in the supplier summary.
+
+## 13. Filing Status Conclusions
+
+The application may classify results as:
+
+* All applicable GSTR-3B filed
+* Some applicable GSTR-3B not filed
+* Filed with delay
+* Quarterly filing confirmed
+* Monthly filing confirmed
+* Filing frequency changed during year
+* Registration cancelled
+* Registration suspended
+* Portal data unavailable
+* Manual review required
+
+Do not state that invoice-level GST was paid merely because GSTR-3B was filed.
+
+Clearly distinguish:
+
+* Return filed
+* Return filed late
+* Return not filed
+* Invoice-level tax payment not independently verified
+
+## 14. GST Portal Evidence PDF
+
+After each GSTIN verification, save a PDF of the GST Portal result page.
+
+Use short filenames.
+
+Preferred format:
+
+GSTIN_FY.pdf
+
+Example:
+
+27AAAAA0000A1Z5_22-23.pdf
+
+Where there are multiple checks on different dates, use:
+
+27AAAAA0000A1Z5_22-23_050826.pdf
+
+Do not use long descriptive filenames.
+
+The evidence PDF should include, where displayed:
+
+* Taxpayer profile
+* Registration status
+* Cancellation date
+* Filing frequency
+* GSTR-3B filing table
+* Portal URL
+* Capture date and time
+
+Use browser print-to-PDF or full-page PDF capture.
+
+Also create a SHA-256 hash for each evidence PDF and store it in the evidence index.
+
+## 15. Output Excel Workbook
+
+Create a professionally formatted Excel workbook containing:
+
+### Sheet 1: Summary
+
+* Project details
+* Total GSTINs imported
+* Unique GSTINs
+* Duplicate GSTINs removed
+* Total invoice count
+* Total taxable value
+* Total IGST
+* Total CGST
+* Total SGST
+* Total Cess
+* Total GST
+* Total invoice value
+* Total notice amount
+* Active suppliers
+* Cancelled suppliers
+* All returns filed
+* Returns not filed
+* Delayed filers
+* Verification failures
+
+### Sheet 2: Supplier Summary
+
+One row per unique GSTIN with aggregated values and verification results.
+
+### Sheet 3: Invoice Details
+
+Original invoice-level records.
+
+### Sheet 4: GSTR-3B Filing Status
+
+One row per GSTIN per applicable return period.
+
+### Sheet 5: Exceptions
+
+Only:
+
+* Invalid GSTINs
+* Cancelled suppliers
+* Suspended suppliers
+* Missing GSTR-3B
+* Delayed GSTR-3B
+* Portal errors
+* Manual review cases
+
+### Sheet 6: Evidence Index
+
+* GSTIN
+* Financial year
+* Evidence PDF filename
+* Evidence path
+* Verification date
+* File hash
+
+### Sheet 7: Import Log
+
+* Imported file name
+* File type
+* Sheet name
+* Total rows
+* GSTINs found
+* Unique GSTINs
+* Duplicate GSTINs
+* Invalid GSTINs
+* Import date
+
+Use professional formatting:
+
+* Frozen header rows
+* Filters
+* Currency formatting
+* Indian number formatting where possible
+* Bold totals
+* Auto column widths
+* Conditional formatting
+* Clear status colours
+
+## 16. PDF Consolidated Report
+
+Create a consolidated professional PDF report containing:
+
+1. Cover page
+2. Project details
+3. Verification methodology
+4. Overall summary
+5. Supplier-wise verification summary
+6. GSTIN-wise aggregated amount summary
+7. GSTR-3B filing summary
+8. Exception report
+9. Evidence index
+10. Important disclaimer
+
+The report must show:
+
+* Total number of invoice records
+* Total number of unique suppliers
+* Duplicate GSTINs removed
+* Total taxable value
+* Total GST
+* Total invoice value
+* Total notice amount
+* Supplier-wise aggregated amounts
+
+Keep the report concise and litigation-friendly.
+
+## 17. Dashboard
+
+Create a professional dashboard showing:
+
+* Projects
+* Total suppliers checked
+* Pending verification
+* Active suppliers
+* Cancelled suppliers
+* Quarterly filers
+* Monthly filers
+* All GSTR-3B filed
+* Missing GSTR-3B
+* Delayed filers
+* Total taxable value
+* Total GST
+* Total notice amount
+
+Add cards, charts, and progress indicators without clutter.
+
+## 18. User Interface
+
+The application must have a professional CA-office appearance.
+
+Use:
+
+* Sidebar navigation
+* Clean dashboard
+* Modern cards
+* Professional typography
+* Status badges
+* Progress bars
+* Search box
+* Filter controls
+* Large scrollable data tables
+* Clear action buttons
+* Responsive layout for different screen sizes
+
+Main modules:
+
+* Dashboard
+* Projects
+* Import Data
+* GSTIN Queue
+* Portal Verification
+* Supplier Results
+* Filing Details
+* Invoice Details
+* Exceptions
+* Evidence
+* Reports
+* API Settings
+* Backup and Restore
+* Application Settings
+
+## 19. Database
+
+Use SQLite with proper relational tables for:
+
+* Projects
+* Imported files
+* Suppliers
+* Invoices
+* GSTIN verification
+* Filing frequency
+* Return filing status
+* Evidence files
+* API configuration
+* Application settings
+* Audit logs
+
+Do not overwrite previous verification results.
+
+Where a GSTIN is rechecked, keep:
+
+* Previous status
+* Current status
+* Previous filing details
+* Updated filing details
+* Verification date history
+
+## 20. Error Handling
+
+Handle:
+
+* Invalid GSTIN
+* Duplicate GSTIN
+* Empty Excel
+* Missing columns
+* Corrupted Excel
+* Corrupted PDF
+* Password-protected PDF
+* OCR failure
+* Portal unavailable
+* Portal layout changed
+* CAPTCHA failure
+* Internet interruption
+* Browser crash
+* Database error
+* PDF generation error
+* Excel export error
+* Permission denied
+* Output file already open
+
+Show user-friendly errors.
+
+Write technical errors to an application log file.
+
+## 21. Backup and Restore
+
+Provide:
+
+* Create backup
+* Restore backup
+* Export project
+* Import project
+* Automatic database backup
+* Evidence folder backup
+* Backup integrity check
+
+Use one ZIP backup containing:
+
+* SQLite database
+* Project files
+* Excel reports
+* PDF reports
+* Evidence PDFs
+* Application settings, excluding sensitive credentials where appropriate
+
+## 22. Security
+
+Implement:
+
+* No hard-coded credentials
+* Encrypted API secrets
+* Masked password fields
+* Optional application password
+* Secure browser session handling
+* Clear browser session option
+* Audit trail
+* Local-only storage by default
+* No external data transfer except GST Portal or configured API provider
+
+## 23. Packaging
+
+Provide:
+
+* Complete source code
+* requirements.txt
+* setup instructions
+* PyInstaller spec file
+* Build script
+* Inno Setup installer script
+* Application icon placeholder
+* User manual
+* Sample Excel template
+* Sample test data
+* Database initialization script
+
+The final EXE must run on Windows 10 and Windows 11 without Python installed.
+
+Prefer PyInstaller one-folder mode for stability.
+
+Use a command similar to:
+
+python -m PyInstaller --noconfirm --clean --onedir --windowed --name "ASG GST Supplier Verifier" main.py
+
+The installer must:
+
+* Install application files
+* Create desktop shortcut
+* Create Start Menu shortcut
+* Create data folders
+* Detect Microsoft Edge
+* Preserve database during application upgrades
+* Provide clean uninstall
+* Avoid deleting user-generated reports during uninstall unless specifically selected
+
+## 24. Testing
+
+Create automated and manual tests for:
+
+* One GSTIN entered manually
+* Duplicate GSTIN pasted multiple times
+* Same GSTIN appearing in 100 invoices
+* Same GSTIN appearing in multiple Excel files
+* GSTR-2A Excel import
+* Generic Excel import
+* Searchable PDF import
+* Scanned PDF import
+* Invalid GSTIN
+* Monthly filer
+* Quarterly filer
+* Filing frequency changed during year
+* Active GSTIN
+* Cancelled GSTIN
+* Suspended GSTIN
+* All GSTR-3B filed
+* GSTR-3B missing
+* Delayed filing
+* Portal timeout
+* Invalid CAPTCHA
+* Excel export
+* PDF export
+* Short evidence PDF filename
+* Backup and restore
+* EXE running without Python installed
+
+## 25. Development Requirements
+
+Produce complete working code.
+
+Do not provide placeholders such as:
+
+* Implement later
+* Add your logic here
+* TODO
+* Mock portal response in final version
+* Continue from here
+
+Keep code modular and maintainable.
+
+Use:
+
+* Type hints
+* Dataclasses or Pydantic models where useful
+* Logging
+* Clear folder structure
+* Proper exception handling
+* Docstrings for important functions
+* Configuration files
+* Database migrations or safe schema initialization
+
+Suggested structure:
+
+asg_gst_supplier_verifier/
+main.py
+app/
+ui/
+database/
+models/
+services/
+importers/
+exporters/
+portal/
+api/
+reports/
+security/
+utils/
+assets/
+templates/
+tests/
+requirements.txt
+build.bat
+installer.iss
+README.md
+
+## 26. Final Deliverables
+
+Provide:
+
+1. Complete application source code.
+2. Fully working PySide6 interface.
+3. SQLite database.
+4. GSTR-2A Excel importer.
+5. Generic Excel importer with column mapping.
+6. PDF GSTIN extractor.
+7. GSTIN deduplication and GSTIN-wise amount aggregation.
+8. Monthly and quarterly filing logic.
+9. Browser-assisted GST Portal verification.
+10. Manual CAPTCHA workflow.
+11. Short evidence PDF filenames.
+12. Excel output.
+13. Consolidated PDF output.
+14. Full GST Portal page PDF capture.
+15. Backup and restore.
+16. PyInstaller build files.
+17. Inno Setup installer.
+18. Sample Excel template.
+19. Sample test data.
+20. Installation and user instructions.
+
+Prioritise reliability, data accuracy, evidence preservation, professional presentation, and practical usability in GST litigation work.

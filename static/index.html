@@ -1,0 +1,971 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Non Ind AS Schedule III Financial Statements Builder</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+    <script>
+        if (window.location.protocol === 'file:') {
+            document.addEventListener('DOMContentLoaded', () => {
+                const banner = document.createElement('div');
+                banner.style.cssText = 'background:#ef4444; color:white; padding:18px; text-align:center; font-weight:bold; font-size:16px; position:fixed; top:0; left:0; width:100%; z-index:999999; box-shadow:0 4px 12px rgba(0,0,0,0.3);';
+                banner.innerHTML = '⚠️ ATTENTION: You opened index.html directly from File Explorer.<br/>To run the application, please launch <strong>run.bat</strong> or open <a href="http://127.0.0.1:5000" style="color:#fef08a; text-decoration:underline;">http://127.0.0.1:5000</a> in your web browser!';
+                document.body.prepend(banner);
+            });
+        }
+    </script>
+</head>
+<body>
+    <header class="app-header">
+        <div class="brand">
+            <div class="logo-icon">📊</div>
+            <div>
+                <h1>Non Ind AS Schedule III Financial Statements Builder</h1>
+                <p class="subtitle">Companies Act 2013 | Division I Preparation & Review Tool</p>
+            </div>
+        </div>
+        <div class="header-actions">
+            <div class="theme-selector-wrapper" style="display:flex; align-items:center; background:rgba(255,255,255,0.12); padding:5px 12px; border-radius:8px; border:1px solid rgba(255,255,255,0.25);">
+                <label for="themeSelector" style="font-size:12.5px; margin-right:6px; cursor:pointer; color:#ffffff; font-weight:500;">🎨 UI Theme:</label>
+                <select id="themeSelector" onchange="changeAppTheme(this.value)" style="background:transparent; color:#ffffff; border:none; outline:none; font-size:12.5px; font-weight:600; cursor:pointer;">
+                    <option value="royal" style="color:#0f172a; background:#ffffff;">🌊 Royal Navy & Ice Blue</option>
+                    <option value="emerald" style="color:#0f172a; background:#ffffff;">🌲 Emerald Chartered & Mint</option>
+                    <option value="burgundy" style="color:#0f172a; background:#ffffff;">🍷 Burgundy & Champagne</option>
+                    <option value="terracotta" style="color:#0f172a; background:#ffffff;">🌅 Terracotta & Bronze</option>
+                    <option value="midnight" style="color:#0f172a; background:#ffffff;">🌌 Midnight Sapphire (Dark)</option>
+                </select>
+            </div>
+            <div class="rounding-badge" id="currentRoundingBadge">Unit: Lakhs</div>
+            <button class="btn btn-secondary" onclick="loadSampleData()">⚡ Load Sample Data</button>
+            <button class="btn btn-primary" onclick="exportData('excel')">📥 Export Excel</button>
+        </div>
+    </header>
+
+    <div class="workflow-stepper">
+        <div class="step active" id="step-setup" onclick="switchTab('setup')"><span class="step-num">1</span> Setup</div>
+        <div class="step-line"></div>
+        <div class="step" id="step-import" onclick="switchTab('import')"><span class="step-num">2</span> Import TB</div>
+        <div class="step-line"></div>
+        <div class="step" id="step-mapping" onclick="switchTab('mapping')"><span class="step-num">3</span> Map Ledgers</div>
+        <div class="step-line"></div>
+        <div class="step" id="step-exceptions" onclick="switchTab('exceptions')"><span class="step-num">4</span> Audit Exceptions</div>
+        <div class="step-line"></div>
+        <div class="step" id="step-bs" onclick="switchTab('bs')"><span class="step-num">5</span> Financial Statements</div>
+    </div>
+
+    <div class="app-container">
+        <!-- Navigation Sidebar -->
+        <nav class="nav-sidebar">
+            <div class="nav-section-label">1. WORKFLOW & AUDIT</div>
+            <button class="nav-tab active" onclick="switchTab('setup')">
+                <span class="nav-tab-icon">🏢</span>
+                <span class="nav-tab-text">Entity & Period Setup</span>
+            </button>
+            <button class="nav-tab" onclick="switchTab('import')">
+                <span class="nav-tab-icon">📥</span>
+                <span class="nav-tab-text">Tally TB Import</span>
+            </button>
+            <button class="nav-tab" onclick="switchTab('mapping')">
+                <span class="nav-tab-icon">🗺️</span>
+                <span class="nav-tab-text">Ledger Mapping</span>
+                <span class="badge badge-warning" id="reviewCountBadge">0</span>
+            </button>
+            <button class="nav-tab" onclick="switchTab('exceptions')">
+                <span class="nav-tab-icon">⚠️</span>
+                <span class="nav-tab-text">Audit Exceptions</span>
+                <span class="badge badge-danger" id="exceptionBadge">0</span>
+            </button>
+
+            <div class="nav-section-label">2. FINANCIAL STATEMENTS</div>
+            <button class="nav-tab" onclick="switchTab('corp_policies')">
+                <span class="nav-tab-icon">📜</span>
+                <span class="nav-tab-text">Policies (Note 1)</span>
+            </button>
+            <button class="nav-tab" onclick="switchTab('bs')">
+                <span class="nav-tab-icon">🏛️</span>
+                <span class="nav-tab-text">Balance Sheet</span>
+            </button>
+            <button class="nav-tab" onclick="switchTab('pl')">
+                <span class="nav-tab-icon">📈</span>
+                <span class="nav-tab-text">Profit & Loss</span>
+            </button>
+            <button class="nav-tab" onclick="switchTab('cashflow')">
+                <span class="nav-tab-icon">💵</span>
+                <span class="nav-tab-text">Cash Flow Statement</span>
+            </button>
+            <button class="nav-tab" onclick="switchTab('notes')">
+                <span class="nav-tab-icon">📑</span>
+                <span class="nav-tab-text">Notes to Accounts (2–29)</span>
+            </button>
+            <button class="nav-tab" onclick="switchTab('ratios')">
+                <span class="nav-tab-icon">📊</span>
+                <span class="nav-tab-text">Mandatory 11 Ratios</span>
+            </button>
+
+            <div class="nav-section-label">3. OUTPUT & AUDIT PAPERS</div>
+            <button class="nav-tab" onclick="switchTab('exports')">
+                <span class="nav-tab-icon">🗂️</span>
+                <span class="nav-tab-text">Reports & Exports</span>
+            </button>
+            <button class="nav-tab" onclick="switchTab('userguide')">
+                <span class="nav-tab-icon">📖</span>
+                <span class="nav-tab-text">User Guide & Tests</span>
+            </button>
+        </nav>
+
+        <!-- Main Content Panel -->
+        <main class="main-content">
+
+            <!-- TAB 1: SETUP -->
+            <section id="tab-setup" class="tab-content active">
+                <div class="card">
+                    <h2>🏢 Entity Profile & Statutory Reporting Parameters</h2>
+                    <p class="card-desc">Configure corporate metadata, comparative period, reporting currency, and rounding unit as per statutory requirements.</p>
+
+                    <form id="companyForm" onsubmit="saveCompanySettings(event)" class="form-grid">
+                        <div class="form-group span-2">
+                            <label>Company / Entity Name</label>
+                            <input type="text" id="company_name" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Financial Statements Type</label>
+                            <select id="financial_statement_type">
+                                <option value="Standalone">Standalone Financial Statements</option>
+                                <option value="Consolidated">Consolidated Financial Statements</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Financial Year (Current)</label>
+                            <input type="text" id="financial_year" placeholder="e.g. 2023-24" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Comparative Financial Year</label>
+                            <input type="text" id="comparative_year" placeholder="e.g. 2022-23" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Reporting Currency</label>
+                            <select id="currency">
+                                <option value="INR">INR (₹)</option>
+                                <option value="USD">USD ($)</option>
+                                <option value="EUR">EUR (€)</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Rounding Off Unit (Schedule III)</label>
+                            <select id="rounding_unit" onchange="updateRoundingPreview()">
+                                <option value="Absolute">Absolute (INR ₹)</option>
+                                <option value="Hundreds">Hundreds</option>
+                                <option value="Thousands">Thousands</option>
+                                <option value="Lakhs">Lakhs (Recommended)</option>
+                                <option value="Millions">Millions</option>
+                                <option value="Crores">Crores</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Decimal Precision</label>
+                            <select id="decimal_places">
+                                <option value="2">2 Decimal Places</option>
+                                <option value="0">Rounded to Integer</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Entity Category</label>
+                            <select id="entity_type">
+                                <option value="Non-SMC">Non-SMC (Full Disclosures Required)</option>
+                                <option value="SMC">Small and Medium Company (SMC)</option>
+                                <option value="Micro">Micro Enterprise</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Corporate Identity Number (CIN)</label>
+                            <input type="text" id="cin" placeholder="e.g. U29253MH2012PTC234567">
+                        </div>
+                        <div class="form-group span-2">
+                            <label>Registered Office Address</label>
+                            <input type="text" id="registered_address">
+                        </div>
+
+                        <div class="form-actions span-2">
+                            <button type="submit" class="btn btn-primary btn-lg">💾 Save Profile & Proceed to TB Import ➔</button>
+                        </div>
+                    </form>
+                </div>
+            </section>
+
+            <!-- TAB 2: IMPORT -->
+            <section id="tab-import" class="tab-content">
+                <div class="card">
+                    <h2>📥 Import Tally Trial Balance</h2>
+                    <p class="card-desc">Import Trial Balance directly from Tally exports (Excel, CSV, or Tally XML format). Raw data is preserved unchanged.</p>
+
+                    <!-- Tally TB Converter Banner -->
+                    <div class="converter-banner">
+                        <div class="converter-banner-left">
+                            <div class="converter-icon">🔄</div>
+                            <div>
+                                <h3>Got Tally's standard Trial Balance export?</h3>
+                                <p>Tally exports a <strong>hierarchical format</strong> with group headers and Dr/Cr suffixes — different from what this app needs.<br>
+                                Use the built-in converter to auto-flatten it into the correct import format.</p>
+                            </div>
+                        </div>
+                        <button class="btn btn-converter" onclick="openTallyConverter()">
+                            🔄 Open Tally TB Converter
+                        </button>
+                    </div>
+
+                    <div class="import-dropzone" onclick="document.getElementById('tbFileInput').click()">
+                        <div class="drop-icon">📁</div>
+                        <h3>Click to upload Tally Trial Balance</h3>
+                        <p>Supports <strong>.xlsx, .xls, .csv, and Tally .xml</strong> files</p>
+                        <input type="file" id="tbFileInput" style="display:none" onchange="uploadTbFile(event)" accept=".xlsx,.xls,.csv,.xml">
+                    </div>
+
+                    <div class="divider">OR</div>
+
+                    <div class="demo-box">
+                        <h3>⚡ Don't have a file right now?</h3>
+                        <p>Load realistic manufacturing demo Trial Balance data with comparative numbers to test statement generation immediately.</p>
+                        <button class="btn btn-secondary" onclick="loadSampleData()">Load Demo Sample Trial Balance</button>
+                        <a href="/api/export/sample_template" class="btn btn-outline" download>📥 Download Sample Excel Template</a>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h2>Raw Imported Trial Balance Ledgers</h2>
+                    <div class="table-responsive">
+                        <table class="data-table" id="importedTbTable">
+                            <thead>
+                                <tr>
+                                    <th>Ledger Name</th>
+                                    <th>Tally Group</th>
+                                    <th class="text-right">Opening Balance</th>
+                                    <th class="text-right">Transactions Dr</th>
+                                    <th class="text-right">Transactions Cr</th>
+                                    <th class="text-right">Closing Dr</th>
+                                    <th class="text-right">Closing Cr</th>
+                                    <th class="text-right">Prior Year Closing</th>
+                                </tr>
+                            </thead>
+                            <tfoot id="importedTbFoot">
+                                <tr style="font-weight:700;background:#f0f4ff;">
+                                    <td colspan="3" class="text-right" style="font-style:italic;">Column Totals ↓</td>
+                                    <td id="totTxDr" class="text-right">—</td>
+                                    <td id="totTxCr" class="text-right">—</td>
+                                    <td id="totClDr" class="text-right" style="color:#166534;">—</td>
+                                    <td id="totClCr" class="text-right" style="color:#991b1b;">—</td>
+                                    <td id="totPY" class="text-right">—</td>
+                                </tr>
+                            </tfoot>
+                            <tbody id="importedTbBody">
+                                <tr><td colspan="8" class="text-center text-muted">No Trial Balance imported yet. Upload a file or click "Load Demo Sample Data".</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="next-step-bar">
+                        <button class="btn btn-success btn-lg" onclick="switchTab('mapping')">Proceed to Ledger Mapping & Review ➔</button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- TAB 3: MAPPING -->
+            <section id="tab-mapping" class="tab-content">
+                <div class="card">
+                    <div class="card-header-flex">
+                        <div>
+                            <h2>🗺️ Ledger Mapping Register & Classification</h2>
+                            <p class="card-desc">Map Tally ledgers to Schedule III line items, note numbers, current/non-current overrides, and CA review status.</p>
+                        </div>
+                        <div class="filter-actions">
+                            <select id="mappingFilterStatus" onchange="loadMappingRegister()">
+                                <option value="">All Mappings</option>
+                                <option value="CA Review Required">⚠️ CA Review Required</option>
+                                <option value="Approved">✅ Approved</option>
+                            </select>
+                            <button class="btn btn-secondary" onclick="runAutoMapping()">⚡ Re-run Auto Mapping Rules</button>
+                        </div>
+                    </div>
+
+                    <div class="bulk-box">
+                        <h4>⚡ Bulk Map Tally Group</h4>
+                        <div class="bulk-inputs">
+                            <input type="text" id="bulkTallyGroup" placeholder="Tally Group (e.g. Sundry Creditors)">
+                            <select id="bulkScheduleCode" onchange="onBulkScheduleCodeChange()">
+                                <option value="">-- Select Schedule III Line Item --</option>
+                            </select>
+                            <input type="text" id="bulkNoteNo" placeholder="Note No.">
+                            <button class="btn btn-primary" onclick="applyBulkMapping()">Apply Bulk Mapping</button>
+                        </div>
+                    </div>
+
+
+                    <div class="table-responsive">
+                        <table class="data-table" id="mappingRegisterTable">
+                            <thead>
+                                <tr>
+                                    <th>Ledger Name</th>
+                                    <th>Tally Group</th>
+                                    <th>Net Balance</th>
+                                    <th>Schedule III Line Item</th>
+                                    <th>Note</th>
+                                    <th>Normal Bal</th>
+                                    <th>Current / Non-Current</th>
+                                    <th>Cash Flow Category</th>
+                                    <th>Status</th>
+                                    <th>Action</th>
+                                </tr>
+                            </thead>
+                            <tbody id="mappingRegisterBody">
+                                <tr><td colspan="10" class="text-center text-muted">No mapping data available. Please import a Trial Balance first.</td></tr>
+                            </tbody>
+
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- TAB 4: EXCEPTIONS -->
+            <section id="tab-exceptions" class="tab-content">
+                <div class="card">
+                    <h2>⚠️ Reconciliation & Validation Exceptions Report</h2>
+                    <p class="card-desc">Audit control center displaying unreconciled amounts, out-of-balance warnings, unmapped ledgers, and mandatory disclosures checklist.</p>
+
+                    <div class="stats-grid" id="reconStatsGrid">
+                        <div class="stat-card">
+                            <span class="stat-label">TB Balance Status</span>
+                            <span class="stat-value text-success" id="tbBalanceStatus">Balanced</span>
+                        </div>
+                        <div class="stat-card">
+                            <span class="stat-label">Balance Sheet Difference</span>
+                            <span class="stat-value text-success" id="bsDiffValue">0.00</span>
+                        </div>
+                        <div class="stat-card">
+                            <span class="stat-label">Unmapped Ledgers</span>
+                            <span class="stat-value text-warning" id="unmappedCountVal">0</span>
+                        </div>
+                        <div class="stat-card">
+                            <span class="stat-label">CA Review Required</span>
+                            <span class="stat-value text-danger" id="reviewCountVal">0</span>
+                        </div>
+                    </div>
+
+                    <h3>Identified Exceptions & Warnings</h3>
+                    <div id="exceptionsContainer" class="exceptions-list">
+                        <!-- Dynamic exceptions injected here -->
+                    </div>
+
+                    <h3 class="mt-4">Mandatory Schedule III Disclosures Checklist</h3>
+                    <div class="table-responsive">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Ref</th>
+                                    <th>Schedule III Statutory Disclosure Item</th>
+                                    <th>Status</th>
+                                    <th>Disclosure Details / Auditor Remarks</th>
+                                    <th style="width: 140px; text-align: center;">Action</th>
+                                </tr>
+                            </thead>
+                            <tbody id="checklistBody">
+                                <!-- Dynamic checklist injected here -->
+                            </tbody>
+                        </table>
+                    </div>
+
+                </div>
+            </section>
+
+            <!-- TAB 5: BALANCE SHEET -->
+            <section id="tab-bs" class="tab-content">
+                <div class="card">
+                    <div class="statements-quick-nav">
+                        <button class="sub-nav-pill active" onclick="switchTab('bs')">🏛️ Balance Sheet</button>
+                        <button class="sub-nav-pill" onclick="switchTab('pl')">📈 Profit & Loss</button>
+                        <button class="sub-nav-pill" onclick="switchTab('cashflow')">💵 Cash Flow</button>
+                        <button class="sub-nav-pill" onclick="switchTab('corp_policies')">📜 Policies (Note 1)</button>
+                        <button class="sub-nav-pill" onclick="switchTab('notes')">📑 Notes (2–29)</button>
+                        <button class="sub-nav-pill" onclick="switchTab('ratios')">📊 11 Ratios</button>
+                    </div>
+
+                    <div class="card-header-flex">
+                        <div>
+                            <h2 id="bsCompanyName">Apex Engineering India Private Limited</h2>
+                            <h3>BALANCE SHEET AS AT 31ST MARCH, <span id="bsFY">2024</span></h3>
+                            <p class="card-desc" id="bsUnitHeader">(All amounts in INR Lakhs, unless otherwise stated)</p>
+                        </div>
+                        <button class="btn btn-primary" onclick="exportData('excel')">📥 Export Working Papers</button>
+                    </div>
+
+                    <div class="table-responsive">
+                        <table class="statement-table">
+                            <thead>
+                                <tr>
+                                    <th>Particulars</th>
+                                    <th class="text-center">Note No.</th>
+                                    <th class="text-right">As at 31st March, <span id="bsColCY">2024</span></th>
+                                    <th class="text-right">As at 31st March, <span id="bsColPY">2023</span></th>
+                                </tr>
+                            </thead>
+                            <tbody id="bsTableBody">
+                                <!-- Dynamic Balance Sheet injected here -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- TAB 6: PROFIT AND LOSS -->
+            <section id="tab-pl" class="tab-content">
+                <div class="card">
+                    <div class="statements-quick-nav">
+                        <button class="sub-nav-pill" onclick="switchTab('bs')">🏛️ Balance Sheet</button>
+                        <button class="sub-nav-pill active" onclick="switchTab('pl')">📈 Profit & Loss</button>
+                        <button class="sub-nav-pill" onclick="switchTab('cashflow')">💵 Cash Flow</button>
+                        <button class="sub-nav-pill" onclick="switchTab('corp_policies')">📜 Policies (Note 1)</button>
+                        <button class="sub-nav-pill" onclick="switchTab('notes')">📑 Notes (2–29)</button>
+                        <button class="sub-nav-pill" onclick="switchTab('ratios')">📊 11 Ratios</button>
+                    </div>
+
+                    <div class="card-header-flex">
+                        <div>
+                            <h2 id="plCompanyName">Apex Engineering India Private Limited</h2>
+                            <h3>STATEMENT OF PROFIT AND LOSS FOR THE YEAR ENDED 31ST MARCH, <span id="plFY">2024</span></h3>
+                            <p class="card-desc" id="plUnitHeader">(All amounts in INR Lakhs, unless otherwise stated)</p>
+                        </div>
+                        <button class="btn btn-primary" onclick="exportData('word')">📄 Export Word Draft</button>
+                    </div>
+
+                    <div class="table-responsive">
+                        <table class="statement-table">
+                            <thead>
+                                <tr>
+                                    <th>Particulars</th>
+                                    <th class="text-center">Note No.</th>
+                                    <th class="text-right">For year ended 31st March, <span id="plColCY">2024</span></th>
+                                    <th class="text-right">For year ended 31st March, <span id="plColPY">2023</span></th>
+                                </tr>
+                            </thead>
+                            <tbody id="plTableBody">
+                                <!-- Dynamic Profit & Loss injected here -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- TAB 7: CASH FLOW STATEMENT -->
+            <section id="tab-cashflow" class="tab-content">
+                <div class="card">
+                    <div class="statements-quick-nav">
+                        <button class="sub-nav-pill" onclick="switchTab('bs')">🏛️ Balance Sheet</button>
+                        <button class="sub-nav-pill" onclick="switchTab('pl')">📈 Profit & Loss</button>
+                        <button class="sub-nav-pill active" onclick="switchTab('cashflow')">💵 Cash Flow</button>
+                        <button class="sub-nav-pill" onclick="switchTab('corp_policies')">📜 Policies (Note 1)</button>
+                        <button class="sub-nav-pill" onclick="switchTab('notes')">📑 Notes (2–29)</button>
+                        <button class="sub-nav-pill" onclick="switchTab('ratios')">📊 11 Ratios</button>
+                    </div>
+
+                    <div class="card-header-flex">
+                        <div>
+                            <h2 id="cfCompanyName">Cash Flow Statement</h2>
+                            <h3>STATEMENT OF CASH FLOWS FOR THE YEAR ENDED 31ST MARCH, <span id="cfFY">2024</span></h3>
+                            <p class="card-desc" id="cfUnitHeader">(All amounts in INR Lakhs, unless otherwise stated)</p>
+                        </div>
+                    </div>
+                    <p class="card-desc">As required by Accounting Standard-3 (AS-3) / Schedule III of Companies Act 2013.</p>
+
+                    <div class="table-responsive">
+                        <table class="statement-table">
+                            <thead>
+                                <tr>
+                                    <th>Particulars</th>
+                                    <th class="text-right">For year ended 31st March, <span id="cfColCY">2024</span> (<span class="unitText">Lakhs</span>)</th>
+                                    <th class="text-right">For year ended 31st March, <span id="cfColPY">2023</span> (<span class="unitText">Lakhs</span>)</th>
+                                </tr>
+                            </thead>
+                            <tbody id="cfTableBody">
+                                <!-- Dynamic Cash Flow injected here -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+
+            <!-- TAB 8: RATIOS -->
+            <section id="tab-ratios" class="tab-content">
+                <div class="card">
+                    <div class="statements-quick-nav">
+                        <button class="sub-nav-pill" onclick="switchTab('bs')">🏛️ Balance Sheet</button>
+                        <button class="sub-nav-pill" onclick="switchTab('pl')">📈 Profit & Loss</button>
+                        <button class="sub-nav-pill" onclick="switchTab('cashflow')">💵 Cash Flow</button>
+                        <button class="sub-nav-pill" onclick="switchTab('corp_policies')">📜 Policies (Note 1)</button>
+                        <button class="sub-nav-pill" onclick="switchTab('notes')">📑 Notes (2–29)</button>
+                        <button class="sub-nav-pill active" onclick="switchTab('ratios')">📊 11 Ratios</button>
+                    </div>
+
+                    <h2>🔢 Mandatory Schedule III Ratios Disclosure</h2>
+                    <p class="card-desc">Comprehensive analysis of 11 statutory financial ratios introduced in Schedule III 2021 amendments.</p>
+
+                    <div class="table-responsive">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Ratio Name</th>
+                                    <th>Numerator</th>
+                                    <th>Denominator</th>
+                                    <th class="text-right">Current Year</th>
+                                    <th class="text-right">Prior Year</th>
+                                    <th>Variance %</th>
+                                    <th>Benchmark</th>
+                                </tr>
+                            </thead>
+                            <tbody id="ratiosTableBody">
+                                <!-- Dynamic Ratios injected here -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- TAB: CORPORATE INFORMATION & SIGNIFICANT ACCOUNTING POLICIES (NOTE 1) -->
+            <section id="tab-corp_policies" class="tab-content">
+                <div class="card">
+                    <div class="statements-quick-nav">
+                        <button class="sub-nav-pill" onclick="switchTab('bs')">🏛️ Balance Sheet</button>
+                        <button class="sub-nav-pill" onclick="switchTab('pl')">📈 Profit & Loss</button>
+                        <button class="sub-nav-pill" onclick="switchTab('cashflow')">💵 Cash Flow</button>
+                        <button class="sub-nav-pill active" onclick="switchTab('corp_policies')">📜 Policies (Note 1)</button>
+                        <button class="sub-nav-pill" onclick="switchTab('notes')">📑 Notes (2–29)</button>
+                        <button class="sub-nav-pill" onclick="switchTab('ratios')">📊 11 Ratios</button>
+                    </div>
+
+                    <div class="card-header-flex">
+                        <div>
+                            <h2 id="policiesCompanyName">Corporate Information & Significant Accounting Policies</h2>
+                            <p class="card-desc">Note 1 to Financial Statements — Statutory Accounting Policies compliant with Indian GAAP / Non-Ind AS Schedule III Division I.</p>
+                        </div>
+                        <div style="display:flex; gap:10px; flex-wrap:wrap;">
+                            <button type="button" class="btn btn-outline btn-sm" onclick="addPolicyClause()">➕ Add Policy Clause</button>
+                            <button type="button" class="btn btn-secondary btn-sm" onclick="resetPoliciesToDefault()">↺ Reset to ICAI Standard</button>
+                            <button type="button" class="btn btn-primary btn-sm" onclick="saveDirectPolicies()">💾 Save Policies</button>
+                        </div>
+                    </div>
+
+                    <div style="background:#eff6ff; border-left:4px solid #3b82f6; padding:12px 18px; border-radius:8px; margin-bottom:20px; font-size:13px; color:#1e40af; line-height:1.5;">
+                        💡 <strong>Dedicated Accounting Policies Workspace:</strong> Customize corporate background, statutory basis of preparation, and accounting policies (Depreciation, Revenue, Inventories, Taxation, Employee Benefits, Foreign Currency, etc.) as pure text clauses without tabular formatting conflicts. Changes are permanently retained per company.
+                    </div>
+
+                    <div id="directPoliciesContainer" style="display:flex; flex-direction:column; gap:16px;">
+                        <p class="text-muted text-center" style="padding:30px;">Loading Accounting Policies...</p>
+                    </div>
+
+                    <div style="margin-top:24px; padding-top:16px; border-top:1px solid #e2e8f0; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
+                        <div style="display:flex; gap:10px;">
+                            <button type="button" class="btn btn-outline" onclick="addPolicyClause()">➕ Add Policy Clause</button>
+                            <button type="button" class="btn btn-secondary" onclick="resetPoliciesToDefault()">↺ Reset to ICAI Template</button>
+                        </div>
+                        <button type="button" class="btn btn-primary btn-lg" onclick="saveDirectPolicies()">💾 Save Accounting Policies ➔</button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- TAB: NOTES & FINANCIAL SCHEDULES (NOTES 2 TO 29) -->
+            <section id="tab-notes" class="tab-content">
+                <div class="card">
+                    <div class="statements-quick-nav">
+                        <button class="sub-nav-pill" onclick="switchTab('bs')">🏛️ Balance Sheet</button>
+                        <button class="sub-nav-pill" onclick="switchTab('pl')">📈 Profit & Loss</button>
+                        <button class="sub-nav-pill" onclick="switchTab('cashflow')">💵 Cash Flow</button>
+                        <button class="sub-nav-pill" onclick="switchTab('corp_policies')">📜 Policies (Note 1)</button>
+                        <button class="sub-nav-pill active" onclick="switchTab('notes')">📑 Notes (2–29)</button>
+                        <button class="sub-nav-pill" onclick="switchTab('ratios')">📊 11 Ratios</button>
+                    </div>
+
+                    <div class="card-header-flex">
+                        <div>
+                            <h2 id="notesCompanyName">Notes & Financial Schedules (Notes 2 to 29)</h2>
+                            <p class="card-desc" id="notesUnitHeader">All amounts in INR Lakhs unless otherwise stated | Under each note, you can add custom auditor remarks, security terms, or footnote disclosures.</p>
+                        </div>
+                        <button class="btn btn-primary" onclick="exportData('excel')">📥 Export Working Papers</button>
+                    </div>
+                    <div id="notesContainer">
+                        <p class="text-muted text-center">Loading Notes & Financial Schedules... Please ensure Trial Balance is imported and mapped.</p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- TAB 9: EXPORTS & UTILITIES -->
+            <section id="tab-exports" class="tab-content">
+                <div class="card">
+                    <h2>📥 Reports & Downloads Hub</h2>
+                    <p class="card-desc">Generate audit-ready deliverables in Excel, Word, and PDF formats.</p>
+
+                    <div class="exports-grid">
+                        <div class="export-card">
+                            <div class="exp-icon">📊</div>
+                            <h3>Excel Working Papers</h3>
+                            <p>Complete multi-tab Excel workbook containing Balance Sheet, P&L, Ratios, Mapping Register, and Audit Trail.</p>
+                            <button class="btn btn-primary" onclick="exportData('excel')">Download Excel Working Papers (.xlsx)</button>
+                        </div>
+                        <div class="export-card">
+                            <div class="exp-icon">📄</div>
+                            <h3>Editable Word Draft</h3>
+                            <p>Formatted Word document with cover page, notes to accounts cross-references, and policy templates.</p>
+                            <button class="btn btn-secondary" onclick="exportData('word')">Download Word Financials (.docx)</button>
+                        </div>
+                        <div class="export-card">
+                            <div class="exp-icon">📕</div>
+                            <h3>Print-Ready PDF Report</h3>
+                            <p>Formal statutory PDF financial report styled with corporate headers, page numbers, and sign-off spaces.</p>
+                            <button class="btn btn-outline" onclick="exportData('pdf')">Download PDF Report (.pdf)</button>
+                        </div>
+                    </div>
+
+                    <h3 class="mt-4">Database Backup & Security</h3>
+                    <div class="demo-box">
+                        <p>All data is stored locally inside an embedded SQLite database (<code>non_indas_schedule3.db</code>). No company data leaves your machine.</p>
+                        <button class="btn btn-secondary" onclick="triggerDbBackup()">💾 Create Local Database Backup</button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- TAB 10: USER GUIDE & AUTOMATED TESTS -->
+            <section id="tab-userguide" class="tab-content">
+                <div class="card">
+                    <h2>📖 User Guide & Automated Test Suite</h2>
+                    
+                    <div class="user-guide-section">
+                        <h3>Core Workflow Guide</h3>
+                        <ol class="guide-steps">
+                            <li><strong>Entity Setup:</strong> Configure Company Name, Financial Year, Comparative Period, Currency, and Rounding Unit in <em>Entity & Period Setup</em> tab.</li>
+                            <li><strong>TB Import:</strong> Upload your Tally export file (Excel, CSV, or XML) or click <em>Load Demo Sample Data</em>.</li>
+                            <li><strong>Ledger Mapping:</strong> Review auto-mapped ledgers. Pay attention to items marked <code>CA Review Required</code> and update classification as needed.</li>
+                            <li><strong>Reconciliation:</strong> Check the <em>Exceptions & Audit Checklist</em> tab to confirm that Balance Sheet tallies ($Assets = Equity + Liabilities$).</li>
+                            <li><strong>Export Outputs:</strong> Download audit working papers in Excel, Word, or PDF.</li>
+                        </ol>
+                    </div>
+
+                    <h3>Data Required Checklist</h3>
+                    <ul class="guide-checklist">
+                        <li>✅ Tally Trial Balance (Current FY & Comparative FY)</li>
+                        <li>✅ Shareholding pattern (> 5% shareholders & promoters shareholding)</li>
+                        <li>✅ Fixed Assets Addition/Deletion register for PPE Schedule</li>
+                        <li>✅ MSME Creditors classification confirmation</li>
+                        <li>✅ Ageing breakdown for Sundry Debtors and Creditors</li>
+                    </ul>
+
+                    <h3 class="mt-4">Automated Verification Test Suite</h3>
+                    <p>Run internal automated reconciliation tests against trial balance datasets.</p>
+                    <button class="btn btn-primary" onclick="runAutomatedTests()">▶️ Run Automated Tests</button>
+                    <pre id="testOutputLog" class="test-log-box" style="display:none"></pre>
+                </div>
+            </section>
+
+        </main>
+    </div>
+
+    <!-- Edit Mapping Modal -->
+    <div id="mappingModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Edit Ledger Mapping</h3>
+                <span class="close-btn" onclick="closeMappingModal()">&times;</span>
+            </div>
+            <div class="modal-body">
+                <form id="editMappingForm" onsubmit="saveMappingEdit(event)">
+                    <input type="hidden" id="edit_ledger_name">
+                    <div class="form-group">
+                        <label>Ledger Name</label>
+                        <input type="text" id="edit_ledger_display" disabled>
+                    </div>
+                    <div class="form-group">
+                        <label>Schedule III Line Item</label>
+                        <select id="edit_schedule3_code" required onchange="onScheduleCodeChange()">
+                            <option value="EQUITY_SHARE_CAPITAL">Equity Share Capital (Note 2)</option>
+                            <option value="RESERVES_SURPLUS">Reserves and Surplus (Note 3)</option>
+                            <option value="LONG_TERM_BORROWINGS">Long-term borrowings (Note 4)</option>
+                            <option value="DEFERRED_TAX_LIAB">Deferred tax liabilities (Net) (Note 5)</option>
+                            <option value="SHORT_TERM_BORROWINGS">Short-term borrowings (Note 8)</option>
+                            <option value="TRADE_PAYABLES_OTHERS">Trade Payables (Note 9)</option>
+                            <option value="OTHER_CURRENT_LIAB">Other Current Liabilities (Note 10)</option>
+                            <option value="PPE_TANGIBLE">Property, Plant & Equipment (Note 12)</option>
+                            <option value="NON_CURRENT_INVESTMENTS">Non-current investments (Note 13)</option>
+                            <option value="INVENTORIES">Inventories (Note 17)</option>
+                            <option value="TRADE_RECEIVABLES">Trade Receivables (Note 18)</option>
+                            <option value="CASH_BANK_BALANCES">Cash and Cash Equivalents (Note 19)</option>
+                            <option value="SHORT_TERM_LOANS_ADV">Short-term Loans and Advances (Note 20)</option>
+                            <option value="REVENUE_OPERATIONS">Revenue from Operations (Note 22)</option>
+                            <option value="OTHER_INCOME">Other Income (Note 23)</option>
+                            <option value="COST_MATERIALS_CONSUMED">Cost of materials consumed (Note 24)</option>
+                            <option value="EMPLOYEE_BENEFIT_EXPENSE">Employee benefits expense (Note 27)</option>
+                            <option value="FINANCE_COSTS">Finance costs (Note 28)</option>
+                            <option value="OTHER_EXPENSES">Other expenses (Note 29)</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Note No.</label>
+                        <input type="text" id="edit_note_no">
+                    </div>
+                    <div class="form-group">
+                        <label>Classification</label>
+                        <select id="edit_classification">
+                            <option value="Current">Current</option>
+                            <option value="Non-Current">Non-Current</option>
+                            <option value="N/A">N/A</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Cash Flow Category</label>
+                        <select id="edit_cash_flow">
+                            <option value="Operating">Operating</option>
+                            <option value="Investing">Investing</option>
+                            <option value="Financing">Financing</option>
+                            <option value="Cash_Equivalent">Cash Equivalent</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Review Status</label>
+                        <select id="edit_review_status">
+                            <option value="Approved">✅ Approved</option>
+                            <option value="CA Review Required">⚠️ CA Review Required</option>
+                        </select>
+                    </div>
+                    <div class="form-actions">
+                        <button type="submit" class="btn btn-primary">Save Mapping</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+
+    <!-- ═══════════════════════════════════════════════════════════════════
+         TALLY TB CONVERTER MODAL
+         ═══════════════════════════════════════════════════════════════════ -->
+    <div id="tallyConverterModal" class="tc-overlay" style="display:none" onclick="closeTallyConverter(event)">
+        <div class="tc-modal" onclick="event.stopPropagation()">
+
+            <!-- Header -->
+            <div class="tc-header">
+                <div class="tc-header-left">
+                    <div class="tc-logo">🔄</div>
+                    <div>
+                        <h2>Tally TB Format Converter</h2>
+                        <p>Converts Tally's hierarchical Trial Balance export → Application flat import format</p>
+                    </div>
+                </div>
+                <button class="tc-close" onclick="closeTallyConverterModal()" title="Close">&times;</button>
+            </div>
+
+            <!-- Body -->
+            <div class="tc-body">
+
+                <!-- Left: Upload Panel -->
+                <div class="tc-left">
+
+                    <!-- How it works -->
+                    <div class="tc-info-box">
+                        <h4>📌 What this tool does</h4>
+                        <ul>
+                            <li>Reads Tally's <strong>standard Excel TB</strong> (with bold group headers)</li>
+                            <li>Detects hierarchical structure using <strong>bold &amp; indent</strong></li>
+                            <li>Flattens each ledger with its <strong>Parent Tally Group</strong></li>
+                            <li>Converts <code>Dr</code>/<code>Cr</code> suffixes to signed numbers</li>
+                            <li>Outputs a ready-to-import Excel file</li>
+                        </ul>
+                        <div class="tc-tip">💡 <strong>Tip:</strong> Export Trial Balance from Tally with <em>All Ledgers</em> and the <em>Columnar format</em> (Detailed view). Both .xlsx and .csv are supported.</div>
+                    </div>
+
+                    <!-- Upload Zone -->
+                    <div class="tc-upload-zone" id="tcDropZone"
+                         onclick="document.getElementById('tcFileInput').click()"
+                         ondragover="tcDragOver(event)"
+                         ondragleave="tcDragLeave(event)"
+                         ondrop="tcDrop(event)">
+                        <div class="tc-upload-icon">📁</div>
+                        <h3>Drop Tally Excel / CSV here</h3>
+                        <p>or click to browse</p>
+                        <p class="tc-upload-ext">.xlsx &nbsp; .xls &nbsp; .csv</p>
+                        <input type="file" id="tcFileInput" style="display:none"
+                               accept=".xlsx,.xls,.csv"
+                               onchange="tcFileSelected(event)">
+                    </div>
+
+                    <!-- Selected file info -->
+                    <div class="tc-file-info" id="tcFileInfo" style="display:none">
+                        <span class="tc-file-icon">📄</span>
+                        <span id="tcFileName">No file selected</span>
+                        <button class="tc-clear-btn" onclick="tcClearFile()" title="Remove file">✕</button>
+                    </div>
+
+                    <!-- Action Buttons -->
+                    <div class="tc-actions">
+                        <button class="btn btn-primary tc-btn" id="tcPreviewBtn"
+                                onclick="tcRunPreview()" disabled>
+                            🔍 Preview Conversion
+                        </button>
+                        <button class="btn tc-btn tc-download-btn" id="tcDownloadBtn"
+                                onclick="tcDownload()" disabled>
+                            📥 Download Converted File
+                        </button>
+                        <button class="btn btn-success tc-btn" id="tcImportBtn"
+                                onclick="tcImportDirect()" disabled>
+                            ⚡ Convert &amp; Import Directly
+                        </button>
+                    </div>
+
+                    <!-- Status -->
+                    <div id="tcStatus" class="tc-status" style="display:none"></div>
+
+                    <!-- Stats Chips -->
+                    <div class="tc-stats" id="tcStats" style="display:none">
+                        <div class="tc-stat-chip" id="tcStatLedgers">📋 0 Ledgers</div>
+                        <div class="tc-stat-chip" id="tcStatGroups">🗂 0 Groups</div>
+                        <div class="tc-stat-chip tc-stat-ok" id="tcStatStatus">✅ Ready</div>
+                    </div>
+
+                </div>
+
+                <!-- Right: Preview Table -->
+                <div class="tc-right">
+                    <div class="tc-preview-header">
+                        <h3>Conversion Preview</h3>
+                        <span class="tc-preview-sub" id="tcPreviewSub">Upload a file and click "Preview Conversion" to see results</span>
+                    </div>
+
+                    <div class="tc-table-wrap">
+                        <table class="tc-table" id="tcPreviewTable">
+                            <thead>
+                                <tr>
+                                    <th>#</th>
+                                    <th>Ledger Name</th>
+                                    <th>Parent Tally Group</th>
+                                    <th>Opening Balance</th>
+                                    <th>Debit</th>
+                                    <th>Credit</th>
+                                    <th>Closing Balance</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tcPreviewBody">
+                                <tr>
+                                    <td colspan="7" class="tc-empty-msg">
+                                        Upload a Tally Excel/CSV Trial Balance file and click <strong>Preview Conversion</strong>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- Format reference -->
+                    <div class="tc-format-ref">
+                        <h4>📋 Format Comparison</h4>
+                        <div class="tc-format-grid">
+                            <div class="tc-format-col">
+                                <div class="tc-format-title tally-color">Tally Export (Input)</div>
+                                <div class="tc-format-row header-row">
+                                    <span>Particulars</span><span>Opening</span><span>Debit</span><span>Credit</span><span>Closing</span>
+                                </div>
+                                <div class="tc-format-row group-row"><span>Capital Account</span><span colspan="4">(Group Header - Bold)</span></div>
+                                <div class="tc-format-row ledger-row indent"><span>Share Capital</span><span>10L Cr</span><span>—</span><span>—</span><span>10L Cr</span></div>
+                                <div class="tc-format-row group-row"><span>Sundry Debtors</span><span colspan="4">(Group Header)</span></div>
+                                <div class="tc-format-row ledger-row indent"><span>ABC Pvt Ltd</span><span>5L Dr</span><span>2L</span><span>1L</span><span>6L Dr</span></div>
+                            </div>
+                            <div class="tc-format-arrow">→</div>
+                            <div class="tc-format-col">
+                                <div class="tc-format-title app-color">App Format (Output)</div>
+                                <div class="tc-format-row header-row">
+                                    <span>Ledger Name</span><span>Tally Group</span><span>Opening</span><span>Debit</span><span>Credit</span><span>Closing</span>
+                                </div>
+                                <div class="tc-format-row ledger-row"><span>Share Capital</span><span class="grp-pill">Capital Account</span><span>10L Cr</span><span>—</span><span>—</span><span>10L Cr</span></div>
+                                <div class="tc-format-row ledger-row"><span>ABC Pvt Ltd</span><span class="grp-pill">Sundry Debtors</span><span>5L Dr</span><span>2L</span><span>1L</span><span>6L Dr</span></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            </div><!-- /tc-body -->
+        </div><!-- /tc-modal -->
+    </div><!-- /tallyConverterModal -->
+
+    <!-- CHECKLIST EDIT MODAL -->
+    <div id="checklistEditModal" class="modal-overlay" style="display:none; position:fixed; top:0; left:0; width:100vw; height:100vh; background:rgba(0,0,0,0.55); z-index:9999; justify-content:center; align-items:center;">
+        <div class="modal-card" style="background:#fff; border-radius:12px; width:90%; max-width:680px; max-height:90vh; overflow-y:auto; box-shadow:0 20px 40px rgba(0,0,0,0.25); display:flex; flex-direction:column;">
+            <div style="padding:18px 24px; border-bottom:1px solid #e2e8f0; display:flex; justify-content:space-between; align-items:center; background:#f8fafc; border-radius:12px 12px 0 0;">
+                <h3 style="margin:0; font-size:17px; color:#1e293b; display:flex; align-items:center; gap:8px;">
+                    <span>📋</span> <span id="ckModalTitle">Edit Schedule III Disclosure</span>
+                </h3>
+                <button type="button" onclick="closeChecklistModal()" style="background:none; border:none; font-size:22px; cursor:pointer; color:#64748b; line-height:1;">&times;</button>
+            </div>
+            <div style="padding:24px; display:flex; flex-direction:column; gap:16px;">
+                <input type="hidden" id="ckModalRefId">
+                <input type="hidden" id="ckModalItemTitle">
+                
+                <div>
+                    <label style="display:block; font-size:13px; font-weight:600; color:#475569; margin-bottom:6px;">Statutory Disclosure Requirement</label>
+                    <div id="ckModalItemDesc" style="padding:10px 14px; background:#f1f5f9; border-radius:8px; font-size:14px; color:#1e293b; font-weight:500;"></div>
+                </div>
+
+                <div class="form-row" style="display:flex; gap:16px;">
+                    <div style="flex:1;">
+                        <label style="display:block; font-size:13px; font-weight:600; color:#475569; margin-bottom:6px;">Compliance Status</label>
+                        <select id="ckModalStatus" class="form-control" style="width:100%; padding:10px; border-radius:8px; border:1px solid #cbd5e1; font-size:14px;">
+                            <option value="Completed / Complied">✅ Completed / Complied</option>
+                            <option value="Computed / Ready">⚡ Computed / Ready</option>
+                            <option value="Requires Input">⚠️ Requires Input</option>
+                            <option value="Not Applicable">➖ Not Applicable</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div>
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+                        <label style="font-size:13px; font-weight:600; color:#475569;">Auditor Notes, Workings & Statutory Disclosure Details</label>
+                        <button type="button" class="btn btn-sm btn-outline" style="font-size:11px; padding:4px 8px;" onclick="insertChecklistTemplate()">⚡ Insert Template</button>
+                    </div>
+                    <textarea id="ckModalDetails" rows="7" class="form-control" style="width:100%; padding:12px; border-radius:8px; border:1px solid #cbd5e1; font-family:monospace; font-size:13px; resize:vertical;" placeholder="Enter specific disclosures, shareholding names/%, CSR applicability notes, related party names, or auditor verification remarks..."></textarea>
+                    <small style="color:#64748b; font-size:12px; margin-top:4px; display:block;">These details and status are permanently saved for this company and included in the audit trail & documentation.</small>
+                </div>
+            </div>
+            <div style="padding:16px 24px; border-top:1px solid #e2e8f0; display:flex; justify-content:flex-end; gap:12px; background:#f8fafc; border-radius:0 0 12px 12px;">
+                <button type="button" class="btn btn-secondary" onclick="closeChecklistModal()">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="saveChecklistModal()">💾 Save Disclosure Details</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- NOTE 1 POLICIES EDIT MODAL -->
+    <div id="note1EditModal" class="modal-overlay" style="display:none; position:fixed; top:0; left:0; width:100vw; height:100vh; background:rgba(0,0,0,0.55); z-index:9999; justify-content:center; align-items:center;">
+        <div class="modal-card" style="background:#fff; border-radius:12px; width:92%; max-width:880px; max-height:92vh; overflow-y:auto; box-shadow:0 20px 40px rgba(0,0,0,0.25); display:flex; flex-direction:column;">
+            <div style="padding:18px 24px; border-bottom:1px solid #e2e8f0; display:flex; justify-content:space-between; align-items:center; background:#1e3a8a; color:#fff; border-radius:12px 12px 0 0;">
+                <div>
+                    <h3 style="margin:0; font-size:17px; color:#fff; display:flex; align-items:center; gap:8px;">
+                        <span>✏️</span> Edit Note 1: Corporate Information & Significant Accounting Policies
+                    </h3>
+                    <p style="margin:4px 0 0 0; font-size:12px; color:#bfdbfe;">Customize company-specific statutory accounting policies compliant with AS / Non-Ind AS Schedule III</p>
+                </div>
+                <button type="button" onclick="closeNote1Modal()" style="background:none; border:none; font-size:24px; cursor:pointer; color:#fff; line-height:1;">&times;</button>
+            </div>
+            <div style="padding:24px; display:flex; flex-direction:column; gap:20px; max-height:65vh; overflow-y:auto;" id="note1SectionsContainer">
+                <!-- Dynamic policy sections rendered here -->
+            </div>
+            <div style="padding:14px 24px; border-top:1px solid #e2e8f0; display:flex; justify-content:space-between; align-items:center; background:#f8fafc; border-radius:0 0 12px 12px;">
+                <div style="display:flex; gap:10px;">
+                    <button type="button" class="btn btn-sm btn-outline" onclick="addNote1CustomSection()">➕ Add Policy Clause</button>
+                    <button type="button" class="btn btn-sm btn-secondary" onclick="resetNote1ToDefault()">↺ Reset to Standard ICAI Template</button>
+                </div>
+                <div style="display:flex; gap:10px;">
+                    <button type="button" class="btn btn-secondary" onclick="closeNote1Modal()">Cancel</button>
+                    <button type="button" class="btn btn-primary" onclick="saveNote1Modal()">💾 Save Accounting Policies</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+</body>
+</html>
+

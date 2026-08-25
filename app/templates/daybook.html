@@ -1,0 +1,241 @@
+{% extends "base.html" %}
+
+{% block page_title %}Day Book{% endblock %}
+{% block page_kicker %}Daily sales by payment channel{% endblock %}
+
+{% block content %}
+{% include "partials/import_daily_sales.html" %}
+<div class="filter-toolbar">
+    <div class="form-group">
+        <label class="form-label">Branch</label>
+        <select id="dbBranch" class="form-select" onchange="loadDayBook()">
+            <option value="">All Branches</option>
+            {% for b in branches %}
+            <option value="{{ b.id }}">{{ b.name }}</option>
+            {% endfor %}
+        </select>
+    </div>
+    {% with period_prefix='db', period_reload='loadDayBook' %}
+    {% include "partials/period_filter.html" %}
+    {% endwith %}
+    <div class="form-group" style="margin-left: auto; flex-direction: row; gap: 0.5rem; align-items: flex-end;">
+        <button type="button" onclick="openDaybookModal()" class="btn btn-primary" data-perm="daybook.enter"><i class="fa-solid fa-plus"></i> Entry / Edit</button>
+        <a id="btnExportDayBook" href="/api/reports/export/daybook/excel" class="btn btn-outline-excel"><i class="fa-solid fa-file-excel"></i> Export Excel</a>
+        <a id="btnExportDayBookPdf" href="/api/reports/export/daybook/pdf" target="_blank" class="btn btn-outline-pdf"><i class="fa-solid fa-file-pdf"></i> Export PDF</a>
+    </div>
+</div>
+
+<div class="glass-card">
+    <div class="table-responsive">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Date</th>
+                    <th>Cash Balance</th>
+                    <th>Cash Sale</th>
+                    <th>Card / QR Code</th>
+                    <th>Zomato</th>
+                    <th>Swiggy</th>
+                    <th>Dineout</th>
+                    <th>Other Channels</th>
+                    <th>Online Payment</th>
+                    <th>Total Sales</th>
+                    <th>Status</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody id="daybookTbody">
+                <tr><td colspan="12" style="text-align: center;">Loading Day Book...</td></tr>
+            </tbody>
+            <tfoot>
+                <tr id="daybookTfoot">
+                    <td>TOTALS</td>
+                    <td id="totCashBal" class="amount-num">-</td>
+                    <td id="totCash" class="amount-num">₹ 0.00</td>
+                    <td id="totCard" class="amount-num">₹ 0.00</td>
+                    <td id="totZomato" class="amount-num">₹ 0.00</td>
+                    <td id="totSwiggy" class="amount-num">₹ 0.00</td>
+                    <td id="totDineout" class="amount-num">₹ 0.00</td>
+                    <td id="totOther" class="amount-num">₹ 0.00</td>
+                    <td id="totOnline" class="amount-num">₹ 0.00</td>
+                    <td id="totSales" class="amount-num">₹ 0.00</td>
+                    <td>-</td>
+                    <td></td>
+                </tr>
+            </tfoot>
+        </table>
+    </div>
+</div>
+
+<div class="modal-backdrop" id="daybookModal">
+    <div class="modal-card">
+        <div class="modal-header">
+            <h3 style="font-size: 1.1rem;"><i class="fa-solid fa-pen-to-square"></i> <span id="daybookModalTitle">Day Book entry</span></h3>
+            <button class="modal-close" onclick="closeModal('daybookModal')">&times;</button>
+        </div>
+        <form id="daybookForm" onsubmit="saveDaybookEntry(event)">
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; margin-bottom: 0.85rem;">
+                <div class="form-group">
+                    <label class="form-label">Branch</label>
+                    <select id="dbEntryBranch" class="form-select" required>
+                        {% for b in branches %}
+                        <option value="{{ b.id }}">{{ b.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Date</label>
+                    <input type="date" id="dbEntryDate" class="form-control" required>
+                </div>
+            </div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; margin-bottom: 0.85rem;">
+                <div class="form-group">
+                    <label class="form-label">Cash sale (₹)</label>
+                    <input type="number" step="0.01" id="dbEntryCash" class="form-control" value="0">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Card / QR (₹)</label>
+                    <input type="number" step="0.01" id="dbEntryCard" class="form-control" value="0">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Zomato (₹)</label>
+                    <input type="number" step="0.01" id="dbEntryZomato" class="form-control" value="0">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Swiggy (₹)</label>
+                    <input type="number" step="0.01" id="dbEntrySwiggy" class="form-control" value="0">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Dineout (₹)</label>
+                    <input type="number" step="0.01" id="dbEntryDineout" class="form-control" value="0">
+                </div>
+            </div>
+            <div style="display: flex; justify-content: flex-end; gap: 0.75rem;">
+                <button type="button" class="btn btn-secondary" onclick="closeModal('daybookModal')">Cancel</button>
+                <button type="submit" class="btn btn-primary">Save entry</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/js/imports.js?v=salary1"></script>
+<script>
+    let daybookRows = [];
+    let daybookEditOriginal = null;
+
+    document.addEventListener('DOMContentLoaded', () => {
+        initPeriodFilter('db');
+        loadDayBook();
+    });
+
+    async function loadDayBook() {
+        const branchId = document.getElementById('dbBranch').value;
+        const { start, end } = periodRange('db');
+
+        let url = `/api/daybook/consolidated?`;
+        if (branchId) url += `branch_id=${branchId}&`;
+        if (start) url += `start_date=${start}&`;
+        if (end) url += `end_date=${end}&`;
+
+        let params = new URLSearchParams();
+        if (branchId) params.append('branch_id', branchId);
+        if (start) params.append('start_date', start);
+        if (end) params.append('end_date', end);
+        const q = params.toString() ? '?' + params.toString() : '';
+
+        document.getElementById('btnExportDayBook').href = `/api/reports/export/daybook/excel${q}`;
+        document.getElementById('btnExportDayBookPdf').href = `/api/reports/export/daybook/pdf${q}`;
+
+        const data = await apiFetch(url);
+        if (!data) return;
+
+        const tbody = document.getElementById('daybookTbody');
+        tbody.innerHTML = '';
+
+        if (data.rows.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="12" style="text-align: center; color: var(--text-muted);">No records found. Use Entry / Edit or import a photo.</td></tr>`;
+            return;
+        }
+
+        daybookRows = data.rows;
+        data.rows.forEach((r, idx) => {
+            let statusBadge = r.status === 'RECONCILED' ? '<span class="badge badge-reconciled">Reconciled</span>' :
+                              r.status === 'DIFFERENCE' ? '<span class="badge badge-difference">Difference</span>' :
+                              '<span class="badge badge-pending">Pending</span>';
+
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td>${r.date}</td>
+                <td class="amount-num">${formatINR(r.cash_balance)}</td>
+                <td class="amount-num">${formatINR(r.cash)}</td>
+                <td class="amount-num">${formatINR(r.card_qr)}</td>
+                <td class="amount-num">${formatINR(r.zomato)}</td>
+                <td class="amount-num">${formatINR(r.swiggy)}</td>
+                <td class="amount-num">${formatINR(r.dineout)}</td>
+                <td class="amount-num">${formatINR(r.other_channels)}</td>
+                <td class="amount-num">${formatINR(r.online_payment)}</td>
+                <td class="amount-num"><strong>${formatINR(r.total_sales)}</strong></td>
+                <td>${statusBadge}</td>
+                <td>${!r.is_aggregate && typeof canDo === 'function' && (canDo('daybook', 'enter') || canDo('daybook', 'edit_saved')) ? `<button type="button" class="btn btn-secondary btn-sm" onclick="openDaybookModal(${idx})">Edit</button>` : ''}</td>
+            `;
+            tbody.appendChild(tr);
+        });
+
+        // Totals
+        document.getElementById('totCashBal').innerText = formatINR(data.totals.cash_balance || 0);
+        document.getElementById('totCash').innerText = formatINR(data.totals.cash);
+        document.getElementById('totCard').innerText = formatINR(data.totals.card_qr);
+        document.getElementById('totZomato').innerText = formatINR(data.totals.zomato);
+        document.getElementById('totSwiggy').innerText = formatINR(data.totals.swiggy);
+        document.getElementById('totDineout').innerText = formatINR(data.totals.dineout);
+        document.getElementById('totOther').innerText = formatINR(data.totals.other_channels);
+        document.getElementById('totOnline').innerText = formatINR(data.totals.online_payment);
+        document.getElementById('totSales').innerText = formatINR(data.totals.total_sales);
+    }
+
+    function daybookDateValue(value) {
+        if (!value) return '';
+        if (typeof value === 'string') return value.slice(0, 10);
+        return value;
+    }
+
+    function openDaybookModal(idx) {
+        const row = typeof idx === 'number' ? daybookRows[idx] : null;
+        document.getElementById('daybookModalTitle').innerText = row ? 'Edit Day Book' : 'Day Book entry';
+        document.getElementById('dbEntryDate').value = row ? daybookDateValue(row.date) : new Date().toISOString().split('T')[0];
+        if (row && row.branch_id) document.getElementById('dbEntryBranch').value = row.branch_id;
+        document.getElementById('dbEntryCash').value = row ? (row.cash || 0) : 0;
+        document.getElementById('dbEntryCard').value = row ? (row.card_qr || 0) : 0;
+        document.getElementById('dbEntryZomato').value = row ? (row.zomato || 0) : 0;
+        document.getElementById('dbEntrySwiggy').value = row ? (row.swiggy || 0) : 0;
+        document.getElementById('dbEntryDineout').value = row ? (row.dineout || 0) : 0;
+        daybookEditOriginal = row ? { branch_id: row.branch_id, sale_date: daybookDateValue(row.date) } : null;
+        openModal('daybookModal');
+    }
+
+    async function saveDaybookEntry(e) {
+        e.preventDefault();
+        const res = await apiFetch('/api/daybook/entry', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                branch_id: parseInt(document.getElementById('dbEntryBranch').value, 10),
+                sale_date: document.getElementById('dbEntryDate').value,
+                cash: parseFloat(document.getElementById('dbEntryCash').value || 0),
+                card_qr: parseFloat(document.getElementById('dbEntryCard').value || 0),
+                zomato: parseFloat(document.getElementById('dbEntryZomato').value || 0),
+                swiggy: parseFloat(document.getElementById('dbEntrySwiggy').value || 0),
+                dineout: parseFloat(document.getElementById('dbEntryDineout').value || 0),
+                original_branch_id: daybookEditOriginal ? daybookEditOriginal.branch_id : null,
+                original_sale_date: daybookEditOriginal ? daybookEditOriginal.sale_date : null
+            })
+        });
+        if (!res) return;
+        showToast('Day Book saved', 'success');
+        closeModal('daybookModal');
+        loadDayBook();
+    }
+</script>
+{% endblock %}

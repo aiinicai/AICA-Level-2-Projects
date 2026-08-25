@@ -1,0 +1,1798 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DeprecAI Pro — Depreciation, Deferred Tax &amp; Capital Gains Calculator</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=IBM+Plex+Mono:wght@400;500&family=DM+Sans:wght@300;400;500;600&display=swap');
+
+:root {
+  --bg:#0b0f1a; --surface:#131826; --surface2:#1a2035; --surface3:#202840;
+  --border:#2a3550; --border2:#364060;
+  --gold:#c9a84c; --gold2:#e8c56a; --gold-dim:rgba(201,168,76,.15);
+  --teal:#3ecfcf; --teal-dim:rgba(62,207,207,.12);
+  --rose:#e05c7a; --rose-dim:rgba(224,92,122,.12);
+  --green:#4ade80; --green-dim:rgba(74,222,128,.1);
+  --purple:#a78bfa; --purple-dim:rgba(167,139,250,.12);
+  --text:#e2e8f0; --text2:#94a3b8; --text3:#64748b;
+  --radius:10px;
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;font-size:14px;line-height:1.6;min-height:100vh;}
+
+.app-header{background:linear-gradient(135deg,#0d1525,#111827,#0d1a2e);border-bottom:1px solid var(--border);padding:14px 24px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:200;}
+.app-header::after{content:'';position:absolute;bottom:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,var(--gold),transparent);}
+.header-brand h1{font-family:'Playfair Display',serif;font-size:19px;color:var(--gold2);}
+.ver-badge{display:inline-block;font-family:'IBM Plex Mono',monospace;font-size:9px;background:var(--teal-dim);border:1px solid var(--teal);color:var(--teal);padding:1px 7px;border-radius:20px;vertical-align:middle;margin-left:6px;}
+.law-banner{background:linear-gradient(135deg,rgba(201,168,76,.08),rgba(62,207,207,.05));border:1px solid var(--border2);border-radius:8px;padding:8px 11px;font-size:10.5px;color:var(--text2);margin-bottom:10px;line-height:1.6;}
+.law-banner strong{color:var(--gold2);}
+.disposal-box{background:var(--rose-dim);border:1px solid var(--rose);border-radius:8px;padding:10px 12px;margin-bottom:10px;font-size:11px;line-height:1.7;}
+.ai-card{background:linear-gradient(135deg,rgba(167,139,250,.07),rgba(62,207,207,.05));border:1px solid var(--purple);border-radius:12px;padding:16px;margin-bottom:14px;}
+.ai-card-title{font-family:'Playfair Display',serif;font-size:14px;color:var(--purple);display:flex;align-items:center;gap:6px;margin-bottom:8px;}
+.ai-sparkle{display:inline-block;animation:sparkle 2s ease-in-out infinite;}
+@keyframes sparkle{0%,100%{opacity:1;transform:scale(1);}50%{opacity:.6;transform:scale(1.15);}}
+.confidence-badge{display:inline-block;font-size:9px;font-weight:700;padding:2px 8px;border-radius:20px;letter-spacing:.5px;text-transform:uppercase;}
+.confidence-high{background:var(--teal-dim);color:var(--teal);border:1px solid var(--teal);}
+.confidence-medium{background:rgba(201,168,76,.12);color:var(--gold2);border:1px solid var(--gold);}
+.confidence-low{background:var(--rose-dim);color:var(--rose);border:1px solid var(--rose);}
+.risk-badge{display:inline-flex;align-items:center;gap:4px;font-size:10px;font-weight:700;padding:3px 9px;border-radius:20px;}
+.risk-pass{background:var(--teal-dim);color:var(--teal);}
+.risk-review{background:rgba(201,168,76,.12);color:var(--gold2);}
+.risk-high{background:var(--rose-dim);color:var(--rose);}
+.issue-card{background:var(--surface2);border:1px solid var(--border2);border-left:3px solid var(--gold);border-radius:8px;padding:11px 13px;margin-bottom:9px;font-size:11px;line-height:1.7;}
+.issue-card.high{border-left-color:var(--rose);}
+.issue-card.pass{border-left-color:var(--teal);}
+.issue-row{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin-bottom:4px;}
+.issue-row b{color:var(--text);}
+.why-btn{display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:50%;background:var(--surface3);color:var(--text3);font-size:10px;border:1px solid var(--border2);cursor:pointer;margin-left:6px;vertical-align:middle;transition:.15s;}
+.why-btn:hover{background:var(--purple);color:#fff;border-color:var(--purple);}
+.health-ring{width:64px;height:64px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-family:'IBM Plex Mono',monospace;font-weight:700;font-size:15px;flex-shrink:0;}
+.health-good{background:conic-gradient(var(--teal) var(--pct,90%),var(--surface3) 0);}
+.health-review{background:conic-gradient(var(--gold) var(--pct,60%),var(--surface3) 0);}
+.health-attn{background:conic-gradient(var(--rose) var(--pct,30%),var(--surface3) 0);}
+.health-ring-inner{width:52px;height:52px;border-radius:50%;background:var(--surface);display:flex;align-items:center;justify-content:center;color:var(--text);}
+.ai-classify-box{background:var(--surface2);border:1px solid var(--border2);border-radius:10px;padding:12px;margin-top:10px;}
+.demo-menu{position:absolute;top:calc(100% + 6px);right:0;background:var(--surface);border:1px solid var(--border2);border-radius:10px;box-shadow:0 16px 40px rgba(0,0,0,.5);min-width:280px;max-height:400px;overflow-y:auto;display:none;z-index:200;}
+.demo-menu.open{display:block;}
+.demo-item{padding:9px 13px;font-size:11px;cursor:pointer;border-bottom:1px solid var(--border);transition:.15s;}
+.demo-item:last-child{border-bottom:none;}
+.demo-item:hover{background:var(--surface2);}
+.demo-item b{color:var(--gold2);display:block;font-size:11.5px;}
+.demo-item span{color:var(--text3);font-size:9.5px;}
+.exec-summary-box{background:linear-gradient(135deg,rgba(201,168,76,.06),rgba(62,207,207,.04));border:1px solid var(--border2);border-radius:12px;padding:16px;font-size:12px;line-height:1.9;color:var(--text2);}
+.exec-summary-box ol{margin:8px 0 0 18px;padding:0;}
+.exec-summary-box li{margin-bottom:4px;}
+.ai-disclaimer{background:rgba(224,92,122,.06);border:1px dashed var(--rose);border-radius:8px;padding:8px 11px;font-size:10px;color:var(--rose);margin-top:10px;line-height:1.6;}
+.header-brand p{color:var(--text3);font-size:10px;font-family:'IBM Plex Mono',monospace;}
+.header-actions{display:flex;gap:8px;align-items:center;}
+
+.mode-switcher{display:flex;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:3px;gap:3px;}
+.mode-btn{padding:6px 14px;border:none;background:transparent;color:var(--text3);font-family:'DM Sans',sans-serif;font-size:12px;font-weight:500;border-radius:6px;cursor:pointer;transition:.2s;white-space:nowrap;}
+.mode-btn.active{background:var(--gold);color:#0b0f1a;font-weight:700;}
+
+.btn{padding:6px 14px;border-radius:6px;border:none;cursor:pointer;font-family:'DM Sans',sans-serif;font-size:12px;font-weight:500;transition:.2s;display:inline-flex;align-items:center;gap:5px;}
+.btn-ghost{background:transparent;border:1px solid var(--border2);color:var(--text2);}
+.btn-ghost:hover{border-color:var(--gold);color:var(--gold);}
+.btn-gold{background:var(--gold);color:#0b0f1a;font-weight:700;}
+.btn-gold:hover{background:var(--gold2);}
+.btn-sm{padding:4px 9px;font-size:11px;}
+
+.app-body{display:grid;grid-template-columns:330px 1fr;min-height:calc(100vh - 59px);}
+
+.sidebar{background:var(--surface);border-right:1px solid var(--border);padding:18px;overflow-y:auto;max-height:calc(100vh - 59px);position:sticky;top:59px;}
+.section-title{font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:2px;text-transform:uppercase;color:var(--gold);margin-bottom:10px;padding-bottom:6px;border-bottom:1px solid var(--gold-dim);}
+.form-group{margin-bottom:11px;}
+.form-group label{display:block;font-size:11px;color:var(--text2);margin-bottom:3px;font-weight:500;}
+.form-control{width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:7px 10px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:12px;transition:.2s;outline:none;}
+.form-control:focus{border-color:var(--gold);box-shadow:0 0 0 2px var(--gold-dim);}
+select.form-control{cursor:pointer;}
+select.form-control option{background:var(--surface2);}
+.form-row{display:grid;grid-template-columns:1fr 1fr;gap:7px;}
+.form-separator{height:1px;background:var(--border);margin:12px 0;}
+.toggle-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;}
+.toggle-label{font-size:11px;color:var(--text2);}
+.toggle{position:relative;width:36px;height:20px;}
+.toggle input{opacity:0;width:0;height:0;}
+.toggle-slider{position:absolute;inset:0;background:var(--surface3);border-radius:20px;cursor:pointer;transition:.2s;border:1px solid var(--border2);}
+.toggle-slider::before{content:'';position:absolute;width:14px;height:14px;border-radius:50%;background:var(--text3);top:2px;left:2px;transition:.2s;}
+.toggle input:checked+.toggle-slider{background:var(--gold-dim);border-color:var(--gold);}
+.toggle input:checked+.toggle-slider::before{transform:translateX(16px);background:var(--gold);}
+.rate-badge{display:inline-block;padding:2px 9px;border-radius:20px;font-family:'IBM Plex Mono',monospace;font-size:10px;background:var(--gold-dim);border:1px solid var(--gold);color:var(--gold2);margin-top:2px;}
+.rate-badge.teal{background:var(--teal-dim);border-color:var(--teal);color:var(--teal);}
+.calc-btn{width:100%;padding:11px;border-radius:8px;border:none;background:linear-gradient(135deg,var(--gold),#a87c30);color:#0b0f1a;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:700;cursor:pointer;transition:.2s;margin-top:12px;}
+.calc-btn:hover{transform:translateY(-1px);box-shadow:0 5px 18px rgba(201,168,76,.4);}
+
+.main-content{padding:18px;overflow-y:auto;}
+.mode-panel{display:none;}
+.mode-panel.active{display:block;}
+
+/* UPLOAD */
+.upload-zone{border:2px dashed var(--border2);border-radius:12px;padding:34px 28px;text-align:center;cursor:pointer;transition:.3s;position:relative;background:linear-gradient(135deg,rgba(201,168,76,.02),rgba(62,207,207,.02));margin-bottom:16px;}
+.upload-zone:hover,.upload-zone.drag-over{border-color:var(--gold);background:var(--gold-dim);}
+.upload-zone input[type=file]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%;}
+.upload-icon{font-size:36px;margin-bottom:10px;display:block;}
+.upload-title{font-family:'Playfair Display',serif;font-size:17px;color:var(--text);margin-bottom:4px;}
+.upload-sub{font-size:11px;color:var(--text3);line-height:1.8;}
+.upload-formats{display:flex;gap:6px;justify-content:center;margin-top:10px;flex-wrap:wrap;}
+.fmt-tag{padding:2px 8px;border-radius:20px;font-size:10px;font-family:'IBM Plex Mono',monospace;background:var(--surface2);border:1px solid var(--border2);color:var(--text3);}
+
+.template-box{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:16px;}
+.template-title{font-size:12px;font-weight:600;color:var(--text);margin-bottom:6px;}
+.template-desc{font-size:11px;color:var(--text3);margin-bottom:10px;line-height:1.6;}
+.col-list{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:10px;}
+.col-tag{padding:2px 8px;border-radius:5px;font-size:9px;font-family:'IBM Plex Mono',monospace;background:var(--surface2);border:1px solid var(--border);color:var(--text2);}
+.col-tag.req{border-color:var(--gold);color:var(--gold2);background:var(--gold-dim);}
+
+/* CARDS */
+.summary-cards{display:grid;grid-template-columns:repeat(5,1fr);gap:11px;margin-bottom:18px;}
+.summary-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px;position:relative;overflow:hidden;transition:.2s;}
+.summary-card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;}
+.summary-card.gold::before{background:linear-gradient(90deg,var(--gold),transparent);}
+.summary-card.teal::before{background:linear-gradient(90deg,var(--teal),transparent);}
+.summary-card.rose::before{background:linear-gradient(90deg,var(--rose),transparent);}
+.summary-card.green::before{background:linear-gradient(90deg,var(--green),transparent);}
+.summary-card.purple::before{background:linear-gradient(90deg,var(--purple),transparent);}
+.summary-card:hover{transform:translateY(-2px);}
+.card-label{font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.8px;font-family:'IBM Plex Mono',monospace;}
+.card-value{font-family:'Playfair Display',serif;font-size:20px;font-weight:700;margin-top:4px;line-height:1.1;}
+.card-value.gold{color:var(--gold2);}.card-value.teal{color:var(--teal);}.card-value.rose{color:var(--rose);}.card-value.green{color:var(--green);}.card-value.purple{color:var(--purple);}
+.card-sub{font-size:10px;color:var(--text3);margin-top:2px;}
+
+/* TABS */
+.tabs{display:flex;gap:2px;margin-bottom:16px;border-bottom:1px solid var(--border);flex-wrap:wrap;}
+.tab{padding:8px 16px;border:none;background:transparent;color:var(--text3);font-family:'DM Sans',sans-serif;font-size:12px;font-weight:500;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px;transition:.2s;white-space:nowrap;}
+.tab:hover{color:var(--text2);}
+.tab.active{color:var(--gold2);border-bottom-color:var(--gold);}
+.tab-panel{display:none;}
+.tab-panel.active{display:block;}
+
+/* TABLES */
+.table-container{background:var(--surface);border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:14px;}
+.table-container.scrollable{overflow-x:auto;}
+.table-header{padding:11px 15px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--border);background:var(--surface2);flex-wrap:wrap;gap:6px;}
+.table-title{font-size:12px;font-weight:600;color:var(--text);}
+table{width:100%;border-collapse:collapse;}
+thead th{background:var(--surface2);padding:8px 12px;text-align:right;font-size:9px;font-family:'IBM Plex Mono',monospace;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid var(--border);white-space:nowrap;}
+thead th:first-child{text-align:left;}
+tbody tr{border-bottom:1px solid rgba(42,53,80,.5);transition:.15s;}
+tbody tr:hover{background:rgba(201,168,76,.04);}
+tbody tr:last-child{border-bottom:none;}
+td{padding:8px 12px;text-align:right;font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--text2);white-space:nowrap;}
+td:first-child{text-align:left;color:var(--text);font-weight:500;font-family:'DM Sans',sans-serif;font-size:12px;}
+.td-gold{color:var(--gold2)!important;}.td-teal{color:var(--teal)!important;}.td-rose{color:var(--rose)!important;}.td-green{color:var(--green)!important;}.td-purple{color:var(--purple)!important;}
+tfoot td{background:var(--surface2);font-weight:600;color:var(--text);border-top:2px solid var(--border2);}
+.clickable-row{cursor:pointer;}
+.clickable-row:hover td:first-child{color:var(--gold2);}
+
+/* MODAL */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.75);backdrop-filter:blur(5px);z-index:500;display:none;align-items:center;justify-content:center;padding:16px;}
+.modal-overlay.open{display:flex;}
+.modal{background:var(--surface);border:1px solid var(--border2);border-radius:14px;width:min(920px,100%);max-height:90vh;overflow-y:auto;box-shadow:0 24px 64px rgba(0,0,0,.7);}
+.modal-header{padding:16px 22px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;background:var(--surface);z-index:10;}
+.modal-title{font-family:'Playfair Display',serif;font-size:16px;color:var(--gold2);}
+.modal-close{background:none;border:none;color:var(--text3);font-size:18px;cursor:pointer;padding:3px 7px;border-radius:4px;}
+.modal-close:hover{color:var(--rose);}
+.modal-body{padding:18px 22px;}
+.modal-tabs{display:flex;gap:2px;border-bottom:1px solid var(--border);margin-bottom:14px;}
+.modal-tab{padding:7px 13px;border:none;background:transparent;color:var(--text3);font-size:11px;font-family:'DM Sans',sans-serif;font-weight:500;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px;transition:.2s;}
+.modal-tab.active{color:var(--gold2);border-bottom-color:var(--gold);}
+.modal-panel{display:none;}
+.modal-panel.active{display:block;}
+
+/* CHARTS */
+.charts-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px;}
+.chart-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px;}
+.chart-title{font-size:12px;font-weight:600;margin-bottom:10px;color:var(--text);}
+canvas{width:100%!important;display:block;}
+
+/* MISC */
+.placeholder{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:56px 36px;text-align:center;color:var(--text3);}
+.placeholder-icon{font-size:40px;margin-bottom:12px;opacity:.5;}
+.placeholder h3{font-family:'Playfair Display',serif;font-size:17px;color:var(--text2);margin-bottom:6px;}
+.placeholder p{font-size:12px;max-width:340px;line-height:1.7;}
+.alert{padding:8px 12px;border-radius:8px;font-size:11px;margin-bottom:10px;border:1px solid;}
+.alert-warn{background:rgba(201,168,76,.08);border-color:var(--gold);color:var(--gold2);}
+.alert-info{background:var(--teal-dim);border-color:var(--teal);color:var(--teal);}
+.alert-err{background:var(--rose-dim);border-color:var(--rose);color:var(--rose);}
+.legend{display:flex;gap:16px;flex-wrap:wrap;margin-bottom:8px;}
+.legend-item{display:flex;align-items:center;gap:5px;font-size:11px;color:var(--text2);}
+.legend-dot{width:9px;height:9px;border-radius:50%;}
+.export-bar{display:flex;gap:7px;padding:10px 0;border-top:1px solid var(--border);margin-top:12px;flex-wrap:wrap;}
+.error-list{background:var(--rose-dim);border:1px solid var(--rose);border-radius:8px;padding:11px 14px;margin-bottom:12px;}
+.error-list li{font-size:11px;color:var(--rose);margin-left:14px;line-height:1.8;}
+.deferred-card{background:linear-gradient(135deg,rgba(62,207,207,.05),rgba(201,168,76,.05));border:1px solid var(--border2);border-radius:10px;padding:14px;margin-bottom:12px;}
+.deferred-title{font-size:10px;font-family:'IBM Plex Mono',monospace;color:var(--teal);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;}
+.asset-num{display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:50%;background:var(--gold-dim);border:1px solid var(--gold);color:var(--gold2);font-family:'IBM Plex Mono',monospace;font-size:9px;font-weight:500;flex-shrink:0;}
+.status-ok{display:inline-block;padding:1px 7px;border-radius:4px;font-size:10px;font-family:'IBM Plex Mono',monospace;background:var(--green-dim);color:var(--green);border:1px solid rgba(74,222,128,.3);}
+
+@media print{.sidebar,.app-header,.export-bar,.tabs,.calc-btn,.mode-switcher,.upload-zone,.template-box,.btn{display:none!important;}.app-body{display:block;}.main-content{padding:0;}.tab-panel,.mode-panel{display:block!important;}body{background:#fff;color:#000;}td,th,.card-value{color:#000!important;}}
+@media(max-width:1100px){.app-body{grid-template-columns:280px 1fr;}.summary-cards{grid-template-columns:repeat(3,1fr);}}
+@media(max-width:768px){.app-body{grid-template-columns:1fr;}.sidebar{position:static;max-height:none;}.charts-grid{grid-template-columns:1fr;}.summary-cards{grid-template-columns:repeat(2,1fr);}}
+::-webkit-scrollbar{width:5px;height:5px;}::-webkit-scrollbar-track{background:var(--bg);}::-webkit-scrollbar-thumb{background:var(--border2);border-radius:3px;}
+</style>
+</head>
+<body>
+
+<header class="app-header">
+  <div class="header-brand">
+    <h1>DeprecAI Pro — Depreciation Calculator <span class="ver-badge">v2.0</span></h1>
+    <p>Companies Act 2013 (Sch. II) &nbsp;·&nbsp; <span id="lawHeaderLabel">Income-tax Act, 1961 (Sec. 32)</span> &nbsp;·&nbsp; AS 22 / Ind AS 12 Deferred Tax &nbsp;·&nbsp; Disposal &amp; Capital Gains &nbsp;·&nbsp; Bulk Upload</p>
+  </div>
+  <div class="header-actions">
+    <div class="mode-switcher">
+      <button class="mode-btn active" onclick="setMode('single')" id="modeBtnSingle">Single Asset</button>
+      <button class="mode-btn" onclick="setMode('bulk')" id="modeBtnBulk">⤒ Bulk Upload</button>
+    </div>
+    <button class="btn btn-ghost btn-sm" onclick="generatePDFReport()">⤓ PDF Report</button>
+    <button class="btn btn-ghost btn-sm" onclick="generateWordReport()">⤓ Word Report</button>
+    <div style="position:relative;">
+      <button class="btn btn-ghost btn-sm" onclick="toggleDemoMenu()">🎓 Demo Cases</button>
+      <div class="demo-menu" id="demoMenu"></div>
+    </div>
+    <button class="btn btn-ghost" onclick="resetAll()">↺ Reset</button>
+    <button class="btn btn-ghost" onclick="window.print()">⎙ Print</button>
+  </div>
+</header>
+
+<div class="app-body">
+
+<!-- ══ SIDEBAR ══ -->
+<aside class="sidebar">
+  <div class="section-title">① Asset Details</div>
+  <div class="form-group">
+    <label>Asset Category</label>
+    <select class="form-control" id="assetCategory" onchange="onCategoryChange()">
+      <option value="">— Select —</option>
+      <option value="buildings">Buildings</option>
+      <option value="plantmachinery">Plant &amp; Machinery</option>
+      <option value="computers">Computers / IT Assets</option>
+      <option value="vehicles">Motor Vehicles</option>
+      <option value="furniture">Furniture &amp; Fixtures</option>
+      <option value="electricals">Electrical Installations</option>
+      <option value="ships">Ships</option>
+      <option value="aircrafts">Aircrafts</option>
+      <option value="intangibles">Intangible Assets</option>
+      <option value="custom">Custom / Other</option>
+    </select>
+  </div>
+  <div class="form-group">
+    <label>Asset Description</label>
+    <input class="form-control" type="text" id="assetDesc" placeholder="e.g. Server Room Equipment">
+  </div>
+  <div class="form-row">
+    <div class="form-group"><label>Date of Purchase</label><input class="form-control" type="date" id="dateOfPurchase"></div>
+    <div class="form-group"><label>Date Put to Use</label><input class="form-control" type="date" id="datePutToUse"></div>
+  </div>
+  <div class="form-row">
+    <div class="form-group"><label>Original Cost (₹)</label><input class="form-control" type="number" id="originalCost" placeholder="1000000" min="0"></div>
+    <div class="form-group"><label>Add. Capitalisation (₹)</label><input class="form-control" type="number" id="addCapital" value="0" min="0"></div>
+  </div>
+  <div class="form-row">
+    <div class="form-group"><label>Residual Value %</label><input class="form-control" type="number" id="residualPct" value="5" min="0" max="100" step="0.01"></div>
+    <div class="form-group"><label>Projection Years</label><input class="form-control" type="number" id="projYears" value="10" min="1" max="50"></div>
+  </div>
+  <div class="form-separator"></div>
+  <div class="section-title">① Applicable Law</div>
+  <div class="form-group">
+    <label>Assessment Year (Tax Year)</label>
+    <select class="form-control" id="assessmentYear" onchange="onLawRegimeChange()">
+      <option value="2024-25">AY 2024-25 (FY 2023-24)</option>
+      <option value="2025-26">AY 2025-26 (FY 2024-25)</option>
+      <option value="2026-27" selected>AY 2026-27 (Tax Year 2026-27) — IT Act 2025 applies</option>
+      <option value="2027-28">AY 2027-28 (Tax Year 2027-28)</option>
+      <option value="2028-29">AY 2028-29 (Tax Year 2028-29)</option>
+    </select>
+  </div>
+  <div class="law-banner" id="lawBanner"></div>
+  <div class="form-group">
+    <label>Deferred Tax Standard</label>
+    <select class="form-control" id="dtStandard" onchange="renderDeferred()">
+      <option value="as22">AS 22 (Timing Difference)</option>
+      <option value="indas12">Ind AS 12 (Temporary Diff.)</option>
+    </select>
+  </div>
+  <div class="form-separator"></div>
+  <div class="section-title">② Companies Act — Schedule II</div>
+  <div class="form-group">
+    <label>Depreciation Method</label>
+    <select class="form-control" id="caMethod" onchange="updateRateBadges()">
+      <option value="SLM">Straight Line Method (SLM)</option>
+      <option value="WDV">Written Down Value (WDV)</option>
+    </select>
+  </div>
+  <div class="form-row">
+    <div class="form-group"><label>Useful Life (years)</label><input class="form-control" type="number" id="caUsefulLife" value="15" min="1"></div>
+    <div class="form-group"><label>Residual Value %</label><input class="form-control" type="number" id="caResidual" value="5" min="0" max="100" step="0.01"></div>
+  </div>
+  <div class="toggle-row">
+    <span class="toggle-label">Pro-rata (first year — days basis)</span>
+    <label class="toggle"><input type="checkbox" id="caProRata" checked onchange="updateProRataDisplay()"><span class="toggle-slider"></span></label>
+  </div>
+  <div id="proRataDisplay" style="display:none;margin-bottom:10px;padding:9px 11px;background:var(--gold-dim);border:1px solid var(--gold);border-radius:8px;font-size:11px;line-height:1.8;">
+    <div style="color:var(--gold2);font-weight:600;margin-bottom:2px;">📅 Pro-rata Calculation</div>
+    <div id="prDaysLine" style="color:var(--text2);"></div>
+    <div id="prFracLine" style="color:var(--text2);"></div>
+    <div id="prFYLine" style="color:var(--text3);font-size:10px;"></div>
+  </div>
+  <div class="form-group"><label>Effective CA Rate</label><div class="rate-badge" id="caRateBadge">—</div></div>
+  <div class="form-separator"></div>
+  <div class="section-title" id="itSectionTitle">③ Income Tax Act — Section 32</div>
+  <div class="form-group">
+    <label>Block of Asset</label>
+    <select class="form-control" id="itBlock" onchange="onITBlockChange()">
+      <option value="">— Select Block —</option>
+      <option value="10">Buildings — 10%</option>
+      <option value="5">Buildings Residential — 5%</option>
+      <option value="40b">Temporary Structures — 40%</option>
+      <option value="15">Plant &amp; Machinery — 15%</option>
+      <option value="30">P&amp;M Outside India / Pollution — 30%</option>
+      <option value="40pm">P&amp;M Ships / Aircraft — 40%</option>
+      <option value="40">Computers &amp; Peripherals — 40%</option>
+      <option value="15v">Motor Vehicles — 15%</option>
+      <option value="10f">Furniture &amp; Fittings — 10%</option>
+      <option value="25">Intangibles (Patent / Know-how) — 25%</option>
+      <option value="custom">Custom Rate</option>
+    </select>
+  </div>
+  <div class="form-row">
+    <div class="form-group"><label>IT Dep Rate %</label><input class="form-control" type="number" id="itRate" value="15" min="0" max="100" step="0.01"></div>
+    <div class="form-group"><label id="addlDepLabel">Addl Dep % (Sec 32(1)(iia))</label><input class="form-control" type="number" id="itAddlDep" value="0" min="0" max="20" step="0.01"></div>
+  </div>
+  <div class="toggle-row">
+    <span class="toggle-label">Used &lt; 180 days (half-year rule)</span>
+    <label class="toggle"><input type="checkbox" id="itHalfYear" onchange="updateRateBadges()"><span class="toggle-slider"></span></label>
+  </div>
+  <div class="form-group"><label>Effective IT Rate</label><div class="rate-badge teal" id="itRateBadge">—</div></div>
+  <div class="toggle-row">
+    <span class="toggle-label">Compute Deferred Tax</span>
+    <label class="toggle"><input type="checkbox" id="deferredToggle" onchange="renderDeferred()"><span class="toggle-slider"></span></label>
+  </div>
+  <div class="form-row">
+    <div class="form-group"><label>Tax Rate %</label><input class="form-control" type="number" id="taxRate" value="25.168" step="0.001" oninput="renderDeferred()"></div>
+  </div>
+  <div class="form-separator"></div>
+  <div class="section-title">④ Asset Disposal (Optional)</div>
+  <div class="toggle-row">
+    <span class="toggle-label">Enable Disposal / Sale Scenario</span>
+    <label class="toggle"><input type="checkbox" id="disposalToggle" onchange="toggleDisposalFields()"><span class="toggle-slider"></span></label>
+  </div>
+  <div id="disposalFields" style="display:none;">
+    <div class="form-row">
+      <div class="form-group"><label>Disposal in Schedule Year</label><input class="form-control" type="number" id="disposalYear" value="3" min="1"></div>
+      <div class="form-group"><label>Sale / Disposal Value (₹)</label><input class="form-control" type="number" id="disposalValue" value="0" min="0"></div>
+    </div>
+    <div class="form-group">
+      <label>IT Block Status on Disposal</label>
+      <select class="form-control" id="blockStatus" onchange="toggleDisposalFields()">
+        <option value="ceases">Block ceases to exist (only/last asset)</option>
+        <option value="continues">Block continues (other assets remain)</option>
+      </select>
+    </div>
+    <div class="form-group" id="otherBlockWDVGroup" style="display:none;">
+      <label>Other Assets' WDV Remaining in Block (₹)</label>
+      <input class="form-control" type="number" id="otherBlockWDV" value="0" min="0">
+    </div>
+    <div class="disposal-box">📌 Disposal is assumed at the <strong>start</strong> of the selected schedule year (no depreciation charged in that year, per common practice). CA gain/loss follows AS 10 / Ind AS 16; IT gain follows Sec. 50 (Sec 32/33) block-of-assets rules.</div>
+  </div>
+  <button class="calc-btn" onclick="calculate()">⟳ Calculate Depreciation</button>
+</aside>
+
+<!-- ══ MAIN ══ -->
+<main class="main-content">
+
+  <!-- SINGLE MODE -->
+  <div class="mode-panel active" id="panel-single">
+    <div class="summary-cards">
+      <div class="summary-card gold"><div class="card-label">CA Effective Rate <span class="why-btn" onclick="explainCalc('carate')" title="Why?">ⓘ</span></div><div class="card-value gold" id="scCARate">—</div><div class="card-sub" id="scCAMethod">—</div></div>
+      <div class="summary-card teal"><div class="card-label">IT Effective Rate <span class="why-btn" onclick="explainCalc('itrate')" title="Why?">ⓘ</span></div><div class="card-value teal" id="scITRate">—</div><div class="card-sub" id="scITNote">—</div></div>
+      <div class="summary-card rose"><div class="card-label">Rate Difference</div><div class="card-value rose" id="scRateDiff">—</div><div class="card-sub">IT Rate − CA Rate</div></div>
+      <div class="summary-card green"><div class="card-label">Depreciable Cost <span class="why-btn" onclick="explainCalc('cadep')" title="Why?">ⓘ</span></div><div class="card-value green" id="scDepAmt">—</div><div class="card-sub" id="scResidual">—</div></div>
+      <div class="summary-card purple"><div class="card-label">Total IT Dep <span class="why-btn" onclick="explainCalc('itdep')" title="Why?">ⓘ</span></div><div class="card-value purple" id="scITTotal">—</div><div class="card-sub">Over projection period</div></div>
+    </div>
+    <div class="tabs" id="singleTabs">
+      <button class="tab active" onclick="switchTab('ca')">Companies Act</button>
+      <button class="tab" onclick="switchTab('it')">Income Tax</button>
+      <button class="tab" onclick="switchTab('comparison')">Comparison</button>
+      <button class="tab" onclick="switchTab('charts')">Charts</button>
+      <button class="tab" onclick="switchTab('deferred')">Deferred Tax</button>
+      <button class="tab" onclick="switchTab('disposal')">Disposal</button>
+      <button class="tab" onclick="switchTab('aiadvisor')">🤖 AI Advisor</button>
+    </div>
+    <div class="tab-panel active" id="tab-ca"><div id="ca-content"><div class="placeholder"><div class="placeholder-icon">🏢</div><h3>Companies Act Schedule</h3><p>Fill in asset details on the left and click Calculate to generate the Schedule II depreciation table.</p></div></div></div>
+    <div class="tab-panel" id="tab-it"><div id="it-content"><div class="placeholder"><div class="placeholder-icon">📋</div><h3>Income Tax Schedule</h3><p>Click Calculate to generate the WDV block depreciation table.</p></div></div></div>
+    <div class="tab-panel" id="tab-comparison"><div id="comparison-content"><div class="placeholder"><div class="placeholder-icon">⚖️</div><h3>Comparison</h3><p>Side-by-side comparison of CA vs IT rates and amounts will appear here after calculation.</p></div></div></div>
+    <div class="tab-panel" id="tab-charts"><div id="charts-content"><div class="placeholder"><div class="placeholder-icon">📈</div><h3>Visual Analysis</h3><p>Depreciation trend and WDV charts appear here after calculation.</p></div></div></div>
+    <div class="tab-panel" id="tab-deferred"><div id="deferred-content"><div class="placeholder"><div class="placeholder-icon">🧾</div><h3>Deferred Tax</h3><p>Enable "Compute Deferred Tax" toggle in the sidebar to view DTA/DTL analysis.</p></div></div></div>
+    <div class="tab-panel" id="tab-disposal"><div id="disposal-content"><div class="placeholder"><div class="placeholder-icon">🏷️</div><h3>Asset Disposal &amp; Capital Gains</h3><p>Enable "Disposal / Sale Scenario" in the sidebar and click Calculate to see AS 10 profit/loss and Section 50 capital gains.</p></div></div></div>
+    <div class="tab-panel" id="tab-aiadvisor"><div id="aiadvisor-content"></div></div>
+  </div>
+
+  <!-- BULK MODE -->
+  <div class="mode-panel" id="panel-bulk">
+    <div class="template-box">
+      <div class="template-title">📄 CSV Upload Format — Column Reference</div>
+      <div class="template-desc">Download the blank template or sample data. Fill one row per asset and upload below. <span style="color:var(--gold2);font-weight:600;">Gold = Required</span> · Grey = Optional (defaults apply)</div>
+      <div class="col-list">
+        <span class="col-tag req">AssetID</span><span class="col-tag req">AssetDescription</span><span class="col-tag req">AssetCategory</span>
+        <span class="col-tag req">DateOfPurchase</span><span class="col-tag req">DatePutToUse</span><span class="col-tag req">OriginalCost</span>
+        <span class="col-tag">AddCapital</span><span class="col-tag req">CAMethod</span><span class="col-tag req">CAUsefulLife</span>
+        <span class="col-tag">CAResidualPct</span><span class="col-tag req">ITRate</span><span class="col-tag">ITAddlDepPct</span>
+        <span class="col-tag">HalfYearRule (Yes/No)</span><span class="col-tag">ProjectionYears</span><span class="col-tag">TaxRate</span>
+        <span class="col-tag">AssessmentYear</span><span class="col-tag">DisposalYear</span><span class="col-tag">DisposalValue</span><span class="col-tag">BlockStatus</span>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        <button class="btn btn-gold" onclick="downloadTemplate()">⤓ Download Blank Template</button>
+        <button class="btn btn-ghost" onclick="downloadSampleData()">⤓ Download Sample Data (7 Assets)</button>
+      </div>
+    </div>
+
+    <div class="upload-zone" id="uploadZone">
+      <input type="file" id="csvFileInput" accept=".csv,.txt" onchange="handleFileUpload(event)">
+      <span class="upload-icon">📂</span>
+      <div class="upload-title">Drop CSV File Here or Click to Browse</div>
+      <div class="upload-sub">Supports .csv files exported from Excel, Google Sheets, or any spreadsheet app<br>Maximum 500 assets · UTF-8 encoding · Comma-separated</div>
+      <div class="upload-formats">
+        <span class="fmt-tag">Excel → Save As CSV</span>
+        <span class="fmt-tag">Google Sheets → Download CSV</span>
+        <span class="fmt-tag">Plain .csv</span>
+      </div>
+    </div>
+
+    <div id="bulk-results" style="display:none;">
+      <div id="bulk-error-box"></div>
+      <div class="summary-cards">
+        <div class="summary-card gold"><div class="card-label">Total Assets</div><div class="card-value gold" id="bcAssets">0</div><div class="card-sub">Loaded from CSV</div></div>
+        <div class="summary-card green"><div class="card-label">Total Asset Value</div><div class="card-value green" id="bcTotalCost">₹0</div><div class="card-sub">Original + Additions</div></div>
+        <div class="summary-card gold"><div class="card-label">CA Dep — Year 1</div><div class="card-value gold" id="bcTotalCADep">₹0</div><div class="card-sub">All assets combined</div></div>
+        <div class="summary-card teal"><div class="card-label">IT Dep — Year 1</div><div class="card-value teal" id="bcTotalITDep">₹0</div><div class="card-sub">All assets combined</div></div>
+        <div class="summary-card purple"><div class="card-label">Net DTA/DTL Y1</div><div class="card-value purple" id="bcDTX">₹0</div><div class="card-sub">Deferred Tax Y1</div></div>
+      </div>
+      <div class="tabs" id="bulkTabs">
+        <button class="tab active" onclick="switchBulkTab('register')">📋 Asset Register</button>
+        <button class="tab" onclick="switchBulkTab('bca')">CA Schedules</button>
+        <button class="tab" onclick="switchBulkTab('bit')">IT Schedules</button>
+        <button class="tab" onclick="switchBulkTab('bcomparison')">Comparison</button>
+        <button class="tab" onclick="switchBulkTab('bdeferred')">Deferred Tax</button>
+        <button class="tab" onclick="switchBulkTab('bcharts')">Charts</button>
+      </div>
+      <div class="tab-panel active" id="tab-register"><div id="register-content"></div></div>
+      <div class="tab-panel" id="tab-bca"><div id="bca-content"></div></div>
+      <div class="tab-panel" id="tab-bit"><div id="bit-content"></div></div>
+      <div class="tab-panel" id="tab-bcomparison"><div id="bcomparison-content"></div></div>
+      <div class="tab-panel" id="tab-bdeferred"><div id="bdeferred-content"></div></div>
+      <div class="tab-panel" id="tab-bcharts"><div id="bcharts-content"></div></div>
+    </div>
+  </div>
+</main>
+</div>
+
+<!-- ASSET DETAIL MODAL -->
+<div class="modal-overlay" id="assetModal">
+  <div class="modal">
+    <div class="modal-header">
+      <div>
+        <div class="modal-title" id="modalTitle">Asset Detail</div>
+        <div style="font-size:10px;color:var(--text3);font-family:'IBM Plex Mono',monospace;margin-top:2px;" id="modalMeta"></div>
+      </div>
+      <button class="modal-close" onclick="closeModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="modal-tabs">
+        <button class="modal-tab active" onclick="switchModalTab('mca')">Companies Act</button>
+        <button class="modal-tab" onclick="switchModalTab('mit')">Income Tax</button>
+        <button class="modal-tab" onclick="switchModalTab('mcomp')">Comparison</button>
+        <button class="modal-tab" onclick="switchModalTab('mdeferred')">Deferred Tax</button>
+        <button class="modal-tab" onclick="switchModalTab('mdisposal')">Disposal</button>
+      </div>
+      <div class="modal-panel active" id="tab-mca"><div id="modal-ca-content"></div></div>
+      <div class="modal-panel" id="tab-mit"><div id="modal-it-content"></div></div>
+      <div class="modal-panel" id="tab-mcomp"><div id="modal-comp-content"></div></div>
+      <div class="modal-panel" id="tab-mdeferred"><div id="modal-deferred-content"></div></div>
+      <div class="modal-panel" id="tab-mdisposal"><div id="modal-disposal-content"></div></div>
+      <div class="export-bar">
+        <button class="btn btn-ghost btn-sm" onclick="exportModalCA()">⤓ CA CSV</button>
+        <button class="btn btn-ghost btn-sm" onclick="exportModalIT()">⤓ IT CSV</button>
+        <button class="btn btn-ghost btn-sm" onclick="exportModalComp()">⤓ Comparison CSV</button>
+        <button class="btn btn-ghost btn-sm" onclick="exportModalDeferred()">⤓ Deferred Tax CSV</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="explainModal">
+  <div class="modal" style="width:min(640px,100%);">
+    <div class="modal-header">
+      <div class="modal-title" id="explainTitle">Why this number?</div>
+      <button class="modal-close" onclick="closeExplainModal()">✕</button>
+    </div>
+    <div class="modal-body" id="explainBody"></div>
+  </div>
+</div>
+
+<script>
+// ═══ RATE TABLES ═══
+const CA_LIFE = {buildings:30,plantmachinery:15,computers:3,vehicles:8,furniture:10,electricals:10,ships:20,aircrafts:20,intangibles:5,custom:10};
+const IT_RATES = {'10':10,'5':5,'40b':40,'15':15,'30':30,'40pm':40,'40':40,'15v':15,'10f':10,'25':25,'custom':0};
+
+// ═══ STATE ═══
+let singleCA=[],singleIT=[],singleComp=[];
+let bulkAssets=[];
+let lastP=null, lastR=null;
+let aiClassifyResult=null;
+let currentModalIdx=-1;
+let singleDisposal=null;
+let lawRegime='new'; // 'new' = IT Act 2025 (Sec 33), 'old' = IT Act 1961 (Sec 32)
+
+// ═══ LAW REGIME (Section 32 / 1961 vs Section 33 / 2025) ═══
+function lawSectionLabel(regime){
+  regime = regime || lawRegime;
+  return regime==='new' ? 'Section 33, Income-tax Act, 2025' : 'Section 32, Income-tax Act, 1961';
+}
+function onLawRegimeChange(){
+  const ay = el('assessmentYear').value;
+  const ayStartYear = parseInt(ay.split('-')[0]);
+  lawRegime = ayStartYear >= 2026 ? 'new' : 'old';
+  const shortLabel = lawRegime==='new' ? 'Section 33 (2025)' : 'Section 32 (1961)';
+  el('lawHeaderLabel').textContent = lawRegime==='new' ? 'Income-tax Act, 2025 (Sec. 33)' : 'Income-tax Act, 1961 (Sec. 32)';
+  el('itSectionTitle').textContent = '③ Income Tax Act — ' + shortLabel;
+  el('addlDepLabel').textContent = lawRegime==='new' ? "Addl Dep % (Sec 33(8))" : "Addl Dep % (Sec 32(1)(iia))";
+  el('lawBanner').innerHTML = lawRegime==='new'
+    ? `⚖️ <strong>Section 33, Income-tax Act, 2025</strong> applies for Tax Year ${ay} onward (effective 1-Apr-2026). This corresponds to the erstwhile <strong>Section 32</strong> of the repealed Income-tax Act, 1961 — computation mechanics (WDV block, rates, additional depreciation, half-year rule) are carried forward largely unchanged.`
+    : `⚖️ <strong>Section 32, Income-tax Act, 1961</strong> applies for AY ${ay}. (For Tax Year 2026-27 onward, the corresponding provision is <strong>Section 33, Income-tax Act, 2025</strong>.)`;
+}
+
+// ═══ DISPOSAL / CAPITAL GAINS (Sec 50, block-of-assets) ═══
+function toggleDisposalFields(){
+  const on = el('disposalToggle').checked;
+  el('disposalFields').style.display = on ? 'block' : 'none';
+  el('otherBlockWDVGroup').style.display = (on && el('blockStatus').value==='continues') ? 'block' : 'none';
+}
+// Given the full (undisposed) CA/IT schedules, truncate and compute AS10/Sec50 outcome
+function computeDisposal(caSchedule,itSchedule,totalCost,disposal){
+  if(!disposal || !disposal.enabled) return null;
+  const dYear = Math.max(1, Math.min(disposal.year, caSchedule.length));
+  const caWDVAtDisposal = dYear===1 ? totalCost : (caSchedule[dYear-2]?.closeWDV ?? totalCost);
+  const itWDVAtDisposal = dYear===1 ? totalCost : (itSchedule[dYear-2]?.closeWDV ?? totalCost);
+  const caGainLoss = disposal.value - caWDVAtDisposal;
+  let itOutcome, itGainLoss=0, resultingBlockWDV=null;
+  if(disposal.blockStatus==='ceases'){
+    itGainLoss = disposal.value - itWDVAtDisposal;
+    itOutcome = itGainLoss>=0 ? 'STCG' : 'STCL';
+  } else {
+    const combined = itWDVAtDisposal + (disposal.otherBlockWDV||0) - disposal.value;
+    if(combined < 0){ itOutcome='STCG'; itGainLoss = -combined; resultingBlockWDV = 0; }
+    else { itOutcome='CONTINUES'; resultingBlockWDV = combined; }
+  }
+  return {
+    year:dYear, saleValue:disposal.value, blockStatus:disposal.blockStatus,
+    caWDVAtDisposal, caGainLoss,
+    itWDVAtDisposal, itOutcome, itGainLoss, resultingBlockWDV,
+    caSchedule: caSchedule.slice(0,dYear-1), itSchedule: itSchedule.slice(0,dYear-1)
+  };
+}
+
+// ═══ HELPERS ═══
+const fmt = n=>'₹'+Math.round(n).toLocaleString('en-IN');
+const fmtP = n=>parseFloat(n).toFixed(2)+'%';
+const el = id=>document.getElementById(id);
+const fmtShort = n=>{
+  if(n>=1e7) return (n/1e7).toFixed(2)+'Cr';
+  if(n>=1e5) return (n/1e5).toFixed(2)+'L';
+  if(n>=1e3) return (n/1e3).toFixed(1)+'K';
+  return Math.round(n).toString();
+};
+
+// ═══════════════════════════════════════════════════════════
+// AI FIXED ASSET ADVISOR — rules/heuristics engine
+// This is NOT a live LLM call. It runs entirely in-browser using a
+// built-in knowledge base + deterministic checks. All outputs are
+// clearly labelled as AI-assisted suggestions requiring human review —
+// never presented as statutory positions.
+// ═══════════════════════════════════════════════════════════
+
+// --- 1. Asset Classification Knowledge Base ---
+const ASSET_KB = [
+  {kw:['building','office space','factory shed','warehouse','godown','showroom'],cat:'buildings',caLife:60,caMethod:'SLM',itBlock:'10',itRate:10,addl:false,note:'General buildings (non-residential) — Schedule II useful life 60 years; IT block 10%.'},
+  {kw:['residential','flat','apartment','staff quarters'],cat:'buildings',caLife:60,caMethod:'SLM',itBlock:'5',itRate:5,addl:false,note:'Residential buildings — IT block typically 5%.'},
+  {kw:['temporary structure','site shed','temporary shed'],cat:'buildings',caLife:5,caMethod:'SLM',itBlock:'40b',itRate:40,addl:false,note:'Purely temporary structures — IT block 40%.'},
+  {kw:['cnc','lathe','machine','machinery','plant','manufacturing equipment','production line','press','boiler','compressor','generator set','dg set','turbine'],cat:'plantmachinery',caLife:15,caMethod:'WDV',itBlock:'15',itRate:15,addl:true,note:'General plant & machinery — Schedule II life 15 years (single-shift); IT block 15%. Additional depreciation u/s 32(1)(iia)/33(8) may apply if used in manufacture/production.'},
+  {kw:['pollution control','effluent treatment','emission control'],cat:'plantmachinery',caLife:15,caMethod:'WDV',itBlock:'30',itRate:30,addl:false,note:'Pollution-control equipment — higher IT block of 30% typically applies.'},
+  {kw:['ship','vessel','tanker','barge'],cat:'ships',caLife:20,caMethod:'WDV',itBlock:'40pm',itRate:40,addl:false,note:'Ships — IT block 40%.'},
+  {kw:['aircraft','helicopter','airplane'],cat:'aircrafts',caLife:20,caMethod:'WDV',itBlock:'40pm',itRate:40,addl:false,note:'Aircraft — IT block 40%.'},
+  {kw:['server','computer','laptop','desktop','data centre','data center','it hardware','network equipment','router','switch (network)'],cat:'computers',caLife:3,caMethod:'WDV',itBlock:'40',itRate:40,addl:false,note:'Computers & peripherals — Schedule II life 3 years; IT block 40%.'},
+  {kw:['software','erp','license','licence'],cat:'intangibles',caLife:5,caMethod:'SLM',itBlock:'25',itRate:25,addl:false,note:'Computer software / intangible — IT block 25% (intangibles).'},
+  {kw:['car','truck','bus','tempo','vehicle','motorcycle','scooter','fleet'],cat:'vehicles',caLife:8,caMethod:'WDV',itBlock:'15v',itRate:15,addl:false,note:'Motor vehicles (non-commercial-running-on-hire) — Schedule II life 8 years; IT block 15%.'},
+  {kw:['taxi','vehicle on hire','commercial vehicle running on hire'],cat:'vehicles',caLife:6,caMethod:'WDV',itBlock:'30',itRate:30,addl:false,note:'Vehicles run on hire — higher IT rate of 30% may apply u/r Appendix I.'},
+  {kw:['furniture','chair','desk','workstation','table','cabinet','almirah'],cat:'furniture',caLife:10,caMethod:'SLM',itBlock:'10f',itRate:10,addl:false,note:'Furniture & fittings — Schedule II life 10 years; IT block 10%.'},
+  {kw:['electrical','wiring','hvac','air conditioning','ac plant','electrical installation','panel board'],cat:'electricals',caLife:10,caMethod:'WDV',itBlock:'15',itRate:15,addl:false,note:'Electrical installations — often clubbed with plant & machinery, IT block 15%.'},
+  {kw:['patent','trademark','copyright','know-how','franchise','goodwill','intangible'],cat:'intangibles',caLife:10,caMethod:'SLM',itBlock:'25',itRate:25,addl:false,note:'Intangible assets — IT block 25% (know-how, patents, trademarks, licences, franchises).'},
+  {kw:['wind turbine','wind mill','windmill','renewable energy'],cat:'plantmachinery',caLife:22,caMethod:'WDV',itBlock:'40',itRate:40,addl:true,note:'Renewable-energy generating devices often qualify for a higher IT rate (commonly 40%) plus additional depreciation.'},
+  {kw:['mobile','handset','tablet','ipad'],cat:'computers',caLife:3,caMethod:'WDV',itBlock:'15',itRate:15,addl:false,note:'Mobile phones are usually NOT treated as computers for IT purposes (per judicial precedent) — general plant rate of 15% is commonly applied; verify against latest rulings.'},
+];
+function classifyAsset(text){
+  const t=(text||'').toLowerCase().trim();
+  if(!t) return null;
+  let best=null,bestScore=0;
+  ASSET_KB.forEach(entry=>{
+    let score=0;
+    entry.kw.forEach(k=>{ if(t.includes(k)) score+=k.split(' ').length; });
+    if(score>bestScore){ bestScore=score; best=entry; }
+  });
+  if(!best) return {matched:false,confidence:'Low',cat:'custom',caLife:10,caMethod:'WDV',itBlock:'custom',itRate:15,addl:false,
+    note:'No confident keyword match found in the built-in knowledge base for this description.',
+    assumptions:['Defaulted to a generic Plant & Machinery-style profile (10-year SLM-equivalent life, 15% IT rate) purely as a starting point.'],
+    verify:['Asset category and useful life must be manually determined with reference to Schedule II Part C and the applicable IT rate schedule.','Confirm whether the asset falls under a specific named block (buildings/furniture/vehicles/intangibles) rather than the generic plant & machinery block.']};
+  const confidence = bestScore>=3?'High':bestScore===2?'Medium':'Low';
+  return {matched:true,confidence,cat:best.cat,caLife:best.caLife,caMethod:best.caMethod,itBlock:best.itBlock,itRate:best.itRate,addl:best.addl,
+    note:best.note,
+    assumptions:[
+      `Matched on keyword(s) found in your description (match strength: ${confidence}).`,
+      best.addl?'Additional depreciation (Sec 32(1)(iia) / Sec 33(8)) is potentially available since this category is typically used in manufacture or production — eligibility depends on being a new asset acquired and installed by an eligible assessee.':'Additional depreciation is not typically claimed for this asset category.'
+    ],
+    verify:['Confirm the asset is correctly matched to this category — the match is based on keywords in your description, not a review of invoices/technical specifications.','Verify the exact IT block and rate against Income-tax Rules, Appendix I (or the corresponding Schedule under the 2025 Act) for the asset\'s precise nature.','Confirm eligibility conditions for additional depreciation, if applicable (new asset, manufacturing use, assessee type).']};
+}
+function renderAIAdvisorTab(){
+  const container = el('aiadvisor-content');
+  if(!container) return;
+  container.innerHTML = buildAIAdvisorHTML();
+}
+function buildAIAdvisorHTML(){
+  const hasCalc = !!lastR;
+  const classifyBoxHTML = aiClassifyResult ? renderClassifyResultHTML(aiClassifyResult) : '';
+  let complianceHTML = '', healthHTML = '', summaryHTML = '';
+  if(hasCalc){
+    const issues = runComplianceCheck();
+    complianceHTML = renderComplianceHTML(issues);
+    const health = computeHealthScore(issues);
+    healthHTML = renderHealthScoreHTML(health);
+    summaryHTML = renderExecutiveSummaryHTML();
+  } else {
+    complianceHTML = `<div class="placeholder"><div class="placeholder-icon">🔍</div><h3>AI Compliance Check</h3><p>Calculate a schedule first, then this section will automatically scan for issues.</p></div>`;
+    healthHTML = '';
+    summaryHTML = '';
+  }
+  return `
+    <div class="ai-card">
+      <div class="ai-card-title"><span class="ai-sparkle">✨</span> Asset Classification Assistant</div>
+      <p style="font-size:11px;color:var(--text2);margin-bottom:8px;">Describe the asset in plain words and get a suggested category, useful life, method and IT block. Nothing is applied to your inputs until you click <strong>Use Recommendation</strong>.</p>
+      <textarea class="form-control" id="aiDescInput" rows="2" placeholder="e.g. CNC machine used for manufacturing automobile components" style="resize:vertical;"></textarea>
+      <div style="margin-top:8px;"><button class="btn btn-gold btn-sm" onclick="runClassifyAsset()">✨ Analyse Description</button></div>
+      <div id="aiClassifyBox">${classifyBoxHTML}</div>
+      <div class="ai-disclaimer">⚠ AI-generated suggestion, not a statutory determination. Verify category, useful life and tax block independently before relying on it.</div>
+    </div>
+    ${healthHTML}
+    <div class="ai-card">
+      <div class="ai-card-title">🔍 AI Compliance Check</div>
+      <p style="font-size:11px;color:var(--text2);margin-bottom:8px;">Automated scan of your current inputs and computed schedule for common review points.</p>
+      ${complianceHTML}
+    </div>
+    ${summaryHTML}
+  `;
+}
+
+// --- Classification UI handlers ---
+function runClassifyAsset(){
+  const text = el('aiDescInput').value;
+  const result = classifyAsset(text);
+  if(!result){ el('aiClassifyBox').innerHTML = `<div class="alert alert-warn" style="margin-top:10px;">⚠ Please describe the asset first.</div>`; return; }
+  aiClassifyResult = result;
+  el('aiClassifyBox').innerHTML = renderClassifyResultHTML(result);
+}
+function renderClassifyResultHTML(r){
+  const confCls = 'confidence-'+r.confidence.toLowerCase();
+  return `
+    <div class="ai-classify-box">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+        <div style="font-weight:600;color:var(--gold2);">Recommendation</div>
+        <span class="confidence-badge ${confCls}">${r.confidence} Confidence</span>
+      </div>
+      <table style="width:100%;font-size:11px;line-height:2;">
+        <tr><td style="color:var(--text3);width:50%;">Suggested Category</td><td style="font-weight:600;">${r.cat}</td></tr>
+        <tr><td style="color:var(--text3);">Suggested CA Useful Life</td><td style="font-weight:600;">${r.caLife} years</td></tr>
+        <tr><td style="color:var(--text3);">Suggested CA Method</td><td style="font-weight:600;">${r.caMethod}</td></tr>
+        <tr><td style="color:var(--text3);">Suggested IT Block / Rate</td><td style="font-weight:600;">${r.itBlock} @ ${r.itRate}%</td></tr>
+        <tr><td style="color:var(--text3);">Additional Depreciation</td><td style="font-weight:600;">${r.addl?'Potentially applicable':'Not typically applicable'}</td></tr>
+      </table>
+      <div style="font-size:10.5px;color:var(--text2);margin-top:6px;">📌 ${r.note}</div>
+      <div style="font-size:10px;color:var(--text3);margin-top:8px;"><strong>Key assumptions:</strong><ul style="margin:4px 0 0 16px;padding:0;">${r.assumptions.map(a=>`<li>${a}</li>`).join('')}</ul></div>
+      <div style="font-size:10px;color:var(--rose);margin-top:8px;"><strong>Requires human verification:</strong><ul style="margin:4px 0 0 16px;padding:0;">${r.verify.map(a=>`<li>${a}</li>`).join('')}</ul></div>
+      <div style="margin-top:10px;display:flex;gap:8px;">
+        <button class="btn btn-gold btn-sm" onclick="applyAIRecommendation()">✓ Use Recommendation</button>
+        <button class="btn btn-ghost btn-sm" onclick="dismissAIRecommendation()">✎ Edit Manually / Dismiss</button>
+      </div>
+    </div>`;
+}
+function applyAIRecommendation(){
+  if(!aiClassifyResult) return;
+  const r=aiClassifyResult;
+  if(el('assetCategory').querySelector(`option[value="${r.cat}"]`)) el('assetCategory').value=r.cat;
+  el('caUsefulLife').value=r.caLife;
+  el('caMethod').value=r.caMethod;
+  if(el('itBlock').querySelector(`option[value="${r.itBlock}"]`)) el('itBlock').value=r.itBlock;
+  el('itRate').value=r.itRate;
+  updateRateBadges();
+  el('aiClassifyBox').insertAdjacentHTML('beforeend',`<div class="alert alert-info" style="margin-top:8px;">✓ Applied to sidebar inputs. Click <strong>Calculate</strong> to regenerate the schedule.</div>`);
+}
+function dismissAIRecommendation(){ aiClassifyResult=null; el('aiClassifyBox').innerHTML=''; }
+
+// --- 2. AI Compliance Check ---
+function runComplianceCheck(){
+  if(!lastP || !lastR) return [];
+  const p=lastP, r=lastR, issues=[];
+  const push=(sev,issue,why,input,fix,fixField,fixValue)=>issues.push({sev,issue,why,input,fix,fixField,fixValue});
+
+  if(p.caResidualPct>5) push('review','Residual value exceeds standard 5%','Schedule II / general accounting practice treats 5% of original cost as the customary residual value ceiling for most assets; a higher figure needs justification.',`Residual Value = ${p.caResidualPct}%`,'Reduce residual value to 5% unless a technical justification is documented.','caResidual','5');
+  if(p.caResidualPct<0) push('high','Negative residual value entered','Residual value cannot be negative.',`Residual Value = ${p.caResidualPct}%`,'Set residual value to a non-negative figure (commonly 5%).','caResidual','5');
+  if(p.caUsefulLife<1||p.caUsefulLife>75) push('high','Unusual useful life','Useful life outside a 1–75 year range is atypical for Schedule II assets and may indicate a data-entry error.',`Useful Life = ${p.caUsefulLife} years`,'Re-check the useful life against Schedule II Part C for this asset class.',null,null);
+  if(!p.datePutToUse) push('high','Missing Date Put to Use','Depreciation cannot commence without a date the asset was put to use; pro-rata computation also depends on this date.','Date Put to Use is blank','Enter the date the asset was put to use.',null,null);
+  const dop = el('dateOfPurchase').value;
+  if(!dop) push('review','Missing Date of Purchase','Date of purchase is useful for audit trail and to cross-check against invoices, even though it does not directly drive the depreciation computation.','Date of Purchase is blank','Enter the invoice/purchase date.',null,null);
+  if(dop && p.datePutToUse && new Date(dop) > new Date(p.datePutToUse)) push('high','Purchase date is after Date Put to Use','An asset cannot be put to use before it is purchased — check for a data entry error.',`Purchase: ${dop} vs Put to Use: ${p.datePutToUse}`,'Correct one of the two dates.',null,null);
+  if(p.itRate<0||p.itRate>40) push('review','Unusual Income-tax depreciation rate','Standard IT block rates range from 5% to 40% under Appendix I; a rate outside this range is unusual.',`IT Rate = ${p.itRate}%`,'Cross-check the rate against the applicable block in Appendix I / corresponding IT Act 2025 schedule.',null,null);
+  if(p.itHalfYear && p.itAddlDep>0) push('review','Half-year rule + additional depreciation together','When the half-year rule applies (used < 180 days), additional depreciation is also restricted to 50% of the otherwise eligible amount — ensure this has been correctly factored (the calculator does apply this automatically).',`Half-year rule: ON, Addl Dep: ${p.itAddlDep}%`,'Confirm the resulting additional depreciation amount in the IT schedule reflects the 50% restriction.',null,null);
+  if(p.itAddlDep>20) push('review','Additional depreciation rate looks high','Additional depreciation under Sec 32(1)(iia)/33(8) is ordinarily capped at 20% (35% for notified backward-area undertakings) of actual cost.',`Addl Dep = ${p.itAddlDep}%`,'Confirm eligibility for the enhanced 35% rate, else cap at 20%.',null,null);
+  const catField = el('assetCategory').value;
+  if(catField && CA_LIFE[catField] && Math.abs(CA_LIFE[catField]-p.caUsefulLife) > CA_LIFE[catField]*0.5){
+    push('review','Useful life differs materially from the category default','The entered useful life deviates by more than 50% from the Schedule II indicative life normally used for this category.',`Category: ${catField}, Entered life: ${p.caUsefulLife}y, Indicative: ${CA_LIFE[catField]}y`,'Confirm the deviation is technically justified and documented (Schedule II permits deviation with disclosure).',null,null);
+  }
+  // Depreciation vs depreciable amount checks
+  const caTotalDep = singleCA.reduce((s,x)=>s+x.dep,0);
+  if(caTotalDep > (r.totalCost - r.caResiAmt) + 1) push('high','CA depreciation exceeds depreciable amount','Cumulative depreciation should never exceed (Cost − Residual Value).',`Cumulative CA Dep = ${fmt(caTotalDep)} vs Depreciable Amount = ${fmt(r.totalCost-r.caResiAmt)}`,'Review the depreciation schedule computation.',null,null);
+  const lastCAWDV = singleCA.length?singleCA[singleCA.length-1].closeWDV:null;
+  if(lastCAWDV!==null && lastCAWDV<0) push('high','CA WDV has gone negative','Written-down value cannot be negative under any circumstances.',`Closing WDV = ${fmt(lastCAWDV)}`,'Review depreciation rate/method — WDV should floor at residual value.',null,null);
+  const lastITWDV = singleIT.length?singleIT[singleIT.length-1].closeWDV:null;
+  if(lastITWDV!==null && lastITWDV<0) push('high','IT block WDV has gone negative','Block WDV cannot be negative; if sale proceeds exceed WDV the excess is a short-term capital gain, not a negative WDV carried forward.',`Closing IT WDV = ${fmt(lastITWDV)}`,'Review — this typically indicates a disposal / capital gains scenario should be modelled instead.',null,null);
+  // Disposal-specific
+  if(singleDisposal){
+    if(singleDisposal.year < 2) push('review','Disposal in Year 1 (very early in useful life)','Disposing of an asset within the first year of its useful life is unusual and may warrant a note on the reason for early disposal (obsolescence, damage, etc.).',`Disposal Year = ${singleDisposal.year}`,'Document the commercial reason for early disposal.',null,null);
+    if(singleDisposal.saleValue<=0) push('review','Disposal sale value is zero or not entered','A zero sale value implies the asset was scrapped/written off rather than sold — confirm this is intentional.',`Sale Value = ${fmt(singleDisposal.saleValue)}`,'Enter the actual sale/scrap value, or confirm a full write-off is intended.',null,null);
+  }
+  // Deferred tax consistency
+  if(el('deferredToggle').checked){
+    const totalDiff = singleComp.length?singleComp[singleComp.length-1].cumDiff:0;
+    if(Math.abs(totalDiff) > (r.totalCost-r.caResiAmt)*0.6) push('review','Large cumulative CA vs IT timing difference','A cumulative timing difference exceeding ~60% of the depreciable base is unusually large and should be reviewed for rate/method mismatches.',`Cumulative Diff = ${fmt(totalDiff)}`,'Re-check CA useful life vs IT block rate for consistency of intent.',null,null);
+  }
+  if(!p.itAddlDep && ['plantmachinery'].includes(catField)) push('review','Additional depreciation not claimed for Plant & Machinery','Plant & machinery used in manufacture/production is often eligible for additional depreciation u/s 32(1)(iia)/33(8) — confirm whether this asset qualifies.','Addl Dep % = 0','Assess eligibility (new asset, manufacturing use) and claim additional depreciation if applicable.',null,null);
+
+  if(!issues.length) push('pass','No issues detected','All automated checks passed for the current inputs.','—','—',null,null);
+  return issues;
+}
+function renderComplianceHTML(issues){
+  const counts={pass:0,review:0,high:0};
+  issues.forEach(i=>counts[i.sev]++);
+  const summary = `<div style="display:flex;gap:10px;margin-bottom:12px;flex-wrap:wrap;">
+    <span class="risk-badge risk-pass">🟢 PASS ×${issues.filter(i=>i.sev==='pass').length}</span>
+    <span class="risk-badge risk-review">🟡 REVIEW ×${issues.filter(i=>i.sev==='review').length}</span>
+    <span class="risk-badge risk-high">🔴 HIGH RISK ×${issues.filter(i=>i.sev==='high').length}</span>
+  </div>`;
+  const cards = issues.map(i=>{
+    const cls = i.sev==='high'?'high':i.sev==='pass'?'pass':'';
+    const icon = i.sev==='high'?'🔴':i.sev==='pass'?'🟢':'🟡';
+    const fixBtn = i.fixField && i.fixValue!=null ? `<button class="btn btn-ghost btn-sm" style="margin-top:6px;" onclick="applyComplianceFix('${i.fixField}','${i.fixValue}')">🔧 Fix</button>` : '';
+    return `<div class="issue-card ${cls}">
+      <div class="issue-row"><b>${icon} ${i.issue}</b></div>
+      ${i.why!=='—'?`<div style="color:var(--text2);">${i.why}</div>`:''}
+      ${i.input!=='—'?`<div style="color:var(--text3);margin-top:3px;">Input: <span style="font-family:'IBM Plex Mono',monospace;">${i.input}</span></div>`:''}
+      ${i.fix!=='—'?`<div style="color:var(--gold2);margin-top:3px;">Suggested: ${i.fix}</div>`:''}
+      ${fixBtn}
+    </div>`;
+  }).join('');
+  return summary+cards;
+}
+function applyComplianceFix(fieldId,value){
+  if(el(fieldId)){ el(fieldId).value=value; updateRateBadges(); calculate(); }
+}
+
+// --- 3. Asset Health Score ---
+function computeHealthScore(issues){
+  issues = issues || runComplianceCheck();
+  let score=100;
+  issues.forEach(i=>{ if(i.sev==='high') score-=15; else if(i.sev==='review') score-=6; });
+  score=Math.max(0,Math.min(100,score));
+  const band = score>=80?'good':score>=55?'review':'attn';
+  const bandLabel = band==='good'?'🟢 GOOD':band==='review'?'🟡 REVIEW REQUIRED':'🔴 ATTENTION REQUIRED';
+  return {score,band,bandLabel,issues};
+}
+function renderHealthScoreHTML(health){
+  const ringCls = health.band==='good'?'health-good':health.band==='review'?'health-review':'health-attn';
+  return `<div class="ai-card" onclick="toggleHealthDetail()" style="cursor:pointer;">
+    <div class="ai-card-title">💯 Asset Health Score</div>
+    <div style="display:flex;align-items:center;gap:16px;">
+      <div class="health-ring ${ringCls}" style="--pct:${health.score}%;"><div class="health-ring-inner">${health.score}</div></div>
+      <div>
+        <div style="font-weight:700;font-size:13px;">${health.bandLabel}</div>
+        <div style="font-size:10.5px;color:var(--text3);margin-top:2px;">Score based on data completeness, consistency &amp; compliance checks. Click to see breakdown.</div>
+      </div>
+    </div>
+    <div id="healthDetail" style="display:none;margin-top:10px;font-size:10.5px;color:var(--text2);">
+      Starting score: 100. Each <strong>High Risk</strong> flag deducts 15 points; each <strong>Review</strong> flag deducts 6 points.<br>
+      ${health.issues.filter(i=>i.sev!=='pass').map(i=>`− ${i.sev==='high'?15:6} pts: ${i.issue}`).join('<br>') || 'No deductions — all checks passed.'}
+    </div>
+  </div>`;
+}
+function toggleHealthDetail(){ const d=el('healthDetail'); if(d) d.style.display = d.style.display==='none'?'block':'none'; }
+
+// --- 4. AI Executive Summary ---
+function renderExecutiveSummaryHTML(){
+  return `<div class="ai-card">
+    <div class="ai-card-title">✨ AI Executive Summary</div>
+    <div class="exec-summary-box" id="execSummaryText">${generateExecutiveSummary()}</div>
+    <div style="margin-top:10px;display:flex;gap:8px;">
+      <button class="btn btn-ghost btn-sm" onclick="copyExecSummary()">📋 Copy Summary</button>
+    </div>
+    <div class="ai-disclaimer">⚠ AI-generated draft summary for internal review purposes — verify all figures and matters listed before external use.</div>
+  </div>`;
+}
+function generateExecutiveSummary(){
+  if(!lastR||!singleCA.length||!singleIT.length) return 'Calculate a schedule first to generate a summary.';
+  const carry = singleCA[singleCA.length-1].closeWDV;
+  const caY1 = singleCA[0].dep, itY1 = singleIT[0].dep;
+  const diffY1 = itY1-caY1;
+  const tr = parseFloat(el('taxRate').value)/100||0.25168;
+  const dtx = diffY1*tr;
+  const dtNature = diffY1>0?'Deferred Tax Liability (DTL)':diffY1<0?'Deferred Tax Asset (DTA)':'no material timing difference';
+  const issues = runComplianceCheck().filter(i=>i.sev!=='pass');
+  let html = `<p>The asset (${el('assetDesc').value||'as described'}) has a Companies Act carrying amount (WDV) of <strong>${fmt(carry)}</strong> at the end of the projection period. Accounting (Companies Act) depreciation for Year 1 is <strong>${fmt(caY1)}</strong>, compared with Income-tax depreciation of <strong>${fmt(itY1)}</strong> under ${lawSectionLabel()}. The resulting Year 1 timing difference is <strong>${fmt(Math.abs(diffY1))}</strong>, giving rise to a potential ${dtNature} of approximately <strong>${fmt(Math.abs(dtx))}</strong> at a tax rate of ${(tr*100).toFixed(2)}%.</p>`;
+  if(singleDisposal){
+    html += `<p>The asset is modelled as disposed in Year ${singleDisposal.year} for ${fmt(singleDisposal.saleValue)}, resulting in a book ${singleDisposal.caGainLoss>=0?'profit':'loss'} on sale of ${fmt(Math.abs(singleDisposal.caGainLoss))}, and a ${singleDisposal.itOutcome==='STCG'?'short-term capital gain':singleDisposal.itOutcome==='STCL'?'short-term capital loss':'continuing block'} of ${singleDisposal.itOutcome!=='CONTINUES'?fmt(Math.abs(singleDisposal.itGainLoss)):fmt(singleDisposal.resultingBlockWDV)+' (WDV carried forward)'} for tax purposes.</p>`;
+  }
+  if(issues.length){
+    html += `<p>The following matters require review:</p><ol>${issues.slice(0,6).map(i=>`<li>${i.issue}</li>`).join('')}</ol>`;
+  } else {
+    html += `<p>No exceptions were flagged by the automated compliance check on the current inputs.</p>`;
+  }
+  return html;
+}
+function copyExecSummary(){
+  const text = el('execSummaryText').innerText;
+  if(navigator.clipboard) navigator.clipboard.writeText(text).then(()=>alert('Executive summary copied to clipboard.')).catch(()=>fallbackCopy(text));
+  else fallbackCopy(text);
+}
+function fallbackCopy(text){
+  const ta=document.createElement('textarea'); ta.value=text; document.body.appendChild(ta); ta.select();
+  try{ document.execCommand('copy'); alert('Copied to clipboard.'); }catch(e){ alert('Copy failed — please select and copy manually.'); }
+  document.body.removeChild(ta);
+}
+
+// --- 5. "Why this calculation?" explanation modal ---
+function explainCalc(type){
+  if(!lastP||!lastR){ alert('⚠ Please click Calculate first.'); return; }
+  const p=lastP, r=lastR;
+  const caY1=r.caSchedule[0], itY1=r.itSchedule[0];
+  let title='', body='';
+  if(type==='carate'||type==='cadep'){
+    title='Why this number? — Companies Act Depreciation (Year 1)';
+    const method=p.caMethod;
+    body = `
+      <table style="width:100%;font-family:'IBM Plex Mono',monospace;font-size:11.5px;line-height:2.2;">
+        <tr><td style="color:var(--text2);">Original Cost</td><td style="text-align:right;">${fmt(p.cost)}</td></tr>
+        <tr><td style="color:var(--text2);">+ Capital Additions</td><td style="text-align:right;">${fmt(p.addCap)}</td></tr>
+        <tr style="border-top:1px solid var(--border2);"><td style="font-weight:600;">= Total Cost</td><td style="text-align:right;font-weight:600;">${fmt(r.totalCost)}</td></tr>
+        <tr><td style="color:var(--text2);">− Residual Value (${p.caResidualPct}%)</td><td style="text-align:right;">(${fmt(r.caResiAmt)})</td></tr>
+        <tr style="border-top:1px solid var(--border2);"><td style="font-weight:600;">= Depreciable Amount</td><td style="text-align:right;font-weight:600;">${fmt(r.totalCost-r.caResiAmt)}</td></tr>
+        <tr><td style="color:var(--text2);">${method==='SLM'?'÷ Useful Life':'× WDV Rate'}</td><td style="text-align:right;">${method==='SLM'?p.caUsefulLife+' years':fmtP(r.caRatePct)}</td></tr>
+        <tr><td style="color:var(--text2);">× Pro-rata Factor (days in use ÷ FY days)</td><td style="text-align:right;">${r.proRataInfo && r.proRataInfo.frac!=null ? (r.proRataInfo.frac*100).toFixed(2)+'%' : '100.00%'}</td></tr>
+        <tr style="border-top:2px solid var(--gold);"><td style="font-weight:700;color:var(--gold2);">= Year 1 Depreciation</td><td style="text-align:right;font-weight:700;color:var(--gold2);">${fmt(caY1?caY1.dep:0)}</td></tr>
+      </table>
+      <div style="margin-top:10px;font-size:11px;color:var(--text2);">Method used: <strong>${method}</strong> under Companies Act 2013, Schedule II. Regime: Companies Act depreciation is independent of the Income-tax law regime toggle.</div>`;
+  } else if(type==='itrate'||type==='itdep'){
+    title=`Why this number? — Income Tax Depreciation (${lawSectionLabel()})`;
+    let itEff=p.itRate; if(p.itHalfYear) itEff*=0.5;
+    body = `
+      <table style="width:100%;font-family:'IBM Plex Mono',monospace;font-size:11.5px;line-height:2.2;">
+        <tr><td style="color:var(--text2);">Opening WDV of Block (Year 1 = Total Cost)</td><td style="text-align:right;">${fmt(r.totalCost)}</td></tr>
+        <tr><td style="color:var(--text2);">× IT Depreciation Rate</td><td style="text-align:right;">${p.itRate}%</td></tr>
+        ${p.itHalfYear?`<tr><td style="color:var(--text2);">× Half-Year Rule (used &lt; 180 days → 50%)</td><td style="text-align:right;">50%</td></tr>`:''}
+        <tr style="border-top:1px solid var(--border2);"><td style="font-weight:600;">= Normal Depreciation</td><td style="text-align:right;font-weight:600;">${fmt(r.totalCost*(itEff/100))}</td></tr>
+        ${p.itAddlDep>0?`<tr><td style="color:var(--text2);">+ Additional Depreciation (${p.itAddlDep}%${p.itHalfYear?' × 50%':''})</td><td style="text-align:right;">${fmt(itY1?itY1.addlDep:0)}</td></tr>`:''}
+        <tr style="border-top:2px solid var(--teal);"><td style="font-weight:700;color:var(--teal);">= Year 1 IT Depreciation</td><td style="text-align:right;font-weight:700;color:var(--teal);">${fmt(itY1?itY1.dep:0)}</td></tr>
+      </table>
+      <div style="margin-top:10px;font-size:11px;color:var(--text2);">Regime applied: <strong>${lawSectionLabel()}</strong> (based on the Assessment Year selected in the sidebar). Method: WDV block-of-assets — no pro-rata for part-year use beyond the half-year rule.</div>`;
+  }
+  el('explainTitle').textContent=title;
+  el('explainBody').innerHTML=body+`<div class="ai-disclaimer" style="margin-top:14px;">This is a deterministic statutory calculation (not an AI estimate) — shown here purely to make the formula transparent.</div>`;
+  el('explainModal').classList.add('open');
+}
+function closeExplainModal(){ el('explainModal').classList.remove('open'); }
+
+// --- 6. Demo / Sample Cases ---
+const DEMO_CASES=[
+  {name:'Office Building',sub:'Buildings — SLM, 60yr life',cat:'buildings',desc:'Corporate office building',cost:50000000,addCap:0,caMethod:'SLM',caLife:60,caResidual:5,itBlock:'10',itRate:10,addlDep:0,halfYear:false,dpu:'2023-04-01',projYears:15,disposal:false},
+  {name:'Plant & Machinery',sub:'CNC Machine — WDV, additional dep',cat:'plantmachinery',desc:'CNC machine used for manufacturing automobile components',cost:8500000,addCap:500000,caMethod:'WDV',caLife:15,caResidual:5,itBlock:'15',itRate:15,addlDep:20,halfYear:false,dpu:'2023-08-01',projYears:10,disposal:false},
+  {name:'Computer / Server',sub:'Data centre servers — 3yr life',cat:'computers',desc:'Dell servers for data centre',cost:3200000,addCap:0,caMethod:'WDV',caLife:3,caResidual:5,itBlock:'40',itRate:40,addlDep:0,halfYear:false,dpu:'2024-01-10',projYears:5,disposal:false},
+  {name:'Motor Vehicle',sub:'Company fleet — WDV, 8yr life',cat:'vehicles',desc:'Toyota Innova fleet for employee transport',cost:6250000,addCap:0,caMethod:'WDV',caLife:8,caResidual:5,itBlock:'15v',itRate:15,addlDep:0,halfYear:false,dpu:'2023-09-01',projYears:8,disposal:false},
+  {name:'Furniture & Fixtures',sub:'Office furniture — SLM, 10yr',cat:'furniture',desc:'Office workstations and chairs',cost:1200000,addCap:200000,caMethod:'SLM',caLife:10,caResidual:5,itBlock:'10f',itRate:10,addlDep:0,halfYear:false,dpu:'2023-06-01',projYears:10,disposal:false},
+  {name:'Intangible Asset',sub:'ERP software licence — 5yr',cat:'intangibles',desc:'ERP software licence for enterprise operations',cost:2500000,addCap:0,caMethod:'SLM',caLife:5,caResidual:0,itBlock:'25',itRate:25,addlDep:0,halfYear:false,dpu:'2023-04-01',projYears:5,disposal:false},
+  {name:'Mid-Year Purchase',sub:'Asset put to use in Nov (pro-rata + half-year rule)',cat:'plantmachinery',desc:'Packaging machine acquired mid-year',cost:4000000,addCap:0,caMethod:'WDV',caLife:15,caResidual:5,itBlock:'15',itRate:15,addlDep:0,halfYear:true,dpu:'2023-11-15',projYears:10,disposal:false},
+  {name:'Asset Sold Early',sub:'Disposed in Year 2 — capital gains scenario',cat:'plantmachinery',desc:'Old CNC machine sold before end of useful life',cost:5000000,addCap:0,caMethod:'WDV',caLife:15,caResidual:5,itBlock:'15',itRate:15,addlDep:0,halfYear:false,dpu:'2022-04-01',projYears:10,disposal:true,dispYear:2,dispValue:3500000,blockStatus:'ceases',otherBlockWDV:0},
+  {name:'Additional Capitalisation',sub:'Machine with major mid-life addition',cat:'plantmachinery',desc:'Machine with capitalised overhaul cost',cost:6000000,addCap:1500000,caMethod:'WDV',caLife:15,caResidual:5,itBlock:'15',itRate:15,addlDep:0,halfYear:false,dpu:'2022-04-01',projYears:10,disposal:false},
+  {name:'Asset Creating DTA',sub:'CA dep > IT dep — Deferred Tax Asset',cat:'buildings',desc:'Building depreciated faster in books than under tax law',cost:20000000,addCap:0,caMethod:'SLM',caLife:20,caResidual:5,itBlock:'10',itRate:10,addlDep:0,halfYear:false,dpu:'2022-04-01',projYears:10,disposal:false},
+  {name:'Asset Creating DTL',sub:'IT dep > CA dep — Deferred Tax Liability',cat:'plantmachinery',desc:'Machinery depreciated faster under tax law (WDV + addl dep) than in books',cost:9000000,addCap:0,caMethod:'SLM',caLife:15,caResidual:5,itBlock:'15',itRate:15,addlDep:20,halfYear:false,dpu:'2022-04-01',projYears:10,disposal:false},
+];
+function toggleDemoMenu(){
+  const menu=el('demoMenu');
+  if(!menu.classList.contains('open')){
+    menu.innerHTML = DEMO_CASES.map((d,i)=>`<div class="demo-item" onclick="loadDemoCase(${i})"><b>${d.name}</b><span>${d.sub}</span></div>`).join('')
+      + `<div class="demo-item" onclick="loadBulkDemoCase()" style="border-top:1px solid var(--border2);"><b>Bulk Company Asset Register</b><span>7-asset sample CSV, loads Bulk Upload mode</span></div>`;
+  }
+  menu.classList.toggle('open');
+}
+document.addEventListener('click',(e)=>{
+  const menu=document.getElementById('demoMenu');
+  if(menu && menu.classList.contains('open') && !e.target.closest('#demoMenu') && !e.target.closest('button[onclick="toggleDemoMenu()"]')) menu.classList.remove('open');
+});
+function loadDemoCase(i){
+  const d=DEMO_CASES[i]; if(!d) return;
+  setMode('single');
+  el('assetCategory').value=d.cat; el('assetDesc').value=d.desc;
+  el('originalCost').value=d.cost; el('addCapital').value=d.addCap;
+  el('caMethod').value=d.caMethod; el('caUsefulLife').value=d.caLife; el('caResidual').value=d.caResidual;
+  if(el('itBlock').querySelector(`option[value="${d.itBlock}"]`)) el('itBlock').value=d.itBlock;
+  el('itRate').value=d.itRate; el('itAddlDep').value=d.addlDep; el('itHalfYear').checked=d.halfYear;
+  el('datePutToUse').value=d.dpu; el('dateOfPurchase').value=d.dpu; el('projYears').value=d.projYears;
+  el('deferredToggle').checked=true;
+  el('disposalToggle').checked=!!d.disposal;
+  if(d.disposal){ el('disposalYear').value=d.dispYear; el('disposalValue').value=d.dispValue; el('blockStatus').value=d.blockStatus; el('otherBlockWDV').value=d.otherBlockWDV||0; }
+  toggleDisposalFields(); updateProRataDisplay(); updateRateBadges();
+  calculate();
+  el('demoMenu').classList.remove('open');
+  switchTab('aiadvisor');
+}
+function loadBulkDemoCase(){
+  setMode('bulk'); downloadSampleData();
+  el('demoMenu').classList.remove('open');
+  alert('Sample CSV downloaded — please upload it via the Bulk Upload panel (browser security prevents auto-loading a downloaded file).');
+}
+
+
+// ═══ PRO-RATA (Days-based — Companies Act) ═══
+// Returns {frac, days, fyDays, fyEndYear, fyLabel}
+// days = no. of days asset was in use in first FY (date-put-to-use to Mar 31, inclusive)
+// fyDays = total days in that financial year (365 or 366 for leap years)
+function proRataInfo(dpu){
+  if(!dpu) return {frac:1, days:null, fyDays:null, fyEndYear:null, fyLabel:null};
+  const parts = dpu.split('-').map(Number);
+  const [y, m, d] = parts; // YYYY-MM-DD
+  // Determine FY end year: Apr–Mar financial year
+  const fyEndYear = m >= 4 ? y + 1 : y;
+  // FY dates
+  const putDate  = new Date(y, m-1, d);                 // date put to use
+  const fyEnd    = new Date(fyEndYear, 2, 31);           // March 31
+  const fyStart  = new Date(fyEndYear - 1, 3, 1);       // April 1 of FY start
+  // Days from date put to use → March 31 (both dates inclusive)
+  const days    = Math.round((fyEnd - putDate) / 86400000) + 1;
+  // Total days in FY (handles leap-year Feb correctly)
+  const fyDays  = Math.round((fyEnd - fyStart) / 86400000) + 1;
+  const frac    = Math.min(Math.max(days / fyDays, 0), 1);
+  const fyLabel = `${fyEndYear-1}-${String(fyEndYear).slice(-2)}`;
+  return {frac, days, fyDays, fyEndYear, fyLabel};
+}
+// Legacy wrapper kept for safety
+function proRataFraction(dpu){ return proRataInfo(dpu).frac; }
+
+function computeCARate(method,life,resPct){
+  const n=parseFloat(life)||0, rv=(parseFloat(resPct)||5)/100;
+  if(n<=0) return 0;
+  if(method==='SLM') return ((1-rv)/n)*100;
+  return (1-Math.pow(Math.max(rv,0.001),1/n))*100;
+}
+
+// ═══ CORE ENGINE ═══
+function calcAsset(p){
+  const totalCost=p.cost+p.addCap;
+  const caResiAmt=totalCost*(p.caResidualPct/100);
+  const caRatePct=computeCARate(p.caMethod,p.caUsefulLife,p.caResidualPct);
+  const caRate=caRatePct/100;
+  // Days-based pro-rata for CA Year 1
+  const prInfo = p.caProRata ? proRataInfo(p.datePutToUse) : {frac:1, days:null, fyDays:null, fyLabel:null};
+  const yr1Frac = prInfo.frac;
+
+  // CA
+  const caSchedule=[];
+  let caWDV=totalCost,cumCA=0;
+  for(let y=1;y<=p.projYears;y++){
+    const open=caWDV, frac=y===1?yr1Frac:1;
+    const daysUsed  = y===1 ? prInfo.days  : null;
+    const fyDays    = y===1 ? prInfo.fyDays : null;
+    const fyLabel   = y===1 ? prInfo.fyLabel : null;
+    let dep=0;
+    if(p.caMethod==='SLM'){
+      dep=(totalCost-caResiAmt)*caRate*frac;
+      if(cumCA+dep>totalCost-caResiAmt) dep=Math.max(0,totalCost-caResiAmt-cumCA);
+    } else {
+      dep=caWDV*caRate*frac;
+      if(caWDV-dep<caResiAmt) dep=Math.max(0,caWDV-caResiAmt);
+    }
+    dep=Math.max(0,dep); cumCA+=dep; caWDV=Math.max(caResiAmt,caWDV-dep);
+    caSchedule.push({year:y,openWDV:open,rate:caRate*frac*100,dep,closeWDV:caWDV,cumDep:cumCA,daysUsed,fyDays,fyLabel});
+  }
+
+  // IT
+  const itSchedule=[];
+  let itWDV=totalCost,cumIT=0;
+  for(let y=1;y<=p.projYears;y++){
+    const open=itWDV;
+    let effRate=y===1&&p.itHalfYear?p.itRate*0.5:p.itRate;
+    let dep=itWDV*(effRate/100), addlDep=0;
+    if(y===1&&p.itAddlDep>0){ addlDep=totalCost*(p.itAddlDep/100)*(p.itHalfYear?0.5:1); dep+=addlDep; }
+    dep=Math.max(0,Math.min(dep,itWDV)); cumIT+=dep; itWDV=Math.max(0,itWDV-dep);
+    itSchedule.push({year:y,openWDV:open,rate:effRate,addlDep,dep,closeWDV:itWDV,cumDep:cumIT});
+  }
+
+  // Comparison
+  const comparison=[]; let cumDiff=0;
+  for(let y=0;y<p.projYears;y++){
+    const ca=caSchedule[y],it=itSchedule[y];
+    const diff=it.dep-ca.dep; cumDiff+=diff;
+    comparison.push({year:y+1,caRate:ca.rate,caDep:ca.dep,caWDV:ca.closeWDV,itRate:it.rate,itDep:it.dep,itWDV:it.closeWDV,diff,cumDiff,wdvDiff:it.closeWDV-ca.closeWDV});
+  }
+  return {caSchedule,itSchedule,comparison,caRatePct,totalCost,caResiAmt,projYears:p.projYears,proRataInfo:prInfo};
+}
+
+// ═══ SIDEBAR EVENTS ═══
+function onCategoryChange(){
+  const cat=el('assetCategory').value;
+  if(CA_LIFE[cat]) el('caUsefulLife').value=CA_LIFE[cat];
+  updateRateBadges();
+}
+function onITBlockChange(){
+  const v=el('itBlock').value;
+  if(v&&IT_RATES[v]!==undefined) el('itRate').value=IT_RATES[v];
+  updateRateBadges();
+}
+function updateProRataDisplay(){
+  const dpu = el('datePutToUse').value;
+  const enabled = el('caProRata').checked;
+  const box = el('proRataDisplay');
+  if(!enabled || !dpu){ box.style.display='none'; return; }
+  const info = proRataInfo(dpu);
+  if(!info.days){ box.style.display='none'; return; }
+  const pct = (info.frac*100).toFixed(2);
+  el('prDaysLine').innerHTML = `Days in use (FY ${info.fyLabel}): <strong style="color:var(--gold2);">${info.days} days</strong> of ${info.fyDays} days`;
+  el('prFracLine').innerHTML = `Pro-rata factor: <strong style="color:var(--gold2);">${pct}%</strong> &nbsp;(${info.days} ÷ ${info.fyDays})`;
+  el('prFYLine').textContent = `FY: 01-Apr-${info.fyEndYear-1} to 31-Mar-${info.fyEndYear} (${info.fyDays === 366 ? 'Leap Year — 366 days' : '365 days'})`;
+  box.style.display='block';
+}
+
+function updateRateBadges(){
+  const ca=computeCARate(el('caMethod').value,el('caUsefulLife').value,el('caResidual').value);
+  let it=parseFloat(el('itRate').value)||0;
+  if(el('itHalfYear').checked) it*=0.5;
+  el('caRateBadge').textContent=fmtP(ca)+' p.a.';
+  el('itRateBadge').textContent=fmtP(it)+' p.a.';
+}
+
+// ═══ MODE ═══
+function setMode(mode){
+  el('modeBtnSingle').classList.toggle('active',mode==='single');
+  el('modeBtnBulk').classList.toggle('active',mode==='bulk');
+  el('panel-single').classList.toggle('active',mode==='single');
+  el('panel-bulk').classList.toggle('active',mode==='bulk');
+}
+
+// ═══ SINGLE CALCULATE ═══
+function calculate(){
+  const cost=parseFloat(el('originalCost').value);
+  const life=parseFloat(el('caUsefulLife').value);
+  const rv=parseFloat(el('residualPct').value);
+  if(!cost||cost<=0){alert('⚠ Original Cost must be positive.');return;}
+  if(!life||life<=0){alert('⚠ Useful Life must be > 0.');return;}
+  if(rv>5&&!confirm(`⚠ Residual Value ${rv}% exceeds standard 5%. Continue?`)) return;
+
+  const p={
+    cost,addCap:parseFloat(el('addCapital').value)||0,
+    caMethod:el('caMethod').value,caUsefulLife:parseFloat(el('caUsefulLife').value),
+    caResidualPct:parseFloat(el('caResidual').value)||5,caProRata:el('caProRata').checked,
+    itRate:parseFloat(el('itRate').value)||0,itAddlDep:parseFloat(el('itAddlDep').value)||0,
+    itHalfYear:el('itHalfYear').checked,projYears:parseInt(el('projYears').value)||10,
+    datePutToUse:el('datePutToUse').value
+  };
+  const r=calcAsset(p);
+  singleCA=r.caSchedule; singleIT=r.itSchedule; singleComp=r.comparison;
+  lastP=p; lastR=r;
+
+  // Disposal
+  const disposalEnabled=el('disposalToggle').checked;
+  const disposalInput=disposalEnabled?{
+    enabled:true, year:parseInt(el('disposalYear').value)||1, value:parseFloat(el('disposalValue').value)||0,
+    blockStatus:el('blockStatus').value, otherBlockWDV:parseFloat(el('otherBlockWDV').value)||0
+  }:null;
+  singleDisposal=computeDisposal(singleCA,singleIT,r.totalCost,disposalInput);
+  if(singleDisposal){
+    singleCA=singleDisposal.caSchedule; singleIT=singleDisposal.itSchedule;
+    singleComp=singleComp.slice(0,singleDisposal.year-1);
+  }
+
+  let itEff=p.itRate; if(p.itHalfYear) itEff*=0.5;
+  const rDiff=itEff-r.caRatePct;
+  el('scCARate').textContent=fmtP(r.caRatePct);
+  el('scCAMethod').textContent=p.caMethod+' Method';
+  el('scITRate').textContent=fmtP(itEff);
+  el('scITNote').textContent=p.itHalfYear?'Half-year rule applied':'WDV Block Method';
+  el('scRateDiff').textContent=(rDiff>=0?'+':'')+fmtP(rDiff);
+  el('scDepAmt').textContent=fmt(r.totalCost-r.caResiAmt);
+  el('scResidual').textContent='Residual: '+fmt(r.caResiAmt)+' ('+p.caResidualPct+'%)';
+  el('scITTotal').textContent=fmt(singleIT.reduce((s,x)=>s+x.dep,0));
+
+  updateRateBadges();
+  renderCA(); renderIT(); renderComparison(); renderCharts(); renderDeferred(); renderDisposal(); renderAIAdvisorTab();
+}
+
+// ═══ SINGLE RENDERERS ═══
+function tblCA(rows,foot){
+  return `<div class="table-container scrollable"><table><thead><tr><th>Year</th><th>Days in Use</th><th>Opening WDV(₹)</th><th>Full Rate%</th><th>Effective Rate%</th><th>Depreciation(₹)</th><th>Closing WDV(₹)</th><th>Cumulative Dep(₹)</th></tr></thead><tbody>${rows}</tbody><tfoot>${foot}</tfoot></table></div>`;
+}
+function tblIT(rows,foot){
+  return `<div class="table-container scrollable"><table><thead><tr><th>Year</th><th>Opening WDV(₹)</th><th>Rate%</th><th>Normal Dep(₹)</th><th>Addl Dep(₹)</th><th>Total Dep(₹)</th><th>Closing WDV(₹)</th></tr></thead><tbody>${rows}</tbody><tfoot>${foot}</tfoot></table></div>`;
+}
+
+function renderCA(){
+  const fullRatePct = computeCARate(el('caMethod').value, el('caUsefulLife').value, el('caResidual').value);
+  let rows='',total=0;
+  singleCA.forEach(r=>{
+    total+=r.dep;
+    const daysBadge = r.daysUsed!=null
+      ? `<span style="display:inline-block;padding:1px 6px;border-radius:4px;font-size:9px;font-family:'IBM Plex Mono',monospace;background:var(--gold-dim);border:1px solid var(--gold);color:var(--gold2);">${r.daysUsed} / ${r.fyDays} days</span>`
+      : `<span style="color:var(--text3);font-size:10px;">Full Year</span>`;
+    const fullRateCell = `<td class="td-gold" style="color:var(--text3);">${fmtP(fullRatePct)}</td>`;
+    const effRateCell  = `<td class="td-gold">${fmtP(r.rate)}</td>`;
+    rows+=`<tr><td>Year ${r.year}</td><td style="text-align:center;">${daysBadge}</td><td>${fmt(r.openWDV)}</td>${fullRateCell}${effRateCell}<td class="td-gold">${fmt(r.dep)}</td><td>${fmt(r.closeWDV)}</td><td>${fmt(r.cumDep)}</td></tr>`;
+  });
+  const foot=`<tr><td colspan="5">Total</td><td class="td-gold">${fmt(total)}</td><td>${fmt(singleCA.at(-1)?.closeWDV||0)}</td><td>${fmt(total)}</td></tr>`;
+  // Build pro-rata info banner
+  const r1=singleCA[0];
+  let proRataBanner='';
+  if(el('caProRata').checked && r1?.daysUsed!=null){
+    const pct=((r1.daysUsed/r1.fyDays)*100).toFixed(2);
+    proRataBanner=`<div class="alert alert-warn" style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;">
+      <span>📅 <strong>Pro-rata (Days-based)</strong> — FY ${r1.fyLabel}</span>
+      <span>Days in use: <strong>${r1.daysUsed} days</strong> of <strong>${r1.fyDays} days</strong> in FY</span>
+      <span>Pro-rata factor: <strong>${pct}%</strong> &nbsp;(${r1.daysUsed}÷${r1.fyDays})</span>
+      <span>Effective Y1 Rate: <strong>${fmtP(r1.rate)}</strong> &nbsp;vs Full Rate: ${fmtP(fullRatePct)}</span>
+    </div>`;
+  }
+  el('ca-content').innerHTML=`<div class="table-header" style="border-radius:10px 10px 0 0;"><span class="table-title">📘 Schedule II — ${el('caMethod').value} Method · Life: ${el('caUsefulLife').value} yrs · Full Rate: ${fmtP(fullRatePct)}</span><button class="btn btn-ghost btn-sm" onclick="exportCA()">⤓ CSV</button></div>${proRataBanner}${tblCA(rows,foot)}<div class="export-bar"><button class="btn btn-ghost btn-sm" onclick="exportCA()">⤓ CA Schedule CSV</button></div>`;
+}
+
+function renderIT(){
+  let rows='',total=0;
+  singleIT.forEach(r=>{ total+=r.dep; rows+=`<tr><td>Year ${r.year}</td><td>${fmt(r.openWDV)}</td><td class="td-teal">${fmtP(r.rate)}</td><td>${fmt(r.dep-r.addlDep)}</td><td class="td-teal">${r.addlDep>0?fmt(r.addlDep):'—'}</td><td class="td-teal">${fmt(r.dep)}</td><td>${fmt(r.closeWDV)}</td></tr>`; });
+  const foot=`<tr><td colspan="5">Total</td><td class="td-teal">${fmt(total)}</td><td>${fmt(singleIT.at(-1)?.closeWDV||0)}</td></tr>`;
+  el('it-content').innerHTML=`<div class="alert alert-info">ℹ No residual value floor under Income Tax Act — WDV block reduces until disposal or full write-off.</div>${tblIT(rows,foot)}<div class="export-bar"><button class="btn btn-ghost btn-sm" onclick="exportIT()">⤓ IT Schedule CSV</button></div>`;
+}
+
+function renderComparison(){
+  let rows='';
+  singleComp.forEach(r=>{
+    const dc=r.diff>0?'td-teal':r.diff<0?'td-rose':'', cc=r.cumDiff>0?'td-teal':r.cumDiff<0?'td-rose':'', wc=r.wdvDiff>0?'td-teal':r.wdvDiff<0?'td-rose':'';
+    rows+=`<tr><td>Year ${r.year}</td><td class="td-gold">${fmtP(r.caRate)}</td><td class="td-gold">${fmt(r.caDep)}</td><td>${fmt(r.caWDV)}</td><td class="td-teal">${fmtP(r.itRate)}</td><td class="td-teal">${fmt(r.itDep)}</td><td>${fmt(r.itWDV)}</td><td class="${dc}">${(r.diff>=0?'+':'')+fmt(r.diff)}</td><td class="${cc}">${(r.cumDiff>=0?'+':'')+fmt(r.cumDiff)}</td><td class="${wc}">${(r.wdvDiff>=0?'+':'')+fmt(r.wdvDiff)}</td></tr>`;
+  });
+  el('comparison-content').innerHTML=`<div class="table-container scrollable"><div class="table-header"><span class="table-title">⚖️ CA vs IT Comparison</span><button class="btn btn-ghost btn-sm" onclick="exportComparison()">⤓ CSV</button></div><table><thead><tr><th>Year</th><th>CA Rate%</th><th>CA Dep(₹)</th><th>CA WDV(₹)</th><th>IT Rate%</th><th>IT Dep(₹)</th><th>IT WDV(₹)</th><th>Diff(₹)</th><th>Cum Diff(₹)</th><th>WDV Diff(₹)</th></tr></thead><tbody>${rows}</tbody></table></div><div class="export-bar"><button class="btn btn-ghost btn-sm" onclick="exportComparison()">⤓ Comparison CSV</button><button class="btn btn-ghost btn-sm" onclick="window.print()">⎙ Print</button></div>`;
+}
+
+function renderCharts(){
+  el('charts-content').innerHTML=`<div class="legend"><div class="legend-item"><div class="legend-dot" style="background:var(--gold)"></div>Companies Act</div><div class="legend-item"><div class="legend-dot" style="background:var(--teal)"></div>Income Tax</div></div><div class="charts-grid"><div class="chart-card"><div class="chart-title">📉 Annual Depreciation (₹)</div><canvas id="chartDep" height="200"></canvas></div><div class="chart-card"><div class="chart-title">📊 WDV Comparison (₹)</div><canvas id="chartWDV" height="200"></canvas></div></div><div class="chart-card"><div class="chart-title">📈 Cumulative Timing Difference (₹) — Positive = IT higher</div><canvas id="chartDiff" height="140"></canvas></div>`;
+  setTimeout(()=>{
+    const lb=singleCA.map(r=>'Y'+r.year);
+    drawBars('chartDep',singleCA.map(r=>r.dep),singleIT.map(r=>r.dep),lb);
+    drawLines('chartWDV',singleCA.map(r=>r.closeWDV),singleIT.map(r=>r.closeWDV),lb);
+    drawDiff('chartDiff',singleComp.map(r=>r.cumDiff),lb);
+  },60);
+}
+
+function renderDeferred(){
+  if(!el('deferredToggle').checked){
+    el('deferred-content').innerHTML = `<div class="placeholder"><div class="placeholder-icon">🧾</div><h3>Deferred Tax</h3><p>Enable "Compute Deferred Tax" toggle in the sidebar to view DTA/DTL analysis.</p></div>`;
+    return;
+  }
+  const tr=parseFloat(el('taxRate').value)/100||0.25168;
+  const std = el('dtStandard').value==='indas12' ? 'Ind AS 12 (Balance-Sheet / Temporary Difference Approach)' : 'AS 22 (Income-Statement / Timing Difference Approach)';
+  const stdNote = `<div class="alert alert-info">📐 Standard applied: <strong>${std}</strong>. ${el('dtStandard').value==='indas12' ? 'Deferred tax is measured on temporary differences between carrying amount and tax base, using enacted/substantively enacted rates — for a single depreciable asset this numerically equals the timing-difference approach below.' : 'Deferred tax is measured on timing differences between book and tax depreciation charged to the Statement of Profit &amp; Loss each year.'}</div>`;
+  if(!singleComp.length){
+    el('deferred-content').innerHTML = stdNote + `<div class="alert alert-warn">⚠ No schedule yet — fill in asset details on the left and click <strong>Calculate</strong> to generate the DTA/DTL analysis.</div>`;
+    return;
+  }
+  el('deferred-content').innerHTML=stdNote+buildDeferredHTML(singleComp,tr,'single');
+}
+
+// ═══ DISPOSAL RENDER ═══
+function renderDisposal(){
+  if(!singleDisposal){
+    el('disposal-content').innerHTML=`<div class="placeholder"><div class="placeholder-icon">🏷️</div><h3>Asset Disposal &amp; Capital Gains</h3><p>Enable "Disposal / Sale Scenario" in the sidebar and click Calculate to see AS 10 profit/loss and Section 50 capital gains.</p></div>`;
+    return;
+  }
+  el('disposal-content').innerHTML = buildAssetDisposalHTML(singleDisposal);
+}
+function buildAssetDisposalHTML(d){
+  const caGainCls=d.caGainLoss>=0?'td-green':'td-rose';
+  const itLabel = lawSectionLabel();
+  let itOutcomeHTML='';
+  if(d.itOutcome==='STCG'){
+    itOutcomeHTML=`<tr><td style="color:var(--text2);">Short-Term Capital Gain — Sec. 50 (block ceases / deemed nil)</td><td class="td-teal" style="text-align:right;font-weight:700;">${fmt(d.itGainLoss)}</td></tr>`;
+  } else if(d.itOutcome==='STCL'){
+    itOutcomeHTML=`<tr><td style="color:var(--text2);">Short-Term Capital Loss — Sec. 50 (block ceases, sale &lt; WDV)</td><td class="td-rose" style="text-align:right;font-weight:700;">${fmt(Math.abs(d.itGainLoss))}</td></tr>`;
+  } else {
+    itOutcomeHTML=`<tr><td style="color:var(--text2);">Block continues — Resulting WDV c/f (no dep this year)</td><td class="td-gold" style="text-align:right;font-weight:700;">${fmt(d.resultingBlockWDV)}</td></tr>`;
+  }
+  return `
+    <div class="alert alert-warn">📅 Disposal assumed at start of <strong>Year ${d.year}</strong> · Sale Value: <strong>${fmt(d.saleValue)}</strong> · IT Block Status: <strong>${d.blockStatus==='ceases'?'Ceases to exist':'Continues (other assets remain)'}</strong></div>
+    <div class="charts-grid">
+      <div class="chart-card">
+        <div class="chart-title">🏢 Companies Act — Profit / (Loss) on Sale (AS 10 / Ind AS 16)</div>
+        <table style="width:100%;font-family:'IBM Plex Mono',monospace;font-size:11px;">
+          <tr><td style="padding:4px 0;color:var(--text2);">Carrying Amount (WDV) at Disposal</td><td style="text-align:right;">${fmt(d.caWDVAtDisposal)}</td></tr>
+          <tr><td style="padding:4px 0;color:var(--text2);">Sale Value</td><td style="text-align:right;">${fmt(d.saleValue)}</td></tr>
+          <tr style="border-top:1px solid var(--border2);"><td style="padding:5px 0;font-weight:700;">Profit / (Loss) on Sale — recognised in P&amp;L</td><td class="${caGainCls}" style="text-align:right;font-weight:700;">${(d.caGainLoss>=0?'+':'')+fmt(d.caGainLoss)}</td></tr>
+        </table>
+      </div>
+      <div class="chart-card">
+        <div class="chart-title">📋 Income Tax — Capital Gains on Block (${itLabel})</div>
+        <table style="width:100%;font-family:'IBM Plex Mono',monospace;font-size:11px;">
+          <tr><td style="padding:4px 0;color:var(--text2);">WDV of Block at Disposal (this asset)</td><td style="text-align:right;">${fmt(d.itWDVAtDisposal)}</td></tr>
+          <tr><td style="padding:4px 0;color:var(--text2);">Sale Value</td><td style="text-align:right;">${fmt(d.saleValue)}</td></tr>
+          ${itOutcomeHTML}
+        </table>
+      </div>
+    </div>
+    <div class="alert alert-info">ℹ Depreciation schedules above are truncated at Year ${d.year-1||0} — no depreciation is charged under either Act in the year of disposal in this simplified model. Under ${itLabel}, no depreciation is admissible on a block that ceases to exist or is reduced to nil.</div>`;
+}
+
+function buildDeferredHTML(comp,tr,pfx){
+  let rows='',cum=0;
+  comp.forEach(r=>{
+    const t=r.caDep-r.itDep, dtx=t*tr; cum+=dtx;
+    const n=t>0?'DTA':t<0?'DTL':'NIL', c=t>0?'td-teal':t<0?'td-rose':'', cc=cum>0?'td-teal':cum<0?'td-rose':'';
+    const badge=`<span style="padding:2px 7px;border-radius:4px;font-size:9px;background:${n==='DTA'?'var(--teal-dim)':n==='DTL'?'var(--rose-dim)':'var(--surface3)'};color:${n==='DTA'?'var(--teal)':n==='DTL'?'var(--rose)':'var(--text3)'};">${n}</span>`;
+    rows+=`<tr><td>Year ${r.year}</td><td>${fmt(r.caDep)}</td><td>${fmt(r.itDep)}</td><td class="${c}">${(t>=0?'+':'')+fmt(t)}</td><td class="${c}">${(dtx>=0?'+':'')+fmt(dtx)}</td><td class="${cc}">${(cum>=0?'+':'')+fmt(cum)}</td><td>${badge}</td></tr>`;
+  });
+  return `<div class="deferred-card"><div class="deferred-title">Deferred Tax — Timing Difference Analysis</div><p style="font-size:11px;color:var(--text2);">Tax Rate: <strong>${(tr*100).toFixed(3)}%</strong> &nbsp;·&nbsp; DTA = CA Dep &gt; IT Dep &nbsp;·&nbsp; DTL = IT Dep &gt; CA Dep</p></div><div class="table-container scrollable"><table><thead><tr><th>Year</th><th>CA Dep(₹)</th><th>IT Dep(₹)</th><th>Timing Diff(₹)</th><th>DTA/DTL(₹)</th><th>Cum DTA/DTL(₹)</th><th>Nature</th></tr></thead><tbody>${rows}</tbody></table></div><div class="export-bar"><button class="btn btn-ghost btn-sm" onclick="exportDeferred('${pfx}')">⤓ Export CSV</button></div>`;
+}
+
+// ═══ CANVAS CHARTS ═══
+function setupCanvas(id,h){
+  const c=el(id); if(!c) return null;
+  const ctx=c.getContext('2d'), dpr=window.devicePixelRatio||1;
+  const W=c.parentElement.clientWidth-28;
+  c.width=W*dpr; c.height=h*dpr; c.style.width=W+'px'; c.style.height=h+'px';
+  ctx.scale(dpr,dpr);
+  return {ctx,W,H:h,pad:{t:18,r:14,b:34,l:68}};
+}
+
+function grid(ctx,W,H,pad,max,steps){
+  const cW=W-pad.l-pad.r, cH=H-pad.t-pad.b;
+  ctx.strokeStyle='rgba(42,53,80,.6)'; ctx.lineWidth=.5;
+  for(let i=0;i<=steps;i++){
+    const y=pad.t+cH*(1-i/steps);
+    ctx.beginPath(); ctx.moveTo(pad.l,y); ctx.lineTo(W-pad.r,y); ctx.stroke();
+    ctx.fillStyle='#64748b'; ctx.font='8px IBM Plex Mono'; ctx.textAlign='right';
+    ctx.fillText(fmtShort(max*i/steps),pad.l-4,y+3);
+  }
+  ctx.strokeStyle='#364060'; ctx.lineWidth=1;
+  ctx.beginPath(); ctx.moveTo(pad.l,pad.t); ctx.lineTo(pad.l,H-pad.b); ctx.lineTo(W-pad.r,H-pad.b); ctx.stroke();
+}
+
+function rr(ctx,x,y,w,h,r){
+  if(h<=0) return;
+  ctx.beginPath();
+  ctx.moveTo(x+r,y); ctx.lineTo(x+w-r,y); ctx.quadraticCurveTo(x+w,y,x+w,y+r);
+  ctx.lineTo(x+w,y+h); ctx.lineTo(x,y+h); ctx.lineTo(x,y+r); ctx.quadraticCurveTo(x,y,x+r,y); ctx.closePath();
+}
+
+function drawBars(id,d1,d2,labels){
+  const s=setupCanvas(id,200); if(!s) return;
+  const {ctx,W,H,pad}=s, cW=W-pad.l-pad.r, cH=H-pad.t-pad.b;
+  const max=Math.max(...d1,...d2,1), n=labels.length;
+  ctx.clearRect(0,0,W,H); grid(ctx,W,H,pad,max,5);
+  const gW=cW/n, bW=Math.min(gW*.3,14);
+  for(let i=0;i<n;i++){
+    const gx=pad.l+i*gW+gW/2;
+    [[d1[i],'201,168,76',-1],[d2[i],'62,207,207',1]].forEach(([v,rgb,off])=>{
+      const h=(v/max)*cH;
+      const g=ctx.createLinearGradient(0,pad.t+cH-h,0,pad.t+cH);
+      g.addColorStop(0,`rgb(${rgb})`); g.addColorStop(1,`rgba(${rgb},.2)`);
+      ctx.fillStyle=g; rr(ctx,gx+off*(bW+2)-bW/2,pad.t+cH-h,bW,h,3); ctx.fill();
+    });
+    ctx.fillStyle='#64748b'; ctx.font='8px IBM Plex Mono'; ctx.textAlign='center';
+    ctx.fillText(labels[i],gx,H-pad.b+12);
+  }
+}
+
+function drawLines(id,d1,d2,labels){
+  const s=setupCanvas(id,200); if(!s) return;
+  const {ctx,W,H,pad}=s, cW=W-pad.l-pad.r, cH=H-pad.t-pad.b;
+  const max=Math.max(...d1,...d2,1), n=labels.length;
+  ctx.clearRect(0,0,W,H); grid(ctx,W,H,pad,max,5);
+  if(n<2) return;
+  [[d1,'201,168,76'],[d2,'62,207,207']].forEach(([data,rgb])=>{
+    ctx.beginPath();
+    data.forEach((v,i)=>{ const x=pad.l+(i/(n-1))*cW,y=pad.t+cH-(v/max)*cH; i===0?ctx.moveTo(x,y):ctx.lineTo(x,y); });
+    ctx.lineTo(pad.l+cW,H-pad.b); ctx.lineTo(pad.l,H-pad.b); ctx.closePath();
+    const ga=ctx.createLinearGradient(0,pad.t,0,H-pad.b);
+    ga.addColorStop(0,`rgba(${rgb},.15)`); ga.addColorStop(1,'transparent');
+    ctx.fillStyle=ga; ctx.fill();
+    ctx.beginPath(); ctx.strokeStyle=`rgb(${rgb})`; ctx.lineWidth=2;
+    data.forEach((v,i)=>{ const x=pad.l+(i/(n-1))*cW,y=pad.t+cH-(v/max)*cH; i===0?ctx.moveTo(x,y):ctx.lineTo(x,y); });
+    ctx.stroke();
+    data.forEach((v,i)=>{ const x=pad.l+(i/(n-1))*cW,y=pad.t+cH-(v/max)*cH; ctx.beginPath();ctx.arc(x,y,2.5,0,Math.PI*2);ctx.fillStyle=`rgb(${rgb})`;ctx.fill(); });
+    labels.forEach((l,i)=>{ ctx.fillStyle='#64748b';ctx.font='8px IBM Plex Mono';ctx.textAlign='center';ctx.fillText(l,pad.l+(i/(n-1))*cW,H-pad.b+12); });
+  });
+}
+
+function drawDiff(id,diffs,labels){
+  const s=setupCanvas(id,140); if(!s) return;
+  const {ctx,W,H,pad}=s, cW=W-pad.l-pad.r, cH=H-pad.t-pad.b;
+  const max=Math.max(...diffs.map(Math.abs),1), n=labels.length;
+  ctx.clearRect(0,0,W,H);
+  const midY=pad.t+cH/2;
+  ctx.strokeStyle='rgba(42,53,80,.6)'; ctx.lineWidth=.5;
+  ctx.beginPath(); ctx.moveTo(pad.l,midY); ctx.lineTo(W-pad.r,midY); ctx.stroke();
+  ctx.fillStyle='#64748b'; ctx.font='8px IBM Plex Mono'; ctx.textAlign='right'; ctx.fillText('0',pad.l-4,midY+3);
+  const bW=Math.min(cW/n*.5,12);
+  for(let i=0;i<n;i++){
+    const x=pad.l+(i/Math.max(n-1,1))*cW, v=diffs[i], h=Math.abs(v/max)*cH*.47;
+    ctx.fillStyle=v>=0?'rgb(62,207,207)':'rgb(224,92,122)';
+    ctx.fillRect(x-bW/2,v>=0?midY-h:midY,bW,h);
+    ctx.fillStyle='#64748b'; ctx.font='8px IBM Plex Mono'; ctx.textAlign='center';
+    ctx.fillText(labels[i],x,H-pad.b+12);
+  }
+  ctx.strokeStyle='#364060'; ctx.lineWidth=1;
+  ctx.beginPath(); ctx.moveTo(pad.l,pad.t); ctx.lineTo(pad.l,H-pad.b); ctx.lineTo(W-pad.r,H-pad.b); ctx.stroke();
+}
+
+// ═══ BULK UPLOAD ═══
+const zone=el('uploadZone');
+zone.addEventListener('dragover',e=>{e.preventDefault();zone.classList.add('drag-over');});
+zone.addEventListener('dragleave',()=>zone.classList.remove('drag-over'));
+zone.addEventListener('drop',e=>{
+  e.preventDefault(); zone.classList.remove('drag-over');
+  const f=e.dataTransfer.files[0];
+  if(!f||!/\.csv$/i.test(f.name)){alert('Please upload a .csv file.');return;}
+  const r=new FileReader(); r.onload=ev=>parseAndProcess(ev.target.result); r.readAsText(f);
+});
+
+function handleFileUpload(evt){
+  const f=evt.target.files[0]; if(!f) return;
+  const r=new FileReader(); r.onload=e=>parseAndProcess(e.target.result); r.readAsText(f);
+}
+
+function splitLine(line){
+  const res=[]; let cur='',inQ=false;
+  for(const c of line){ if(c==='"'){inQ=!inQ;}else if(c===','&&!inQ){res.push(cur);cur='';}else{cur+=c;} }
+  return [...res,cur];
+}
+
+function parseAndProcess(text){
+  const lines=text.trim().split(/\r?\n/);
+  const headers=splitLine(lines[0]).map(h=>h.trim().replace(/^"|"$/g,''));
+  const errors=[], assets=[];
+
+  for(let i=1;i<lines.length;i++){
+    if(!lines[i].trim()) continue;
+    const vals=splitLine(lines[i]);
+    const row={};
+    headers.forEach((h,j)=>{ row[h]=(vals[j]||'').trim().replace(/^"|"$/g,''); });
+    const ln=i+1, id=row['AssetID']||`Asset-${i}`, desc=row['AssetDescription']||'—';
+    const cost=parseFloat(row['OriginalCost'])||0;
+    const life=parseFloat(row['CAUsefulLife'])||0;
+    if(!cost||cost<=0){errors.push(`Row ${ln} (${id}): OriginalCost invalid.`);continue;}
+    if(!life||life<=0){errors.push(`Row ${ln} (${id}): CAUsefulLife invalid.`);continue;}
+    const cat=(row['AssetCategory']||'custom').toLowerCase().replace(/\s/g,'');
+    const method=(row['CAMethod']||'WDV').toUpperCase()==='SLM'?'SLM':'WDV';
+    const p={
+      cost,addCap:parseFloat(row['AddCapital'])||0,
+      caMethod:method,caUsefulLife:life,
+      caResidualPct:parseFloat(row['CAResidualPct'])||5,
+      caProRata:!!row['DatePutToUse'],
+      itRate:parseFloat(row['ITRate'])||15,
+      itAddlDep:parseFloat(row['ITAddlDepPct'])||0,
+      itHalfYear:(row['HalfYearRule']||'').toLowerCase()==='yes',
+      projYears:Math.min(parseInt(row['ProjectionYears'])||10,50),
+      datePutToUse:row['DatePutToUse']||''
+    };
+    const res=calcAsset(p);
+    let caSch=res.caSchedule, itSch=res.itSchedule, comp=res.comparison, disposal=null;
+    const dispYear=parseInt(row['DisposalYear']);
+    if(dispYear>0){
+      const disposalInput={ enabled:true, year:dispYear, value:parseFloat(row['DisposalValue'])||0,
+        blockStatus:(row['BlockStatus']||'ceases').toLowerCase().includes('continue')?'continues':'ceases',
+        otherBlockWDV:parseFloat(row['OtherBlockWDV'])||0 };
+      disposal=computeDisposal(caSch,itSch,res.totalCost,disposalInput);
+      if(disposal){ caSch=disposal.caSchedule; itSch=disposal.itSchedule; comp=comp.slice(0,disposal.year-1); }
+    }
+    assets.push({id,desc,cat,dop:row['DateOfPurchase']||'',dpu:p.datePutToUse,taxRate:parseFloat(row['TaxRate'])||25.168,...p,...res,caSchedule:caSch,itSchedule:itSch,comparison:comp,disposal});
+  }
+
+  bulkAssets=assets;
+  el('bulk-results').style.display='block';
+  el('bulk-error-box').innerHTML=errors.length?`<div class="error-list"><strong style="font-size:12px;color:var(--rose);">⚠ ${errors.length} row(s) skipped:</strong><ul>${errors.map(e=>`<li>${e}</li>`).join('')}</ul></div>`:'';
+
+  // Summary
+  const n=bulkAssets.length;
+  const totCost=bulkAssets.reduce((s,a)=>s+a.totalCost,0);
+  const totCA1=bulkAssets.reduce((s,a)=>s+(a.caSchedule[0]?.dep||0),0);
+  const totIT1=bulkAssets.reduce((s,a)=>s+(a.itSchedule[0]?.dep||0),0);
+  const totDTX=bulkAssets.reduce((s,a)=>{const t=(a.caSchedule[0]?.dep||0)-(a.itSchedule[0]?.dep||0);return s+t*(a.taxRate/100);},0);
+  el('bcAssets').textContent=n;
+  el('bcTotalCost').textContent=fmt(totCost);
+  el('bcTotalCADep').textContent=fmt(totCA1);
+  el('bcTotalITDep').textContent=fmt(totIT1);
+  el('bcDTX').textContent=(totDTX>=0?'+':'')+fmt(totDTX);
+
+  renderRegister();
+  renderBulkCA();
+  renderBulkIT();
+  renderBulkComparison();
+  renderBulkDeferred();
+  renderBulkCharts();
+}
+
+function renderRegister(){
+  let rows='';
+  bulkAssets.forEach((a,i)=>{
+    const ca1=a.caSchedule[0]?.dep||0, it1=a.itSchedule[0]?.dep||0, diff=it1-ca1;
+    const dc=diff>0?'td-teal':diff<0?'td-rose':'';
+    rows+=`<tr class="clickable-row" onclick="openModal(${i})">
+      <td><div style="display:flex;align-items:center;gap:7px;"><div class="asset-num">${i+1}</div>${a.id}</div></td>
+      <td style="text-align:left;">${a.desc}</td><td style="text-align:left;">${a.cat}</td>
+      <td>${fmt(a.totalCost)}</td><td>${a.caMethod}/${a.caUsefulLife}yr</td>
+      <td class="td-gold">${fmtP(a.caRatePct)}</td><td class="td-gold">${fmt(ca1)}</td>
+      <td class="td-teal">${fmtP(a.itHalfYear?a.itRate*0.5:a.itRate)}</td><td class="td-teal">${fmt(it1)}</td>
+      <td class="${dc}">${(diff>=0?'+':'')+fmt(diff)}</td>
+      <td>${a.disposal?`<span class="status-ok" style="background:var(--rose-dim);color:var(--rose);border-color:rgba(224,92,122,.3);">Disposed Y${a.disposal.year}</span>`:'<span class="status-ok">✓</span>'}</td>
+    </tr>`;
+  });
+  const totCA=bulkAssets.reduce((s,a)=>s+(a.caSchedule[0]?.dep||0),0);
+  const totIT=bulkAssets.reduce((s,a)=>s+(a.itSchedule[0]?.dep||0),0);
+  el('register-content').innerHTML=`
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px;">
+      <div style="font-weight:600;font-size:13px;">Asset Register — ${bulkAssets.length} Assets &nbsp;<span style="font-size:11px;color:var(--text3);font-weight:400;">Click any row to drill down into full schedules</span></div>
+      <div style="display:flex;gap:6px;"><button class="btn btn-ghost btn-sm" onclick="exportRegister()">⤓ Register CSV</button><button class="btn btn-ghost btn-sm" onclick="exportAllBulk()">⤓ Full Report (All CSVs)</button></div>
+    </div>
+    <div class="table-container scrollable">
+      <table><thead><tr><th>Asset ID</th><th style="text-align:left;">Description</th><th style="text-align:left;">Category</th><th>Total Cost(₹)</th><th>CA Method</th><th>CA Rate%</th><th>CA Dep Y1(₹)</th><th>IT Rate%</th><th>IT Dep Y1(₹)</th><th>Diff Y1(₹)</th><th>Status</th></tr></thead>
+      <tbody>${rows}</tbody>
+      <tfoot><tr><td colspan="6">Grand Total — Year 1</td><td class="td-gold">${fmt(totCA)}</td><td></td><td class="td-teal">${fmt(totIT)}</td><td class="${totIT-totCA>0?'td-teal':'td-rose'}">${(totIT-totCA>=0?'+':'')+fmt(totIT-totCA)}</td><td></td></tr></tfoot>
+      </table>
+    </div>
+    <div class="export-bar"><button class="btn btn-ghost btn-sm" onclick="exportRegister()">⤓ Asset Register CSV</button><button class="btn btn-ghost btn-sm" onclick="exportAllBulk()">⤓ Full Report CSV</button></div>`;
+}
+
+function renderBulkCA(){
+  let html='';
+  bulkAssets.forEach((a,i)=>{
+    const fullRate=computeCARate(a.caMethod,a.caUsefulLife,a.caResidualPct);
+    let rows='',tot=0;
+    a.caSchedule.forEach(r=>{
+      tot+=r.dep;
+      const daysBadge=r.daysUsed!=null
+        ?`<span style="display:inline-block;padding:1px 6px;border-radius:4px;font-size:9px;font-family:'IBM Plex Mono',monospace;background:var(--gold-dim);border:1px solid var(--gold);color:var(--gold2);">${r.daysUsed} / ${r.fyDays} days</span>`
+        :`<span style="color:var(--text3);font-size:10px;">Full Year</span>`;
+      rows+=`<tr><td>Year ${r.year}</td><td style="text-align:center;">${daysBadge}</td><td>${fmt(r.openWDV)}</td><td style="color:var(--text3);text-align:right;font-family:'IBM Plex Mono',monospace;font-size:11px;">${fmtP(fullRate)}</td><td class="td-gold">${fmtP(r.rate)}</td><td class="td-gold">${fmt(r.dep)}</td><td>${fmt(r.closeWDV)}</td><td>${fmt(r.cumDep)}</td></tr>`;
+    });
+    const r1=a.caSchedule[0];
+    const prBanner=r1?.daysUsed!=null?`<div style="padding:7px 12px;background:var(--gold-dim);border-bottom:1px solid var(--gold);font-size:11px;color:var(--gold2);">📅 Pro-rata FY ${r1.fyLabel}: <strong>${r1.daysUsed} days</strong> of ${r1.fyDays} days &nbsp;(${((r1.daysUsed/r1.fyDays)*100).toFixed(2)}%) — Effective Y1 Rate: ${fmtP(r1.rate)}</div>`:'';
+    html+=`<div style="margin-bottom:18px;"><div class="table-container scrollable"><div class="table-header"><span class="table-title"><span class="asset-num" style="margin-right:6px;">${i+1}</span>${a.id} — ${a.desc} (${a.caMethod}, ${a.caUsefulLife}yr, Full Rate: ${fmtP(fullRate)})</span></div>${prBanner}<table><thead><tr><th>Year</th><th>Days in Use</th><th>Opening WDV(₹)</th><th>Full Rate%</th><th>Eff. Rate%</th><th>Dep(₹)</th><th>Closing WDV(₹)</th><th>Cum Dep(₹)</th></tr></thead><tbody>${rows}</tbody><tfoot><tr><td colspan="5">Total</td><td class="td-gold">${fmt(tot)}</td><td>${fmt(a.caSchedule.at(-1)?.closeWDV||0)}</td><td>${fmt(tot)}</td></tr></tfoot></table></div></div>`;
+  });
+  el('bca-content').innerHTML=html+`<div class="export-bar"><button class="btn btn-ghost btn-sm" onclick="exportBulkCA()">⤓ All CA Schedules CSV</button></div>`;
+}
+
+function renderBulkIT(){
+  let html='';
+  bulkAssets.forEach((a,i)=>{
+    let rows='',tot=0;
+    a.itSchedule.forEach(r=>{ tot+=r.dep; rows+=`<tr><td>Year ${r.year}</td><td>${fmt(r.openWDV)}</td><td class="td-teal">${fmtP(r.rate)}</td><td>${fmt(r.dep-r.addlDep)}</td><td class="td-teal">${r.addlDep>0?fmt(r.addlDep):'—'}</td><td class="td-teal">${fmt(r.dep)}</td><td>${fmt(r.closeWDV)}</td></tr>`; });
+    html+=`<div style="margin-bottom:18px;"><div class="table-container scrollable"><div class="table-header"><span class="table-title"><span class="asset-num" style="margin-right:6px;">${i+1}</span>${a.id} — ${a.desc}${a.itHalfYear?' (½-yr)':''} · IT Rate: ${fmtP(a.itHalfYear?a.itRate*0.5:a.itRate)}</span></div><table><thead><tr><th>Year</th><th>Opening WDV(₹)</th><th>Rate%</th><th>Normal Dep(₹)</th><th>Addl Dep(₹)</th><th>Total Dep(₹)</th><th>Closing WDV(₹)</th></tr></thead><tbody>${rows}</tbody><tfoot><tr><td colspan="5">Total</td><td class="td-teal">${fmt(tot)}</td><td>${fmt(a.itSchedule.at(-1)?.closeWDV||0)}</td></tr></tfoot></table></div></div>`;
+  });
+  el('bit-content').innerHTML=html+`<div class="export-bar"><button class="btn btn-ghost btn-sm" onclick="exportBulkIT()">⤓ All IT Schedules CSV</button></div>`;
+}
+
+function renderBulkComparison(){
+  const maxY=Math.max(...bulkAssets.map(a=>a.projYears),1);
+  let rows='',cum=0;
+  for(let y=1;y<=maxY;y++){
+    let ca=0,it=0;
+    bulkAssets.forEach(a=>{ if(y<=a.projYears){ ca+=a.caSchedule[y-1]?.dep||0; it+=a.itSchedule[y-1]?.dep||0; } });
+    const d=it-ca; cum+=d;
+    const dc=d>0?'td-teal':d<0?'td-rose':'', cc=cum>0?'td-teal':cum<0?'td-rose':'';
+    rows+=`<tr><td>Year ${y}</td><td class="td-gold">${fmt(ca)}</td><td class="td-teal">${fmt(it)}</td><td class="${dc}">${(d>=0?'+':'')+fmt(d)}</td><td class="${cc}">${(cum>=0?'+':'')+fmt(cum)}</td></tr>`;
+  }
+  el('bcomparison-content').innerHTML=`<div class="alert alert-info">ℹ Consolidated comparison — all ${bulkAssets.length} assets aggregated by year. Click an asset in the Register tab for individual drill-down.</div><div class="table-container scrollable"><div class="table-header"><span class="table-title">📊 Consolidated CA vs IT — ${bulkAssets.length} Assets</span><button class="btn btn-ghost btn-sm" onclick="exportBulkComp()">⤓ CSV</button></div><table><thead><tr><th>Year</th><th>Total CA Dep(₹)</th><th>Total IT Dep(₹)</th><th>Net Diff(₹)</th><th>Cumulative Diff(₹)</th></tr></thead><tbody>${rows}</tbody></table></div><div class="export-bar"><button class="btn btn-ghost btn-sm" onclick="exportBulkComp()">⤓ Comparison CSV</button></div>`;
+}
+
+function renderBulkDeferred(){
+  const maxY=Math.max(...bulkAssets.map(a=>a.projYears),1);
+  let rows='',cum=0;
+  for(let y=1;y<=maxY;y++){
+    let ca=0,it=0,wtTax=0,n=0;
+    bulkAssets.forEach(a=>{ if(y<=a.projYears){ ca+=a.caSchedule[y-1]?.dep||0; it+=a.itSchedule[y-1]?.dep||0; wtTax+=a.taxRate; n++; } });
+    const avgTax=n>0?wtTax/n:25.168, t=ca-it, dtx=t*(avgTax/100); cum+=dtx;
+    const nat=t>0?'DTA':t<0?'DTL':'NIL', c=t>0?'td-teal':t<0?'td-rose':'', cc=cum>0?'td-teal':cum<0?'td-rose':'';
+    const badge=`<span style="padding:1px 7px;border-radius:3px;font-size:9px;background:${nat==='DTA'?'var(--teal-dim)':nat==='DTL'?'var(--rose-dim)':'var(--surface3)'};color:${nat==='DTA'?'var(--teal)':nat==='DTL'?'var(--rose)':'var(--text3)'};">${nat}</span>`;
+    rows+=`<tr><td>Year ${y}</td><td>${fmt(ca)}</td><td>${fmt(it)}</td><td class="${c}">${(t>=0?'+':'')+fmt(t)}</td><td class="${c}">${(dtx>=0?'+':'')+fmt(dtx)}</td><td class="${cc}">${(cum>=0?'+':'')+fmt(cum)}</td><td>${badge}</td></tr>`;
+  }
+  el('bdeferred-content').innerHTML=`<div class="deferred-card"><div class="deferred-title">Consolidated Deferred Tax — All ${bulkAssets.length} Assets</div><p style="font-size:11px;color:var(--text2);">Weighted avg tax rate applied per year based on individual asset tax rates. DTA = timing diff favours books. DTL = timing diff favours tax.</p></div><div class="table-container scrollable"><table><thead><tr><th>Year</th><th>Total CA Dep(₹)</th><th>Total IT Dep(₹)</th><th>Timing Diff(₹)</th><th>DTA/DTL(₹)</th><th>Cum DTA/DTL(₹)</th><th>Nature</th></tr></thead><tbody>${rows}</tbody></table></div><div class="export-bar"><button class="btn btn-ghost btn-sm" onclick="exportBulkDeferred()">⤓ Export Deferred Tax CSV</button></div>`;
+}
+
+function renderBulkCharts(){
+  const maxY=Math.min(Math.max(...bulkAssets.map(a=>a.projYears),1),20);
+  const lb=[],ca1=[],it1=[],caW=[],itW=[];
+  for(let y=1;y<=maxY;y++){
+    lb.push('Y'+y); let tc=0,ti=0,tw1=0,tw2=0;
+    bulkAssets.forEach(a=>{ if(y<=a.projYears){ tc+=a.caSchedule[y-1]?.dep||0; ti+=a.itSchedule[y-1]?.dep||0; tw1+=a.caSchedule[y-1]?.closeWDV||0; tw2+=a.itSchedule[y-1]?.closeWDV||0; } });
+    ca1.push(tc); it1.push(ti); caW.push(tw1); itW.push(tw2);
+  }
+  el('bcharts-content').innerHTML=`<div class="legend"><div class="legend-item"><div class="legend-dot" style="background:var(--gold)"></div>CA — All Assets</div><div class="legend-item"><div class="legend-dot" style="background:var(--teal)"></div>IT — All Assets</div></div><div class="charts-grid"><div class="chart-card"><div class="chart-title">📉 Consolidated Annual Depreciation (₹)</div><canvas id="bchartDep" height="200"></canvas></div><div class="chart-card"><div class="chart-title">📊 Consolidated WDV (₹)</div><canvas id="bchartWDV" height="200"></canvas></div></div>`;
+  setTimeout(()=>{ drawBars('bchartDep',ca1,it1,lb); drawLines('bchartWDV',caW,itW,lb); },60);
+}
+
+// ═══ MODAL ═══
+function openModal(idx){
+  const a=bulkAssets[idx]; currentModalIdx=idx;
+  el('modalTitle').textContent=`${a.id} — ${a.desc}`;
+  el('modalMeta').textContent=`Category: ${a.cat}  ·  Cost: ${fmt(a.totalCost)}  ·  ${a.caMethod}/${a.caUsefulLife}yr  ·  IT: ${a.itRate}%  ·  TaxRate: ${a.taxRate}%`;
+
+  let caR='',itR='',coR=''; let cum=0;
+  const fullRate=computeCARate(a.caMethod,a.caUsefulLife,a.caResidualPct);
+  a.caSchedule.forEach(r=>{
+    const daysBadge=r.daysUsed!=null
+      ?`<span style="display:inline-block;padding:1px 5px;border-radius:4px;font-size:9px;font-family:'IBM Plex Mono',monospace;background:var(--gold-dim);border:1px solid var(--gold);color:var(--gold2);">${r.daysUsed}/${r.fyDays}d</span>`
+      :`<span style="color:var(--text3);font-size:10px;">Full Yr</span>`;
+    caR+=`<tr><td>Year ${r.year}</td><td style="text-align:center;">${daysBadge}</td><td>${fmt(r.openWDV)}</td><td style="color:var(--text3);text-align:right;font-family:'IBM Plex Mono',monospace;font-size:11px;">${fmtP(fullRate)}</td><td class="td-gold">${fmtP(r.rate)}</td><td class="td-gold">${fmt(r.dep)}</td><td>${fmt(r.closeWDV)}</td><td>${fmt(r.cumDep)}</td></tr>`;
+  });
+  a.itSchedule.forEach(r=>{ itR+=`<tr><td>Year ${r.year}</td><td>${fmt(r.openWDV)}</td><td class="td-teal">${fmtP(r.rate)}</td><td>${fmt(r.dep-r.addlDep)}</td><td class="td-teal">${r.addlDep>0?fmt(r.addlDep):'—'}</td><td class="td-teal">${fmt(r.dep)}</td><td>${fmt(r.closeWDV)}</td></tr>`; });
+  a.comparison.forEach(r=>{ cum+=r.diff; const dc=r.diff>0?'td-teal':r.diff<0?'td-rose':'', cc=cum>0?'td-teal':cum<0?'td-rose':''; coR+=`<tr><td>Year ${r.year}</td><td class="td-gold">${fmtP(r.caRate)}</td><td class="td-gold">${fmt(r.caDep)}</td><td>${fmt(r.caWDV)}</td><td class="td-teal">${fmtP(r.itRate)}</td><td class="td-teal">${fmt(r.itDep)}</td><td>${fmt(r.itWDV)}</td><td class="${dc}">${(r.diff>=0?'+':'')+fmt(r.diff)}</td><td class="${cc}">${(cum>=0?'+':'')+fmt(cum)}</td></tr>`; });
+
+  const modalR1=a.caSchedule[0];
+  const modalPrBanner=modalR1?.daysUsed!=null?`<div style="padding:7px 12px;background:var(--gold-dim);border-bottom:1px solid var(--gold);font-size:11px;color:var(--gold2);">📅 Pro-rata FY ${modalR1.fyLabel}: <strong>${modalR1.daysUsed} days</strong> of ${modalR1.fyDays} days (${((modalR1.daysUsed/modalR1.fyDays)*100).toFixed(2)}%) — Full Rate ${fmtP(fullRate)} → Effective Y1 Rate ${fmtP(modalR1.rate)}</div>`:'';
+  el('modal-ca-content').innerHTML=`<div class="table-container scrollable">${modalPrBanner}<table><thead><tr><th>Year</th><th>Days in Use</th><th>Opening WDV</th><th>Full Rate%</th><th>Eff. Rate%</th><th>Dep(₹)</th><th>Closing WDV</th><th>Cum Dep(₹)</th></tr></thead><tbody>${caR}</tbody></table></div>`;
+  el('modal-it-content').innerHTML=`<div class="table-container scrollable"><table><thead><tr><th>Year</th><th>Opening WDV</th><th>Rate%</th><th>Normal Dep</th><th>Addl Dep</th><th>Total Dep(₹)</th><th>Closing WDV</th></tr></thead><tbody>${itR}</tbody></table></div>`;
+  el('modal-comp-content').innerHTML=`<div class="table-container scrollable"><table><thead><tr><th>Year</th><th>CA Rate%</th><th>CA Dep</th><th>CA WDV</th><th>IT Rate%</th><th>IT Dep</th><th>IT WDV</th><th>Diff(₹)</th><th>Cum Diff(₹)</th></tr></thead><tbody>${coR}</tbody></table></div>`;
+  el('modal-deferred-content').innerHTML=buildDeferredHTML(a.comparison,a.taxRate/100,'modal');
+  el('modal-disposal-content').innerHTML = a.disposal ? buildAssetDisposalHTML(a.disposal) : `<div class="placeholder"><div class="placeholder-icon">🏷️</div><h3>No Disposal Recorded</h3><p>Add DisposalYear, DisposalValue &amp; BlockStatus columns in the CSV to model a sale for this asset.</p></div>`;
+
+  el('assetModal').classList.add('open');
+  switchModalTab('mca');
+}
+function closeModal(){ el('assetModal').classList.remove('open'); currentModalIdx=-1; }
+el('assetModal').addEventListener('click',e=>{ if(e.target===el('assetModal')) closeModal(); });
+document.addEventListener('keydown',e=>{ if(e.key==='Escape') closeModal(); });
+
+function switchModalTab(name){
+  document.querySelectorAll('.modal-tab').forEach((t,i)=>{ t.classList.toggle('active',['mca','mit','mcomp','mdeferred'][i]===name); });
+  document.querySelectorAll('.modal-panel').forEach(p=>p.classList.remove('active'));
+  el('tab-'+name).classList.add('active');
+}
+
+// ═══ TAB SWITCHING ═══
+function switchTab(name){
+  document.querySelectorAll('#singleTabs .tab').forEach((t,i)=>{ t.classList.toggle('active',['ca','it','comparison','charts','deferred','disposal','aiadvisor'][i]===name); });
+  document.querySelectorAll('#panel-single .tab-panel').forEach(p=>p.classList.remove('active'));
+  el('tab-'+name).classList.add('active');
+}
+function switchBulkTab(name){
+  document.querySelectorAll('#bulkTabs .tab').forEach((t,i)=>{ t.classList.toggle('active',['register','bca','bit','bcomparison','bdeferred','bcharts'][i]===name); });
+  document.querySelectorAll('#bulk-results .tab-panel').forEach(p=>p.classList.remove('active'));
+  el('tab-'+name).classList.add('active');
+}
+
+// ═══ AUDIT-READY REPORTS (PDF / WORD) ═══
+function getActiveMode(){ return el('panel-bulk').classList.contains('active') ? 'bulk':'single'; }
+
+function generatePDFReport(){
+  if(!window.jspdf){ alert('⚠ PDF engine failed to load (needs internet access to cdnjs.cloudflare.com). Try the Word Report instead.'); return; }
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({unit:'pt',format:'a4'});
+  const pageW = doc.internal.pageSize.getWidth();
+  let y = 42;
+  doc.setFont('helvetica','bold'); doc.setFontSize(16); doc.setTextColor(20);
+  doc.text('DeprecAI Pro — Depreciation & Deferred Tax Report',40,y); y+=16;
+  doc.setFontSize(9); doc.setFont('helvetica','normal'); doc.setTextColor(90);
+  doc.text(`Generated: ${new Date().toLocaleString('en-IN')}   ·   Companies Act 2013 (Sch. II)   ·   ${lawSectionLabel()}`,40,y); y+=8;
+  doc.setDrawColor(200); doc.line(40,y,pageW-40,y); y+=18;
+  doc.setTextColor(0);
+  const ensureRoom=(need)=>{ if(y+need>760){ doc.addPage(); y=42; } };
+
+  if(getActiveMode()==='single'){
+    if(!singleCA.length){ alert('⚠ Please click Calculate first.'); return; }
+    doc.setFont('helvetica','bold'); doc.setFontSize(11); doc.text('Asset Details',40,y); y+=6;
+    doc.autoTable({ startY:y, theme:'grid', styles:{fontSize:8}, margin:{left:40,right:40},
+      head:[['Category','Description','Cost incl. Additions (₹)','CA Method / Life','IT Rate']],
+      body:[[el('assetCategory').value||'—', el('assetDesc').value||'—', fmt(parseFloat(el('originalCost').value||0)+parseFloat(el('addCapital').value||0)), el('caMethod').value+' / '+el('caUsefulLife').value+'yr', el('itRate').value+'%']] });
+    y = doc.lastAutoTable.finalY+18; ensureRoom(120);
+
+    doc.setFont('helvetica','bold'); doc.setFontSize(11); doc.text('Companies Act 2013 — Schedule II Depreciation',40,y); y+=6;
+    doc.autoTable({ startY:y, theme:'striped', styles:{fontSize:8}, margin:{left:40,right:40}, headStyles:{fillColor:[201,168,76]},
+      head:[['Year','Opening WDV (₹)','Rate %','Depreciation (₹)','Closing WDV (₹)']],
+      body: singleCA.map(r=>['Y'+r.year, fmt(r.openWDV), r.rate.toFixed(2), fmt(r.dep), fmt(r.closeWDV)]) });
+    y = doc.lastAutoTable.finalY+18; ensureRoom(120);
+
+    doc.setFont('helvetica','bold'); doc.setFontSize(11); doc.text(`Income Tax — ${lawSectionLabel()} Depreciation (WDV Block)`,40,y); y+=6;
+    doc.autoTable({ startY:y, theme:'striped', styles:{fontSize:8}, margin:{left:40,right:40}, headStyles:{fillColor:[62,207,207]},
+      head:[['Year','Opening WDV (₹)','Rate %','Depreciation (₹)','Closing WDV (₹)']],
+      body: singleIT.map(r=>['Y'+r.year, fmt(r.openWDV), r.rate.toFixed(2), fmt(r.dep), fmt(r.closeWDV)]) });
+    y = doc.lastAutoTable.finalY+18; ensureRoom(120);
+
+    doc.setFont('helvetica','bold'); doc.setFontSize(11); doc.text('CA vs IT — Comparison',40,y); y+=6;
+    doc.autoTable({ startY:y, theme:'striped', styles:{fontSize:8}, margin:{left:40,right:40}, headStyles:{fillColor:[224,92,122]},
+      head:[['Year','CA Dep (₹)','IT Dep (₹)','Diff (₹)','Cum Diff (₹)']],
+      body: singleComp.map(r=>['Y'+r.year, fmt(r.caDep), fmt(r.itDep), fmt(r.diff), fmt(r.cumDiff)]) });
+    y = doc.lastAutoTable.finalY+18; ensureRoom(120);
+
+    if(el('deferredToggle').checked){
+      const tr=parseFloat(el('taxRate').value)/100||0.25168; let cum=0;
+      doc.setFont('helvetica','bold'); doc.setFontSize(11); doc.text(`Deferred Tax — DTA/DTL (${el('dtStandard').value==='indas12'?'Ind AS 12':'AS 22'})`,40,y); y+=6;
+      doc.autoTable({ startY:y, theme:'striped', styles:{fontSize:8}, margin:{left:40,right:40}, headStyles:{fillColor:[167,139,250]},
+        head:[['Year','CA Dep (₹)','IT Dep (₹)','Timing Diff (₹)','DTA/DTL (₹)','Nature']],
+        body: singleComp.map(r=>{ const t=r.caDep-r.itDep, dtx=t*tr; cum+=dtx; return ['Y'+r.year, fmt(r.caDep), fmt(r.itDep), fmt(t), fmt(dtx), t>0?'DTA':t<0?'DTL':'NIL']; }) });
+      y = doc.lastAutoTable.finalY+18; ensureRoom(80);
+    }
+    if(singleDisposal){
+      const d=singleDisposal;
+      doc.setFont('helvetica','bold'); doc.setFontSize(11); doc.text(`Asset Disposal — Year ${d.year} (Sale Value ${fmt(d.saleValue)})`,40,y); y+=6;
+      const itRow = d.itOutcome==='CONTINUES' ? ['Block continues — WDV c/f', fmt(d.resultingBlockWDV)] : [`${d.itOutcome==='STCG'?'Short-Term Capital Gain':'Short-Term Capital Loss'} — ${lawSectionLabel()}, Sec 50`, fmt(Math.abs(d.itGainLoss))];
+      doc.autoTable({ startY:y, theme:'grid', styles:{fontSize:8}, margin:{left:40,right:40},
+        head:[['Basis','Amount (₹)']],
+        body:[['CA Carrying Amount (WDV) at Disposal', fmt(d.caWDVAtDisposal)],['CA Profit/(Loss) on Sale (AS 10 / Ind AS 16)', fmt(d.caGainLoss)],['IT WDV of Block at Disposal', fmt(d.itWDVAtDisposal)], itRow] });
+      y = doc.lastAutoTable.finalY+18;
+    }
+    const issues = runComplianceCheck().filter(i=>i.sev!=='pass');
+    if(issues.length){
+      ensureRoom(80);
+      doc.setFont('helvetica','bold'); doc.setFontSize(11); doc.text('AI Compliance Check — Items for Review',40,y); y+=6;
+      doc.autoTable({ startY:y, theme:'grid', styles:{fontSize:7.5}, margin:{left:40,right:40}, headStyles:{fillColor:[167,139,250]},
+        head:[['Risk','Issue','Suggested Action']],
+        body: issues.map(i=>[i.sev==='high'?'HIGH':'REVIEW', i.issue, i.fix]) });
+      y = doc.lastAutoTable.finalY+18;
+    }
+  } else {
+    if(!bulkAssets.length){ alert('⚠ Please upload and process a CSV first.'); return; }
+    doc.setFont('helvetica','bold'); doc.setFontSize(11); doc.text(`Asset Register — ${bulkAssets.length} Assets`,40,y); y+=6;
+    doc.autoTable({ startY:y, theme:'grid', styles:{fontSize:7}, margin:{left:40,right:40},
+      head:[['ID','Description','Cost (₹)','CA Dep Y1 (₹)','IT Dep Y1 (₹)','Diff Y1 (₹)','Disposed?']],
+      body: bulkAssets.map(a=>[a.id,a.desc,fmt(a.totalCost),fmt(a.caSchedule[0]?.dep||0),fmt(a.itSchedule[0]?.dep||0),fmt((a.itSchedule[0]?.dep||0)-(a.caSchedule[0]?.dep||0)),a.disposal?`Y${a.disposal.year}`:'—']) });
+    y = doc.lastAutoTable.finalY+18; ensureRoom(120);
+    const maxY=Math.max(...bulkAssets.map(a=>a.projYears),1); const rows=[]; let cum=0;
+    for(let yr=1;yr<=maxY;yr++){ let ca=0,it=0; bulkAssets.forEach(a=>{ if(yr<=a.projYears){ ca+=a.caSchedule[yr-1]?.dep||0; it+=a.itSchedule[yr-1]?.dep||0; } }); const d=it-ca; cum+=d; rows.push(['Y'+yr,fmt(ca),fmt(it),fmt(d),fmt(cum)]); }
+    doc.setFont('helvetica','bold'); doc.setFontSize(11); doc.text('Consolidated CA vs IT Comparison',40,y); y+=6;
+    doc.autoTable({ startY:y, theme:'striped', styles:{fontSize:8}, margin:{left:40,right:40}, headStyles:{fillColor:[224,92,122]},
+      head:[['Year','Total CA Dep (₹)','Total IT Dep (₹)','Net Diff (₹)','Cum Diff (₹)']], body:rows });
+    y = doc.lastAutoTable.finalY+18;
+  }
+
+  ensureRoom(90);
+  doc.setFont('helvetica','italic'); doc.setFontSize(8); doc.setTextColor(110);
+  doc.text('Disclaimer: This report is computer-generated for illustrative and academic purposes (ICAI capstone project) and does not constitute professional tax, accounting, or legal advice. Figures should be independently verified against the applicable Act, Rules, and professional judgement before statutory reliance.',40,y,{maxWidth:pageW-80}); y+=32;
+  doc.setTextColor(0); doc.setFont('helvetica','normal'); doc.setFontSize(9);
+  doc.text('Prepared By: _______________________',40,y);
+  doc.text('Reviewed By: _______________________',320,y); y+=18;
+  doc.text('Date: _______________________',40,y);
+
+  doc.save('DeprecAI_Report_'+today+'.pdf');
+}
+
+function generateWordReport(){
+  const mode=getActiveMode();
+  const title='DeprecAI Pro — Depreciation & Deferred Tax Report';
+  const meta=`Generated: ${new Date().toLocaleString('en-IN')} &nbsp;|&nbsp; Companies Act 2013 (Schedule II) &nbsp;|&nbsp; ${lawSectionLabel()}`;
+  let bodyHTML='';
+  if(mode==='single'){
+    if(!singleCA.length){ alert('⚠ Please click Calculate first.'); return; }
+    bodyHTML=`<h2>Asset Details</h2>
+      <p>Category: ${el('assetCategory').value||'—'} &nbsp;|&nbsp; Description: ${el('assetDesc').value||'—'} &nbsp;|&nbsp; Cost incl. Additions: ${fmt(parseFloat(el('originalCost').value||0)+parseFloat(el('addCapital').value||0))}</p>
+      <h2>Companies Act 2013 — Schedule II</h2>${el('ca-content').innerHTML}
+      <h2>Income Tax — ${lawSectionLabel()}</h2>${el('it-content').innerHTML}
+      <h2>CA vs IT Comparison</h2>${el('comparison-content').innerHTML}
+      ${el('deferredToggle').checked?'<h2>Deferred Tax</h2>'+el('deferred-content').innerHTML:''}
+      ${singleDisposal?'<h2>Asset Disposal &amp; Capital Gains</h2>'+el('disposal-content').innerHTML:''}
+      <h2>AI Executive Summary</h2>${generateExecutiveSummary()}
+      <h2>AI Compliance Check</h2>${renderComplianceHTML(runComplianceCheck())}`;
+  } else {
+    if(!bulkAssets.length){ alert('⚠ Please upload and process a CSV first.'); return; }
+    bodyHTML=`<h2>Asset Register</h2>${el('register-content').innerHTML}
+      <h2>Consolidated CA vs IT Comparison</h2>${el('bcomparison-content').innerHTML}
+      <h2>Consolidated Deferred Tax</h2>${el('bdeferred-content').innerHTML}`;
+  }
+  bodyHTML = bodyHTML.replace(/<button[\s\S]*?<\/button>/g,'');
+  const disclaimer=`<p style="font-size:9pt;color:#555;margin-top:26px;"><em>Disclaimer: This report is computer-generated for illustrative and academic purposes (ICAI capstone project) and does not constitute professional tax, accounting, or legal advice. Figures should be independently verified against the applicable Act, Rules, and professional judgement before statutory reliance.</em></p>
+    <p style="margin-top:20px;">Prepared By: ______________________ &nbsp;&nbsp;&nbsp;&nbsp; Reviewed By: ______________________</p>
+    <p>Date: ______________________</p>`;
+  const html=`<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
+  <head><meta charset='utf-8'><title>${title}</title>
+  <style>
+    body{font-family:Calibri,Arial,sans-serif;font-size:10.5pt;color:#111;}
+    h1{color:#8a6d1d;} h2{color:#8a6d1d;border-bottom:1px solid #ccc;padding-bottom:3px;margin-top:22px;}
+    table{border-collapse:collapse;width:100%;margin:8px 0;} td,th{border:1px solid #999;padding:4px 7px;font-size:9pt;text-align:right;}
+    th{background:#f2e9d0;} td:first-child,th:first-child{text-align:left;}
+  </style></head>
+  <body><h1>${title}</h1><p>${meta}</p>${bodyHTML}${disclaimer}</body></html>`;
+  const blob=new Blob(['\ufeff',html],{type:'application/msword'});
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='DeprecAI_Report_'+today+'.doc'; a.click();
+}
+
+// ═══ EXPORTS ═══
+function dl(name,rows){
+  const csv=rows.map(r=>r.map(c=>'"'+String(c??'').replace(/"/g,'""')+'"').join(',')).join('\n');
+  const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'})); a.download=name; a.click();
+}
+function exportCA(){
+  const fullRate=computeCARate(el('caMethod').value,el('caUsefulLife').value,el('caResidual').value);
+  dl('CA_Schedule.csv',[
+    ['Year','Days Used','FY Days','FY','Full Rate%','Effective Rate%','Opening WDV','Depreciation','Closing WDV','Cumulative Dep'],
+    ...singleCA.map(r=>['Year '+r.year, r.daysUsed??'Full Year', r.fyDays??'—', r.fyLabel??'—', fullRate.toFixed(4), r.rate.toFixed(4), r.openWDV.toFixed(2), r.dep.toFixed(2), r.closeWDV.toFixed(2), r.cumDep.toFixed(2)])
+  ]);
+}
+function exportIT(){ dl('IT_Schedule.csv',[['Year','Opening WDV','Rate%','Normal Dep','Addl Dep','Total Dep','Closing WDV'],...singleIT.map(r=>['Year '+r.year,r.openWDV.toFixed(2),r.rate.toFixed(4),(r.dep-r.addlDep).toFixed(2),r.addlDep.toFixed(2),r.dep.toFixed(2),r.closeWDV.toFixed(2)])]); }
+function exportComparison(){ let c=0; dl('Comparison.csv',[['Year','CA Rate%','CA Dep','CA WDV','IT Rate%','IT Dep','IT WDV','Diff','Cum Diff','WDV Diff'],...singleComp.map(r=>{ c+=r.diff; return ['Year '+r.year,r.caRate.toFixed(4),r.caDep.toFixed(2),r.caWDV.toFixed(2),r.itRate.toFixed(4),r.itDep.toFixed(2),r.itWDV.toFixed(2),r.diff.toFixed(2),c.toFixed(2),r.wdvDiff.toFixed(2)]; })]); }
+function exportDeferred(pfx){ const tr=pfx==='modal'&&currentModalIdx>=0?bulkAssets[currentModalIdx].taxRate/100:parseFloat(el('taxRate').value)/100||0.25168; const comp=pfx==='modal'&&currentModalIdx>=0?bulkAssets[currentModalIdx].comparison:singleComp; let c=0; dl('Deferred_Tax.csv',[['Year','CA Dep','IT Dep','Timing Diff','DTA/DTL','Cum DTA/DTL','Nature'],...comp.map(r=>{ const t=r.caDep-r.itDep, dtx=t*tr; c+=dtx; return ['Year '+r.year,r.caDep.toFixed(2),r.itDep.toFixed(2),t.toFixed(2),dtx.toFixed(2),c.toFixed(2),t>0?'DTA':t<0?'DTL':'NIL']; })]); }
+function exportModalCA(){ if(currentModalIdx<0) return; const a=bulkAssets[currentModalIdx]; dl(`${a.id}_CA.csv`,[['Year','Opening WDV','Rate%','Dep','Closing WDV','Cum Dep'],...a.caSchedule.map(r=>['Year '+r.year,r.openWDV.toFixed(2),r.rate.toFixed(4),r.dep.toFixed(2),r.closeWDV.toFixed(2),r.cumDep.toFixed(2)])]); }
+function exportModalIT(){ if(currentModalIdx<0) return; const a=bulkAssets[currentModalIdx]; dl(`${a.id}_IT.csv`,[['Year','Opening WDV','Rate%','Normal Dep','Addl Dep','Total Dep','Closing WDV'],...a.itSchedule.map(r=>['Year '+r.year,r.openWDV.toFixed(2),r.rate.toFixed(4),(r.dep-r.addlDep).toFixed(2),r.addlDep.toFixed(2),r.dep.toFixed(2),r.closeWDV.toFixed(2)])]); }
+function exportModalComp(){ if(currentModalIdx<0) return; const a=bulkAssets[currentModalIdx]; let c=0; dl(`${a.id}_Comparison.csv`,[['Year','CA Rate%','CA Dep','CA WDV','IT Rate%','IT Dep','IT WDV','Diff','Cum Diff'],...a.comparison.map(r=>{ c+=r.diff; return ['Year '+r.year,r.caRate.toFixed(4),r.caDep.toFixed(2),r.caWDV.toFixed(2),r.itRate.toFixed(4),r.itDep.toFixed(2),r.itWDV.toFixed(2),r.diff.toFixed(2),c.toFixed(2)]; })]); }
+function exportModalDeferred(){ exportDeferred('modal'); }
+function exportRegister(){ if(!bulkAssets.length) return; dl('Asset_Register.csv',[['AssetID','Description','Category','TotalCost','CAMethod','CALife','CARate%','CADep_Y1','ITRate%','ITDep_Y1','Diff_Y1','TaxRate'],...bulkAssets.map(a=>{ const ca1=(a.caSchedule[0]?.dep||0),it1=(a.itSchedule[0]?.dep||0); return [a.id,a.desc,a.cat,a.totalCost.toFixed(2),a.caMethod,a.caUsefulLife,a.caRatePct.toFixed(4),ca1.toFixed(2),(a.itHalfYear?a.itRate*0.5:a.itRate).toFixed(2),it1.toFixed(2),(it1-ca1).toFixed(2),a.taxRate]; })]); }
+function exportBulkCA(){ if(!bulkAssets.length) return; const rows=[['AssetID','Description','Year','Days Used','FY Days','Full Rate%','Eff Rate%','Opening WDV','Dep','Closing WDV','Cum Dep']]; bulkAssets.forEach(a=>{ const fr=computeCARate(a.caMethod,a.caUsefulLife,a.caResidualPct); a.caSchedule.forEach(r=>rows.push([a.id,a.desc,'Year '+r.year,r.daysUsed??'Full Year',r.fyDays??'—',fr.toFixed(4),r.rate.toFixed(4),r.openWDV.toFixed(2),r.dep.toFixed(2),r.closeWDV.toFixed(2),r.cumDep.toFixed(2)])); }); dl('All_CA_Schedules.csv',rows); }
+function exportBulkIT(){ if(!bulkAssets.length) return; const rows=[['AssetID','Description','Year','Opening WDV','Rate%','Normal Dep','Addl Dep','Total Dep','Closing WDV']]; bulkAssets.forEach(a=>a.itSchedule.forEach(r=>rows.push([a.id,a.desc,'Year '+r.year,r.openWDV.toFixed(2),r.rate.toFixed(4),(r.dep-r.addlDep).toFixed(2),r.addlDep.toFixed(2),r.dep.toFixed(2),r.closeWDV.toFixed(2)]))); dl('All_IT_Schedules.csv',rows); }
+function exportBulkComp(){ if(!bulkAssets.length) return; const maxY=Math.max(...bulkAssets.map(a=>a.projYears)); const rows=[['Year','Total CA Dep','Total IT Dep','Net Diff','Cum Diff']]; let c=0; for(let y=1;y<=maxY;y++){ let ca=0,it=0; bulkAssets.forEach(a=>{ if(y<=a.projYears){ ca+=a.caSchedule[y-1]?.dep||0; it+=a.itSchedule[y-1]?.dep||0; } }); const d=it-ca; c+=d; rows.push(['Year '+y,ca.toFixed(2),it.toFixed(2),d.toFixed(2),c.toFixed(2)]); } dl('Consolidated_Comparison.csv',rows); }
+function exportBulkDeferred(){ if(!bulkAssets.length) return; const maxY=Math.max(...bulkAssets.map(a=>a.projYears)); const rows=[['Year','Total CA Dep','Total IT Dep','Timing Diff','DTA/DTL','Cum DTA/DTL','Nature']]; let c=0; for(let y=1;y<=maxY;y++){ let ca=0,it=0,wt=0,n=0; bulkAssets.forEach(a=>{ if(y<=a.projYears){ ca+=a.caSchedule[y-1]?.dep||0; it+=a.itSchedule[y-1]?.dep||0; wt+=a.taxRate; n++; } }); const t=ca-it, dtx=t*(wt/(n||1)/100); c+=dtx; rows.push(['Year '+y,ca.toFixed(2),it.toFixed(2),t.toFixed(2),dtx.toFixed(2),c.toFixed(2),t>0?'DTA':t<0?'DTL':'NIL']); } dl('Consolidated_Deferred_Tax.csv',rows); }
+function exportAllBulk(){ exportRegister(); setTimeout(exportBulkCA,300); setTimeout(exportBulkIT,600); setTimeout(exportBulkComp,900); setTimeout(exportBulkDeferred,1200); }
+
+// ═══ TEMPLATES ═══
+function downloadTemplate(){
+  dl('DeprecAI_Template.csv',[['AssetID','AssetDescription','AssetCategory','DateOfPurchase','DatePutToUse','OriginalCost','AddCapital','CAMethod','CAUsefulLife','CAResidualPct','ITRate','ITAddlDepPct','HalfYearRule','ProjectionYears','TaxRate','DisposalYear','DisposalValue','BlockStatus','OtherBlockWDV']]);
+}
+function downloadSampleData(){
+  dl('DeprecAI_Sample.csv',[
+    ['AssetID','AssetDescription','AssetCategory','DateOfPurchase','DatePutToUse','OriginalCost','AddCapital','CAMethod','CAUsefulLife','CAResidualPct','ITRate','ITAddlDepPct','HalfYearRule','ProjectionYears','TaxRate','DisposalYear','DisposalValue','BlockStatus','OtherBlockWDV'],
+    ['A001','Office Building Block A','Buildings','2023-04-01','2023-04-01','50000000','0','SLM','30','5','10','0','No','15','25.168','','','',''],
+    ['A002','CNC Machining Centre','plantmachinery','2023-07-15','2023-08-01','8500000','500000','WDV','15','5','15','20','Yes','10','25.168','','','',''],
+    ['A003','Dell Servers — Data Centre','Computers','2024-01-10','2024-01-10','3200000','0','WDV','3','5','40','0','No','3','25.168','2','1000000','ceases','0'],
+    ['A004','Toyota Innova Fleet x5','vehicles','2023-09-01','2023-09-01','6250000','0','WDV','8','5','15','0','No','8','22','','','',''],
+    ['A005','Office Workstations & Chairs','Furniture','2023-06-01','2023-06-01','1200000','200000','SLM','10','5','10','0','No','10','25.168','','','',''],
+    ['A006','HVAC & Electrical Fittings','electricals','2023-04-15','2023-05-01','4500000','0','WDV','10','5','10','0','No','10','25.168','4','2000000','continues','1500000'],
+    ['A007','Wind Turbine Generator','plantmachinery','2024-03-20','2024-03-20','120000000','0','WDV','22','5','15','0','No','20','25.168','','','',''],
+  ]);
+}
+
+// ═══ RESET ═══
+function resetAll(){
+  if(!confirm('Reset all inputs and results?')) return;
+  ['originalCost','addCapital'].forEach(id=>el(id).value='0');
+  el('assetDesc').value=''; el('assetCategory').value=''; el('dateOfPurchase').value=today; el('datePutToUse').value=today;
+  el('residualPct').value='5'; el('projYears').value='10'; el('caMethod').value='SLM'; el('caUsefulLife').value='15';
+  el('caResidual').value='5'; el('caProRata').checked=true; el('itRate').value='15'; el('itAddlDep').value='0';
+  el('itHalfYear').checked=false; el('deferredToggle').checked=false; el('taxRate').value='25.168'; el('itBlock').value='';
+  el('disposalToggle').checked=false;
+  el('disposalYear').value='3'; el('disposalValue').value='0'; el('blockStatus').value='ceases'; el('otherBlockWDV').value='0';
+  toggleDisposalFields();
+  singleCA=[]; singleIT=[]; singleComp=[]; bulkAssets=[]; singleDisposal=null; lastP=null; lastR=null; aiClassifyResult=null;
+  ['scCARate','scITRate','scRateDiff','scDepAmt','scITTotal'].forEach(id=>el(id).textContent='—');
+  ['scCAMethod','scITNote','scResidual'].forEach(id=>el(id).textContent='—');
+  const ph=(icon,h,p)=>`<div class="placeholder"><div class="placeholder-icon">${icon}</div><h3>${h}</h3><p>${p}</p></div>`;
+  el('ca-content').innerHTML=ph('🏢','Companies Act Schedule','Configure inputs and click Calculate.');
+  el('it-content').innerHTML=ph('📋','Income Tax Schedule','Configure inputs and click Calculate.');
+  el('comparison-content').innerHTML=ph('⚖️','Comparison','Calculate to see comparison.');
+  el('charts-content').innerHTML=ph('📈','Charts','Calculate to see charts.');
+  el('deferred-content').innerHTML=ph('🧾','Deferred Tax','Enable toggle and calculate.');
+  el('disposal-content').innerHTML=ph('🏷️','Asset Disposal & Capital Gains','Enable disposal toggle and calculate.');
+  renderAIAdvisorTab();
+  el('bulk-results').style.display='none';
+  el('csvFileInput').value=''; el('bulk-error-box').innerHTML='';
+  updateRateBadges();
+  updateProRataDisplay();
+}
+
+// ═══ INIT ═══
+const today=new Date().toISOString().split('T')[0];
+el('dateOfPurchase').value=today; el('datePutToUse').value=today;
+updateRateBadges();
+updateProRataDisplay();
+onLawRegimeChange();
+toggleDisposalFields();
+['caMethod','caUsefulLife','caResidual','itRate'].forEach(id=>{ const e=el(id); if(e){e.addEventListener('change',updateRateBadges);e.addEventListener('input',updateRateBadges);} });
+el('datePutToUse').addEventListener('change', updateProRataDisplay);
+el('datePutToUse').addEventListener('input', updateProRataDisplay);
+</script>
+</body>
+</html>

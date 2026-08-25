@@ -1,0 +1,304 @@
+{% extends "base.html" %}
+
+{% block page_title %}Masters{% endblock %}
+{% block page_kicker %}Branches, channels, and settlement setup{% endblock %}
+
+{% block content %}
+<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-bottom: 2rem;">
+    <!-- Branch Master Card -->
+    <div class="glass-card">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+            <h3 style="font-size: 1.1rem;"><i class="fa-solid fa-store"></i> Branch Master</h3>
+            <button onclick="openBranchModal()" class="btn btn-primary btn-sm"><i class="fa-solid fa-plus"></i> Add Branch</button>
+        </div>
+        <div class="table-responsive">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Code</th>
+                        <th>Name</th>
+                        <th>Opening Cash Bal</th>
+                        <th>Base Kitchen</th>
+                        <th>Active</th>
+                    </tr>
+                </thead>
+                <tbody id="branchTbody">
+                    <tr><td colspan="5" style="text-align: center;">Loading Branches...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Payment Channels Card -->
+    <div class="glass-card">
+        <h3 style="margin-bottom: 1rem; font-size: 1.1rem;"><i class="fa-solid fa-credit-card"></i> Payment Channels</h3>
+        <div class="table-responsive">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Code</th>
+                        <th>Name</th>
+                        <th>Type</th>
+                        <th>Reconciliation Method</th>
+                    </tr>
+                </thead>
+                <tbody id="channelTbody">
+                    <tr><td colspan="4" style="text-align: center;">Loading Channels...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<div class="glass-card" style="margin-bottom: 2rem;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; gap: 1rem; flex-wrap: wrap;">
+        <div>
+            <h3 style="font-size: 1.1rem;"><i class="fa-solid fa-users"></i> Staff Master</h3>
+            <p class="field-source">Basic staff list by branch. New names from an attendance photo are added here automatically.</p>
+        </div>
+        <div style="display: flex; gap: 0.5rem; align-items: flex-end;">
+            <div class="form-group" style="margin: 0;">
+                <label class="form-label">Branch</label>
+                <select id="staffBranch" class="form-select" onchange="loadStaffMaster()">
+                    <option value="">All branches</option>
+                    {% for b in branches %}
+                    <option value="{{ b.id }}">{{ b.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <button type="button" onclick="openStaffModal()" class="btn btn-primary btn-sm"><i class="fa-solid fa-plus"></i> Add staff</button>
+        </div>
+    </div>
+    <div class="table-responsive">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>Rank</th>
+                    <th>Team</th>
+                    <th>Salary</th>
+                    <th>Branch</th>
+                    <th>First seen</th>
+                    <th>Last seen</th>
+                    <th>Active</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody id="staffTbody">
+                <tr><td colspan="9" style="text-align: center;">Loading staff…</td></tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Modal Dialog for Add Branch -->
+<div class="modal-backdrop" id="branchModal">
+    <div class="modal-card">
+        <div class="modal-header">
+            <h3 style="font-size: 1.1rem;"><i class="fa-solid fa-plus"></i> Add New Restaurant Branch</h3>
+            <button class="modal-close" onclick="closeModal('branchModal')">&times;</button>
+        </div>
+        <form id="branchForm" onsubmit="saveNewBranch(event)">
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
+                <div class="form-group">
+                    <label class="form-label">Branch Code</label>
+                    <input type="text" id="bCode" class="form-control" placeholder="GKP01" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Branch Name</label>
+                    <input type="text" id="bName" class="form-control" placeholder="Gorakhpur Branch" required>
+                </div>
+            </div>
+            <div class="form-group" style="margin-bottom: 1rem;">
+                <label class="form-label">Address</label>
+                <input type="text" id="bAddress" class="form-control" placeholder="123 Main Road, City">
+            </div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1.25rem;">
+                <div class="form-group">
+                    <label class="form-label">Initial Opening Cash Balance</label>
+                    <input type="number" step="0.01" id="bOpeningBal" class="form-control" value="10000.00" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Is Base Kitchen?</label>
+                    <select id="bBaseKitchen" class="form-select">
+                        <option value="false">No</option>
+                        <option value="true">Yes</option>
+                    </select>
+                </div>
+            </div>
+            <div style="display: flex; justify-content: flex-end; gap: 0.75rem;">
+                <button type="button" class="btn btn-secondary" onclick="closeModal('branchModal')">Cancel</button>
+                <button type="submit" class="btn btn-primary"><i class="fa-solid fa-check"></i> Create Branch</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="modal-backdrop" id="staffModal">
+    <div class="modal-card">
+        <div class="modal-header">
+            <h3 style="font-size: 1.1rem;"><i class="fa-solid fa-user-plus"></i> <span id="staffModalTitle">Add staff</span></h3>
+            <button class="modal-close" onclick="closeModal('staffModal')">&times;</button>
+        </div>
+        <form id="staffForm" onsubmit="saveStaffMaster(event)">
+            <input type="hidden" id="staffId" value="">
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
+                <div class="form-group">
+                    <label class="form-label">Name</label>
+                    <input type="text" id="staffName" class="form-control" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Branch</label>
+                    <select id="staffFormBranch" class="form-select" required>
+                        {% for b in branches %}
+                        <option value="{{ b.id }}">{{ b.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
+                <div class="form-group">
+                    <label class="form-label">Rank</label>
+                    <input type="text" id="staffRank" class="form-control" placeholder="Chef, Tandoor, Ut">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Team</label>
+                    <input type="text" id="staffTeam" class="form-control" placeholder="Kitchen">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Active</label>
+                    <select id="staffActive" class="form-select">
+                        <option value="true">Yes</option>
+                        <option value="false">No</option>
+                    </select>
+                </div>
+            </div>
+            <div class="form-group" style="margin-bottom: 1.25rem;">
+                <label class="form-label">Monthly salary (₹)</label>
+                <input type="number" step="0.01" min="0" id="staffSalary" class="form-control" placeholder="0.00">
+            </div>
+            <div style="display: flex; justify-content: flex-end; gap: 0.75rem;">
+                <button type="button" class="btn btn-secondary" onclick="closeModal('staffModal')">Cancel</button>
+                <button type="submit" class="btn btn-primary">Save staff</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        loadBranches();
+        loadStaffMaster();
+    });
+
+    async function loadStaffMaster() {
+        const tbody = document.getElementById('staffTbody');
+        if (!tbody) return;
+        const branchId = (document.getElementById('staffBranch') || {}).value || '';
+        const q = branchId ? `?branch_id=${branchId}` : '';
+        const rows = await apiFetch(`/api/attendance/staff${q}`);
+        if (!rows) return;
+        if (!rows.length) {
+            tbody.innerHTML = `<tr><td colspan="9" style="text-align:center;color:var(--muted,#64748b);">No staff yet. Add here or upload an attendance register.</td></tr>`;
+            return;
+        }
+        tbody.innerHTML = rows.map((s) => `
+            <tr>
+                <td><strong>${s.name}</strong></td>
+                <td>${s.rank || ''}</td>
+                <td>${s.team || ''}</td>
+                <td class="amount-num">${s.monthly_salary ? formatINR(s.monthly_salary) : '—'}</td>
+                <td>${s.branch_name || ''}</td>
+                <td>${s.first_seen_date || ''}</td>
+                <td>${s.last_seen_date || ''}</td>
+                <td><span class="badge ${s.is_active ? 'badge-reconciled' : 'badge-pending'}">${s.is_active ? 'Active' : 'Inactive'}</span></td>
+                <td><button type="button" class="btn btn-secondary btn-sm" onclick='openStaffModal(${JSON.stringify(s)})'>Edit</button></td>
+            </tr>
+        `).join('');
+    }
+
+    function openStaffModal(staff) {
+        document.getElementById('staffId').value = staff && staff.id ? staff.id : '';
+        document.getElementById('staffModalTitle').innerText = staff && staff.id ? 'Edit staff' : 'Add staff';
+        document.getElementById('staffName').value = staff && staff.name ? staff.name : '';
+        document.getElementById('staffRank').value = staff && staff.rank ? staff.rank : '';
+        document.getElementById('staffTeam').value = staff && staff.team ? staff.team : '';
+        document.getElementById('staffSalary').value = staff && staff.monthly_salary ? staff.monthly_salary : '';
+        document.getElementById('staffActive').value = staff && staff.is_active === false ? 'false' : 'true';
+        if (staff && staff.branch_id) document.getElementById('staffFormBranch').value = staff.branch_id;
+        openModal('staffModal');
+    }
+
+    async function saveStaffMaster(e) {
+        e.preventDefault();
+        const id = document.getElementById('staffId').value;
+        const payload = {
+            name: document.getElementById('staffName').value,
+            branch_id: parseInt(document.getElementById('staffFormBranch').value, 10),
+            rank: document.getElementById('staffRank').value,
+            team: document.getElementById('staffTeam').value,
+            monthly_salary: parseFloat(document.getElementById('staffSalary').value || 0),
+            is_active: document.getElementById('staffActive').value === 'true'
+        };
+        const url = id ? `/api/attendance/staff/${id}` : '/api/attendance/employee';
+        const res = await apiFetch(url, {
+            method: id ? 'PUT' : 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+        if (!res) return;
+        showToast(id ? 'Staff updated' : 'Staff added', 'success');
+        closeModal('staffModal');
+        loadStaffMaster();
+    }
+
+    async function loadBranches() {
+        const branches = await apiFetch('/api/branches');
+        if (!branches) return;
+
+        const tbody = document.getElementById('branchTbody');
+        tbody.innerHTML = '';
+        branches.forEach(b => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td><code>${b.code}</code></td>
+                <td><strong>${b.name}</strong></td>
+                <td class="amount-num">${formatINR(b.opening_cash_balance)}</td>
+                <td>${b.is_base_kitchen ? 'Yes' : 'No'}</td>
+                <td><span class="badge badge-reconciled">${b.is_active ? 'Active' : 'Inactive'}</span></td>
+            `;
+            tbody.appendChild(tr);
+        });
+    }
+
+    function openBranchModal() {
+        openModal('branchModal');
+    }
+
+    async function saveNewBranch(e) {
+        e.preventDefault();
+        const payload = {
+            code: document.getElementById('bCode').value,
+            name: document.getElementById('bName').value,
+            address: document.getElementById('bAddress').value,
+            opening_cash_balance: parseFloat(document.getElementById('bOpeningBal').value || 0),
+            is_base_kitchen: document.getElementById('bBaseKitchen').value === 'true',
+            is_active: true
+        };
+
+        const res = await apiFetch('/api/branches', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+
+        if (res) {
+            showToast('New branch created successfully!', 'success');
+            closeModal('branchModal');
+            loadBranches();
+        }
+    }
+</script>
+{% endblock %}

@@ -1,0 +1,335 @@
+{% extends "base.html" %}
+
+{% block page_title %}Card / QR Reconciliation{% endblock %}
+{% block page_kicker %}Final settlement — Day Book Card/QR vs bank receipts{% endblock %}
+
+{% block content %}
+{% include "partials/import_bank.html" %}
+<div class="filter-toolbar">
+    <div class="form-group">
+        <label class="form-label">Branch</label>
+        <select id="cardBranch" class="form-select" onchange="loadCardQrRec()">
+            <option value="">All Branches</option>
+            {% for b in branches %}
+            <option value="{{ b.id }}">{{ b.name }}</option>
+            {% endfor %}
+        </select>
+    </div>
+    {% with period_prefix='card', period_reload='loadCardQrRec' %}
+    {% include "partials/period_filter.html" %}
+    {% endwith %}
+    <div class="form-group">
+        <label class="form-label">Status</label>
+        <select id="cardStatus" class="form-select" onchange="loadCardQrRec()">
+            <option value="">All</option>
+            <option value="PENDING">Pending</option>
+            <option value="MATCHED">Matched</option>
+            <option value="DIFFERENCE">Difference</option>
+            <option value="MANUALLY_MATCHED">Manually Matched</option>
+        </select>
+    </div>
+    <div class="form-group" style="margin-left: auto; flex-direction: row; gap: 0.5rem; align-items: flex-end;">
+        <button type="button" onclick="openCardQrEntry()" class="btn btn-primary" data-perm="card_qr.enter"><i class="fa-solid fa-plus"></i> Entry / Edit</button>
+        <button onclick="runAutoMatch()" class="btn btn-primary"><i class="fa-solid fa-wand-magic-sparkles"></i> AI Reconcile</button>
+        <button onclick="openManualMatchModal()" class="btn btn-secondary"><i class="fa-solid fa-link"></i> Manual Match</button>
+        <a id="btnExportCardExcel" href="/api/reports/export/card-qr/excel" class="btn btn-outline-excel"><i class="fa-solid fa-file-excel"></i> Export Excel</a>
+        <a id="btnExportCardPdf" href="/api/reports/export/card-qr/pdf" target="_blank" class="btn btn-outline-pdf"><i class="fa-solid fa-file-pdf"></i> Export PDF</a>
+    </div>
+</div>
+
+<div class="glass-card">
+    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem; gap: 1rem; flex-wrap: wrap;">
+        <h3 style="font-size: 1.1rem; font-weight: 700;">
+            <i class="fa-solid fa-scale-balanced" style="color: var(--primary);"></i> Final Settlement Report
+        </h3>
+        <span id="cardQrSub" style="font-size: 0.82rem; color: var(--text-muted);">Day Book Card/QR vs bank received · difference = bank / PG charges</span>
+    </div>
+    <div class="payout-scroll-wrap">
+        <div class="payout-scroll" id="settlementScroll">
+            <table class="data-table settlement-matrix" id="settlementTable">
+                <thead id="settlementHead"></thead>
+                <tbody id="cardQrTbody">
+                    <tr><td colspan="4" style="text-align: center;">Loading Final Settlement Report...</td></tr>
+                </tbody>
+                <tfoot id="settlementFoot"></tfoot>
+            </table>
+        </div>
+    </div>
+</div>
+
+<div class="modal-backdrop" id="cardQrEntryModal">
+    <div class="modal-card">
+        <div class="modal-header">
+            <h3 style="font-size: 1.1rem;"><i class="fa-solid fa-pen-to-square"></i> <span id="cardQrEntryTitle">Card / QR entry</span></h3>
+            <button class="modal-close" onclick="closeModal('cardQrEntryModal')">&times;</button>
+        </div>
+        <form id="cardQrEntryForm" onsubmit="saveCardQrEntry(event)">
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; margin-bottom: 0.85rem;">
+                <div class="form-group">
+                    <label class="form-label">Branch</label>
+                    <select id="cqEntryBranch" class="form-select" required>
+                        {% for b in branches %}
+                        <option value="{{ b.id }}">{{ b.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Date</label>
+                    <input type="date" id="cqEntryDate" class="form-control" required>
+                </div>
+            </div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; margin-bottom: 0.85rem;">
+                <div class="form-group">
+                    <label class="form-label">Card / QR sale (₹)</label>
+                    <input type="number" step="0.01" id="cqEntrySales" class="form-control" value="0">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Received amount (₹)</label>
+                    <input type="number" step="0.01" id="cqEntryReceived" class="form-control" value="0">
+                </div>
+            </div>
+            <div class="form-group" style="margin-bottom: 1.15rem;">
+                <label class="form-label">Remarks</label>
+                <input type="text" id="cqEntryRemarks" class="form-control" placeholder="Manual entry or correction">
+            </div>
+            <div style="display: flex; justify-content: flex-end; gap: 0.75rem;">
+                <button type="button" class="btn btn-secondary" onclick="closeModal('cardQrEntryModal')">Cancel</button>
+                <button type="submit" class="btn btn-primary">Save entry</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="modal-backdrop" id="manualMatchModal">
+    <div class="modal-card">
+        <div class="modal-header">
+            <h3 style="font-size: 1.1rem;"><i class="fa-solid fa-link"></i> Manual Bank Transaction Match</h3>
+            <button class="modal-close" onclick="closeModal('manualMatchModal')">&times;</button>
+        </div>
+        <form id="manualMatchForm" onsubmit="submitManualMatch(event)">
+            <div class="form-group" style="margin-bottom: 1rem;">
+                <label class="form-label">Unmatched Card/QR sale</label>
+                <select id="mCardRecId" class="form-select" required></select>
+            </div>
+            <div class="form-group" style="margin-bottom: 1rem;">
+                <label class="form-label">Unmatched bank credit</label>
+                <select id="mBankTxId" class="form-select" required></select>
+            </div>
+            <div class="form-group" style="margin-bottom: 1.25rem;">
+                <label class="form-label">Reason</label>
+                <input type="text" id="mMatchReason" class="form-control" placeholder="e.g. Settlement delayed by a holiday" required>
+            </div>
+            <div style="display: flex; justify-content: flex-end; gap: 0.75rem;">
+                <button type="button" class="btn btn-secondary" onclick="closeModal('manualMatchModal')">Cancel</button>
+                <button type="submit" class="btn btn-primary"><i class="fa-solid fa-check"></i> Confirm Match</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/js/imports.js?v=multi1"></script>
+<script>
+    let currentRecs = [];
+    let currentMatrix = null;
+    let cardQrEditOriginal = null;
+
+    document.addEventListener('DOMContentLoaded', () => {
+        initPeriodFilter('card');
+        loadCardQrRec();
+    });
+
+    function currentQuery() {
+        const branchId = document.getElementById('cardBranch').value;
+        const status = document.getElementById('cardStatus').value;
+        const { start, end } = periodRange('card');
+        const params = new URLSearchParams();
+        if (branchId) params.append('branch_id', branchId);
+        if (status) params.append('status', status);
+        if (start) params.append('start_date', start);
+        if (end) params.append('end_date', end);
+        return params.toString() ? '?' + params.toString() : '';
+    }
+
+    function fmtDate(iso) {
+        if (!iso) return '-';
+        const [y, m, d] = iso.split('-');
+        const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+        return `${parseInt(d, 10)}-${months[parseInt(m, 10) - 1]}-${String(y).slice(-2)}`;
+    }
+
+    async function loadCardQrRec() {
+        const q = currentQuery();
+        document.getElementById('btnExportCardExcel').href = `/api/reports/export/card-qr/excel${q}`;
+        document.getElementById('btnExportCardPdf').href = `/api/reports/export/card-qr/pdf${q}`;
+
+        const data = await apiFetch(`/api/card-qr/settlement-matrix${q}`);
+        if (!data) return;
+        currentMatrix = data;
+
+        const monthEl = document.getElementById('cardMonth');
+        if (monthEl && !monthEl.value && data.available_months && data.available_months.length) {
+            monthEl.value = data.available_months[data.available_months.length - 1];
+            return loadCardQrRec();
+        }
+
+        const list = await apiFetch(`/api/card-qr${q}`);
+        currentRecs = list || [];
+        renderSettlement(data);
+    }
+
+    function renderSettlement(data) {
+        const head = document.getElementById('settlementHead');
+        const body = document.getElementById('cardQrTbody');
+        const foot = document.getElementById('settlementFoot');
+        const branches = data.branches || [];
+        const dates = data.dates || [];
+        const cells = data.cells || {};
+        const totals = data.totals || {};
+
+        document.getElementById('cardQrSub').textContent =
+            `${dates.length} day(s) · ${branches.length || 0} branch(es) · unmatched bank credits: ${data.unmatched_bank_count || 0}`;
+
+        if (!branches.length || !dates.length) {
+            head.innerHTML = '';
+            foot.innerHTML = '';
+            body.innerHTML = `<tr><td colspan="4" style="text-align:center;color:var(--text-muted);">No Card/QR sales in this period. Import the Day Book, then the settlement ledger.</td></tr>`;
+            return;
+        }
+
+        let top = '<tr><th class="sticky-col date-col" rowspan="2">Date</th>';
+        branches.forEach((b, i) => {
+            top += `<th class="branch-head branch-tone-${i % 4}" colspan="3">${b.name}</th>`;
+        });
+        top += '</tr><tr>';
+        branches.forEach((b, i) => {
+            top += `<th class="sub-head branch-tone-${i % 4}">Card / QR Code</th>`;
+            top += `<th class="sub-head branch-tone-${i % 4}">Received Amount</th>`;
+            top += `<th class="sub-head col-diff">Difference</th>`;
+        });
+        top += '</tr>';
+        head.innerHTML = top;
+
+        body.innerHTML = '';
+        dates.forEach(iso => {
+            const tr = document.createElement('tr');
+            let html = `<td class="sticky-col date-col">${fmtDate(iso)}</td>`;
+            branches.forEach((b, i) => {
+                const cell = (cells[iso] || {})[String(b.id)] || {sales: 0, received: 0, difference: 0, status: ''};
+                const pending = !cell.status || cell.status === 'PENDING';
+                const charge = Math.abs(cell.difference || 0) >= 0.01 && cell.received > 0;
+                html += `<td class="amount-num branch-tone-${i % 4}" style="cursor:pointer;" title="Edit this day" onclick="openCardQrEntry('${iso}', ${b.id}, ${cell.sales || 0}, ${cell.received || 0})">${formatINR(cell.sales)}</td>`;
+                html += `<td class="amount-num branch-tone-${i % 4}" style="cursor:pointer;" title="Edit this day" onclick="openCardQrEntry('${iso}', ${b.id}, ${cell.sales || 0}, ${cell.received || 0})">${cell.received ? formatINR(cell.received) : '<span class="muted-dash">—</span>'}</td>`;
+                html += `<td class="amount-num col-diff ${pending ? 'is-pending' : ''} ${charge ? 'is-charge' : ''}" title="${cell.bank_reference || cell.status || ''}" style="cursor:pointer;" onclick="openCardQrEntry('${iso}', ${b.id}, ${cell.sales || 0}, ${cell.received || 0})">${formatINR(cell.difference)}</td>`;
+            });
+            tr.innerHTML = html;
+            body.appendChild(tr);
+        });
+
+        let footHtml = '<tr><td class="sticky-col date-col"><strong>Total</strong></td>';
+        branches.forEach((b) => {
+            const apiTotal = totals[String(b.id)] || {};
+            let sales = 0, received = 0, difference = 0;
+            dates.forEach(iso => {
+                const cell = (cells[iso] || {})[String(b.id)] || {};
+                sales += Number(cell.sales || 0);
+                received += Number(cell.received || 0);
+                difference += Number(cell.difference || 0);
+            });
+            if (!sales && !received && apiTotal.sales) {
+                sales = Number(apiTotal.sales || 0);
+                received = Number(apiTotal.received || 0);
+                difference = Number(apiTotal.difference || 0);
+            }
+            footHtml += `<td class="amount-num"><strong>${formatINR(sales)}</strong></td>`;
+            footHtml += `<td class="amount-num"><strong>${formatINR(received)}</strong></td>`;
+            footHtml += `<td class="amount-num col-diff"><strong>${formatINR(difference)}</strong></td>`;
+        });
+        footHtml += '</tr>';
+        foot.innerHTML = footHtml;
+    }
+
+    function openCardQrEntry(iso, branchId, sales, received) {
+        document.getElementById('cardQrEntryTitle').innerText = iso ? 'Edit Card / QR' : 'Card / QR entry';
+        document.getElementById('cqEntryDate').value = iso || new Date().toISOString().split('T')[0];
+        if (branchId) document.getElementById('cqEntryBranch').value = String(branchId);
+        document.getElementById('cqEntrySales').value = sales || 0;
+        document.getElementById('cqEntryReceived').value = received || 0;
+        document.getElementById('cqEntryRemarks').value = '';
+        cardQrEditOriginal = iso && branchId ? { branch_id: branchId, sale_date: iso } : null;
+        openModal('cardQrEntryModal');
+    }
+
+    async function saveCardQrEntry(e) {
+        e.preventDefault();
+        const res = await apiFetch('/api/card-qr/entry', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                branch_id: parseInt(document.getElementById('cqEntryBranch').value, 10),
+                sale_date: document.getElementById('cqEntryDate').value,
+                card_qr_sales_amount: parseFloat(document.getElementById('cqEntrySales').value || 0),
+                received_amount: parseFloat(document.getElementById('cqEntryReceived').value || 0),
+                remarks: document.getElementById('cqEntryRemarks').value || 'Manual entry',
+                original_branch_id: cardQrEditOriginal ? cardQrEditOriginal.branch_id : null,
+                original_sale_date: cardQrEditOriginal ? cardQrEditOriginal.sale_date : null
+            })
+        });
+        if (!res) return;
+        showToast('Card / QR entry saved', 'success');
+        closeModal('cardQrEntryModal');
+        loadCardQrRec();
+    }
+
+    async function runAutoMatch() {
+        showToast('Reconciling Day Book Card/QR with bank receipts (1–3 day lag)...', 'info');
+        const res = await apiFetch('/api/card-qr/auto-match', { method: 'POST' });
+        if (res) {
+            showToast(`Reconciled ${res.matched_count} sale day(s). Difference is bank / PG charges.`, 'success');
+            loadCardQrRec();
+        }
+    }
+
+    async function openManualMatchModal() {
+        const selectRec = document.getElementById('mCardRecId');
+        selectRec.innerHTML = '';
+        currentRecs.filter(r => r.status === 'PENDING' || r.status === 'DIFFERENCE').forEach(r => {
+            const opt = document.createElement('option');
+            opt.value = r.id;
+            opt.innerText = `${r.sale_date} | ${r.branch_name} | Sales: ${formatINR(r.card_qr_sales_amount)}`;
+            selectRec.appendChild(opt);
+        });
+
+        const bankTxs = await apiFetch('/api/card-qr/unmatched-bank-txs');
+        const selectBank = document.getElementById('mBankTxId');
+        selectBank.innerHTML = '';
+        if (bankTxs) {
+            bankTxs.forEach(t => {
+                const opt = document.createElement('option');
+                opt.value = t.id;
+                opt.innerText = `${t.tx_date} | ${t.bank_account || 'Bank'} | ${formatINR(t.credit_amount)}`;
+                selectBank.appendChild(opt);
+            });
+        }
+        openModal('manualMatchModal');
+    }
+
+    async function submitManualMatch(e) {
+        e.preventDefault();
+        const card_qr_rec_id = parseInt(document.getElementById('mCardRecId').value);
+        const bank_tx_id = parseInt(document.getElementById('mBankTxId').value);
+        const reason = document.getElementById('mMatchReason').value;
+        const res = await apiFetch('/api/card-qr/manual-match', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ card_qr_rec_id, bank_tx_id, reason })
+        });
+        if (res) {
+            showToast('Manual match completed.', 'success');
+            closeModal('manualMatchModal');
+            loadCardQrRec();
+        }
+    }
+</script>
+{% endblock %}
