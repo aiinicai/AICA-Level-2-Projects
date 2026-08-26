@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>CA Task App Setup</title>
+<style>
+  :root {
+    --blue-900: #0b2e59; --blue-700: #164a8c; --blue-600: #1d5cad; --blue-500: #2563eb;
+    --blue-100: #dbeafe; --blue-50: #eff6ff; --slate-900: #0f172a; --slate-600: #475569;
+    --slate-200: #e2e8f0; --red: #dc2626;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; font-family: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background: linear-gradient(160deg, var(--blue-900), var(--blue-600));
+    display: flex; align-items: center; justify-content: center; height: 100vh;
+  }
+  .card {
+    background: white; width: 440px; border-radius: 16px; padding: 28px 30px;
+    box-shadow: 0 25px 60px rgba(11,46,89,0.4);
+  }
+  .brand { text-align: center; margin-bottom: 18px; }
+  .logo-dot {
+    width: 44px; height: 44px; margin: 0 auto 10px; border-radius: 12px;
+    background: linear-gradient(135deg, var(--blue-600), var(--blue-900));
+    display: flex; align-items: center; justify-content: center; color: white; font-weight: 700;
+  }
+  h1 { font-size: 17px; margin: 0 0 2px; color: var(--slate-900); text-align: center; }
+  p.sub { margin: 0 0 20px; font-size: 12.5px; color: var(--slate-600); text-align: center; }
+  .option {
+    border: 1.5px solid var(--slate-200); border-radius: 10px; padding: 14px 16px;
+    margin-bottom: 12px; cursor: pointer; transition: all 0.15s ease;
+  }
+  .option:hover { border-color: var(--blue-500); background: var(--blue-50); }
+  .option.selected { border-color: var(--blue-600); background: var(--blue-50); }
+  .option .title { font-weight: 700; font-size: 14px; color: var(--slate-900); margin-bottom: 3px; }
+  .option .desc { font-size: 12px; color: var(--slate-600); }
+  .ip-field { display: none; margin-top: 10px; }
+  .ip-field.show { display: block; }
+  .ip-field input {
+    width: 100%; padding: 9px 11px; border: 1px solid var(--slate-200); border-radius: 8px;
+    font-size: 13px;
+  }
+  .ip-field label { font-size: 12px; font-weight: 600; color: var(--slate-600); display: block; margin-bottom: 5px; }
+  .btn {
+    width: 100%; margin-top: 16px; border: none; border-radius: 8px; padding: 11px;
+    background: var(--blue-600); color: white; font-weight: 700; font-size: 14px; cursor: pointer;
+  }
+  .btn:hover { background: var(--blue-700); }
+  .btn:disabled { background: var(--slate-200); color: var(--slate-600); cursor: not-allowed; }
+  .error { color: var(--red); font-size: 12px; margin-top: 10px; display: none; text-align: center; }
+  .error.show { display: block; }
+</style>
+</head>
+<body>
+  <div class="card">
+    <div class="brand">
+      <div class="logo-dot">CA</div>
+      <h1>Welcome — one-time setup</h1>
+      <p class="sub">Choose how this computer should use the Task App.</p>
+    </div>
+
+    <div class="option" id="optHost" data-mode="host">
+      <div class="title">🖥️ This is the main computer (Host)</div>
+      <div class="desc">Starts the shared app and database right here. Choose this on
+        just ONE computer in your office — usually the admin/partner's PC.</div>
+    </div>
+
+    <div class="option" id="optClient" data-mode="client">
+      <div class="title">🔗 Connect to another computer's app</div>
+      <div class="desc">Use this on every teammate's PC. You'll need the Host
+        computer's network address (ask whoever set up the Host).</div>
+    </div>
+
+    <div class="ip-field" id="ipField">
+      <label for="ipInput">Host computer's IP address</label>
+      <input type="text" id="ipInput" placeholder="e.g. 192.168.1.15">
+    </div>
+
+    <button class="btn" id="continueBtn" disabled>Continue</button>
+    <div class="error" id="errorMsg"></div>
+  </div>
+
+<script>
+let selectedMode = null;
+const optHost = document.getElementById('optHost');
+const optClient = document.getElementById('optClient');
+const ipField = document.getElementById('ipField');
+const ipInput = document.getElementById('ipInput');
+const continueBtn = document.getElementById('continueBtn');
+const errorMsg = document.getElementById('errorMsg');
+
+function selectMode(mode) {
+  selectedMode = mode;
+  optHost.classList.toggle('selected', mode === 'host');
+  optClient.classList.toggle('selected', mode === 'client');
+  ipField.classList.toggle('show', mode === 'client');
+  updateButton();
+}
+
+function updateButton() {
+  if (selectedMode === 'host') { continueBtn.disabled = false; return; }
+  if (selectedMode === 'client') { continueBtn.disabled = ipInput.value.trim().length === 0; return; }
+  continueBtn.disabled = true;
+}
+
+optHost.addEventListener('click', () => selectMode('host'));
+optClient.addEventListener('click', () => selectMode('client'));
+ipInput.addEventListener('input', updateButton);
+
+continueBtn.addEventListener('click', async () => {
+  errorMsg.classList.remove('show');
+  continueBtn.disabled = true;
+  continueBtn.textContent = 'Starting…';
+  const choice = { mode: selectedMode, serverIp: ipInput.value.trim() };
+  const result = await window.setupAPI.submit(choice);
+  if (!result.ok) {
+    errorMsg.textContent = result.error || 'Something went wrong. Please try again.';
+    errorMsg.classList.add('show');
+    continueBtn.disabled = false;
+    continueBtn.textContent = 'Continue';
+  }
+});
+</script>
+</body>
+</html>

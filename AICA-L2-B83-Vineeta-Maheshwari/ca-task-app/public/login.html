@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CA Task Manager — Login</title>
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <div class="login-wrap">
+    <div class="login-card">
+      <div class="login-brand">
+        <div class="logo-dot">CA</div>
+        <h1>Task Delegation &amp; Tracker</h1>
+        <p>Sign in to your firm workspace</p>
+      </div>
+      <div id="errorMsg" class="error-msg"></div>
+      <form id="loginForm">
+        <div class="field">
+          <label for="username">Username</label>
+          <input type="text" id="username" autocomplete="username" required>
+        </div>
+        <div class="field">
+          <label for="password">Password</label>
+          <input type="password" id="password" autocomplete="current-password" required>
+        </div>
+        <button class="btn btn-primary" type="submit">Sign in</button>
+      </form>
+      <div class="hint">Default admin login: <b>admin</b> / <b>admin123</b><br>(change this after first login)</div>
+    </div>
+  </div>
+
+<script>
+const form = document.getElementById('loginForm');
+const errorMsg = document.getElementById('errorMsg');
+
+form.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  errorMsg.classList.remove('show');
+  const username = document.getElementById('username').value.trim();
+  const password = document.getElementById('password').value;
+  try {
+    const res = await fetch('/api/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, password }),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      errorMsg.textContent = data.error || 'Login failed.';
+      errorMsg.classList.add('show');
+      return;
+    }
+    window.location.href = '/app.html';
+  } catch (err) {
+    errorMsg.textContent = 'Could not reach the server. Please try again.';
+    errorMsg.classList.add('show');
+  }
+});
+
+// If already logged in, skip straight to the app.
+fetch('/api/session').then(r => r.json()).then(d => {
+  if (d.user) window.location.href = '/app.html';
+});
+</script>
+</body>
+</html>

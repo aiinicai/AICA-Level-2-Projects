@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CA Task Manager</title>
+<link rel="stylesheet" href="/style.css">
+<script>
+  // Chart.js is the one thing this app loads from the internet. Different
+  // office networks/firewalls sometimes block one CDN but not another, so
+  // try a few in order and keep going until one works. window.chartReady
+  // resolves once Chart.js is actually usable (or rejects if none load),
+  // so app.js can wait for it instead of assuming it's there.
+  window.chartReady = new Promise((resolve, reject) => {
+    const sources = [
+      'https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js',
+      'https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js',
+      'https://unpkg.com/chart.js@4.4.4/dist/chart.umd.min.js',
+    ];
+    let i = 0;
+    function tryNext() {
+      if (i >= sources.length) { reject(new Error('Chart.js failed to load from every source')); return; }
+      const s = document.createElement('script');
+      s.src = sources[i++];
+      s.onload = () => resolve();
+      s.onerror = tryNext;
+      document.head.appendChild(s);
+    }
+    tryNext();
+  });
+</script>
+</head>
+<body>
+
+<header class="app-header">
+  <div class="brand"><span class="logo-dot">CA</span> Task Delegation &amp; Tracker</div>
+  <div class="right">
+    <span class="who" id="whoLabel"></span>
+    <span class="role-badge" id="roleBadge"></span>
+    <button class="btn btn-ghost" id="logoutBtn" style="color:white;">Logout</button>
+  </div>
+</header>
+
+<div class="container">
+  <div class="tabs" id="tabs">
+    <button class="tab-btn active" data-tab="dashboard"><span class="tab-icon">📊</span> Dashboard</button>
+    <button class="tab-btn" data-tab="tasks"><span class="tab-icon">✅</span> Tasks</button>
+    <button class="tab-btn" data-tab="team" id="teamTabBtn" style="display:none;"><span class="tab-icon">👥</span> Team Members</button>
+  </div>
+
+  <!-- DASHBOARD TAB -->
+  <div id="tab-dashboard" class="tab-panel">
+    <div class="stat-grid" id="statGrid"></div>
+    <div class="charts-grid">
+      <div class="card">
+        <h2 id="statusChartTitle">Tasks by Status</h2>
+        <div class="chart-box"><canvas id="statusChart"></canvas></div>
+      </div>
+      <div class="card">
+        <h2 id="priorityChartTitle">Tasks by Priority</h2>
+        <div class="chart-box"><canvas id="priorityChart"></canvas></div>
+      </div>
+    </div>
+    <div class="card" id="memberChartCard">
+      <h2>Workload by Team Member</h2>
+      <div class="chart-box" style="height:320px;"><canvas id="memberChart"></canvas></div>
+    </div>
+  </div>
+
+  <!-- TASKS TAB -->
+  <div id="tab-tasks" class="tab-panel" style="display:none;">
+    <div class="toolbar">
+      <div class="filters">
+        <select id="filterStatus">
+          <option value="">All statuses</option>
+          <option>Pending</option>
+          <option>In Progress</option>
+          <option>Completed</option>
+        </select>
+        <select id="filterPriority">
+          <option value="">All priorities</option>
+          <option>Low</option><option>Medium</option><option>High</option><option>Urgent</option>
+        </select>
+        <select id="filterAssignee"><option value="">All team members</option></select>
+        <label style="font-size:13px; display:flex; align-items:center; gap:6px;">
+          <input type="checkbox" id="filterMine"> My tasks only
+        </label>
+        <input type="text" id="filterSearch" placeholder="Search client / task type...">
+      </div>
+      <button class="btn btn-teal" id="newTaskBtn">+ New Task</button>
+    </div>
+    <div class="card" style="padding:0;">
+      <table>
+        <thead>
+          <tr>
+            <th>Client</th><th>Task Type</th><th>Assigned Date</th><th>Due Date</th><th>Days Pending</th><th>Priority</th><th>Status</th>
+            <th>Assigned To</th><th>Assigned By</th><th>Notes</th><th></th>
+          </tr>
+        </thead>
+        <tbody id="taskTableBody"></tbody>
+      </table>
+      <div id="taskEmptyState" class="empty-state" style="display:none;">No tasks found.</div>
+    </div>
+  </div>
+
+  <!-- TEAM TAB (admin only) -->
+  <div id="tab-team" class="tab-panel" style="display:none;">
+    <div class="toolbar">
+      <h2 style="margin:0;">Team Members</h2>
+      <button class="btn btn-purple" id="newUserBtn">+ Add Team Member</button>
+    </div>
+    <div class="card" style="padding:0;">
+      <table>
+        <thead><tr><th>Name</th><th>Username</th><th>Role</th><th>Status</th><th></th></tr></thead>
+        <tbody id="userTableBody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- New / Edit Task Modal -->
+<div class="modal-backdrop" id="taskModalBackdrop">
+  <div class="modal">
+    <h3 id="taskModalTitle">New Task</h3>
+    <form id="taskForm">
+      <input type="hidden" id="taskId">
+      <div class="form-grid">
+        <div class="field full">
+          <label>Client Name</label>
+          <input type="text" id="clientName" required>
+        </div>
+        <div class="field">
+          <label>Task Type</label>
+          <input type="text" id="taskType" placeholder="e.g. GST Filing, ITR, Audit" required>
+        </div>
+        <div class="field">
+          <label>Assigned Date</label>
+          <input type="date" id="assignedDate">
+        </div>
+        <div class="field">
+          <label>Due Date</label>
+          <input type="date" id="dueDate">
+        </div>
+        <div class="field">
+          <label>Priority</label>
+          <select id="priority">
+            <option>Low</option><option selected>Medium</option><option>High</option><option>Urgent</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Status</label>
+          <select id="status">
+            <option>Pending</option><option>In Progress</option><option>Completed</option>
+          </select>
+        </div>
+        <div class="field full">
+          <label>Assign To <span class="small-muted">(select one or more team members)</span></label>
+          <div id="assigneeChecklist" class="checklist"></div>
+        </div>
+        <div class="field full">
+          <label>Notes / Remarks</label>
+          <textarea id="notes" rows="3"></textarea>
+        </div>
+      </div>
+      <div class="modal-actions">
+        <button type="button" class="btn btn-ghost" id="cancelTaskBtn">Cancel</button>
+        <button type="submit" class="btn btn-primary">Save Task</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- New User Modal -->
+<div class="modal-backdrop" id="userModalBackdrop">
+  <div class="modal">
+    <h3>Add Team Member</h3>
+    <form id="userForm">
+      <div class="form-grid">
+        <div class="field full">
+          <label>Full Name</label>
+          <input type="text" id="uName" required>
+        </div>
+        <div class="field">
+          <label>Username</label>
+          <input type="text" id="uUsername" required>
+        </div>
+        <div class="field">
+          <label>Password</label>
+          <input type="password" id="uPassword" required>
+        </div>
+        <div class="field full">
+          <label>Role</label>
+          <select id="uRole">
+            <option value="member">Team Member</option>
+            <option value="admin">Admin / Partner</option>
+          </select>
+        </div>
+      </div>
+      <div class="modal-actions">
+        <button type="button" class="btn btn-ghost" id="cancelUserBtn">Cancel</button>
+        <button type="submit" class="btn btn-primary">Create Account</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="/app.js"></script>
+</body>
+</html>
