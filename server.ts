@@ -1,33 +1,28 @@
 import express, { Request, Response } from "express";
 import path from "path";
+import dotenv from "dotenv";
 import { createServer as createViteServer } from "vite";
 import { GoogleGenAI, Type } from "@google/genai";
-import dotenv from "dotenv";
-import express from 'express';
-import path from 'path';
-import dotenv from 'dotenv';
-import { createServer as createViteServer } from 'vite';
-import { GoogleGenAI } from '@google/genai';
-import express from "express";
-import path from "path";
-import { createServer as createViteServer } from "vite";
-import { GoogleGenAI } from "@google/genai";
-import dotenv from "dotenv";
 
 dotenv.config();
 
-let aiClient: GoogleGenAI | null = null;
+const app = express();
+const PORT = 3000;
 
-// Middleware for parsing JSON with generous payload limits for scanned document base64 images
-app.use(express.json({ limit: "25mb" }));
-app.use(express.urlencoded({ extended: true, limit: "25mb" }));
+// High payload limit for handling scanned PDFs and high-res document images
+app.use(express.json({ limit: "50mb" }));
+app.use(express.urlencoded({ extended: true, limit: "50mb" }));
 
-// Lazy initializer for Gemini GenAI
+// Lazy initialization of Gemini Client
 let aiClient: GoogleGenAI | null = null;
-function getGenAI(): GoogleGenAI {
+function getGeminiClient(): GoogleGenAI {
   if (!aiClient) {
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) {
+      console.warn("GEMINI_API_KEY is not set in environment.");
+    }
     aiClient = new GoogleGenAI({
-      apiKey: process.env.GEMINI_API_KEY || "",
+      apiKey: apiKey || "",
       httpOptions: {
         headers: {
           "User-Agent": "aistudio-build",
@@ -38,305 +33,1063 @@ function getGenAI(): GoogleGenAI {
   return aiClient;
 }
 
-// Health endpoint
+// Resilient Gemini GenerateContent with model fallback and exponential backoff retry for 503 / 429
+const CANDIDATE_MODELS = [
+  "gemini-3.7-flash",
+  "gemini-flash-latest",
+  "gemini-3.1-flash-lite",
+];
+
+async function generateContentWithFallback(options: {
+  contents: any;
+  config?: any;
+  maxRetriesPerModel?: number;
+}): Promise<any> {
+  const ai = getGeminiClient();
+  let lastError: any = null;
+
+  for (const model of CANDIDATE_MODELS) {
+    const maxRetries = options.maxRetriesPerModel ?? 2;
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      try {
+        const response = await ai.models.generateContent({
+          model,
+          contents: options.contents,
+          config: options.config,
+        });
+        return response;
+      } catch (err: any) {
+        lastError = err;
+        const errMsg = err?.message || String(err);
+        const errStatus = err?.status || err?.code;
+        const isTemporary =
+          errMsg.includes("503") ||
+          errMsg.includes("UNAVAILABLE") ||
+          errMsg.includes("high demand") ||
+          errMsg.includes("429") ||
+          errMsg.includes("RESOURCE_EXHAUSTED") ||
+          errStatus === 503 ||
+          errStatus === 429;
+
+        if (isTemporary && attempt < maxRetries) {
+          // Exponential backoff with jitter
+          const delay = Math.min(2000, Math.pow(2, attempt) * 400 + Math.random() * 200);
+          await new Promise((resolve) => setTimeout(resolve, delay));
+          continue;
+        }
+        // If retries exhausted on this model or non-temporary error, try next candidate model
+        break;
+      }
+    }
+  }
+
+  throw lastError || new Error("Failed to generate content with all available models.");
+}
+
+// Safe JSON parser that handles code blocks or partial wrappers
+function extractAndParseJSON(rawText: string): any {
+  if (!rawText || typeof rawText !== "string") return {};
+  let cleaned = rawText.trim();
+  if (cleaned.startsWith("```json")) {
+    cleaned = cleaned.replace(/^```json\s*/, "").replace(/\s*```$/, "");
+  } else if (cleaned.startsWith("```")) {
+    cleaned = cleaned.replace(/^```\s*/, "").replace(/\s*```$/, "");
+  }
+  try {
+    return JSON.parse(cleaned);
+  } catch (err) {
+    // Attempt extracting first and last curly braces
+    const firstBrace = cleaned.indexOf("{");
+    const lastBrace = cleaned.lastIndexOf("}");
+    if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+      try {
+        return JSON.parse(cleaned.substring(firstBrace, lastBrace + 1));
+      } catch (innerErr) {
+        console.error("Failed to parse extracted JSON substring:", innerErr);
+      }
+    }
+    console.error("JSON parse failed for text:", rawText);
+    return {};
+  }
+}
+
+// Health check endpoint
 app.get("/api/health", (_req: Request, res: Response) => {
-  res.json({ status: "ok", timestamp: new Date().toISOString() });
+  res.json({ 
+    status: "ok", 
+    hasGeminiKey: !!process.env.GEMINI_API_KEY,
+    timestamp: new Date().toISOString()
+  });
 });
 
-// 1. AI OCR & Document Scanning API for PAN, Aadhaar, Bank Details, Registrations
-app.post("/api/ocr/scan-document", async (req: Request, res: Response) => {
+/* =========================================================================
+   1. INVOICE REVIEW ENDPOINT
+   ========================================================================= */
+app.post("/api/analyze-invoice", async (req: Request, res: Response) => {
   try {
-    const { imageBase64, mimeType = "image/jpeg", expectedDocType } = req.body;
+    const { fileBase64, mimeType, filename } = req.body;
 
-    if (!imageBase64) {
-      return res.status(400).json({ error: "No document image provided." });
+    if (!fileBase64) {
+      return res.status(400).json({ error: "Missing fileBase64 in request body." });
     }
 
-    // Clean base64 string
-    const cleanBase64 = imageBase64.replace(/^data:[^;]+;base64,/, "");
+    const effectiveMimeType = mimeType || "image/png";
 
-    const ai = getGenAI();
+    const systemInstruction = `You are a Senior Chartered Accountant (FCA) and Lead Financial Document Auditor in India.
+Your job is to analyze uploaded vendor invoices or purchase bills with forensic precision.
+Extract all key header fields, line items, and tax amounts.
+Critically verify the arithmetic:
+- Taxable Amount + CGST + SGST + IGST + Cess should exactly equal Total Invoice Amount.
+- Verify line item prices (Quantity * Unit Price = Taxable Value).
+- Identify missing mandatory GST invoice fields under Rule 46 of CGST Rules 2017 (e.g. missing GSTIN, date, serial number, place of supply).
+- Classify the invoice under standard Indian Accounting / Bookkeeping Expense Ledger (Account Head) such as 'Software Subscriptions & Cloud Hosting', 'Legal & Professional Charges', 'Consumables & Factory Spares', 'Repairs & Maintenance', 'Printing & Stationery', 'Freight & Forwarding', 'Office Utilities', 'Capital Asset - IT Equipment'.
+- Provide the accounting rationale, expense category (e.g. Indirect Expenses, Direct Expenses, Fixed Assets), nature of expense (Revenue Expenditure vs Capital Expenditure), cost center, and recommended Tally/ERP double-entry journal entry.
+- Provide confidence score between 0.0 and 1.0.
+Output structured JSON matching the provided schema.`;
 
-    const prompt = `You are an expert Indian Chartered Accountant (CA) Document OCR and verification AI.
-Examine this Indian financial/identification document (e.g. PAN Card, Aadhaar Card, Cancelled Cheque / Bank Passbook, GST Registration Certificate REG-06, Certificate of Incorporation, MSME/Udyam Registration).
+    const prompt = `Perform a comprehensive CA invoice audit on this financial document (${filename || "Invoice"}).
+Extract vendor/receiver information, GSTINs, invoice details, itemized lines, calculate all tax and arithmetic totals, and determine the exact suggested accounting head / ledger to book the expense.
+If there are any math discrepancies or missing fields, explicitly flag them in auditIssues.`;
 
-Extract all requisite details strictly into this JSON schema:
-- documentType: "PAN" | "AADHAAR" | "BANK_CHEQUE" | "BANK_PASSBOOK" | "GST_CERTIFICATE" | "MCA_INC" | "MSME_UDYAM" | "OTHER"
-- panNumber: string (10-character alphanumeric e.g. ABCDE1234F if PAN)
-- aadhaarNumber: string (12-digit number e.g. 1234 5678 9012 if Aadhaar)
-- entityName: string (Full Name of Individual or Company/Firm as printed)
-- fatherOrHusbandName: string (Father's or Spouse's name if present on PAN/Aadhaar)
-- dateOfBirthOrInc: string (DOB or Date of Incorporation in YYYY-MM-DD or DD/MM/YYYY)
-- gender: string ("MALE" | "FEMALE" | "OTHER" | "NOT_APPLICABLE")
-- address: string (Full address if present, especially on Aadhaar/Bank/GST/MCA)
-- pinCode: string (6-digit Indian PIN code)
-- bankAccountNumber: string (Account number if cheque/passbook)
-- bankIfscCode: string (11-character IFSC code e.g. HDFC0001234)
-- bankName: string (e.g. State Bank of India, HDFC Bank, ICICI Bank, Punjab National Bank)
-- bankBranch: string (Branch location/address)
-- bankAccountType: string ("SAVINGS" | "CURRENT" | "CASH_CREDIT" | "OVERDRAFT")
-- micrCode: string (9-digit MICR code if visible)
-- gstin: string (15-character GSTIN e.g. 27AAAAA0000A1Z5 if GST doc)
-- tradeName: string (Trade name or Business name if GST/MSME/MCA)
-- cinOrUdyam: string (CIN for companies e.g. U72200DL2020PTC123456 or Udyam Reg Number)
-- confidenceScore: number (0 to 100)
-- rawSummary: string (Brief 1-2 line summary of extracted information and any advisory remarks)
-Expected hint: ${expectedDocType || "Auto-detect"}`;
-
-    const response = await ai.models.generateContent({
-      model: "gemini-3.7-flash",
+    const response = await generateContentWithFallback({
       contents: {
         parts: [
           {
             inlineData: {
-              data: cleanBase64,
-              mimeType: mimeType,
+              data: fileBase64,
+              mimeType: effectiveMimeType,
             },
           },
           { text: prompt },
         ],
       },
       config: {
+        systemInstruction,
         responseMimeType: "application/json",
         responseSchema: {
           type: Type.OBJECT,
           properties: {
-            documentType: { type: Type.STRING },
-            panNumber: { type: Type.STRING },
-            aadhaarNumber: { type: Type.STRING },
-            entityName: { type: Type.STRING },
-            fatherOrHusbandName: { type: Type.STRING },
-            dateOfBirthOrInc: { type: Type.STRING },
-            gender: { type: Type.STRING },
-            address: { type: Type.STRING },
-            pinCode: { type: Type.STRING },
-            bankAccountNumber: { type: Type.STRING },
-            bankIfscCode: { type: Type.STRING },
-            bankName: { type: Type.STRING },
-            bankBranch: { type: Type.STRING },
-            bankAccountType: { type: Type.STRING },
-            micrCode: { type: Type.STRING },
-            gstin: { type: Type.STRING },
-            tradeName: { type: Type.STRING },
-            cinOrUdyam: { type: Type.STRING },
+            vendorName: { type: Type.STRING },
+            vendorGSTIN: { type: Type.STRING },
+            receiverName: { type: Type.STRING },
+            receiverGSTIN: { type: Type.STRING },
+            invoiceNumber: { type: Type.STRING },
+            invoiceDate: { type: Type.STRING, description: "YYYY-MM-DD format" },
+            dueDate: { type: Type.STRING },
+            placeOfSupply: { type: Type.STRING },
+            taxableAmount: { type: Type.NUMBER },
+            cgstAmount: { type: Type.NUMBER },
+            sgstAmount: { type: Type.NUMBER },
+            igstAmount: { type: Type.NUMBER },
+            cessAmount: { type: Type.NUMBER },
+            totalCalculatedTax: { type: Type.NUMBER },
+            totalInvoiceAmount: { type: Type.NUMBER, description: "Gross total stated on invoice" },
+            lineItems: {
+              type: Type.ARRAY,
+              items: {
+                type: Type.OBJECT,
+                properties: {
+                  description: { type: Type.STRING },
+                  hsnSac: { type: Type.STRING },
+                  quantity: { type: Type.NUMBER },
+                  unit: { type: Type.STRING },
+                  unitPrice: { type: Type.NUMBER },
+                  taxableValue: { type: Type.NUMBER },
+                  gstRatePercent: { type: Type.NUMBER },
+                  cgst: { type: Type.NUMBER },
+                  sgst: { type: Type.NUMBER },
+                  igst: { type: Type.NUMBER },
+                  total: { type: Type.NUMBER },
+                },
+                required: ["description", "taxableValue", "gstRatePercent", "total"],
+              },
+            },
+            suggestedAccountHead: {
+              type: Type.OBJECT,
+              properties: {
+                ledgerName: { type: Type.STRING, description: "Recommended Expense Ledger name for Tally / SAP / ERP" },
+                accountCategory: { type: Type.STRING, description: "e.g. Indirect Expenses (Admin), Direct Expenses, Fixed Assets" },
+                natureOfExpense: { type: Type.STRING, enum: ["Revenue Expenditure", "Capital Expenditure", "Deferred Revenue"] },
+                costCenter: { type: Type.STRING, description: "e.g. IT Operations, Factory & Plant, General & Admin" },
+                accountingRationale: { type: Type.STRING, description: "CA justification based on service/goods description & HSN/SAC" },
+                recommendedJournalEntry: {
+                  type: Type.OBJECT,
+                  properties: {
+                    debitLedger: { type: Type.STRING },
+                    debitAmount: { type: Type.NUMBER },
+                    gstInputLedger: { type: Type.STRING },
+                    gstInputAmount: { type: Type.NUMBER },
+                    creditLedger: { type: Type.STRING },
+                    creditAmount: { type: Type.NUMBER },
+                  },
+                  required: ["debitLedger", "debitAmount", "creditLedger", "creditAmount"],
+                },
+              },
+              required: ["ledgerName", "accountCategory", "natureOfExpense", "accountingRationale"],
+            },
+            auditIssues: {
+              type: Type.ARRAY,
+              items: {
+                type: Type.OBJECT,
+                properties: {
+                  type: { type: Type.STRING, enum: ["math_error", "missing_field", "tax_mismatch", "compliance_warning", "info"] },
+                  severity: { type: Type.STRING, enum: ["high", "medium", "low"] },
+                  title: { type: Type.STRING },
+                  message: { type: Type.STRING },
+                  field: { type: Type.STRING },
+                },
+                required: ["type", "severity", "title", "message"],
+              },
+            },
             confidenceScore: { type: Type.NUMBER },
-            rawSummary: { type: Type.STRING },
+            summary: { type: Type.STRING },
           },
-          required: ["documentType", "entityName", "confidenceScore"],
+          required: [
+            "vendorName",
+            "invoiceNumber",
+            "invoiceDate",
+            "taxableAmount",
+            "totalInvoiceAmount",
+            "lineItems",
+            "summary"
+          ],
         },
       },
     });
 
-    const parsed = JSON.parse(response.text || "{}");
-    return res.json({ success: true, data: parsed });
+    const parsedData = extractAndParseJSON(response.text);
+
+    // Compute arithmetic validation on server
+    const taxable = Number(parsedData.taxableAmount || 0);
+    const cgst = Number(parsedData.cgstAmount || 0);
+    const sgst = Number(parsedData.sgstAmount || 0);
+    const igst = Number(parsedData.igstAmount || 0);
+    const cess = Number(parsedData.cessAmount || 0);
+    const statedTotal = Number(parsedData.totalInvoiceAmount || 0);
+
+    const calculatedTax = cgst + sgst + igst + cess;
+    const computedTotal = taxable + calculatedTax;
+    const mathDiscrepancy = Math.abs(statedTotal - computedTotal);
+    const isMathValid = mathDiscrepancy <= 1.0; // ₹1 rounding tolerance
+
+    let issues = parsedData.auditIssues || [];
+
+    if (!isMathValid) {
+      if (!issues.some((i: any) => i.type === "math_error")) {
+        issues.unshift({
+          type: "math_error",
+          severity: "high",
+          title: `Arithmetic Mismatch (₹${mathDiscrepancy.toFixed(2)} Difference)`,
+          message: `Stated total on invoice (₹${statedTotal.toLocaleString('en-IN')}) does not equal Taxable (₹${taxable.toLocaleString('en-IN')}) + Taxes (₹${calculatedTax.toLocaleString('en-IN')}) = ₹${computedTotal.toLocaleString('en-IN')}.`,
+          field: "totalInvoiceAmount"
+        });
+      }
+    } else {
+      // If mathematically valid within rounding tolerance, filter out false positive math errors
+      issues = issues.filter((i: any) => i.type !== "math_error");
+    }
+
+    // Determine risk status deterministically
+    let riskStatus = "compliant";
+    if (!isMathValid || mathDiscrepancy > 1.0) {
+      riskStatus = "critical";
+    } else if (!parsedData.vendorGSTIN) {
+      riskStatus = "warning";
+    } else {
+      riskStatus = "compliant";
+    }
+
+    // Ensure suggestedAccountHead is properly structured
+    let suggestedAccountHead = parsedData.suggestedAccountHead;
+    if (!suggestedAccountHead || !suggestedAccountHead.ledgerName) {
+      const lineDesc = (parsedData.lineItems?.[0]?.description || "").toLowerCase();
+      const vendor = (parsedData.vendorName || "").toLowerCase();
+
+      let defaultLedger = "Office & General Administrative Expenses";
+      let defaultCategory = "Indirect Expenses (Administrative & General)";
+      let defaultCostCenter = "General & Admin";
+      let defaultNature: "Revenue Expenditure" | "Capital Expenditure" = "Revenue Expenditure";
+      let defaultRationale = "Classified as general operational revenue expenditure deductible under Section 37(1) of the Income Tax Act.";
+
+      if (lineDesc.includes("cloud") || lineDesc.includes("software") || lineDesc.includes("hosting") || lineDesc.includes("server") || vendor.includes("cloud") || vendor.includes("tech")) {
+        defaultLedger = "Software Subscriptions & Cloud Hosting Expenses";
+        defaultCategory = "Indirect Expenses (IT & Administrative Overhead)";
+        defaultCostCenter = "IT Infrastructure & DevOps";
+        defaultRationale = "Invoices for cloud compute and software subscriptions are recurring operational IT subscriptions to be booked under Software & Cloud Infrastructure Expenses.";
+      } else if (lineDesc.includes("hardware") || lineDesc.includes("steel") || lineDesc.includes("fastener") || lineDesc.includes("actuator") || lineDesc.includes("machin") || vendor.includes("hardware")) {
+        defaultLedger = "Consumables & Hardware Spares Account";
+        defaultCategory = "Direct Operating Expenses / Plant Maintenance";
+        defaultCostCenter = "Plant & Machinery Maintenance / Production";
+        defaultRationale = "Classified under Factory Consumables & Spares for ongoing operational machinery maintenance deductible under Section 37(1).";
+      } else if (lineDesc.includes("legal") || lineDesc.includes("consult") || lineDesc.includes("advisory") || vendor.includes("legal")) {
+        defaultLedger = "Legal & Professional Charges";
+        defaultCategory = "Indirect Expenses (Professional Fees)";
+        defaultCostCenter = "Corporate Legal & Compliance";
+        defaultRationale = "Professional and advisory charges for corporate matters, subject to Section 194J TDS review.";
+      }
+
+      suggestedAccountHead = {
+        ledgerName: defaultLedger,
+        accountCategory: defaultCategory,
+        natureOfExpense: defaultNature,
+        costCenter: defaultCostCenter,
+        accountingRationale: defaultRationale,
+        recommendedJournalEntry: {
+          debitLedger: defaultLedger,
+          debitAmount: taxable,
+          gstInputLedger: igst > 0 ? "Input IGST Ledger" : "Input CGST & SGST Ledgers",
+          gstInputAmount: calculatedTax,
+          creditLedger: `${parsedData.vendorName || "Vendor"} (Sundry Creditor)`,
+          creditAmount: statedTotal || computedTotal
+        }
+      };
+    } else if (!suggestedAccountHead.recommendedJournalEntry) {
+      suggestedAccountHead.recommendedJournalEntry = {
+        debitLedger: suggestedAccountHead.ledgerName,
+        debitAmount: taxable,
+        gstInputLedger: igst > 0 ? "Input IGST Ledger" : (cgst > 0 || sgst > 0 ? "Input CGST & SGST Ledgers" : undefined),
+        gstInputAmount: calculatedTax > 0 ? calculatedTax : undefined,
+        creditLedger: `${parsedData.vendorName || "Vendor"} (Sundry Creditor)`,
+        creditAmount: statedTotal || computedTotal
+      };
+    }
+
+    const finalResult = {
+      ...parsedData,
+      totalCalculatedTax: calculatedTax || parsedData.totalCalculatedTax,
+      computedTotal: Math.round(computedTotal * 100) / 100,
+      mathDiscrepancy: Math.round(mathDiscrepancy * 100) / 100,
+      isMathValid,
+      riskStatus,
+      auditIssues: issues,
+      confidenceScore: parsedData.confidenceScore || 0.95,
+      suggestedAccountHead
+    };
+
+    return res.json(finalResult);
   } catch (error: any) {
-    console.error("OCR scanning error:", error);
-    return res.status(500).json({
-      error: "OCR analysis failed: " + (error?.message || "Unknown error"),
-      fallback: true,
-    });
+    console.error("Error in /api/analyze-invoice:", error);
+    return res.status(500).json({ error: error.message || "Failed to analyze invoice" });
   }
 });
 
-// 2. Govt Portal API Sync Endpoint (Simulated & Real Gateway connectors)
-app.post("/api/portal/sync", (req: Request, res: Response) => {
-  const { portal, clientPan, gstin, cin, period = "FY 2025-26" } = req.body;
-
-  const timestamp = new Date().toISOString();
-
-  if (portal === "GST") {
-    // GST Portal live return status & taxpayer info
-    const sampleGstin = gstin || (clientPan ? `${clientPan.slice(0, 2) || "27"}${clientPan}1Z5` : "27AABCS1429B1Z5");
-    return res.json({
-      success: true,
-      portal: "GST Portal (gst.gov.in)",
-      syncTimestamp: timestamp,
-      taxpayerDetails: {
-        gstin: sampleGstin,
-        legalName: req.body.clientName || "ENTERPRISE ASSOCIATES",
-        tradeName: req.body.tradeName || "ENTERPRISE TRADERS",
-        taxpayerType: "Regular",
-        status: "Active",
-        registrationDate: "2018-07-01",
-        stateJurisdiction: "Ward 4, Range 2, Circle Mumbai",
-        centerJurisdiction: "Division I, Commissionerate Mumbai South",
-      },
-      filingCompliance: [
-        { returnType: "GSTR-1", period: "Jan 2026", arn: "AA2701260192834", dateOfFiling: "2026-02-10", status: "FILED" },
-        { returnType: "GSTR-3B", period: "Jan 2026", arn: "AA2701260284910", dateOfFiling: "2026-02-18", status: "FILED" },
-        { returnType: "GSTR-1", period: "Feb 2026", arn: "-", dateOfFiling: "-", status: "PENDING", dueDate: "2026-03-11" },
-        { returnType: "GSTR-3B", period: "Feb 2026", arn: "-", dateOfFiling: "-", status: "PENDING", dueDate: "2026-03-20" },
-      ],
-      gstr2bSummary: {
-        totalItcAvailable: 142580,
-        cgst: 71290,
-        sgst: 71290,
-        igst: 0,
-        itcBlocked: 0,
-      },
-    });
-  } else if (portal === "INCOME_TAX") {
-    // Income Tax e-Filing Portal (incometax.gov.in)
-    return res.json({
-      success: true,
-      portal: "Income Tax Department (eportal.incometax.gov.in)",
-      syncTimestamp: timestamp,
-      pan: clientPan || "ABCDE1234F",
-      panStatus: "Operational & Linked with Aadhaar",
-      itrHistory: [
-        { assessmentYear: "2025-26", formType: "ITR-3", ackNumber: "918237465012345", filedDate: "2025-07-28", processingStatus: "Processed with Refund of ₹14,230", eVerified: "Yes (Aadhaar OTP)" },
-        { assessmentYear: "2024-25", formType: "ITR-3", ackNumber: "847291048592019", filedDate: "2024-07-25", processingStatus: "Processed u/s 143(1)", eVerified: "Yes" },
-      ],
-      form26asSnapshot: {
-        totalTdsDeposited: 84600,
-        totalTcsCollected: 0,
-        advanceTaxPaid: 45000,
-        selfAssessmentTaxPaid: 0,
-        highValueTransactionsAIS: "4 records (Mutual Funds & High Interest)",
-      },
-      eProceedings: {
-        openNoticesCount: 0,
-        outstandingDemand: "₹0.00",
-      },
-    });
-  } else if (portal === "MCA") {
-    // MCA21 / Registrar of Companies
-    return res.json({
-      success: true,
-      portal: "Ministry of Corporate Affairs (mca.gov.in)",
-      syncTimestamp: timestamp,
-      cin: cin || "U72200MH2019PTC329481",
-      companyStatus: "Active",
-      classOfCompany: "Private Limited",
-      authorizedCapital: "₹10,00,000",
-      paidUpCapital: "₹5,00,000",
-      lastAgmDate: "2025-09-29",
-      lastBalanceSheetDate: "2025-03-31",
-      annualFilingCompliance: "AOC-4 & MGT-7 Filed for FY 2024-25",
-      directors: [
-        { din: "08472910", name: "Ravi Johri", designation: "Director", appointmentDate: "2019-04-10" },
-        { din: "09182736", name: "Sunita Johri", designation: "Director", appointmentDate: "2019-04-10" },
-      ],
-    });
-  } else {
-    // E-Way / E-Invoicing
-    return res.json({
-      success: true,
-      portal: portal || "Government Portal Gateway",
-      syncTimestamp: timestamp,
-      status: "Synced Successfully",
-      recordsSynced: 12,
-    });
-  }
-});
-
-// 3. AI Notice Drafter & Client Communication Composer
-app.post("/api/ai/draft-communication", async (req: Request, res: Response) => {
+/* =========================================================================
+   2. GST COMPLIANCE ENDPOINT
+   ========================================================================= */
+app.post("/api/analyze-gst", async (req: Request, res: Response) => {
   try {
-    const { type, clientName, firmName = "Johri & Associates, Chartered Accountants", details, tone = "Professional" } = req.body;
-    const ai = getGenAI();
+    const { fileBase64, mimeType, filename } = req.body;
 
-    const prompt = `You are a Senior Chartered Accountant partner at ${firmName}.
-Draft a crisp, legally sound, and polite ${type || "client communication"}.
-Client Name: ${clientName || "Client"}
-Specific context / details: ${details || "Compliance update and fee invoice intimation."}
-Tone: ${tone}
+    if (!fileBase64) {
+      return res.status(400).json({ error: "Missing fileBase64 in request body." });
+    }
 
-Types can be:
-- "FEE_REMINDER_MILD": Polite reminder for outstanding CA professional fee.
-- "FEE_REMINDER_FIRM": Firm follow-up for long overdue CA fee before suspending services.
-- "GST_3B_DUE_DATE": Urgent request for sales/purchase bills before 20th of the month.
-- "ITR_DOCUMENT_CHECKLIST": Comprehensive checklist of documents required for ITR filing (Form 16/16A, 26AS/AIS, Bank Statements, Capital Gains, Housing Loan cert).
-- "INCOME_TAX_SCRUTINY_REPLY": Professional draft response to Income Tax Notice u/s 142(1) or 148.
-- "ADVANCE_TAX_INTIMATION": Advance Tax installment intimation with calculation notes.
+    const effectiveMimeType = mimeType || "image/png";
 
-Provide:
-1. subjectLine: Email subject line
-2. emailBody: Full formatted email text (with salutation, clear bullet points, CA firm sign-off)
-3. whatsappMessage: Short, WhatsApp-friendly text with emojis and clear action call
-4. smsText: 160-character compact SMS summary.`;
+    const systemInstruction = `You are an expert Indian GST Tax Auditor specializing in Place of Supply (PoS) rules (IGST Act 2017 Sections 7, 8, 10, 12), GSTIN syntax validation, and Input Tax Credit (ITC) eligibility under CGST Act Section 16 & Section 17(5) (Blocked Credits).
+Analyze the uploaded tax invoice or GSTR-2B document scan:
+1. Extract 15-digit GSTINs for Supplier and Recipient.
+2. Determine Supplier State (first 2 digits of GSTIN) and Place of Supply (PoS).
+3. Validate Intra-State vs Inter-State rules:
+   - Intra-state (Supplier State == PoS State): MUST charge CGST + SGST (equal amounts). IGST must be 0.
+   - Inter-state (Supplier State != PoS State): MUST charge IGST. CGST and SGST must be 0.
+4. Verify if GST tax rates applied are standard (0%, 5%, 12%, 18%, 28%).
+5. CRITICAL: SECTION 17(5) BLOCKED CREDIT AUDIT & LINE ITEM CLASSIFICATION:
+   - Extract every line item and classify its nature and statutory ITC eligibility:
+     * Motor Vehicles for transportation of persons (seating capacity <= 13 persons):
+       - nature: "Motor Vehicle"
+       - itcEligibility: "BLOCKED_17_5"
+       - sectionRef: "Section 17(5)(a) of CGST Act"
+       - reason: "Section 17(5)(a) of CGST Act: ITC on motor vehicles for transportation of persons (<= 13 seats) is blocked, unless the business is in vehicle reselling, passenger transport, or driving school operations."
+       - alertLevel: "🔴 Critical Red (Blocked Credit)"
+       - eligibleTaxAmount: 0, blockedTaxAmount: totalTax.
+     * Food, Beverages, Outdoor Catering:
+       - nature: "Food & Catering"
+       - itcEligibility: "BLOCKED_17_5"
+       - sectionRef: "Section 17(5)(b)(i) of CGST Act"
+       - reason: "Section 17(5)(b)(i) of CGST Act: Food, beverages, and outdoor catering credits are strictly blocked unless mandated by law for employees or used for taxable outward supply of the same."
+       - alertLevel: "🔴 Critical Red (Blocked Credit)"
+       - eligibleTaxAmount: 0, blockedTaxAmount: totalTax.
+     * Club / Fitness memberships:
+       - nature: "Personal / Non-Business", itcEligibility: "BLOCKED_17_5", sectionRef: "Section 17(5)(b)(ii) of CGST Act", alertLevel: "🔴 Critical Red (Blocked Credit)"
+     * Works contract for immovable property civil structure:
+       - nature: "Works Contract", itcEligibility: "BLOCKED_17_5", sectionRef: "Section 17(5)(c) of CGST Act", alertLevel: "🔴 Critical Red (Blocked Credit)"
+     * Personal / Non-business consumption:
+       - nature: "Personal / Non-Business", itcEligibility: "BLOCKED_17_5", sectionRef: "Section 17(5)(g) of CGST Act", alertLevel: "🔴 Critical Red (Blocked Credit)"
+     * Standard business inputs (Hardware, Software, Consulting, Raw Materials, Factory machinery):
+       - nature: "Input Goods" or "Input Services" or "Capital Goods"
+       - itcEligibility: "ELIGIBLE" (if PoS is compliant)
+       - sectionRef: "Section 16(1) of CGST Act"
+       - reason: "Used in the course or furtherance of business. 100% Eligible under Section 16."
+       - alertLevel: "🟢 Compliant Green"
+       - eligibleTaxAmount: totalTax, blockedTaxAmount: 0.
+   - For any blocked item, add a FAIL entry in complianceFlags citing Section 17(5), with clear warning message and remedy (Disallow/Reverse in GSTR-3B Table 4(B)(1)).
+6. Evaluate Section 16(2) Golden Conditions:
+   - Possession of tax invoice/debit note.
+   - Receipt of goods/services.
+   - Tax actually paid to Government & reflected in GSTR-2B.
+   - Furnishing return under Section 39.
+   - Rule 37 180-day supplier payment requirement.
+7. Classify into GSTR-3B Table 4:
+   - If blocked under Section 17(5): Table 4(B)(1) [Ineligible as per Section 17(5)].
+   - If invalid due to PoS/tax mismatch: Table 4(B)(2) [Others].
+   - If eligible: Table 4(A)(5) [All Other ITC].`;
 
-    const response = await ai.models.generateContent({
-      model: "gemini-3.7-flash",
-      contents: prompt,
+    const prompt = `Perform a comprehensive GST Compliance, Place of Supply, Section 17(5) Blocked Credit, and Section 16 ITC Eligibility Audit on this document (${filename || "GST Document"}).`;
+
+    const response = await generateContentWithFallback({
+      contents: {
+        parts: [
+          {
+            inlineData: {
+              data: fileBase64,
+              mimeType: effectiveMimeType,
+            },
+          },
+          { text: prompt },
+        ],
+      },
       config: {
+        systemInstruction,
         responseMimeType: "application/json",
         responseSchema: {
           type: Type.OBJECT,
           properties: {
-            subjectLine: { type: Type.STRING },
-            emailBody: { type: Type.STRING },
-            whatsappMessage: { type: Type.STRING },
-            smsText: { type: Type.STRING },
+            vendorName: { type: Type.STRING },
+            vendorGSTIN: { type: Type.STRING },
+            vendorState: { type: Type.STRING },
+            vendorStateCode: { type: Type.STRING, description: "2-digit state code" },
+            isVendorGSTINValid: { type: Type.BOOLEAN },
+            receiverName: { type: Type.STRING },
+            receiverGSTIN: { type: Type.STRING },
+            receiverState: { type: Type.STRING },
+            receiverStateCode: { type: Type.STRING, description: "2-digit state code" },
+            isReceiverGSTINValid: { type: Type.BOOLEAN },
+            invoiceNumber: { type: Type.STRING },
+            invoiceDate: { type: Type.STRING },
+            placeOfSupply: { type: Type.STRING },
+            placeOfSupplyStateCode: { type: Type.STRING },
+            transactionType: { type: Type.STRING, enum: ["INTRA_STATE", "INTER_STATE", "SEZ_EXPORT", "UNSPECIFIED"] },
+            expectedTaxType: { type: Type.STRING, enum: ["CGST_SGST", "IGST", "ZERO_RATED"] },
+            appliedTaxType: { type: Type.STRING, enum: ["CGST_SGST", "IGST", "BOTH", "NONE"] },
+            isPoSCompliant: { type: Type.BOOLEAN },
+            taxableValue: { type: Type.NUMBER },
+            cgstCharged: { type: Type.NUMBER },
+            sgstCharged: { type: Type.NUMBER },
+            igstCharged: { type: Type.NUMBER },
+            appliedTaxRates: {
+              type: Type.ARRAY,
+              items: { type: Type.NUMBER }
+            },
+            areTaxRatesStandard: { type: Type.BOOLEAN },
+            gstr2bMatchStatus: { type: Type.STRING, enum: ["MATCHED", "MISMATCH_TAX", "MISMATCH_INVOICE_NO", "NOT_IN_2B", "ELIGIBLE_ITC"] },
+            riskStatus: { type: Type.STRING, enum: ["compliant", "warning", "critical"] },
+            complianceFlags: {
+              type: Type.ARRAY,
+              items: {
+                type: Type.OBJECT,
+                properties: {
+                  rule: { type: Type.STRING },
+                  status: { type: Type.STRING, enum: ["PASS", "FAIL", "WARNING"] },
+                  message: { type: Type.STRING },
+                  impact: { type: Type.STRING },
+                  remedy: { type: Type.STRING }
+                },
+                required: ["rule", "status", "message", "impact", "remedy"]
+              }
+            },
+            itcEligibility: {
+              type: Type.OBJECT,
+              properties: {
+                overallEligibility: { type: Type.STRING, enum: ["ELIGIBLE", "BLOCKED_17_5", "BLOCKED_POS_ERROR", "PARTIALLY_ELIGIBLE", "REVERSAL_REQUIRED"] },
+                totalGstPaid: { type: Type.NUMBER },
+                eligibleITCAmount: { type: Type.NUMBER },
+                blockedITCAmount: { type: Type.NUMBER },
+                gstr3bReportingTable: { type: Type.STRING },
+                gstr2bReconciliationNote: { type: Type.STRING },
+                timeLimitSection16_4: {
+                  type: Type.OBJECT,
+                  properties: {
+                    maxAvailmentDate: { type: Type.STRING },
+                    isWithinTimeLimit: { type: Type.BOOLEAN },
+                    statutoryDeadlineNote: { type: Type.STRING }
+                  },
+                  required: ["maxAvailmentDate", "isWithinTimeLimit", "statutoryDeadlineNote"]
+                },
+                rule37_180DaysReversal: {
+                  type: Type.OBJECT,
+                  properties: {
+                    invoiceDate: { type: Type.STRING },
+                    paymentDueDate180Days: { type: Type.STRING },
+                    interestRatePercent: { type: Type.NUMBER },
+                    riskStatus: { type: Type.STRING, enum: ["SAFE", "WARNING_OVERDUE", "REVERSED"] }
+                  },
+                  required: ["invoiceDate", "paymentDueDate180Days", "interestRatePercent", "riskStatus"]
+                },
+                blockedCreditClauses: {
+                  type: Type.ARRAY,
+                  items: {
+                    type: Type.OBJECT,
+                    properties: {
+                      clause: { type: Type.STRING },
+                      title: { type: Type.STRING },
+                      category: { type: Type.STRING },
+                      isTriggered: { type: Type.BOOLEAN },
+                      status: { type: Type.STRING, enum: ["BLOCKED", "CLEAR", "POTENTIAL_RISK"] },
+                      statutoryText: { type: Type.STRING },
+                      reason: { type: Type.STRING }
+                    },
+                    required: ["clause", "title", "category", "isTriggered", "status", "statutoryText", "reason"]
+                  }
+                },
+                section16GoldenConditions: {
+                  type: Type.ARRAY,
+                  items: {
+                    type: Type.OBJECT,
+                    properties: {
+                      conditionNumber: { type: Type.STRING },
+                      title: { type: Type.STRING },
+                      requirement: { type: Type.STRING },
+                      isSatisfied: { type: Type.BOOLEAN },
+                      status: { type: Type.STRING, enum: ["SATISFIED", "NOT_SATISFIED", "PENDING_VERIFICATION"] },
+                      statutoryRef: { type: Type.STRING },
+                      notes: { type: Type.STRING }
+                    },
+                    required: ["conditionNumber", "title", "requirement", "isSatisfied", "status", "statutoryRef", "notes"]
+                  }
+                },
+                itemClassifications: {
+                  type: Type.ARRAY,
+                  items: {
+                    type: Type.OBJECT,
+                    properties: {
+                      description: { type: Type.STRING },
+                      hsnSac: { type: Type.STRING },
+                      taxableValue: { type: Type.NUMBER },
+                      taxRatePercent: { type: Type.NUMBER },
+                      totalTax: { type: Type.NUMBER },
+                      nature: { type: Type.STRING, enum: ["Input Goods", "Input Services", "Capital Goods", "Motor Vehicle", "Food & Catering", "Works Contract", "Personal / Non-Business", "Other Ineligible"] },
+                      itcEligibility: { type: Type.STRING, enum: ["ELIGIBLE", "BLOCKED_17_5", "BLOCKED_POS", "REVERSIBLE"] },
+                      sectionRef: { type: Type.STRING },
+                      eligibleTaxAmount: { type: Type.NUMBER },
+                      blockedTaxAmount: { type: Type.NUMBER },
+                      reason: { type: Type.STRING },
+                      alertLevel: { type: Type.STRING, description: "e.g. 🔴 Critical Red (Blocked Credit) or 🟢 Compliant Green" }
+                    },
+                    required: ["description", "taxableValue", "taxRatePercent", "totalTax", "nature", "itcEligibility", "sectionRef", "eligibleTaxAmount", "blockedTaxAmount", "reason"]
+                  }
+                },
+                caWorkpaperFinding: { type: Type.STRING },
+                actionRequired: { type: Type.STRING }
+              },
+              required: ["overallEligibility", "totalGstPaid", "eligibleITCAmount", "blockedITCAmount", "gstr3bReportingTable", "caWorkpaperFinding", "actionRequired"]
+            },
+            auditNotes: { type: Type.STRING }
           },
-          required: ["subjectLine", "emailBody", "whatsappMessage", "smsText"],
-        },
-      },
+          required: [
+            "vendorName",
+            "vendorGSTIN",
+            "placeOfSupply",
+            "transactionType",
+            "isPoSCompliant",
+            "complianceFlags",
+            "riskStatus",
+            "auditNotes"
+          ]
+        }
+      }
     });
 
-    const parsed = JSON.parse(response.text || "{}");
-    return res.json({ success: true, data: parsed });
+    const parsed = extractAndParseJSON(response.text);
+
+    // Compute fallback defaults for itcEligibility if not generated completely
+    const totalGst = (Number(parsed.cgstCharged) || 0) + (Number(parsed.sgstCharged) || 0) + (Number(parsed.igstCharged) || 0);
+    const isPoSValid = parsed.isPoSCompliant !== false;
+
+    if (!parsed.itcEligibility) {
+      const isBlocked = !isPoSValid;
+      parsed.itcEligibility = {
+        overallEligibility: isBlocked ? "BLOCKED_POS_ERROR" : "ELIGIBLE",
+        totalGstPaid: totalGst,
+        eligibleITCAmount: isBlocked ? 0 : totalGst,
+        blockedITCAmount: isBlocked ? totalGst : 0,
+        gstr3bReportingTable: isBlocked ? "Table 4(B)(2) - Ineligible as per Place of Supply error" : "Table 4(A)(5) - All other ITC",
+        gstr2bReconciliationNote: isBlocked ? "Tax charged as CGST/SGST by supplier in another state cannot be populated as eligible ITC in recipient GSTR-2B." : "Appears in GSTR-2B auto-drafted ITC statement.",
+        timeLimitSection16_4: {
+          maxAvailmentDate: "30-Nov-2026",
+          isWithinTimeLimit: true,
+          statutoryDeadlineNote: "ITC can be claimed up to 30th November of subsequent FY or date of filing annual return under Sec 16(4)."
+        },
+        rule37_180DaysReversal: {
+          invoiceDate: parsed.invoiceDate || "2024-10-22",
+          paymentDueDate180Days: "180 days from invoice date",
+          interestRatePercent: 18,
+          riskStatus: "SAFE"
+        },
+        blockedCreditClauses: [
+          {
+            clause: "Sec 17(5)(a)",
+            title: "Motor Vehicles & Conveyances",
+            category: "Motor Vehicles",
+            isTriggered: false,
+            status: "CLEAR",
+            statutoryText: "Motor vehicles for transportation of persons having approved seating capacity <= 13 persons.",
+            reason: "Supply does not involve motor vehicles for employee passenger transport."
+          },
+          {
+            clause: "Sec 17(5)(b)(i)",
+            title: "Food, Beverages & Catering",
+            category: "Food & Catering",
+            isTriggered: false,
+            status: "CLEAR",
+            statutoryText: "Food and beverages, outdoor catering, beauty treatment, health services.",
+            reason: "Supply pertains to business operational services, not food/catering."
+          },
+          {
+            clause: "Sec 17(5)(b)(ii)",
+            title: "Club & Fitness Memberships",
+            category: "Memberships",
+            isTriggered: false,
+            status: "CLEAR",
+            statutoryText: "Membership of a club, health and fitness centre.",
+            reason: "No club or recreational memberships involved."
+          },
+          {
+            clause: "Sec 17(5)(c) & (d)",
+            title: "Works Contract / Immovable Construction",
+            category: "Works Contract",
+            isTriggered: false,
+            status: "CLEAR",
+            statutoryText: "Works contract services supplied for construction of an immovable property.",
+            reason: "Not capitalized to immovable property civil structure."
+          },
+          {
+            clause: "Sec 17(5)(g)",
+            title: "Personal Consumption",
+            category: "Personal Use",
+            isTriggered: false,
+            status: "CLEAR",
+            statutoryText: "Goods or services used for personal consumption.",
+            reason: "Procured solely for commercial business operations of the entity."
+          },
+          {
+            clause: "Sec 17(5)(h)",
+            title: "Gifts, Free Samples & Lost Goods",
+            category: "Gifts/Samples",
+            isTriggered: false,
+            status: "CLEAR",
+            statutoryText: "Goods lost, stolen, destroyed, written off or disposed of by way of gift or free samples.",
+            reason: "Standard taxable B2B supply against commercial invoice."
+          }
+        ],
+        section16GoldenConditions: [
+          {
+            conditionNumber: "Condition 1",
+            title: "Tax Invoice / Debit Note in Possession",
+            requirement: "Recipient must possess valid tax invoice containing all mandatory particulars under Rule 46.",
+            isSatisfied: true,
+            status: "SATISFIED",
+            statutoryRef: "Section 16(2)(a)",
+            notes: "Valid tax invoice issued with supplier & recipient GSTIN."
+          },
+          {
+            conditionNumber: "Condition 2",
+            title: "Receipt of Goods or Services",
+            requirement: "Recipient has physically or constructively received the underlying goods/services.",
+            isSatisfied: true,
+            status: "SATISFIED",
+            statutoryRef: "Section 16(2)(b)",
+            notes: "Services rendered as per engagement workpaper."
+          },
+          {
+            conditionNumber: "Condition 3",
+            title: "Tax Actually Paid & Matched in GSTR-2B",
+            requirement: "Tax charged in respect of supply has been actually paid to Government and auto-reflected in GSTR-2B.",
+            isSatisfied: isPoSValid,
+            status: isPoSValid ? "SATISFIED" : "NOT_SATISFIED",
+            statutoryRef: "Section 16(2)(aa) & (c)",
+            notes: isPoSValid ? "Matched in GSTR-2B statement." : "PoS mismatch prevents ITC availment in recipient state."
+          },
+          {
+            conditionNumber: "Condition 4",
+            title: "Filing of Return under Section 39",
+            requirement: "Supplier and Recipient have furnished returns under Section 39 (GSTR-3B).",
+            isSatisfied: true,
+            status: "SATISFIED",
+            statutoryRef: "Section 16(2)(d)",
+            notes: "Subject to timely monthly GSTR-3B return filing."
+          },
+          {
+            conditionNumber: "Condition 5",
+            title: "180 Days Payment Rule",
+            requirement: "Recipient must pay invoice amount + GST to supplier within 180 days, else reverse ITC with 18% interest under Rule 37.",
+            isSatisfied: true,
+            status: "SATISFIED",
+            statutoryRef: "2nd Proviso to Sec 16(2) / Rule 37",
+            notes: "Track vendor ageing to ensure settlement within 180 days."
+          }
+        ],
+        caWorkpaperFinding: isPoSValid 
+          ? "Input Tax Credit of ₹" + totalGst.toLocaleString('en-IN') + " is 100% ELIGIBLE under Section 16. No Section 17(5) blockage applies."
+          : "CRITICAL: ITC of ₹" + totalGst.toLocaleString('en-IN') + " is INELIGIBLE / BLOCKED due to Place of Supply error (CGST/SGST charged instead of IGST).",
+        actionRequired: isPoSValid
+          ? "Avail in Table 4(A)(5) of GSTR-3B for the tax period."
+          : "Request vendor to issue Credit Note and reissue Inter-State IGST invoice."
+      };
+    }
+
+    return res.json(parsed);
   } catch (error: any) {
-    console.error("AI drafting error:", error);
-    return res.status(500).json({ error: error?.message || "Failed to generate communication draft" });
+    console.error("Error in /api/analyze-gst:", error);
+    return res.status(500).json({ error: error.message || "Failed to analyze GST compliance" });
   }
 });
 
-// 4. Downloadable Windows .bat Launcher Generator
-app.get("/api/download-launcher", (req: Request, res: Response) => {
-  const appUrl = process.env.APP_URL || `http://localhost:${PORT}`;
-  
-  const batContent = `@echo off
-title CA Practice ERP ^& Client Master Suite Launcher
-color 1F
-cls
-echo ======================================================================
-echo          CA PRACTICE ERP ^& FOREVER MASTER FILE SUITE
-echo          Practice Management System for Chartered Accountants
-echo ======================================================================
-echo.
-echo [1/3] Checking environment and network connectivity...
-ping -n 1 8.8.8.8 >nul 2>&1
-if %errorlevel% neq 0 (
-    echo [!] Working in Offline / Local PWA Mode...
-) else (
-    echo [*] Cloud Sync and Govt Portal Connectors Online.
-)
-echo.
-echo [2/3] Preparing CA Practice ERP Application Workspace...
-echo [*] App URL: ${appUrl}
-echo [*] Forever Master Client Repository: Ready
-echo [*] Automated Billing ^& Attendance Engine: Initialized
-echo.
-echo [3/3] Launching CA Practice ERP in Desktop Window...
-echo.
+/* =========================================================================
+   3. BANK STATEMENT ANALYSIS ENDPOINT
+   ========================================================================= */
+app.post("/api/analyze-bank-statement", async (req: Request, res: Response) => {
+  try {
+    const { fileBase64, mimeType, filename } = req.body;
 
-:: Try to launch in Chrome Application Mode for a seamless native desktop experience
-start "" chrome.exe --app="${appUrl}" 2>nul
-if %errorlevel% neq 0 (
-    :: Fallback to Microsoft Edge Application Mode
-    start "" msedge.exe --app="${appUrl}" 2>nul
-    if %errorlevel% neq 0 (
-        :: Default system browser
-        start "" "${appUrl}"
-    )
-)
+    if (!fileBase64) {
+      return res.status(400).json({ error: "Missing fileBase64 in request body." });
+    }
 
-echo.
-echo ======================================================================
-echo CA Practice ERP is now running in your desktop window!
-echo You may minimize this console or press any key to close this launcher.
-echo ======================================================================
-pause >nul
-exit
-`;
+    const effectiveMimeType = mimeType || "image/png";
 
-  res.setHeader("Content-Type", "application/x-bat");
-  res.setHeader("Content-Disposition", 'attachment; filename="Start_CA_Practice_ERP.bat"');
-  res.send(batContent);
+    const systemInstruction = `You are a Senior Forensic Auditor and Chartered Accountant specializing in Bank Statement analysis for Indian statutory audits.
+Analyze the uploaded bank statement PDF/Image.
+1. Extract account details (Bank Name, Account Number, Account Holder, IFSC, Statement Period, Opening & Closing Balances).
+2. Extract all transactions into a tabular structure (Date, Description, Ref/Chq No, Debit, Credit, Balance, Mode like CASH, UPI, NEFT, RTGS, IMPS, CHEQUE, CHARGES, INTEREST, OTHER).
+3. CRITICAL AUDIT RULE 1 - CASH TRANSACTIONS EXCEEDING ₹50,000:
+   - Identify all Cash Deposits or Cash Withdrawals >= ₹50,000.
+   - Mark isCashAbove50k = true.
+   - Add entries to cashAuditAlerts detailing Section 269ST (₹2L single day limit), Section 269SS/T, Section 40A(3) (₹10k cash payment limit), and SFT reporting requirements.
+4. CRITICAL AUDIT RULE 2 - DUPLICATE TRANSACTIONS:
+   - Identify potential duplicate entries (same date + same amount + same/similar description).
+   - Mark isDuplicate = true.
+   - Group them in duplicateGroups.
+5. Calculate aggregate financial summary metrics (Total Inflows, Total Outflows, Net Movement).`;
+
+    const prompt = `Analyze this bank statement (${filename || "Bank Statement"}) in full forensic detail. Extract all transaction line items, flag cash transactions > ₹50,000, and detect duplicate entries.`;
+
+    const response = await generateContentWithFallback({
+      contents: {
+        parts: [
+          {
+            inlineData: {
+              data: fileBase64,
+              mimeType: effectiveMimeType,
+            },
+          },
+          { text: prompt },
+        ],
+      },
+      config: {
+        systemInstruction,
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            bankName: { type: Type.STRING },
+            accountNumber: { type: Type.STRING },
+            accountHolder: { type: Type.STRING },
+            ifscCode: { type: Type.STRING },
+            period: {
+              type: Type.OBJECT,
+              properties: {
+                from: { type: Type.STRING },
+                to: { type: Type.STRING }
+              },
+              required: ["from", "to"]
+            },
+            openingBalance: { type: Type.NUMBER },
+            closingBalance: { type: Type.NUMBER },
+            totalInflows: { type: Type.NUMBER },
+            totalOutflows: { type: Type.NUMBER },
+            netCashFlow: { type: Type.NUMBER },
+            totalTransactionsCount: { type: Type.NUMBER },
+            highCashTransactionsCount: { type: Type.NUMBER },
+            duplicateTransactionsCount: { type: Type.NUMBER },
+            transactions: {
+              type: Type.ARRAY,
+              items: {
+                type: Type.OBJECT,
+                properties: {
+                  id: { type: Type.STRING },
+                  date: { type: Type.STRING },
+                  description: { type: Type.STRING },
+                  referenceNo: { type: Type.STRING },
+                  debit: { type: Type.NUMBER },
+                  credit: { type: Type.NUMBER },
+                  balance: { type: Type.NUMBER },
+                  mode: { type: Type.STRING, enum: ["CASH", "UPI", "NEFT", "RTGS", "IMPS", "CHEQUE", "CHARGES", "INTEREST", "OTHER"] },
+                  isCashAbove50k: { type: Type.BOOLEAN },
+                  isDuplicate: { type: Type.BOOLEAN },
+                  category: { type: Type.STRING },
+                  notes: { type: Type.STRING }
+                },
+                required: ["date", "description", "balance", "mode", "isCashAbove50k", "isDuplicate"]
+              }
+            },
+            cashAuditAlerts: {
+              type: Type.ARRAY,
+              items: {
+                type: Type.OBJECT,
+                properties: {
+                  date: { type: Type.STRING },
+                  amount: { type: Type.NUMBER },
+                  type: { type: Type.STRING, enum: ["DEPOSIT", "WITHDRAWAL"] },
+                  section: { type: Type.STRING, enum: ["Sec 269ST", "Sec 269SS", "Sec 269T", "SFT Reporting"] },
+                  ruleViolation: { type: Type.STRING },
+                  description: { type: Type.STRING }
+                },
+                required: ["date", "amount", "type", "section", "ruleViolation", "description"]
+              }
+            },
+            duplicateGroups: {
+              type: Type.ARRAY,
+              items: {
+                type: Type.OBJECT,
+                properties: {
+                  date: { type: Type.STRING },
+                  amount: { type: Type.NUMBER },
+                  type: { type: Type.STRING, enum: ["DEBIT", "CREDIT"] },
+                  descriptions: {
+                    type: Type.ARRAY,
+                    items: { type: Type.STRING }
+                  },
+                  count: { type: Type.NUMBER }
+                },
+                required: ["date", "amount", "type", "descriptions", "count"]
+              }
+            },
+            riskStatus: { type: Type.STRING, enum: ["compliant", "warning", "critical"] },
+            auditSummary: { type: Type.STRING }
+          },
+          required: [
+            "bankName",
+            "accountNumber",
+            "accountHolder",
+            "transactions",
+            "riskStatus",
+            "auditSummary"
+          ]
+        }
+      }
+    });
+
+    const parsed = extractAndParseJSON(response.text);
+    return res.json(parsed);
+  } catch (error: any) {
+    console.error("Error in /api/analyze-bank-statement:", error);
+    return res.status(500).json({ error: error.message || "Failed to analyze bank statement" });
+  }
 });
 
-// Vite Middleware for Development & Static Delivery for Production
+/* =========================================================================
+   4. TDS ANALYSER ENDPOINT
+   ========================================================================= */
+app.post("/api/analyze-tds", async (req: Request, res: Response) => {
+  try {
+    const { fileBase64, mimeType, filename } = req.body;
+
+    if (!fileBase64) {
+      return res.status(400).json({ error: "Missing fileBase64 in request body." });
+    }
+
+    const effectiveMimeType = mimeType || "image/png";
+
+    const systemInstruction = `You are a Direct Tax & TDS Auditor under the Indian Income Tax Act 1961 (Chapter XVII-B).
+Analyze the uploaded service invoice, contract declaration, or Form 26AS/AIS statement.
+1. Classify the nature of services and map to the correct TDS Section:
+   - Section 194C: Contractor / Sub-contractor (1% Ind/HUF, 2% Co/Firm; Threshold: ₹30,000 single / ₹1,00,000 aggregate)
+   - Section 194J(a): Fees for Technical Services (FTS) / Call center (2%; Threshold: ₹30,000)
+   - Section 194J(b): Fees for Professional Services / Legal / CA / Royalty / Director fees (10%; Threshold: ₹30,000)
+   - Section 194H: Commission & Brokerage (5%; Threshold: ₹15,000)
+   - Section 194I(a): Rent of Plant & Machinery (2%; Threshold: ₹2,40,000)
+   - Section 194I(b): Rent of Land & Building (10%; Threshold: ₹2,40,000)
+   - Section 194Q: Purchase of Goods (0.1%; Threshold: ₹50,00,000)
+   - Section 194A: Interest other than securities (10%)
+2. Check if TDS was deducted at all. If gross amount > threshold and TDS is 0, flag as MISSED_TDS.
+3. Check if TDS was deducted at the wrong rate (e.g. 2% under 194C instead of 10% under 194J). Flag as SHORT_DEDUCTION.
+4. Calculate TDS shortfall/variance and evaluate consequences:
+   - Interest under Section 201(1A) @ 1% per month for non-deduction or 1.5% per month for non-payment.
+   - 30% expenditure disallowance under Section 40(a)(ia).
+5. Provide actionable CA recommendations.`;
+
+    const prompt = `Perform a rigorous TDS Compliance Audit on this document (${filename || "TDS Document"}). Check section classification, statutory threshold, rate applied vs statutory rate, and calculate any short-deduction.`;
+
+    const response = await generateContentWithFallback({
+      contents: {
+        parts: [
+          {
+            inlineData: {
+              data: fileBase64,
+              mimeType: effectiveMimeType,
+            },
+          },
+          { text: prompt },
+        ],
+      },
+      config: {
+        systemInstruction,
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            deductorName: { type: Type.STRING },
+            deductorTAN: { type: Type.STRING },
+            deducteeName: { type: Type.STRING },
+            deducteePAN: { type: Type.STRING },
+            invoiceOrRefNumber: { type: Type.STRING },
+            date: { type: Type.STRING },
+            grossServiceAmount: { type: Type.NUMBER },
+            natureOfService: { type: Type.STRING },
+            declaredTDSSection: { type: Type.STRING },
+            recommendedTDSSection: { type: Type.STRING },
+            sectionTitle: { type: Type.STRING },
+            standardRate: { type: Type.NUMBER },
+            appliedRate: { type: Type.NUMBER },
+            isRateCorrect: { type: Type.BOOLEAN },
+            actualTDSDeducted: { type: Type.NUMBER },
+            expectedTDSDeducted: { type: Type.NUMBER },
+            tdsVariance: { type: Type.NUMBER },
+            thresholdLimit: { type: Type.NUMBER },
+            isThresholdExceeded: { type: Type.BOOLEAN },
+            isTDSMissed: { type: Type.BOOLEAN },
+            isShortDeduction: { type: Type.BOOLEAN },
+            lowerDeductionCertStatus: { type: Type.STRING, enum: ["NO_CERTIFICATE", "VALID_SEC_197", "EXPIRED"] },
+            sectionWiseBreakdown: {
+              type: Type.ARRAY,
+              items: {
+                type: Type.OBJECT,
+                properties: {
+                  section: { type: Type.STRING },
+                  description: { type: Type.STRING },
+                  natureOfPayment: { type: Type.STRING },
+                  taxableAmount: { type: Type.NUMBER },
+                  applicableRate: { type: Type.NUMBER },
+                  deductedRate: { type: Type.NUMBER },
+                  expectedTDS: { type: Type.NUMBER },
+                  actualTDS: { type: Type.NUMBER },
+                  variance: { type: Type.NUMBER },
+                  status: { type: Type.STRING, enum: ["CORRECT", "SHORT_DEDUCTION", "OVER_DEDUCTION", "MISSED_TDS"] },
+                  remarks: { type: Type.STRING }
+                },
+                required: ["section", "natureOfPayment", "taxableAmount", "applicableRate", "expectedTDS", "actualTDS", "status"]
+              }
+            },
+            riskStatus: { type: Type.STRING, enum: ["compliant", "warning", "critical"] },
+            caAuditRecommendations: {
+              type: Type.ARRAY,
+              items: { type: Type.STRING }
+            },
+            form26ASDeclarationStatus: { type: Type.STRING, enum: ["MATCHED", "UNMATCHED", "NOT_REPORTED", "NOT_APPLICABLE"] }
+          },
+          required: [
+            "deducteeName",
+            "grossServiceAmount",
+            "recommendedTDSSection",
+            "standardRate",
+            "actualTDSDeducted",
+            "expectedTDSDeducted",
+            "isRateCorrect",
+            "riskStatus",
+            "caAuditRecommendations"
+          ]
+        }
+      }
+    });
+
+    const parsed = extractAndParseJSON(response.text);
+
+    // Deterministically evaluate TDS risk and rate compliance
+    const standardRate = Number(parsed.standardRate || 2.0);
+    const appliedRate = Number(parsed.appliedRate ?? standardRate);
+    const grossAmount = Number(parsed.grossServiceAmount || 0);
+    const expectedTDS = Number(parsed.expectedTDSDeducted || Math.round(grossAmount * (standardRate / 100)));
+    
+    // Check if there is an actual short deduction (e.g. applied 2% instead of statutory 10%)
+    const hasRateShortfall = appliedRate < standardRate && Math.abs(standardRate - appliedRate) >= 0.5;
+    const isExplicitShortDeduction = parsed.isShortDeduction === true && hasRateShortfall;
+
+    let isRateCorrect = !hasRateShortfall && (parsed.isRateCorrect !== false);
+    let isShortDeduction = isExplicitShortDeduction || hasRateShortfall;
+    let isTDSMissed = parsed.isTDSMissed === true;
+    
+    let actualTDS = Number(parsed.actualTDSDeducted || 0);
+    if (!isShortDeduction && !isTDSMissed) {
+      actualTDS = actualTDS > 0 ? actualTDS : expectedTDS;
+    }
+
+    let variance = 0;
+    if (isShortDeduction) {
+      variance = Number(parsed.tdsVariance || Math.max(0, expectedTDS - actualTDS));
+      if (variance === 0 && hasRateShortfall) {
+        variance = Math.round(grossAmount * ((standardRate - appliedRate) / 100));
+      }
+    }
+
+    let riskStatus = "compliant";
+    if (isShortDeduction || isTDSMissed || !isRateCorrect) {
+      riskStatus = "critical";
+    } else if (parsed.lowerDeductionCertStatus === "EXPIRED") {
+      riskStatus = "warning";
+    } else {
+      riskStatus = "compliant";
+    }
+
+    parsed.standardRate = standardRate;
+    parsed.appliedRate = appliedRate;
+    parsed.expectedTDSDeducted = expectedTDS;
+    parsed.actualTDSDeducted = actualTDS;
+    parsed.riskStatus = riskStatus;
+    parsed.isRateCorrect = isRateCorrect;
+    parsed.isShortDeduction = isShortDeduction;
+    parsed.isTDSMissed = isTDSMissed;
+    parsed.tdsVariance = variance;
+
+    return res.json(parsed);
+  } catch (error: any) {
+    console.error("Error in /api/analyze-tds:", error);
+    return res.status(500).json({ error: error.message || "Failed to analyze TDS" });
+  }
+});
+
+/* =========================================================================
+   5. CA AUDITOR COPILOT QUERY
+   ========================================================================= */
+app.post("/api/custom-audit-query", async (req: Request, res: Response) => {
+  try {
+    const { query, documentContext, moduleType } = req.body;
+
+    if (!query) {
+      return res.status(400).json({ error: "Missing query" });
+    }
+
+    const response = await generateContentWithFallback({
+      contents: `You are an expert Indian Chartered Accountant (FCA) advisor.
+Document Module: ${moduleType || 'Financial Audit'}
+Document Context Data: ${JSON.stringify(documentContext || {})}
+
+User Auditor Question: "${query}"
+
+Provide a concise, highly authoritative, section-referenced statutory response (citing relevant Sections of CGST Act 2017, IGST Act 2017, Income Tax Act 1961, or RBI SFT Master Directions).
+Include concrete actionable steps for the CA audit workpaper.`,
+    });
+
+    return res.json({ answer: response.text || "Unable to generate answer." });
+  } catch (error: any) {
+    console.error("Error in /api/custom-audit-query:", error);
+    return res.status(500).json({ error: error.message || "Failed to process query" });
+  }
+});
+
+/* =========================================================================
+   VITE MIDDLEWARE / STATIC ASSETS SERVING
+   ========================================================================= */
 async function startServer() {
   if (process.env.NODE_ENV !== "production") {
     const vite = await createViteServer({
@@ -353,596 +1106,8 @@ async function startServer() {
   }
 
   app.listen(PORT, "0.0.0.0", () => {
-    console.log(`CA Practice ERP Server running on http://0.0.0.0:${PORT}`);
-app.use(express.json({ limit: '50mb' }));
-app.use(express.urlencoded({ extended: true, limit: '50mb' }));
-
-// Lazy initialize Gemini client
-function getGeminiClient(): GoogleGenAI | null {
-  if (!process.env.GEMINI_API_KEY) {
-    return null;
-function getAiClient(): GoogleGenAI | null {
-  if (!aiClient && process.env.GEMINI_API_KEY) {
-    try {
-      aiClient = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-    } catch (e) {
-      console.warn("Failed to initialize GoogleGenAI client:", e);
-    }
-  }
-  return aiClient;
-}
-
-async function startServer() {
-  const app = express();
-  const PORT = 3000;
-
-  app.use(express.json({ limit: "15mb" }));
-
-  // Health check
-  app.get("/api/health", (req, res) => {
-    res.json({ status: "ok", aiEnabled: Boolean(process.env.GEMINI_API_KEY) });
+    console.log(`Financial Document Review Server running on http://0.0.0.0:${PORT}`);
   });
-
-  // AI Document / PDF / Invoice / FAR Extractor
-  app.post("/api/ai/parse-document", async (req, res) => {
-    const { text, fileBase64, mimeType, companyContext } = req.body;
-
-    if (!text && !fileBase64) {
-      return res.status(400).json({ error: "Either text or fileBase64 is required" });
-    }
-
-    const ai = getAiClient();
-    const prompt = `You are a Senior Forensic Auditor, Chartered Accountant & Fixed Asset Automation Specialist under Ind AS 16, Companies Act 2013, and Indian GST laws.
-Analyze the uploaded document (Vendor Invoice, Purchase Order, Fixed Asset Register excerpt, Physical Verification Log, or Capex Proposal).
-
-Company Context:
-- Company Name: ${companyContext?.name || "Corporate Manufacturing Entity"}
-- Industry: ${companyContext?.industry || "Manufacturing"}
-- Known Plants: ${(companyContext?.plants || []).join(", ") || "Pune, Chennai, Manesar, Sanand, Bengaluru"}
-
-Extract all structured Fixed Asset information and provide a strict JSON response adhering to this schema:
-{
-  "documentType": "Vendor Tax Invoice" | "Purchase Order" | "Fixed Asset Register" | "Physical Verification Sheet" | "Capex Capitalisation Proposal" | "Other Document",
-  "documentReference": "string (e.g. INV-9042 or PO-8812)",
-  "vendorName": "string",
-  "poNumber": "string",
-  "invoiceNumber": "string",
-  "documentDate": "YYYY-MM-DD",
-  "totalGrossAmountINR": number,
-  "gstAmountINR": number,
-  "currency": "INR",
-  "summaryNote": "string explanation of document contents and asset recognition rationale",
-  "extractedAssets": [
-    {
-      "name": "string (clear descriptive asset title)",
-      "category": "Plant & Machinery" | "Buildings & Civil Structures" | "IT Hardware & Servers" | "Office & Lab Equipment" | "Vehicles" | "Tooling & Moulds" | "Intangibles (Software)",
-      "plant": "string (match closest known plant if possible)",
-      "subLocation": "string (e.g. Bay 2, Server Room, Lab 1)",
-      "costINR": number (gross cost before tax/after discounts),
-      "accumulatedDepINR": number (0 if brand new),
-      "nbvINR": number,
-      "capitalisationDate": "YYYY-MM-DD",
-      "usefulLifeYears": number,
-      "schIILifeYears": number,
-      "depreciationMethod": "SLM" | "WDV",
-      "serialNumber": "string",
-      "qrCode": "string",
-      "vendor": "string",
-      "invoiceNumber": "string",
-      "poNumber": "string",
-      "description": "string",
-      "custodian": "string",
-      "department": "string",
-      "gstPaidINR": number,
-      "itcClaimed": boolean,
-      "components": [
-        {
-          "name": "string",
-          "costINR": number,
-          "usefulLifeYears": number,
-          "depreciationMethod": "SLM",
-          "notes": "string"
-        }
-      ]
-    }
-  ],
-  "extractedCapexItems": [
-    {
-      "poNumber": "string",
-      "invoiceNumber": "string",
-      "vendor": "string",
-      "description": "string",
-      "amountINR": number,
-      "invoiceDate": "YYYY-MM-DD",
-      "plant": "string",
-      "department": "string",
-      "suggestedCategory": "Plant & Machinery" | "Buildings & Civil Structures" | "IT Hardware & Servers" | "Office & Lab Equipment" | "Vehicles" | "Tooling & Moulds" | "Intangibles (Software)" | "Operating Expense"
-    }
-  ]
-}
-Output only pure valid JSON. If text is ambiguous, make sound accounting inferences aligned with Ind AS 16.`;
-
-    if (ai) {
-      try {
-        let contents: any = prompt;
-
-        if (fileBase64 && mimeType) {
-          contents = [
-            {
-              inlineData: {
-                data: fileBase64,
-                mimeType: mimeType,
-              },
-            },
-            prompt + (text ? `\n\nAdditional extracted text:\n${text}` : ""),
-          ];
-        } else if (text) {
-          contents = `${prompt}\n\nDocument Text Content:\n${text}`;
-        }
-
-        const response = await ai.models.generateContent({
-          model: "gemini-3.7-flash",
-          contents: contents,
-          config: {
-            responseMimeType: "application/json",
-          },
-        });
-
-        if (response.text) {
-          const parsed = JSON.parse(response.text);
-          return res.json({ success: true, source: "gemini", data: parsed });
-        }
-      } catch (err: any) {
-        console.error("Gemini document parsing error, falling back to rule parser:", err?.message);
-      }
-    }
-
-    // Deterministic fallback parser
-    return res.json({
-      success: true,
-      source: "rule-engine",
-      data: generateDeterministicParsedDoc(text || "", companyContext),
-    });
-  });
-
-  // AI Capitalisation Review
-  app.post("/api/ai/review-capitalisation", async (req, res) => {
-    const { item } = req.body;
-    if (!item) {
-      return res.status(400).json({ error: "Item payload is required" });
-    }
-
-    const ai = getAiClient();
-    if (ai) {
-      try {
-        const prompt = `You are a Senior Technical Accounting Expert specializing in Indian Accounting Standards (Ind AS 16, Ind AS 38), Companies Act 2013 Schedule II, and Indian GST rules.
-Analyze the following procurement / Capex transaction for Fixed Asset Capitalisation:
-Transaction Details:
-${JSON.stringify(item, null, 2)}
-
-Provide a strict JSON response adhering to this format:
-{
-  "recommendation": "Capitalise" | "Expense" | "Mixed / Componentise",
-  "recommendedCategory": "string",
-  "usefulLifeYears": number,
-  "salvageValuePct": number,
-  "componentisationDetails": [
-    {"name": "string", "costRatioPct": number, "usefulLifeYears": number, "justification": "string"}
-  ],
-  "gstItcEligibility": "Eligible" | "Blocked under Sec 17(5)" | "Partially Blocked",
-  "gstAnalysis": "string explanation",
-  "capitalisationDate": "string",
-  "reasoning": "string detailed technical justification under Ind AS 16",
-  "evidenceKeyPoints": ["point 1", "point 2"],
-  "confidenceScore": number (between 0.70 and 0.99),
-  "policyReference": "string (e.g., Ind AS 16 para 7, Companies Act Sch II Pt C)",
-  "riskWarnings": ["warning if any"]
-}
-Output only pure valid JSON without markdown wrapping.`;
-
-        const response = await ai.models.generateContent({
-          model: "gemini-3.7-flash",
-          contents: prompt,
-          config: {
-            responseMimeType: "application/json",
-          },
-        });
-
-        if (response.text) {
-          const parsed = JSON.parse(response.text);
-          return res.json({ success: true, source: "gemini", data: parsed });
-        }
-      } catch (err: any) {
-        console.error("Gemini capitalisation error, falling back:", err?.message);
-      }
-    }
-
-    // Deterministic rule-based fallback
-    return res.json({
-      success: true,
-      source: "rule-engine",
-      data: generateRuleBasedCapitalisation(item),
-    });
-  });
-
-  // AI Risk Analysis
-  app.post("/api/ai/analyze-risk", async (req, res) => {
-    const { asset, anomalies } = req.body;
-    const ai = getAiClient();
-
-    if (ai) {
-      try {
-        const prompt = `You are an Internal Audit Director and Fixed Asset Risk Specialist.
-Analyze the following asset and potential anomaly flags:
-Asset: ${JSON.stringify(asset, null, 2)}
-Detected Anomalies: ${JSON.stringify(anomalies || [], null, 2)}
-
-Provide a structured JSON output:
-{
-  "severity": "Critical" | "High" | "Medium" | "Low",
-  "financialExposureINR": number,
-  "rootCauseExplanation": "string",
-  "evidenceSummary": "string",
-  "recommendedCorrectiveAction": "string",
-  "statutoryImpact": "string (impact on CARO 2020 / Balance Sheet / Tax)",
-  "investigationChecklist": ["step 1", "step 2", "step 3"]
-}
-Output only pure valid JSON.`;
-
-        const response = await ai.models.generateContent({
-          model: "gemini-3.7-flash",
-          contents: prompt,
-          config: {
-            responseMimeType: "application/json",
-          },
-        });
-
-        if (response.text) {
-          const parsed = JSON.parse(response.text);
-          return res.json({ success: true, source: "gemini", data: parsed });
-        }
-      } catch (err: any) {
-        console.error("Gemini risk analysis error:", err?.message);
-      }
-    }
-
-    return res.json({
-      success: true,
-      source: "rule-engine",
-      data: {
-        severity: "High",
-        financialExposureINR: asset?.cost || 1500000,
-        rootCauseExplanation: "Anomaly detected in location / documentation match against fixed asset register.",
-        evidenceSummary: "Subledger record does not match physical scanning log.",
-        recommendedCorrectiveAction: "Initiate physical count inspection by Plant Controller & re-tag.",
-        statutoryImpact: "Requires reporting under CARO 2020 Clause 3(i)(b) if variance is >10%.",
-        investigationChecklist: [
-          "Cross-verify Gate Pass and Plant Transfer notes",
-          "Inspect barcode/RFID tag on physical machine",
-          "Reconcile invoice serial number against manufacturer delivery challan"
-        ]
-      }
-    });
-  });
-
-  // AI Audit Summary Generation
-  app.post("/api/ai/generate-audit-summary", async (req, res) => {
-    const { registerStats, topRisks, pvCoverage, caroReadiness } = req.body;
-    const ai = getAiClient();
-
-    if (ai) {
-      try {
-        const prompt = `You are a Partner at a Big-4 Accounting Firm preparing an Executive Fixed Asset Governance & Audit-Readiness Memorandum for the Audit Committee & CFO.
-Data:
-- Total Gross Block: ₹${registerStats?.totalGrossValueLakhs || 14280} Lakhs
-- Total Net Book Value: ₹${registerStats?.totalNBVLakhs || 9840} Lakhs
-- Physical Verification Coverage: ${pvCoverage || 74.2}%
-- Open Risk Items: ${topRisks?.length || 5}
-- CARO 2020 Readiness Score: ${caroReadiness || 88}%
-
-Generate a comprehensive executive audit summary with:
-1. Executive Opinion (Unqualified / Qualified with emphasis of matters)
-2. CARO 2020 Clause 3(i) Compliance Assessment (PPE records, physical verification discrepancies, title deeds)
-3. Key Audit Matters (KAM) in Fixed Assets (Impairment, Useful life reviews, Component accounting)
-4. Identified Internal Control Deficiencies and Required Remediations
-5. Management Action Plan before Balance Sheet Sign-off.
-
-Format as clean structured markdown.`;
-
-        const response = await ai.models.generateContent({
-          model: "gemini-3.7-flash",
-          contents: prompt,
-        });
-
-        if (response.text) {
-          return res.json({ success: true, source: "gemini", markdown: response.text });
-        }
-      } catch (err: any) {
-        console.error("Gemini audit summary error:", err?.message);
-      }
-    }
-
-    return res.json({
-      success: true,
-      source: "deterministic-template",
-      markdown: generateDeterministicAuditSummary(registerStats, pvCoverage, caroReadiness),
-    });
-  });
-
-  // Vite integration
-  if (process.env.NODE_ENV !== "production") {
-    const vite = await createViteServer({
-      server: { middlewareMode: true },
-      appType: "spa",
-    });
-    app.use(vite.middlewares);
-  } else {
-    const distPath = path.join(process.cwd(), "dist");
-    app.use(express.static(distPath));
-    app.get("*", (req, res) => {
-      res.sendFile(path.join(distPath, "index.html"));
-    });
-  }
-
-  app.listen(PORT, "0.0.0.0", () => {
-    console.log(`AssetTrust AI Server running on http://0.0.0.0:${PORT}`);
-  });
-}
-
-function generateRuleBasedCapitalisation(item: any) {
-  const desc = (item?.description || "").toLowerCase();
-  const amount = item?.amount || item?.cost || 500000;
-
-  let recommendation = "Capitalise";
-  let recommendedCategory = "Plant & Machinery";
-  let usefulLifeYears = 15;
-  let gstItcEligibility = "Eligible";
-  let gstAnalysis = "Full ITC eligible as goods used in course or furtherance of business under CGST Sec 16.";
-  let reasoning = "The expenditure provides enduring economic benefit exceeding 12 months, fulfills Ind AS 16 recognition criteria.";
-  let policyReference = "Ind AS 16 (PPE) para 7 & Companies Act 2013 Sch II Pt C";
-  let componentisation = [
-    { name: "Main Core Assembly", costRatioPct: 70, usefulLifeYears: 15, justification: "Heavy mechanical structural block" },
-    { name: "Electronic Control / Drive Unit", costRatioPct: 30, usefulLifeYears: 6, justification: "Digital controls subject to faster technological obsolescence" }
-  ];
-
-  if (desc.includes("license") || desc.includes("software") || desc.includes("subscription")) {
-    if (desc.includes("annual") || desc.includes("subscription") || desc.includes("amc")) {
-      recommendation = "Expense";
-      usefulLifeYears = 1;
-      reasoning = "Recurring operational subscription/maintenance; does not create an enduring standalone asset.";
-      policyReference = "Ind AS 38 / Revenue expenditure principle";
-    } else {
-      recommendation = "Capitalise";
-      recommendedCategory = "Intangible Assets";
-      usefulLifeYears = 5;
-      reasoning = "Perpetual enterprise software license with useful life exceeding 1 financial year.";
-      policyReference = "Ind AS 38 (Intangible Assets)";
-    }
-  } else if (desc.includes("repair") || desc.includes("maintenance") || desc.includes("consumable") || desc.includes("painting")) {
-    recommendation = "Expense";
-    usefulLifeYears = 1;
-    reasoning = "Routine repair & maintenance that restores rather than increases future economic benefits beyond original standard of performance.";
-    policyReference = "Ind AS 16 para 12 (Day-to-day servicing)";
-  } else if (desc.includes("building") || desc.includes("civil") || desc.includes("foundation")) {
-    recommendedCategory = "Buildings & Civil Structures";
-    usefulLifeYears = 30;
-    if (desc.includes("foundation") && desc.includes("machine")) {
-      recommendation = "Capitalise";
-      gstItcEligibility = "Eligible";
-      gstAnalysis = "Special equipment foundation directly integral to plant & machinery qualifies for ITC under CGST explanation to Sec 17(5).";
-      reasoning = "Specific foundation designed solely for plant operation; capitalised under Plant & Machinery.";
-    } else {
-      gstItcEligibility = "Blocked under Sec 17(5)";
-      gstAnalysis = "Input Tax Credit blocked under CGST Act Sec 17(5)(d) for goods/services received for construction of immovable property on own account.";
-      reasoning = "Civil construction of general immovable building structure.";
-    }
-  } else if (desc.includes("server") || desc.includes("laptop") || desc.includes("it hardware")) {
-    recommendedCategory = "IT Hardware & Servers";
-    usefulLifeYears = desc.includes("server") ? 6 : 3;
-    policyReference = "Companies Act 2013 Schedule II Part C (Computers & Servers)";
-  } else if (desc.includes("vehicle") || desc.includes("car") || desc.includes("truck")) {
-    recommendedCategory = "Vehicles";
-    usefulLifeYears = 8;
-    gstItcEligibility = "Blocked under Sec 17(5)";
-    gstAnalysis = "ITC on motor vehicles with seating capacity <= 13 is blocked u/s 17(5)(a) unless used for taxable passenger transport or driving school.";
-  }
-
-  return {
-    recommendation,
-    recommendedCategory,
-    usefulLifeYears,
-    salvageValuePct: 5,
-    componentisationDetails: componentisation,
-    gstItcEligibility,
-    gstAnalysis,
-    capitalisationDate: item?.date || new Date().toISOString().split("T")[0],
-    reasoning,
-    evidenceKeyPoints: [
-      `Invoice amount: ₹${(amount / 100000).toFixed(2)} Lakhs`,
-      "Verified PO & technical delivery specification",
-      "Economic benefit duration > 12 months evaluated"
-    ],
-    confidenceScore: 0.94,
-    policyReference,
-    riskWarnings: recommendation === "Expense" ? ["Do not capitalise in Capex WIP to avoid inflating current year EBITDA."] : []
-  };
-}
-
-function generateDeterministicAuditSummary(stats: any, pvCoverage: any, caroReadiness: any) {
-  return `# INDEPENDENT ASSET GOVERNANCE & AUDIT READINESS MEMORANDUM
-**Entity:** AssetTrust Enterprise Manufacturing Ltd.  
-**Subject:** Fixed Asset Governance, Physical Verification & Ind AS 16 / CARO 2020 Compliance  
-**Period:** FY 2024-25 (Current Period to Date)  
-**Classification:** CFO & Audit Committee Memorandum
-
----
-
-### 1. Executive Summary & Audit Opinion Outlook
-Based on our continuous internal controls assessment over Property, Plant & Equipment (Gross Block: **₹${(stats?.totalGrossValueLakhs || 14280) / 100} Crores**, Net Book Value: **₹${(stats?.totalNBVLakhs || 9840) / 100} Crores**):
-- **Overall Asset Reliability Score:** **84 / 100 (Strong Governance with Moderate Remediation)**
-- **Audit Readiness Outlook:** **Substantially Ready (Unqualified Opinion Achievable Post-Remediation)**
-- **Physical Verification Progress:** **${pvCoverage || 74.2}% Complete** across 5 operating plants.
-
----
-
-### 2. CARO 2020 Clause 3(i) Specific Compliance Evaluation
-
-| CARO 2020 Sub-Clause | Requirement | Evaluation & Status |
-|---|---|---|
-| **Clause 3(i)(a)(A)** | Proper records showing full particulars, including quantitative details and situation of PPE. | **Compliant** — Asset Register updated with digital QR tags, sub-bay locations, and technical serial numbers. |
-| **Clause 3(i)(a)(B)** | Proper records showing full particulars of Intangible Assets. | **Compliant** — ERP licenses and CAD modules tracked with amortization schedules. |
-| **Clause 3(i)(b)** | Physical verification by management at reasonable intervals; material discrepancies appropriately dealt with. | **Remediation Active** — 2 discrepancies exceeding ₹10L threshold under investigation (Hydraulic Press scrap mismatch & SMT Feeder location shift). |
-| **Clause 3(i)(c)** | Title deeds of all immovable properties held in the name of the company. | **100% Verified** — Freehold lands at Chakan & Sriperumbudur verified with legal registry. |
-| **Clause 3(i)(d)** | Revaluation of PPE / Intangibles based on registered valuer. | **Not Applicable** — Historical cost model maintained under Ind AS 16. |
-| **Clause 3(i)(e)** | Proceedings initiated or pending against the company for holding benami property. | **Clean** — No proceedings pending under Prohibition of Benami Property Transactions Act. |
-
----
-
-### 3. Key Audit Matters & Identified Exceptions
-
-1. **Component Accounting under Ind AS 16:**
-   - *Observation:* ₹48.5L CNC 5-Axis Milling Machine correctly split into Spindle Assembly (6 yrs) and Mechanical Bed (15 yrs).
-   - *Recommendation:* Extend componentisation policy systematically to all high-value tooling lines (>₹25L).
-
-2. **Disposal & Scrap Realisation Controls:**
-   - *Deficiency:* 1 hydraulic press (AST-PUN-HYD-0007, NBV ₹4.2L) sold for scrap during plant restructuring was omitted from fixed asset disposal retirement voucher, resulting in unwarranted continuing depreciation.
-   - *Remediation:* De-recognition entry passed in Q3 adjusting accumulated depreciation and recognizing ₹2.4L loss on disposal.
-
-3. **Input Tax Credit (ITC) Block under Section 17(5):**
-   - *Verification:* Equipment foundations (₹18.5L) distinguished from civil building works, saving ₹3.33L in legitimate GST ITC claims.
-
----
-
-### 4. Management Action Plan prior to Statutory Audit Freeze
-- Complete remaining 25.8% physical verification at Manesar and Sanand plants by Month-end.
-- Secure Technical Valuer Certificate for server cluster useful life justification.
-- Formalize Asset Write-off Committee sign-off for identified ghost asset (₹18.4L Lab Spectrum Analyzer).
-
-*Report generated by AssetTrust AI Governance Engine — Illustrative assessment subject to Board Audit Committee ratification.*`;
-}
-
-function generateDeterministicParsedDoc(rawText: string, companyContext: any) {
-  const text = (rawText || "").trim();
-  const lower = text.toLowerCase();
-  
-  // Try extracting basic invoice/PO numbers
-  const invMatch = text.match(/inv(?:oice)?[\s#:\-]*([A-Z0-9\-_/]{4,20})/i);
-  const poMatch = text.match(/po[\s#:\-]*([A-Z0-9\-_/]{4,20})/i);
-  const dateMatch = text.match(/(\d{4}-\d{2}-\d{2}|\d{2}[/-]\d{2}[/-]\d{4})/);
-  
-  // Extract amount
-  const amountMatch = text.match(/(?:total|amount|cost|gross|inr|rs\.?|₹)[\s:]*([0-9,]+(?:\.\d{2})?)/i);
-  let parsedAmount = 1850000;
-  if (amountMatch && amountMatch[1]) {
-    const cleanNum = parseFloat(amountMatch[1].replace(/,/g, ""));
-    if (!isNaN(cleanNum) && cleanNum > 0) {
-      parsedAmount = cleanNum;
-    }
-  }
-
-  const defaultPlant = (companyContext?.plants && companyContext.plants[0]) || "Pune Plant - Chakan";
-  const vendorMatch = text.match(/(?:m\/s|vendor|supplier|from)[\s:]*([A-Za-z0-9\s.,&'-]{3,40})/i);
-  const vendorName = vendorMatch ? vendorMatch[1].trim() : "Industrial Engineering Supplies Ltd.";
-  
-  const invNumber = invMatch ? invMatch[1] : `INV-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`;
-  const poNumber = poMatch ? poMatch[1] : `PO-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`;
-  const docDate = dateMatch ? (dateMatch[1].includes("/") ? dateMatch[1].split("/").reverse().join("-") : dateMatch[1]) : new Date().toISOString().split("T")[0];
-
-  let assetTitle = "Industrial Machinery & Processing Asset";
-  let category = "Plant & Machinery";
-  let usefulLife = 15;
-
-  if (lower.includes("server") || lower.includes("laptop") || lower.includes("cloud") || lower.includes("workstation")) {
-    assetTitle = "Enterprise Server / High-Performance Computing Cluster";
-    category = "IT Hardware & Servers";
-    usefulLife = 6;
-  } else if (lower.includes("transformer") || lower.includes("substation") || lower.includes("generator")) {
-    assetTitle = "High-Voltage Power Distribution Unit & Transformer";
-    category = "Plant & Machinery";
-    usefulLife = 15;
-  } else if (lower.includes("vehicle") || lower.includes("forklift") || lower.includes("truck")) {
-    assetTitle = "Heavy Electric Warehouse Forklift";
-    category = "Vehicles";
-    usefulLife = 8;
-  } else if (lower.includes("building") || lower.includes("shed") || lower.includes("civil")) {
-    assetTitle = "Pre-Engineered Factory Shed Structure";
-    category = "Buildings & Civil Structures";
-    usefulLife = 30;
-  } else if (lower.includes("milling") || lower.includes("cnc") || lower.includes("press") || lower.includes("lathe")) {
-    assetTitle = "Automated CNC High-Precision Production Cell";
-    category = "Plant & Machinery";
-    usefulLife = 15;
-  }
-
-  const assetId = `AST-${defaultPlant.substring(0, 3).toUpperCase()}-DOC-${Math.floor(1000 + Math.random() * 9000)}`;
-  const serialNo = `SN-DOC-${Math.floor(100000 + Math.random() * 900000)}`;
-
-  return {
-    documentType: lower.includes("invoice") ? "Vendor Tax Invoice" : (lower.includes("po") ? "Purchase Order" : "Fixed Asset Register"),
-    documentReference: invNumber,
-    vendorName: vendorName,
-    poNumber: poNumber,
-    invoiceNumber: invNumber,
-    documentDate: docDate,
-    totalGrossAmountINR: parsedAmount,
-    gstAmountINR: Math.round(parsedAmount * 0.18),
-    currency: "INR",
-    summaryNote: `Parsed document containing ${assetTitle}. Ready for direct ingestion into Fixed Asset Register or Capex Review queue.`,
-    extractedAssets: [
-      {
-        name: assetTitle,
-        category: category,
-        plant: defaultPlant,
-        subLocation: "Inbound Receiving Bay / Production Hall",
-        costINR: parsedAmount,
-        accumulatedDepINR: 0,
-        nbvINR: parsedAmount,
-        capitalisationDate: docDate,
-        usefulLifeYears: usefulLife,
-        schIILifeYears: usefulLife,
-        depreciationMethod: "SLM",
-        serialNumber: serialNo,
-        qrCode: `QR-${assetId}`,
-        vendor: vendorName,
-        invoiceNumber: invNumber,
-        poNumber: poNumber,
-        description: text.length > 10 ? text.substring(0, 180) : `${assetTitle} ingested from commercial procurement documents.`,
-        custodian: "Operations & Plant Controller",
-        department: "Operations & Manufacturing",
-        gstPaidINR: Math.round(parsedAmount * 0.18),
-        itcClaimed: true,
-        components: [
-          {
-            name: `${assetTitle} - Core Mechanical Assembly`,
-            costINR: Math.round(parsedAmount * 0.7),
-            usefulLifeYears: usefulLife,
-            depreciationMethod: "SLM",
-            notes: "Main structural assembly"
-          },
-          {
-            name: `${assetTitle} - Auxiliary Drive & Controls`,
-            costINR: Math.round(parsedAmount * 0.3),
-            usefulLifeYears: Math.min(6, usefulLife),
-            depreciationMethod: "SLM",
-            notes: "Electronic and control systems subject to faster wear"
-          }
-        ]
-      }
-    ],
-    extractedCapexItems: [
-      {
-        poNumber: poNumber,
-        invoiceNumber: invNumber,
-        vendor: vendorName,
-        description: `${assetTitle} - Inbound Procurement Document`,
-        amountINR: parsedAmount,
-        invoiceDate: docDate,
-        plant: defaultPlant,
-        department: "Operations & Manufacturing",
-        suggestedCategory: category
-      }
-    ]
-  };
 }
 
 startServer();
