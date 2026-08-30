@@ -1,0 +1,608 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div style="display: flex; gap: 1rem; height: 85vh;">
+
+    <!-- Left Panel: Form & Logic -->
+    <div style="flex: 1; overflow-y: auto; padding: 1rem; border-right: 1px solid var(--border-color);">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+            <h2>Edit Profile: {{ profile.profile_name }}</h2>
+            <a href="{{ url_for('profiles.profile_list') }}" class="btn">Back to Profiles</a>
+        </div>
+        
+        <form id="profile-form">
+            <input type="hidden" id="profile-id" value="{{ profile.profile_id }}">
+            <input type="hidden" id="job-id" value="{{ job_id or '' }}">
+            
+            <div style="margin-bottom: 1rem;">
+                <label>Profile Name:</label>
+                <input type="text" id="profile_name" value="{{ profile.profile_name|e }}" style="width: 100%;">
+            </div>
+            <div style="margin-bottom: 1rem;">
+                <label>Bank Name:</label>
+                <input type="text" id="bank_name" value="{{ profile.bank_name|e }}" style="width: 100%;">
+            </div>
+            <div style="margin-bottom: 1rem;">
+                <label>Expected Header Signatures (comma separated):</label>
+                <input type="text" id="signatures" value="{{ profile.expected_header_signatures|join(',')|e }}" style="width: 100%;">
+            </div>
+            
+            <div style="margin-bottom: 1rem; background: var(--bg-secondary); padding: 1rem; border-radius: 4px;">
+                <h4>Page Dimensions (auto-populated by visual mapping)</h4>
+                <div style="display: flex; gap: 1rem;">
+                    <div>Width: <input type="number" id="page_width" value="{{ profile.page_width }}" step="0.1" style="width: 80px;" readonly></div>
+                    <div>Height: <input type="number" id="page_height" value="{{ profile.page_height }}" step="0.1" style="width: 80px;" readonly></div>
+                </div>
+            </div>
+            
+            <div style="margin-bottom: 1rem; background: var(--bg-secondary); padding: 1rem; border-radius: 4px;">
+                <h4>Table Region (BBox)</h4>
+                <p style="font-size: 0.8rem; color: #666;">Define the exact area containing the transaction table to exclude surrounding text. Values in PDF Points.</p>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; margin-bottom: 0.5rem;">
+                    <div>Left (x0): <input type="number" id="bbox_x0" step="0.1" style="width:100%;"></div>
+                    <div>Top: <input type="number" id="bbox_top" step="0.1" style="width:100%;"></div>
+                    <div>Right (x1): <input type="number" id="bbox_x1" step="0.1" style="width:100%;"></div>
+                    <div>Bottom: <input type="number" id="bbox_bottom" step="0.1" style="width:100%;"></div>
+                </div>
+            </div>
+            <div style="margin-bottom: 1rem; background: var(--bg-secondary); padding: 1rem; border-radius: 4px;">
+                <h4>Continuation Table Region (Optional)</h4>
+                <p style="font-size: 0.8rem; color: #666;">Define the exact area containing the transaction table on page 2 onwards.</p>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; margin-bottom: 0.5rem;">
+                    <div>Left (x0): <input type="number" id="cbbox_x0" step="0.1" style="width:100%;"></div>
+                    <div>Top: <input type="number" id="cbbox_top" step="0.1" style="width:100%;"></div>
+                    <div>Right (x1): <input type="number" id="cbbox_x1" step="0.1" style="width:100%;"></div>
+                    <div>Bottom: <input type="number" id="cbbox_bottom" step="0.1" style="width:100%;"></div>
+                </div>
+            </div>
+
+            
+            <div style="margin-bottom: 1rem;">
+                <h4>Column Bounds</h4>
+                <p style="font-size: 0.8rem; color: #666;">
+                    <strong>Coordinate System:</strong> Origin (0,0) is Top-Left. X goes right, Y goes down. Units are PDF Points (1/72 inch).
+                    Regardless of zoom, these coordinates map exactly to the raw PDF geometry.
+                </p>
+                <p style="font-size: 0.8rem;">Click inside the table region to add a column boundary. Drag boundaries to adjust.</p>
+                
+                <table class="table" style="width: 100%;">
+                    <thead>
+                        <tr>
+                            <th>Canonical Name</th>
+                            <th>Left (x0)</th>
+                            <th>Right (x1)</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody id="columns-tbody">
+                        <!-- JS populated -->
+                    </tbody>
+                </table>
+                <div style="margin-top: 0.5rem;">
+                    <button type="button" class="btn" onclick="addBoundary(50)">Add Boundary Line</button>
+                    <button type="button" class="btn" onclick="inferColumns()">Infer Columns from Bounds</button>
+                </div>
+            </div>
+            
+            <div style="margin-top: 2rem; display: flex; gap: 1rem; align-items: center;">
+                <button type="button" class="btn" onclick="previewExtraction()" style="background-color: #f39c12; color: white;">Preview Extraction</button>
+                <button type="button" class="btn" onclick="saveProfile()" style="background-color: var(--primary-color);">Save Profile</button>
+                {% if job_id %}
+                <button type="button" class="btn" onclick="saveAndApplyProfile()" style="background-color: #28a745; color: white;">Save & Apply to Statement</button>
+                {% endif %}
+                <span id="save-msg"></span>
+            </div>
+        </form>
+    </div>
+    
+    <!-- Preview Modal -->
+    <div id="preview-modal" style="display:none; position:fixed; top:10%; left:10%; right:10%; bottom:10%; background:white; z-index:1000; border:1px solid #ccc; box-shadow:0 0 20px rgba(0,0,0,0.5); padding:1rem; overflow:auto;">
+        <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #ddd; padding-bottom: 1rem; margin-bottom: 1rem;">
+            <h3 style="color: #e67e22;">Preview Only — Profile Not Yet Saved</h3>
+            <button class="btn" onclick="document.getElementById('preview-modal').style.display='none'">Close</button>
+        </div>
+        <div style="display: flex; gap: 2rem;">
+            <div style="flex:1;">
+                <h4>Raw Extraction Sample (Top 25)</h4>
+                <div id="raw-preview-content" style="font-size:0.8rem; overflow-x:auto;"></div>
+            </div>
+            <div style="flex:1;">
+                <h4>Normalized Sample (Top 25)</h4>
+                <div id="norm-preview-content" style="font-size:0.8rem; overflow-x:auto;"></div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Right Panel: Visual Mapper (PDF.js) -->
+    <div style="flex: 2; position: relative; background: #e0e0e0; overflow: auto; display: flex; flex-direction: column;">
+        {% if job_id %}
+            <div class="preview-toolbar" style="padding: 0.5rem; background: white; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between;">
+                <div>
+                    <button id="prev-page" class="btn">Previous</button>
+                    <span>Page: <span id="page-num"></span> / <span id="page-count"></span></span>
+                    <button id="next-page" class="btn">Next</button>
+                </div>
+                <div>
+                    <button id="zoom-out" class="btn">Zoom Out</button>
+                    <span id="zoom-val">100%</span>
+                    <button id="zoom-in" class="btn">Zoom In</button>
+                </div>
+            </div>
+            
+            <div id="canvas-container" style="position: relative; margin: 1rem auto; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+                <canvas id="pdf-canvas" style="display: block;"></canvas>
+                <canvas id="overlay-canvas" style="position: absolute; top: 0; left: 0; cursor: col-resize; display: block;"></canvas>
+            </div>
+            <input type="hidden" id="pdf-url" value="{{ url_for('upload.serve_pdf', job_id=job_id) }}">
+        {% else %}
+            <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%;">
+                <h3>No Statement Selected</h3>
+                <p>To use the visual profile builder, create a profile directly from a statement preview.</p>
+            </div>
+        {% endif %}
+    </div>
+</div>
+
+<script>
+    // Global State
+    let boundaries = []; // Array of PDF X coordinates
+    let columnDefs = {{ profile.column_definitions|tojson|safe }}; // Existing columns
+    
+    // BBox state
+    let bbox = null;
+    {% if profile.table_bbox %}
+    bbox = {
+        x0: {{ profile.table_bbox.x0|default(0) }},
+        top: {{ profile.table_bbox.top|default(0) }},
+        x1: {{ profile.table_bbox.x1|default(0) }},
+        bottom: {{ profile.table_bbox.bottom|default(0) }}
+    };
+    {% endif %}
+    
+    // Initialize form bbox
+    if (bbox) {
+        document.getElementById('bbox_x0').value = bbox.x0;
+        document.getElementById('bbox_top').value = bbox.top;
+        document.getElementById('bbox_x1').value = bbox.x1;
+        document.getElementById('bbox_bottom').value = bbox.bottom;
+    }
+    
+
+    let cbbox = null;
+    {% if profile.continuation_table_bbox %}
+    cbbox = {
+        x0: {{ profile.continuation_table_bbox.x0|default(0) }},
+        top: {{ profile.continuation_table_bbox.top|default(0) }},
+        x1: {{ profile.continuation_table_bbox.x1|default(0) }},
+        bottom: {{ profile.continuation_table_bbox.bottom|default(0) }}
+    };
+    {% endif %}
+    
+    if (cbbox) {
+        document.getElementById('cbbox_x0').value = cbbox.x0;
+        document.getElementById('cbbox_top').value = cbbox.top;
+        document.getElementById('cbbox_x1').value = cbbox.x1;
+        document.getElementById('cbbox_bottom').value = cbbox.bottom;
+    }
+    
+    ['x0', 'top', 'x1', 'bottom'].forEach(f => {
+        document.getElementById('cbbox_' + f).addEventListener('change', (e) => {
+            if (!cbbox) cbbox = {x0:0, top:0, x1:0, bottom:0};
+            cbbox[f] = parseFloat(e.target.value) || 0;
+        });
+    });
+
+    // Add event listeners to bbox inputs
+    ['x0', 'top', 'x1', 'bottom'].forEach(f => {
+        document.getElementById('bbox_' + f).addEventListener('change', (e) => {
+            if (!bbox) bbox = {x0:0, top:0, x1:0, bottom:0};
+            bbox[f] = parseFloat(e.target.value) || 0;
+            if (typeof drawOverlay === "function") drawOverlay();
+        });
+    });
+
+    // Load initial boundaries from column_definitions
+    columnDefs.forEach(col => {
+        if (!boundaries.includes(col.x0) && col.x0 !== null) boundaries.push(col.x0);
+        if (!boundaries.includes(col.x1) && col.x1 !== null) boundaries.push(col.x1);
+    });
+    boundaries.sort((a,b) => a - b);
+    
+    function renderColumnTable() {
+        const tbody = document.getElementById('columns-tbody');
+        tbody.innerHTML = '';
+        
+        columnDefs.forEach((col, idx) => {
+            tbody.innerHTML += `
+                <tr>
+                    <td>
+                        <select onchange="updateCol(${idx}, 'canonical_name', this.value)">
+                            <option value="">-- Ignore --</option>
+                            <option value="transaction_date" ${col.canonical_name === 'transaction_date' ? 'selected':''}>Transaction Date</option>
+                            <option value="value_date" ${col.canonical_name === 'value_date' ? 'selected':''}>Value Date</option>
+                            <option value="narration" ${col.canonical_name === 'narration' ? 'selected':''}>Narration</option>
+                            <option value="reference_number" ${col.canonical_name === 'reference_number' ? 'selected':''}>Reference Number</option>
+                            <option value="cheque_number" ${col.canonical_name === 'cheque_number' ? 'selected':''}>Cheque Number</option>
+                            <option value="amount" ${col.canonical_name === 'amount' ? 'selected':''}>Amount</option>
+                            <option value="dr_cr" ${col.canonical_name === 'dr_cr' ? 'selected':''}>CR/DR</option>
+                            <option value="debit" ${col.canonical_name === 'debit' ? 'selected':''}>Debit</option>
+                            <option value="credit" ${col.canonical_name === 'credit' ? 'selected':''}>Credit</option>
+                            <option value="balance" ${col.canonical_name === 'balance' ? 'selected':''}>Balance</option>
+                        </select>
+                    </td>
+                    <td><input type="number" step="0.1" value="${col.x0}" onchange="updateCol(${idx}, 'x0', parseFloat(this.value))" style="width: 60px;"></td>
+                    <td><input type="number" step="0.1" value="${col.x1}" onchange="updateCol(${idx}, 'x1', parseFloat(this.value))" style="width: 60px;"></td>
+                    <td><button type="button" class="btn" onclick="removeCol(${idx})">X</button></td>
+                </tr>
+            `;
+        });
+    }
+    
+    function updateCol(idx, field, val) {
+        columnDefs[idx][field] = val;
+        syncBoundariesFromTable();
+        if (typeof drawOverlay === "function") drawOverlay();
+    }
+    
+    function removeCol(idx) {
+        columnDefs.splice(idx, 1);
+        syncBoundariesFromTable();
+        renderColumnTable();
+        if (typeof drawOverlay === "function") drawOverlay();
+    }
+    
+    function syncBoundariesFromTable() {
+        boundaries = [];
+        columnDefs.forEach(col => {
+            if (!boundaries.includes(col.x0) && col.x0 !== null) boundaries.push(col.x0);
+            if (!boundaries.includes(col.x1) && col.x1 !== null) boundaries.push(col.x1);
+        });
+        boundaries.sort((a,b) => a - b);
+    }
+    
+    function inferColumns() {
+        boundaries.sort((a,b) => a - b);
+        columnDefs = [];
+        for (let i = 0; i < boundaries.length - 1; i++) {
+            columnDefs.push({
+                canonical_name: '',
+                x0: boundaries[i],
+                x1: boundaries[i+1]
+            });
+        }
+        renderColumnTable();
+    }
+    
+    function addBoundary(x) {
+        if (!boundaries.includes(x)) {
+            boundaries.push(x);
+            boundaries.sort((a,b) => a - b);
+            inferColumns();
+            if (typeof drawOverlay === "function") drawOverlay();
+        }
+    }
+    
+    function getProfileData() {
+        return {
+            profile_name: document.getElementById('profile_name').value,
+            bank_name: document.getElementById('bank_name').value,
+            expected_header_signatures: document.getElementById('signatures').value.split(',').map(s => s.trim()).filter(s => s),
+            page_width: parseFloat(document.getElementById('page_width').value) || 0,
+            page_height: parseFloat(document.getElementById('page_height').value) || 0,
+            table_bbox: bbox && bbox.x1 > 0 ? bbox : null,
+            continuation_table_bbox: cbbox && cbbox.x1 > 0 ? cbbox : null,
+            column_definitions: columnDefs
+        };
+    }
+    
+    async function previewExtraction() {
+        const jobId = document.getElementById('job-id').value;
+        if (!jobId) {
+            alert("Please create profile from an active statement to use preview.");
+            return;
+        }
+        
+        try {
+            const res = await fetch('/profiles/api/preview', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    job_id: jobId,
+                    profile_data: getProfileData()
+                })
+            });
+            const j = await res.json();
+            if (j.status === 'success') {
+                document.getElementById('preview-modal').style.display = 'block';
+                
+                // render raw
+                let rHtml = '<table class="table" style="width:100%">';
+                j.raw_rows.forEach(r => {
+                    rHtml += '<tr>';
+                    r.forEach(c => rHtml += `<td>${c}</td>`);
+                    rHtml += '</tr>';
+                });
+                rHtml += '</table>';
+                document.getElementById('raw-preview-content').innerHTML = rHtml;
+                
+                // render norm
+                let nHtml = '<table class="table" style="width:100%"><tr><th>Date</th><th>Narration</th><th>Amount</th><th>Type</th><th>Bal</th></tr>';
+                j.transactions.forEach(t => {
+                    let amt = '';
+                    let type = t.transaction_type || '';
+                    if (type === 'Debit') {
+                        amt = t.debit !== null ? t.debit : '';
+                    } else if (type === 'Credit') {
+                        amt = t.credit !== null ? t.credit : '';
+                    } else {
+                        if (t.amount !== null && t.amount !== undefined && t.amount !== '') {
+                            amt = t.amount;
+                        } else if (t.debit !== null && t.debit !== undefined && t.debit !== '' && parseFloat(t.debit) !== 0) {
+                            amt = t.debit;
+                        } else if (t.credit !== null && t.credit !== undefined && t.credit !== '' && parseFloat(t.credit) !== 0) {
+                            amt = t.credit;
+                        } else {
+                            amt = t.debit !== null ? t.debit : (t.credit !== null ? t.credit : '');
+                        }
+                    }
+                    nHtml += `<tr>
+                        <td>${t.transaction_date || ''}</td>
+                        <td>${t.narration || ''}</td>
+                        <td>${amt}</td>
+                        <td>${type}</td>
+                        <td>${t.balance || ''}</td>
+                    </tr>`;
+                });
+                nHtml += '</table>';
+                document.getElementById('norm-preview-content').innerHTML = nHtml;
+            } else {
+                alert("Preview error: " + j.message);
+            }
+        } catch(e) {
+            alert("Preview failed: " + e);
+        }
+    }
+    
+    async function saveProfile() {
+        // Validate geometry
+        if (bbox && bbox.x1 > 0) {
+            if (bbox.x0 < 0 || bbox.top < 0 || bbox.x1 <= bbox.x0 || bbox.bottom <= bbox.top) {
+                alert("Invalid Table BBox. Please check coordinates (x0 < x1, top < bottom).");
+                return false;
+            }
+        }
+        
+        const id = document.getElementById('profile-id').value;
+        const data = getProfileData();
+        
+        try {
+            const res = await fetch(`/profiles/api/${id}`, {
+                method: 'PUT',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(data)
+            });
+            const j = await res.json();
+            if (j.status === 'success') {
+                document.getElementById('save-msg').innerText = "Saved successfully!";
+                setTimeout(() => document.getElementById('save-msg').innerText = "", 3000);
+                return true;
+            } else {
+                alert("Error saving: " + j.message);
+                return false;
+            }
+        } catch(e) {
+            alert("Network error.");
+            return false;
+        }
+    }
+
+    async function saveAndApplyProfile() {
+        const saved = await saveProfile();
+        if (saved) {
+            const id = document.getElementById('profile-id').value;
+            const jobId = document.getElementById('job-id').value;
+            // Create a form to POST to the normalize endpoint
+            const form = document.createElement('form');
+            form.method = 'POST';
+            form.action = `/jobs/${jobId}/normalize?profile_id=${id}`;
+            document.body.appendChild(form);
+            form.submit();
+        }
+    }
+    
+    renderColumnTable();
+</script>
+
+{% if job_id %}
+<script src="{{ url_for('static', filename='vendor/pdfjs/build/pdf.js') }}"></script>
+<script>
+    pdfjsLib.GlobalWorkerOptions.workerSrc = '/static/vendor/pdfjs/build/pdf.worker.js';
+    
+    const url = document.getElementById('pdf-url').value;
+    let pdfDoc = null, pageNum = 1, pageRendering = false, pageNumPending = null, scale = 1.0;
+    const canvas = document.getElementById('pdf-canvas');
+    const ctx = canvas.getContext('2d');
+    const overlay = document.getElementById('overlay-canvas');
+    const octx = overlay.getContext('2d');
+    
+    let draggingBoundary = -1;
+
+    function drawOverlay() {
+        octx.clearRect(0, 0, overlay.width, overlay.height);
+        
+        // Draw bbox
+        if (bbox && bbox.x1 > 0) {
+            octx.fillStyle = 'rgba(255, 100, 0, 0.1)';
+            octx.fillRect(bbox.x0 * scale, bbox.top * scale, (bbox.x1 - bbox.x0) * scale, (bbox.bottom - bbox.top) * scale);
+            octx.strokeStyle = 'rgba(255, 100, 0, 0.8)';
+            octx.lineWidth = 2;
+            octx.strokeRect(bbox.x0 * scale, bbox.top * scale, (bbox.x1 - bbox.x0) * scale, (bbox.bottom - bbox.top) * scale);
+            
+            // Draw handles at corners
+            octx.fillStyle = 'blue';
+            const s = 6;
+            octx.fillRect(bbox.x0*scale - s/2, bbox.top*scale - s/2, s, s); // tl
+            octx.fillRect(bbox.x1*scale - s/2, bbox.top*scale - s/2, s, s); // tr
+            octx.fillRect(bbox.x0*scale - s/2, bbox.bottom*scale - s/2, s, s); // bl
+            octx.fillRect(bbox.x1*scale - s/2, bbox.bottom*scale - s/2, s, s); // br
+        }
+        
+        // Draw regions inside bbox
+        octx.fillStyle = 'rgba(0, 100, 255, 0.1)';
+        columnDefs.forEach(col => {
+            if(col.x0 !== null && col.x1 !== null && col.canonical_name !== '') {
+                let rTop = (bbox && bbox.x1 > 0) ? bbox.top : 0;
+                let rBottom = (bbox && bbox.x1 > 0) ? bbox.bottom : (overlay.height / scale);
+                octx.fillRect(col.x0 * scale, rTop * scale, (col.x1 - col.x0) * scale, (rBottom - rTop) * scale);
+                octx.fillStyle = 'rgba(0, 100, 255, 0.8)';
+                octx.font = '12px Arial';
+                octx.fillText(col.canonical_name, (col.x0 * scale) + 5, (rTop * scale) + 20);
+                octx.fillStyle = 'rgba(0, 100, 255, 0.1)';
+            }
+        });
+        
+        // Draw vertical line boundaries
+        boundaries.forEach(bx => {
+            octx.beginPath();
+            let rTop = (bbox && bbox.x1 > 0) ? bbox.top : 0;
+            let rBottom = (bbox && bbox.x1 > 0) ? bbox.bottom : (overlay.height / scale);
+            octx.moveTo(bx * scale, rTop * scale);
+            octx.lineTo(bx * scale, rBottom * scale);
+            octx.strokeStyle = 'red';
+            octx.lineWidth = 2;
+            octx.stroke();
+        });
+    }
+
+    function renderPage(num) {
+        pageRendering = true;
+        pdfDoc.getPage(num).then(function(page) {
+            const viewport = page.getViewport({scale: scale});
+            canvas.height = viewport.height;
+            canvas.width = viewport.width;
+            overlay.height = viewport.height;
+            overlay.width = viewport.width;
+            
+            if (num === 1) {
+                document.getElementById('page_width').value = page.getViewport({scale: 1.0}).width.toFixed(2);
+                document.getElementById('page_height').value = page.getViewport({scale: 1.0}).height.toFixed(2);
+            }
+
+            const renderContext = { canvasContext: ctx, viewport: viewport };
+            const renderTask = page.render(renderContext);
+
+            renderTask.promise.then(function() {
+                pageRendering = false;
+                drawOverlay();
+                if (pageNumPending !== null) {
+                    renderPage(pageNumPending);
+                    pageNumPending = null;
+                }
+            });
+        });
+        document.getElementById('page-num').textContent = num;
+    }
+
+    function queueRenderPage(num) {
+        if (pageRendering) pageNumPending = num;
+        else renderPage(num);
+    }
+    
+    document.getElementById('zoom-in').addEventListener('click', () => { scale += 0.25; document.getElementById('zoom-val').textContent = scale*100+'%'; queueRenderPage(pageNum); });
+    document.getElementById('zoom-out').addEventListener('click', () => { if(scale <= 0.5) return; scale -= 0.25; document.getElementById('zoom-val').textContent = scale*100+'%'; queueRenderPage(pageNum); });
+    document.getElementById('prev-page').addEventListener('click', () => { if(pageNum <= 1) return; pageNum--; queueRenderPage(pageNum); });
+    document.getElementById('next-page').addEventListener('click', () => { if(pageNum >= pdfDoc.numPages) return; pageNum++; queueRenderPage(pageNum); });
+
+    let draggingEdge = null; // 'left', 'right', 'top', 'bottom', 'boundary'
+    let startPdfX = 0, startPdfY = 0;
+
+    overlay.addEventListener('mousedown', (e) => {
+        const rect = overlay.getBoundingClientRect();
+        const pdfX = (e.clientX - rect.left) / scale;
+        const pdfY = (e.clientY - rect.top) / scale;
+        
+        // 1. Check bbox edges if bbox exists
+        if (bbox && bbox.x1 > 0) {
+            const t = 5 / scale;
+            if (Math.abs(pdfX - bbox.x0) < t) draggingEdge = 'left';
+            else if (Math.abs(pdfX - bbox.x1) < t) draggingEdge = 'right';
+            else if (Math.abs(pdfY - bbox.top) < t) draggingEdge = 'top';
+            else if (Math.abs(pdfY - bbox.bottom) < t) draggingEdge = 'bottom';
+        }
+        
+        // 2. Check vertical boundaries
+        if (!draggingEdge) {
+            let hitBoundary = boundaries.findIndex(bx => Math.abs(bx - pdfX) < (5 / scale));
+            if (hitBoundary !== -1) {
+                draggingEdge = 'boundary';
+                draggingBoundary = hitBoundary;
+            }
+        }
+        
+        // 3. New boundary (only inside bbox)
+        if (!draggingEdge) {
+            if (!bbox || bbox.x1 === 0 || (pdfX >= bbox.x0 && pdfX <= bbox.x1 && pdfY >= bbox.top && pdfY <= bbox.bottom)) {
+                addBoundary(Math.round(pdfX));
+            } else {
+                // Clicking outside bbox - start drawing new bbox? Too complex, rely on numeric inputs or initial setup
+            }
+        }
+    });
+    
+    overlay.addEventListener('mousemove', (e) => {
+        if (draggingEdge) {
+            const rect = overlay.getBoundingClientRect();
+            let pdfX = (e.clientX - rect.left) / scale;
+            let pdfY = (e.clientY - rect.top) / scale;
+            
+            if (draggingEdge === 'boundary') {
+                boundaries[draggingBoundary] = Math.round(pdfX);
+            } else if (draggingEdge === 'left') {
+                bbox.x0 = Math.round(pdfX);
+                document.getElementById('bbox_x0').value = bbox.x0;
+            } else if (draggingEdge === 'right') {
+                bbox.x1 = Math.round(pdfX);
+                document.getElementById('bbox_x1').value = bbox.x1;
+            } else if (draggingEdge === 'top') {
+                bbox.top = Math.round(pdfY);
+                document.getElementById('bbox_top').value = bbox.top;
+            } else if (draggingEdge === 'bottom') {
+                bbox.bottom = Math.round(pdfY);
+                document.getElementById('bbox_bottom').value = bbox.bottom;
+            }
+            drawOverlay();
+        } else {
+            // Update cursor based on hover
+            const rect = overlay.getBoundingClientRect();
+            let pdfX = (e.clientX - rect.left) / scale;
+            let pdfY = (e.clientY - rect.top) / scale;
+            let cursor = 'crosshair';
+            
+            const t = 5 / scale;
+            if (bbox && bbox.x1 > 0) {
+                if (Math.abs(pdfX - bbox.x0) < t || Math.abs(pdfX - bbox.x1) < t) cursor = 'ew-resize';
+                else if (Math.abs(pdfY - bbox.top) < t || Math.abs(pdfY - bbox.bottom) < t) cursor = 'ns-resize';
+            }
+            if (cursor === 'crosshair' && boundaries.findIndex(bx => Math.abs(bx - pdfX) < t) !== -1) cursor = 'col-resize';
+            
+            overlay.style.cursor = cursor;
+        }
+    });
+    
+    overlay.addEventListener('mouseup', (e) => {
+        if (draggingEdge === 'boundary') {
+            boundaries.sort((a,b) => a - b);
+            inferColumns();
+        }
+        draggingEdge = null;
+        draggingBoundary = -1;
+    });
+
+    pdfjsLib.getDocument(url).promise.then(function(pdfDoc_) {
+        pdfDoc = pdfDoc_;
+        document.getElementById('page-count').textContent = pdfDoc.numPages;
+        renderPage(pageNum);
+    });
+</script>
+{% endif %}
+{% endblock %}

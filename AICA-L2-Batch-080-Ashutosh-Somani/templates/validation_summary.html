@@ -1,0 +1,112 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="card">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+        <h2>Validation Summary</h2>
+        <div>
+            <button onclick="triggerExport('{{ job.id }}', '{{ result.summary.validation_status }}', event)" class="btn" style="background-color: #28a745; color: white;">Export Excel</button>
+            <a href="{{ url_for('normalization.summary', job_id=job.id) }}" class="btn">Back to Normalization</a>
+            <a href="{{ url_for('validation.view_exceptions', job_id=job.id) }}" class="btn" style="background-color: var(--primary-color);">View Exceptions ({{ result.summary.exception_count }})</a>
+        </div>
+    </div>
+
+    <div style="margin-bottom: 2rem; border: 1px solid var(--border-color); padding: 1rem; border-radius: 4px;">
+        <h3>Statement Reconciliation</h3>
+        <p><strong>Result:</strong> 
+            {% if result.summary.validation_status == 'PASS' %}
+                <span class="badge-success">Pass</span>
+            {% elif result.summary.validation_status == 'FAIL' %}
+                <span class="badge-error">Fail</span>
+            {% else %}
+                <span class="badge-warning">{{ result.summary.validation_status }}</span>
+            {% endif %}
+        </p>
+        
+        <table class="table" style="width: 100%; max-width: 600px; margin-top: 1rem;">
+            <tr>
+                <td>Opening Balance:</td>
+                <td style="text-align: right;">{{ result.summary.opening_balance or 'N/A' }}</td>
+            </tr>
+            <tr>
+                <td>+ Total Credits:</td>
+                <td style="text-align: right;">{{ result.summary.total_credits }}</td>
+            </tr>
+            <tr>
+                <td>- Total Debits:</td>
+                <td style="text-align: right;">{{ result.summary.total_debits }}</td>
+            </tr>
+            <tr>
+                <td><strong>= Expected Closing:</strong></td>
+                <td style="text-align: right;"><strong>{{ result.summary.expected_closing_balance or 'N/A' }}</strong></td>
+            </tr>
+            <tr>
+                <td>Actual Closing:</td>
+                <td style="text-align: right;">{{ result.summary.statement_closing_balance or 'N/A' }}</td>
+            </tr>
+            <tr>
+                <td><strong>Difference:</strong></td>
+                <td style="text-align: right; color: {% if result.summary.difference == '0.00' %}green{% else %}red{% endif %};">
+                    <strong>{{ result.summary.difference or 'N/A' }}</strong>
+                </td>
+            </tr>
+        </table>
+    </div>
+
+    <div style="margin-bottom: 2rem; border: 1px solid var(--border-color); padding: 1rem; border-radius: 4px;">
+        <h3>Transaction Level Validation</h3>
+        <p><strong>Total Transactions:</strong> {{ result.summary.transaction_count }}</p>
+        <p><strong>Balanced Rows:</strong> {{ result.summary.validated_transaction_count }}</p>
+        <p><strong>Row Mismatches:</strong> <span style="color: red;">{{ result.summary.balance_mismatch_count }}</span></p>
+        <p><strong>Missing Balance / Not Verifiable:</strong> {{ result.summary.transactions_not_verifiable }}</p>
+    </div>
+</div>
+
+<script>
+function triggerExport(jobId, status, event) {
+    if (status !== 'PASS' && status !== 'VALID') {
+        if (!confirm("This statement contains unresolved exceptions. Are you sure you want to export?")) {
+            return;
+        }
+    }
+    // Disable button to prevent double clicks
+    let btn = event ? event.currentTarget : document.querySelector('button[onclick^="triggerExport"]');
+    if (btn) {
+        btn.disabled = true;
+        btn.innerText = "Exporting...";
+    }
+
+    fetch(`/api/export/${jobId}`, {method: 'POST'})
+        .then(res => {
+            const contentType = res.headers.get("content-type");
+            if (contentType && contentType.indexOf("application/json") !== -1) {
+                return res.json().then(data => ({status: res.status, data: data}));
+            } else {
+                throw new Error(`Export returned non-JSON response (HTTP ${res.status}). Please check Diagnostics.`);
+            }
+        })
+        .then(({status, data}) => {
+            if (data.status === 'processing' && data.progress_url) {
+                window.location.href = data.progress_url;
+            } else if (data.status === 'success' && data.download_url) {
+                window.location.href = data.download_url;
+            } else {
+                const message = data.error || data.message || `Export failed (HTTP ${status})`;
+                alert("Export failed: " + message);
+                if (btn) {
+                    btn.disabled = false;
+                    btn.innerText = "Export Excel";
+                }
+            }
+        })
+        .catch(err => {
+            console.error(err);
+            alert("Export error: " + err.message);
+            if (btn) {
+                btn.disabled = false;
+                btn.innerText = "Export Excel";
+            }
+        });
+}
+</script>
+{% endblock %}

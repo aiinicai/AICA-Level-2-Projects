@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="card">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+        <h2>Diagnostic: Table Candidates</h2>
+        <a href="{{ url_for('extraction.diagnostics', job_id=job.id) }}" class="btn">Back to Diagnostics</a>
+    </div>
+
+    {% if result.table_candidate_count == 0 %}
+        <p>No table candidates detected using generic rules.</p>
+    {% else %}
+        {% for page in result.pages %}
+            {% if page.table_candidates %}
+                <h4>Page {{ page.page_number }}</h4>
+                {% for table in page.table_candidates %}
+                    <div style="margin-bottom: 2rem; border: 1px solid var(--border-color); padding: 1rem; border-radius: 4px;">
+                        <p><strong>Method:</strong> {{ table.detection_method }}</p>
+                        <p><strong>BBox:</strong> {{ table.bbox }}</p>
+                        <p><strong>Grid:</strong> {{ table.row_count }} rows × {{ table.column_count }} columns</p>
+                        
+                        <div style="overflow-x: auto; margin-top: 1rem;">
+                            <table class="table" style="width: 100%; border-collapse: collapse; font-family: monospace; font-size: 12px;">
+                                {% for row in table.cells %}
+                                    <tr>
+                                        {% for cell in row %}
+                                            <td style="border: 1px solid #ddd; padding: 4px;">{{ cell|e if cell else '' }}</td>
+                                        {% endfor %}
+                                    </tr>
+                                {% endfor %}
+                            </table>
+                        </div>
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endfor %}
+    {% endif %}
+</div>
+{% endblock %}

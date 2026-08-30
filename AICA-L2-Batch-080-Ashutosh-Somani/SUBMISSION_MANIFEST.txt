@@ -1,0 +1,181 @@
+================================================================
+ICAI AICA LEVEL 2 - CAPSTONE PROJECT SUBMISSION MANIFEST
+================================================================
+
+Project Name        : Bank Statement Converter
+Participant          : CA Ashutosh Somani
+ICAI Batch Number    : AICA-L2-Batch-080
+Submission Folder    : AICA-L2-Batch-080-Ashutosh-Somani
+
+Application Version  : 1.0.1  (per config.default.ini, launcher.py, CHANGELOG.md)
+Source Git Branch    : master
+Source Git Commit    : b2feb828547a05394f680b1db0f9015eda35c8fe
+                        "fix: stabilize Excel export browser workflow"
+Working Tree Status  : NOT clean at time of packaging. All 119 changed files
+                        differ ONLY by CRLF/LF line-ending normalization
+                        (verified by diff inspection - no content changes).
+                        No functional/content differences were found between
+                        the last commit and the working copy used to build
+                        this submission.
+Preparation Timestamp: 2026-08-30 19:52 UTC (2026-08-31 01:22 IST)
+Prepared By           : Claude (Cowork), per Part A packaging instructions
+
+----------------------------------------------------------------
+INCLUDED
+----------------------------------------------------------------
+Source code           : app/ (all routes, services, models, extractors,
+                         exporters, utils, database access layer),
+                         app.py, launcher.py
+Templates & static     : templates/, static/ (incl. vendored PDF.js viewer
+                         required for local PDF preview)
+App reference data     : config/bank_signatures.json (bank-detection
+                         signatures - not client data)
+Reusable bank profiles : profiles/*.json (31 files) - generic bank-layout
+                         templates only (HDFC, ICICI, Axis, Kotak, Bank of
+                         Baroda, Mock/Test/Synthetic entries). Verified: no
+                         account numbers, no client names, no identifiable
+                         data in any profile.
+Launcher                : START_BANK_CONVERTER.bat (verified, not modified)
+Dependencies             : requirements.txt
+Safe default config      : config.default.ini (verified: no passwords, API
+                          keys, tokens, or machine-specific paths)
+Documentation            : README.md, CHANGELOG.md, DEVELOPMENT_RULES.md,
+                          ARCHITECTURE.md, PRIVACY.md, THIRD_PARTY_NOTICES.md,
+                          STAGE_9_REPORT.md, STAGE_10_REPORT.md, docs/
+                          (CAPSTONE_SUMMARY.md, DEMO_SCRIPT.md,
+                          FINAL_CAPSTONE_VERIFICATION.md,
+                          GITHUB_RELEASE_NOTES_v1.0.0.md,
+                          SUBMISSION_CHECKLIST.md, TECHNICAL_FACT_SHEET.md,
+                          docs/screenshots/SCREENSHOT_CHECKLIST.md)
+Automated tests          : tests/ (49 test modules)
+Synthetic sample data    : samples/ (4 PDFs) - verified fabricated:
+                          "DEMO BANK", "TEST CUSTOMER", masked A/C XXXX1234,
+                          "Bank of Synthetic Baroda". Confirmed via text
+                          extraction and visual page rendering.
+Misc dev scripts         : scripts/build_release.py,
+                          scripts/create_synthetic_defect.py
+.gitignore                : included for reference
+
+Total: 558 files, ~18 MB
+
+----------------------------------------------------------------
+EXCLUDED (and why)
+----------------------------------------------------------------
+.git/                    Version control internals
+.venv/                   Local Python virtual environment
+.pytest_cache/, __pycache__/   Build/test caches
+.secret                  Flask secret key (24 random bytes). NOTE: this
+                          file IS currently tracked in the live project's
+                          git history (first commit) despite
+                          DEVELOPMENT_RULES.md stating "Never store secrets
+                          in source control" and despite a code comment
+                          calling it "ignored" - it is NOT in .gitignore.
+                          Excluded from this submission. Flagged for the
+                          user's manual review of the live repository.
+config.ini                Live/local working config. Excluded in favour of
+                          config.default.ini; launcher.py auto-creates
+                          config.ini from config.default.ini on first run
+                          (verified in source), so nothing is lost.
+data/                     Runtime SQLite database (data/bank_converter.db)
+                          and profile/job backup files.
+database/                 Legacy runtime SQLite database
+                          (bank_statement_converter.db).
+logs/                     Application logs, including two ~10 MB rotated
+                          log files.
+output/                   Contains a generated Excel workbook
+                          (BOB_1_page_1_validated_....xlsx) produced from
+                          local testing - excluded as generated output.
+temp/                     Job-processing artifacts, including a ~128 KB
+                          source.pdf and extracted account
+                          number/IFSC/narration data from local testing.
+                          This PDF is NOT one of the samples/ fixtures and
+                          could not be confirmed synthetic - excluded and
+                          flagged.
+backups/                  Root-level database/profile backup archive.
+profiles/backups/         Profile revision-history snapshots (redundant).
+sample_data/              Present but empty - nothing to include.
+BankStatementConverter_v1.0.0.zip
+                          Stale prior release build: older (by file
+                          timestamp) than the current source, and its
+                          filename/version (v1.0.0) does not match the
+                          current application version (1.0.1). Superseded
+                          by the fresh ZIP generated with this submission.
+
+----------------------------------------------------------------
+AUTOMATED TEST RESULTS (run against current working-tree source)
+----------------------------------------------------------------
+Command               : python -m pytest -q
+Environment            : Python 3.10.12, project requirements.txt installed
+                        fresh into an isolated virtual environment, PLUS
+                        `reportlab` (required by tests/test_ocr_stage13.py
+                        but NOT listed in requirements.txt - see Known
+                        Limitations below).
+Tests collected       : 186
+Tests passed           : 186
+Tests failed            : 0
+Tests skipped           : 0
+Warnings                : 1 (CryptographyDeprecationWarning from the
+                        `pypdf` library's use of ARC4 - originates in a
+                        third-party dependency, not in this project's code)
+
+This result was obtained by actually running the current source; it does
+NOT rely on the "152 Passed / 0 Failed" figure quoted in
+docs/TECHNICAL_FACT_SHEET.md, which is stale (more tests have been added
+since that figure was recorded).
+
+----------------------------------------------------------------
+KNOWN LIMITATIONS / ITEMS FOR MANUAL REVIEW
+----------------------------------------------------------------
+1. .secret is tracked in the live project's git history from its very
+   first commit, contradicting the project's own "never store secrets in
+   source control" rule. Not included here, but the user should consider
+   rotating the key and/or scrubbing it from git history before any wider
+   distribution of the live repository (separate from this submission
+   folder, which does not contain it).
+2. requirements.txt does not list `reportlab`, which
+   tests/test_ocr_stage13.py imports directly. Tests only ran cleanly here
+   after installing it manually.
+3. Version number is inconsistent across the project: config.default.ini,
+   launcher.py, and CHANGELOG.md all say 1.0.1, but
+   START_BANK_CONVERTER.bat's console banner, docs/TECHNICAL_FACT_SHEET.md,
+   and docs/SUBMISSION_CHECKLIST.md still say 1.0.0.
+4. A stray .git/index.lock file exists in the live working copy and could
+   not be removed from this environment (permission denied). It did not
+   block any read-only inspection performed here, but the user should
+   delete it manually before their next git operation if it persists.
+5. Tests for this manifest were executed on Python 3.10.12 in a Linux
+   verification environment (all dependencies installed cleanly, 186/186
+   passed). The application's stated target is Windows 10/11 with Python
+   3.12+; the user should re-run `python -m pytest` via
+   START_BANK_CONVERTER.bat's own virtual environment on their Windows
+   machine before final submission to confirm parity.
+6. The working tree had uncommitted changes at packaging time (see
+   "Working Tree Status" above) - verified as line-ending-only, no content
+   impact on this submission.
+7. static/vendor/pdfjs includes ~8 MB of .js.map source-map files for the
+   vendored PDF.js viewer. These are not required to run or evaluate the
+   application (debug aids only) and could be removed to shrink the
+   package further; left in place by default pending the user's decision.
+
+----------------------------------------------------------------
+PRIVACY / CONFIDENTIALITY CONFIRMATION
+----------------------------------------------------------------
+- No real client bank statement, transaction export, or customer PDF is
+  intentionally included in this submission folder.
+- All four PDFs in samples/ were opened and verified (text extraction plus
+  visual page rendering) to contain only fabricated placeholder data
+  ("DEMO BANK", "TEST CUSTOMER", "Bank of Synthetic Baroda").
+- All profile templates in profiles/*.json were checked field-by-field:
+  only generic bank names and layout geometry are present - no account
+  numbers, IFSC codes, or client names.
+- A keyword scan of the final submission folder for password / secret /
+  api_key / token / bearer / OPENAI / ANTHROPIC / GEMINI patterns returned
+  no hardcoded credentials - the only matches were a Flask form field name
+  (`password`), the application's own runtime secret-key generator code,
+  and a documentation sentence describing this same check.
+- No .env, credentials, or machine-specific confidential paths are present
+  in config.default.ini.
+
+================================================================
+PART A COMPLETE - NO GITHUB OR GOOGLE FORM ACTION TAKEN.
+================================================================
