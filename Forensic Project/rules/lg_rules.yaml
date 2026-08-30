@@ -1,0 +1,222 @@
+- id: LG-01
+  name: New high-value ledger appearing only in final year
+  module: LG
+  status: implemented
+  requires: [trial_balance]
+  min_years: 3
+  branch: fraudulent_statements
+  scheme: 13
+  flag: red
+  weight: 4
+  confidence: 1.0
+  source: "ICAI Ch. 6.1.1 — Sudden appearance of material new balances"
+  params:
+    materiality_factor: 1.0
+  hypothesis: >
+    Ledger '{ledger_name}' was absent in {fy1} and {fy2} but appeared in {fy3} with closing balance {closing_net}.
+    Sudden emergence of large new accounts in the latest period may reflect end-of-period window dressing or fabricated counterparties.
+  procedure:
+    - Verify customer / vendor onboarding date and credit approval documentation
+    - Examine first transaction voucher and supporting delivery / service proofs
+    - Check whether counterparty was created close to financial year end
+
+- id: LG-02
+  name: High-value ledger disappearing without identified write-off
+  module: LG
+  status: implemented
+  requires: [trial_balance]
+  min_years: 3
+  branch: asset_misappropriation
+  scheme: 14
+  flag: red
+  weight: 4
+  confidence: 0.8
+  source: "ICAI Ch. 6.1.1 — Unexplained disappearance of major assets or balances"
+  params:
+    materiality_factor: 1.0
+  hypothesis: >
+    Ledger '{ledger_name}' carried balance {closing_net_fy1} in {fy1} but disappeared in {fy3} without matching write-off.
+    Abrupt elimination of major receivables or assets without explicit bad debt or write-off disclosure suggests unrecorded settlements or improper masking.
+  procedure:
+    - Trace journal entries clearing this ledger balance to the general ledger
+    - Vouch bank settlement credit entries or contra adjustment accounts
+    - Verify board approval if balance was written off or settled via non-cash concessions
+
+- id: LG-03
+  name: Sign flip with material balance across consecutive years
+  module: LG
+  status: implemented
+  requires: [trial_balance]
+  min_years: 3
+  branch: asset_misappropriation
+  scheme: 15
+  flag: red
+  weight: 4
+  confidence: 0.9
+  source: "ICAI Ch. 6.1.1 — Reversal of normal debit/credit posture"
+  params:
+    min_materiality_pct: 0.25
+  hypothesis: >
+    Ledger '{ledger_name}' flipped sign from {balance_prev} ({fy_prev}) to {balance_curr} ({fy_curr}).
+    Substantial polarity reversals in counterparty accounts indicate mixed billing/payment flows, conversion of debt into advances, or commingling of customer/vendor roles.
+  procedure:
+    - Inquire whether entity operates dual vendor-customer relationship with party
+    - Review journal vouchers crossing over debit/credit thresholds
+    - Check for netting-off entries without contractual settlement agreements
+
+- id: LG-04
+  name: Outlier growth in ledger balance relative to group cohort
+  module: LG
+  status: implemented
+  requires: [trial_balance]
+  min_years: 3
+  branch: fraudulent_statements
+  scheme: 16
+  flag: red
+  weight: 4
+  confidence: 0.85
+  source: "ICAI Ch. 6.2.2 — Cohort Z-score growth anomaly"
+  params:
+    min_cohort_size: 10
+    z_threshold: 3.0
+  hypothesis: >
+    Ledger '{ledger_name}' in group '{group}' grew by {growth_pct}% from {fy1} to {fy3} (Z-score: {z_score}).
+    Growth substantially deviating from cohort mean indicates selective manipulation, accelerated booking, or isolated channel stuffing.
+  procedure:
+    - Reconcile ledger growth against relevant business segment performance
+    - Inspect volume of year-end transactions driving abnormal growth
+    - Confirm pricing terms and verify goods acceptance certificates
+
+- id: LG-05
+  name: Stagnant unchanging material balance across three consecutive years
+  module: LG
+  status: implemented
+  requires: [trial_balance]
+  min_years: 3
+  branch: fraudulent_statements
+  scheme: 17
+  flag: yellow
+  weight: 3
+  confidence: 1.0
+  source: "ICAI Ch. 6.1.1 — Stagnant / non-moving overdue balances"
+  params:
+    tolerance: 1.0
+    materiality_factor: 1.0
+  hypothesis: >
+    Ledger '{ledger_name}' carried identical balance of {closing_net} across {fy1}, {fy2}, and {fy3}.
+    Unmoving material balances over multiple years indicate disputed amounts, irrecoverable bad debts not provided for, or evergreen fictitious assets.
+  procedure:
+    - Inspect ageing report and confirm period of dormancy
+    - Review litigation files, lawyer responses, and arbitration records
+    - Assess provisioning requirements under Ind AS 109 / AS 29
+
+- id: LG-06
+  name: Expense group growth disproportionate to stagnant revenue
+  module: LG
+  status: implemented
+  requires: [trial_balance]
+  min_years: 3
+  branch: asset_misappropriation
+  scheme: 18
+  flag: red
+  weight: 5
+  confidence: 0.9
+  source: "ICAI Ch. 6.1.1 — Disproportionate expenditure surge"
+  params:
+    expense_growth_min: 0.25
+    revenue_growth_max: 0.05
+  hypothesis: >
+    Expense group '{group}' surged by {expense_growth_pct}% from {fy1} to {fy3} while revenue grew by only {revenue_growth_pct}%.
+    Rising operational costs without matching revenue growth signals expense leakage, inflated vendor billings, or extraction of funds.
+  procedure:
+    - Perform line-by-line ledger variance breakdown in this expense group
+    - Scrutinise contracts with vendors driving the largest portion of the cost increase
+    - Review physical consumption reports and service deliverables
+
+- id: LG-07
+  name: Persistent circular turnover squaring to nil across all three years
+  module: LG
+  status: implemented
+  requires: [trial_balance]
+  min_years: 3
+  branch: fraudulent_statements
+  scheme: 3
+  flag: red
+  weight: 5
+  confidence: 0.95
+  source: "ICAI Ch. 6.1.1 — Multi-year circular trading pattern"
+  params:
+    closing_pct_threshold: 0.01
+  hypothesis: >
+    Ledger '{ledger_name}' maintained high turnover exceeding materiality in all 3 years while squaring to near-zero balance each year end.
+    Persistent multi-year high-volume wash trades indicate systemic artificial turnover inflation, accommodation billing, or GST input tax credit cycling.
+  procedure:
+    - Inspect GSTR-1 vs GSTR-3B filings and 2A/2B reconciliations
+    - Obtain bank statement details showing fund flow matching
+    - Check whether underlying freight/transport documentation exists
+
+- id: LG-08
+  name: Inverted V-spike or trough pattern in ledger balance
+  module: LG
+  status: implemented
+  requires: [trial_balance]
+  min_years: 3
+  branch: fraudulent_statements
+  scheme: 19
+  flag: red
+  weight: 4
+  confidence: 0.8
+  source: "ICAI Ch. 6.1.1 — Temporary window dressing spike and reversal"
+  params:
+    leg_pct_threshold: 0.30
+  hypothesis: >
+    Ledger '{ledger_name}' exhibited an inverted spike/trough ({val_fy1} → {val_fy2} → {val_fy3}) peaking at {peak_val}.
+    Sharp intermediate surge followed by immediate reversal suggests temporary window dressing for balance sheet dates, loan renewal, or covenant compliance.
+  procedure:
+    - Check the exact timing of postings in the intermediate peak year
+    - Review banking sanction dates and credit facility renewal letters
+    - Examine reversal entries posted in the subsequent period
+
+- id: LG-09
+  name: Strictly increasing proportion of miscellaneous and vague expenses
+  module: LG
+  status: implemented
+  requires: [trial_balance]
+  min_years: 3
+  branch: asset_misappropriation
+  scheme: 20
+  flag: yellow
+  weight: 3
+  confidence: 0.85
+  source: "ICAI Ch. 6.1.1 — Progressive expansion of unclassified expenditure"
+  params:
+    ratio_fy3_threshold: 0.05
+  hypothesis: >
+    Proportion of miscellaneous/vague expenses grew strictly across 3 years ({r1}% → {r2}% → {r3}%), reaching {r3}% in {fy3}.
+    Expanding reliance on unclassified expense buckets indicates creeping loss of expenditure controls or systemic funneling into non-specific heads.
+  procedure:
+    - Re-classify miscellaneous ledger items into primary accounting heads
+    - Scrutinise delegation of financial powers for petty/sundry expenses
+    - Check vendor verification and expense approval workflows
+
+- id: LG-10
+  name: Increasing concentration of receivables in top five debtors
+  module: LG
+  status: implemented
+  requires: [trial_balance]
+  min_years: 3
+  branch: fraudulent_statements
+  scheme: 21
+  flag: yellow
+  weight: 3
+  confidence: 0.85
+  source: "ICAI Ch. 6.1.1 — Customer concentration and credit risk accumulation"
+  params:
+    ratio_fy3_threshold: 0.60
+  hypothesis: >
+    Top 5 debtor concentration rose monotonically across 3 years ({c1}% → {c2}% → {c3}%), reaching {c3}% in {fy3}.
+    High and rising credit concentration heightens vulnerability to uncollectible fictitious balances, round-tripping, or undisclosed related-party exposure.
+  procedure:
+    - Obtain external direct balance confirmations from the top 5 debtors
+    - Verify subsequent collections in the subsequent quarter
+    - Perform creditworthiness and corporate registry search on top debtors

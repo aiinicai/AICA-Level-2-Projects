@@ -1,0 +1,352 @@
+- id: FS-01
+  name: Divergence between positive net profit and negative operating cash flow
+  module: FS
+  status: implemented
+  requires: [trial_balance]
+  min_years: 3
+  branch: fraudulent_statements
+  scheme: 22
+  flag: red
+  weight: 5
+  confidence: 1.0
+  source: "ICAI Ch. 4.2.2 Scheme 1 / Ch. 6.1.1 — Earnings quality and cash flow disconnect"
+  params:
+    min_divergent_years: 2
+  hypothesis: >
+    PAT was positive while operating cash flow (CFO) was negative in {divergent_count} of 3 years.
+    A persistent gap between paper earnings and cash generation is a leading indicator of aggressive revenue recognition or fictitious profits.
+  procedure:
+    - Perform working capital movement reconciliation
+    - Scrutinise non-cash income additions and unbilled revenue accruals
+    - Check quality of debtors and aging of uncollected book debts
+
+- id: FS-02
+  name: Outstanding performance substantially exceeding industry peers
+  module: FS
+  status: implemented
+  requires: [trial_balance, peer_ratios]
+  min_years: 1
+  branch: fraudulent_statements
+  scheme: 2
+  flag: green
+  weight: 4
+  confidence: 0.9
+  source: "ICAI Ch. 6.1.1 — Performance 'too good to be true' relative to industry"
+  params:
+    z_threshold: 2.0
+  hypothesis: >
+    Entity's {metric_name} ({observed_value}) exceeds industry peer mean ({peer_mean}) by > 2 standard deviations.
+    Exceptional outperformance in difficult industry conditions warrants verification to confirm genuine competitive advantage versus fabrication.
+  procedure:
+    - Inquire into specific operational moats or patented advantages
+    - Benchmark unit economics against listed industry competitors
+    - Verify market share and capacity utilisation records
+
+- id: FS-03
+  name: Significant ratio deviation from peer group benchmarks
+  module: FS
+  status: implemented
+  requires: [trial_balance, peer_ratios]
+  min_years: 1
+  branch: fraudulent_statements
+  scheme: 2
+  flag: red
+  weight: 4
+  confidence: 0.9
+  source: "ICAI Ch. 6.1.1 — Financial ratio peer benchmark deviation"
+  params:
+    z_threshold: 2.0
+  hypothesis: >
+    Financial ratio '{ratio_name}' ({observed_value}) deviates by > 2 standard deviations from peer mean ({peer_mean}).
+    Significant divergence from industry norms signals abnormal pricing, non-standard cost structures, or accounting distortions.
+  procedure:
+    - Compare line item definitions with peer accounting policies
+    - Review segment-level margins and contract pricing
+    - Check for unusual inventory valuation methods or capitalization policies
+
+- id: FS-04
+  name: Debtor days surge or receivables growth outpacing revenue growth
+  module: FS
+  status: implemented
+  requires: [trial_balance]
+  min_years: 2
+  branch: fraudulent_statements
+  scheme: 1
+  flag: red
+  weight: 5
+  confidence: 0.95
+  source: "ICAI Ch. 4.2.2 Scheme 1 / Ch. 6.1.1 — Fictitious revenues and channel stuffing"
+  params:
+    debtor_days_increase_pct: 0.30
+    growth_multiplier: 1.5
+  hypothesis: >
+    Receivables growth ({rec_growth}%) outpaced revenue growth ({rev_growth}%) by > 1.5x, or DSO increased by > 30% YoY in {fy}.
+    Accelerating trade receivables relative to turnover suggests premature revenue recognition, unrecorded sales returns, or fictitious billings.
+  procedure:
+    - Inspect subsequent sales returns and credit notes issued after year end
+    - Reconcile e-Way bills with invoices booked in the last month of the financial year
+    - Send direct balance confirmations to newly added or high-balance debtors
+
+- id: FS-05
+  name: Inventory accumulation disproportionate to sales growth
+  module: FS
+  status: implemented
+  requires: [trial_balance]
+  min_years: 2
+  branch: fraudulent_statements
+  scheme: 4
+  flag: red
+  weight: 4
+  confidence: 0.9
+  source: "ICAI Ch. 4.2.2 Scheme 4 — Overstatement of inventory"
+  params:
+    growth_multiplier: 1.5
+  hypothesis: >
+    Inventory growth ({inv_growth}%) exceeded revenue growth ({rev_growth}%) by > 1.5x in {fy}.
+    Inventory expanding faster than sales indicates obsolete stock accumulation, unrecorded valuation write-downs, or inflated physical counts.
+  procedure:
+    - Review physical inventory verification reports and stock reconciliation sheets
+    - Check inventory turnover by product category and test for slow-moving/damaged items
+    - Verify valuation testing (lower of cost and net realizable value)
+
+- id: FS-06
+  name: Sharp shift in gross profit margin
+  module: FS
+  status: implemented
+  requires: [trial_balance]
+  min_years: 2
+  branch: fraudulent_statements
+  scheme: 5
+  flag: red
+  weight: 4
+  confidence: 0.9
+  source: "ICAI Ch. 6.1.1 — Sudden margin volatility"
+  params:
+    margin_change_threshold: 0.05
+  hypothesis: >
+    Gross profit margin shifted by {margin_diff_pp} percentage points (from {gm_prev}% to {gm_curr}%) in {fy}.
+    Sudden shifts in gross margin without fundamental raw material price changes suggest unrecorded purchase invoices or shifting costs between periods.
+  procedure:
+    - Analyze standard bill of materials (BOM) and cost variance trends
+    - Verify cut-off procedures on purchases and sales around year end
+    - Check whether direct production costs were improperly capitalized
+
+- id: FS-07
+  name: Extreme year-over-year net profit volatility
+  module: FS
+  status: implemented
+  requires: [trial_balance]
+  min_years: 2
+  branch: fraudulent_statements
+  scheme: 6
+  flag: yellow
+  weight: 3
+  confidence: 1.0
+  source: "ICAI Ch. 6.1.1 — High earnings volatility"
+  params:
+    volatility_threshold: 0.50
+  hypothesis: >
+    Profit after tax shifted by {pat_change_pct}% YoY in {fy} (from {pat_prev} to {pat_curr}).
+    Sharp swing in bottom line profits suggests one-off management interventions, smoothing reversals, or volatile revenue recognition.
+  procedure:
+    - Scrutinise exceptional and non-recurring items in P&L
+    - Check tax provision calculations and deferred tax adjustments
+    - Examine management commentary and board notes regarding variance
+
+- id: FS-08
+  name: Heavy capitalisation of CWIP and intangibles during flat revenue
+  module: FS
+  status: implemented
+  requires: [trial_balance]
+  min_years: 2
+  branch: fraudulent_statements
+  scheme: 7
+  flag: red
+  weight: 4
+  confidence: 0.9
+  source: "ICAI Ch. 4.2.2 Scheme 3 — Improper capitalisation of operating expenses"
+  params:
+    cwip_growth_threshold: 0.20
+    rev_growth_threshold: 0.05
+  hypothesis: >
+    CWIP & Intangibles grew by {cwip_growth}% in {fy} while revenue grew by only {rev_growth}%.
+    Aggressive expansion of capital work in progress during stagnant operations indicates operating expenses being disguised as capital assets (WorldCom model).
+  procedure:
+    - Vouch contractor invoices, architect certificates, and engineer progress reports
+    - Check whether routine administrative, repair, or salary costs were allocated into CWIP
+    - Verify capitalization eligibility criteria under Ind AS 16 / Ind AS 38
+
+- id: FS-09
+  name: Substantial fixed asset additions without revenue accretion
+  module: FS
+  status: implemented
+  requires: [trial_balance]
+  min_years: 2
+  branch: fraudulent_statements
+  scheme: 8
+  flag: red
+  weight: 5
+  confidence: 0.9
+  source: "ICAI Ch. 4.2.2 Scheme 3 / Ch. 6.1.1 — Idle or fictitious capital expenditure"
+  params:
+    addition_pct_threshold: 0.10
+    rev_growth_threshold: 0.02
+  hypothesis: >
+    Fixed asset additions represented {addition_pct}% of opening gross block in {fy}, yet revenue growth was only {rev_growth}%.
+    Substantial capex yielding no commercial output points to round-tripping through equipment vendors, inflated capex invoicing, or ghost assets.
+  procedure:
+    - Physically inspect newly added plant and equipment at project sites
+    - Verify vendor invoices, customs clearance docs, and installation certificates
+    - Inquire into reasons for delayed commercial production or capacity underutilization
+
+- id: FS-10
+  name: Unexplained gross block uplift indicating unrecorded revaluation
+  module: FS
+  status: implemented
+  requires: [trial_balance]
+  min_years: 2
+  branch: fraudulent_statements
+  scheme: 9
+  flag: red
+  weight: 4
+  confidence: 0.85
+  source: "ICAI Ch. 4.2.2 Scheme 3 — Revaluation reserve manipulation and asset inflation"
+  params:
+    tolerance: 1.0
+  hypothesis: >
+    Gross block increased by {delta_gross_block} in {fy}, exceeding identified additions minus disposals by {unexplained_uplift}.
+    Unexplained asset increases suggest unbacked revaluations, hidden mergers, or artificial balance sheet inflation.
+  procedure:
+    - Review fixed asset register additions and asset movement schedule
+    - Check whether independent registered valuer report exists
+    - Verify whether corresponding credit was routed to revaluation reserve or P&L
+
+- id: FS-11
+  name: Material or expanding related-party exposure relative to revenue
+  module: FS
+  status: implemented
+  requires: [trial_balance, related_parties]
+  min_years: 1
+  branch: asset_misappropriation
+  scheme: 10
+  flag: red
+  weight: 5
+  confidence: 0.9
+  source: "ICAI Ch. 4.2.2 Scheme 10 / Ch. 6.1.1 — Related party transactions"
+  params:
+    revenue_pct_threshold: 0.10
+  hypothesis: >
+    Related party balance ({rp_balance}) represents {rp_rev_pct}% of revenue in {fy}, or its growth exceeded revenue growth.
+    Disproportionate related-party exposure signals siphoning, transfer pricing distortions, or circular liquidity support.
+  procedure:
+    - Review Audit Committee approvals and transfer pricing documentation
+    - Verify arm's length justification and benchmarking studies
+    - Check settlement timeline and verify fund transfers via bank statements
+
+- id: FS-12
+  name: Working capital debt expanding relative to turnover
+  module: FS
+  status: implemented
+  requires: [trial_balance]
+  min_years: 3
+  branch: fraudulent_statements
+  scheme: 11
+  flag: red
+  weight: 4
+  confidence: 0.9
+  source: "ICAI Ch. 6.1.1 — Deteriorating working capital debt coverage"
+  params:
+    increase_pp_threshold: 0.05
+  hypothesis: >
+    Working capital borrowings to revenue ratio increased by {wc_debt_rise_pp} percentage points across the period (reaching {ratio_fy3}% in {fy3}).
+    Increasing dependence on short-term bank borrowings during steady or growing turnover indicates trapped cash in non-performing assets or fund diversion.
+  procedure:
+    - Obtain monthly bank stock statements and drawing power calculation sheets
+    - Check for discrepancies between book debt aging and bank drawing statements
+    - Verify compliance with bank sanction covenants and end-use of overdrafts
+
+- id: FS-13
+  name: Rapid expansion of unbilled revenue balances
+  module: FS
+  status: implemented
+  requires: [trial_balance]
+  min_years: 2
+  branch: fraudulent_statements
+  scheme: 1
+  flag: red
+  weight: 4
+  confidence: 0.9
+  source: "ICAI Ch. 4.2.2 Scheme 1 — Premature revenue recognition via unbilled receivables"
+  params:
+    growth_threshold: 0.25
+  hypothesis: >
+    Unbilled revenue surged by {unbilled_growth}% YoY in {fy}.
+    Fast-growing unbilled revenue indicates premature booking before contractual milestones are satisfied, or recognition of disputed claim amounts.
+  procedure:
+    - Review contractual milestone certificates and client sign-offs
+    - Verify subsequent billing and collection status post balance sheet date
+    - Check compliance with Ind AS 115 revenue recognition principles
+
+- id: FS-14
+  name: Reporting period irregularity or extreme internal ratio anomaly
+  module: FS
+  status: implemented
+  requires: [trial_balance]
+  min_years: 3
+  branch: fraudulent_statements
+  scheme: 12
+  flag: yellow
+  weight: 3
+  confidence: 0.7
+  source: "ICAI Ch. 6.1.1 — Financial reporting period and ratio irregularities"
+  params:
+    sigma_threshold: 3.0
+  hypothesis: >
+    Financial statement ratio '{metric_name}' in {fy} ({observed_value}) deviated by > 3σ from company's own 3-year baseline.
+    Internal statistical outliers indicate structural breaks in operational efficiency, sudden accounting method changes, or isolated manipulation.
+  procedure:
+    - Inquire about changes in accounting estimates, depreciation rates, or classifications
+    - Review minutes of board meetings regarding exceptional operational changes
+    - Check if period covers more or less than 12 months
+
+- id: FS-15
+  name: Repeated prior-period adjustments across consecutive years
+  module: FS
+  status: implemented
+  requires: [trial_balance, prior_adjustments]
+  min_years: 2
+  branch: fraudulent_statements
+  scheme: 13
+  flag: red
+  weight: 4
+  confidence: 1.0
+  source: "ICAI Ch. 6.1.1 — Chronic prior period error corrections"
+  params: {}
+  hypothesis: >
+    Prior period adjustments of similar nature ('{description}') appeared in consecutive years ({fy_prev} and {fy_curr}).
+    Recurring prior-period adjustments indicate chronic internal control failures or deliberate deferral of expenses to restated historical periods.
+  procedure:
+    - Review root-cause analysis for each prior-period correction
+    - Inspect statutory audit qualification notes from prior years
+    - Check whether errors were known to management prior to closing
+
+- id: FS-16
+  name: Asymmetric provision movements matching earnings management pattern (Cookie Jar)
+  module: FS
+  status: implemented
+  requires: [trial_balance]
+  min_years: 3
+  branch: fraudulent_statements
+  scheme: 14
+  flag: red
+  weight: 4
+  confidence: 0.8
+  source: "ICAI Ch. 4.2.2 Scheme 6 — Cookie-jar provisioning and earnings smoothing"
+  params: {}
+  hypothesis: >
+    Provisions were increased in peak profit year ({peak_fy}) and drawn down / decreased in lowest profit year ({trough_fy}).
+    Asymmetric provision maneuvers consistent with income smoothing obscure true operating volatility and mislead stakeholders regarding profitability.
+  procedure:
+    - Obtain actuarial reports and provisioning computation worksheets
+    - Scrutinise justification for releasing provisions in low-profit years
+    - Review consistency of provisioning methodology under applicable accounting standards

@@ -1,0 +1,320 @@
+- id: TB-01
+  name: Trial balance Dr and Cr closing totals do not reconcile
+  module: TB
+  status: implemented
+  requires: [trial_balance]
+  min_years: 1
+  branch: fraudulent_statements
+  scheme: 1
+  flag: red
+  weight: 5
+  confidence: 1.0
+  source: "ICAI Ch. 6.1.1 — Trial balance arithmetic inaccuracy"
+  params:
+    tolerance: 1.0
+  hypothesis: >
+    Trial balance for {fy} is out of balance by {observed_value}.
+    An un-reconciled trial balance indicates unposted adjustments, one-sided journal entries,
+    or deliberate omission of balancing entries.
+  procedure:
+    - Verify arithmetic summation of all debit and credit ledgers
+    - Reconcile general ledger totals with subsidiary ledgers
+    - Check for one-sided manual journal entries posted before period end
+
+- id: TB-02
+  name: Abnormal ledger balance sign relative to Schedule III nature
+  module: TB
+  status: implemented
+  requires: [trial_balance]
+  min_years: 1
+  branch: asset_misappropriation
+  scheme: 5
+  flag: red
+  weight: 4
+  confidence: 1.0
+  source: "ICAI Ch. 6.1.1 — Abnormal debit or credit balances"
+  params:
+    tolerance: 1.0
+  hypothesis: >
+    Ledger {ledger_name} in group {group} carried a closing balance of {closing_net} at {fy},
+    violating expected {expected_sign} nature. Abnormal balances often conceal credit balances in debtors,
+    overdrawn cash accounts, or debit balances in creditors representing improper advances.
+  procedure:
+    - Obtain ledger breakdown and scrutinise reverse-sign transactions
+    - Check for unapplied customer credits or unmatched supplier debit notes
+    - Inspect physical cash verification sheets for overdrawn cash
+
+- id: TB-03
+  name: Suspense or control ledger carrying a year-end balance
+  module: TB
+  status: implemented
+  requires: [trial_balance]
+  min_years: 1
+  branch: asset_misappropriation
+  scheme: 5
+  flag: red
+  weight: 5
+  confidence: 1.0
+  source: "ICAI Ch. 6.1.1 — Unreconciled subsidiary and general ledger"
+  params:
+    name_patterns: ["suspense", "difference", "control", "clearing", "unadjusted"]
+    min_balance_pct_of_materiality: 0.25
+  hypothesis: >
+    Ledger {ledger_name} carried a closing balance of {closing_net} at {fy}.
+    Suspense and control accounts are expected to be nil at period end;
+    a residual balance is consistent with unreconciled items or with
+    misappropriation temporarily parked pending write-off.
+  procedure:
+    - Obtain the ledger account for the full period
+    - Identify the largest constituent items and their contra accounts
+    - Verify the ageing of unadjusted items
+    - Confirm authorisation for any subsequent write-off
+
+- id: TB-04
+  name: High-value round-number closing balances
+  module: TB
+  status: implemented
+  requires: [trial_balance]
+  min_years: 1
+  branch: fraudulent_statements
+  scheme: 2
+  flag: yellow
+  weight: 3
+  confidence: 0.8
+  source: "ICAI Ch. 6.1.1 — Round-tripping and estimated balances"
+  params:
+    round_base: 100000
+    min_materiality_pct: 0.20
+  hypothesis: >
+    Ledger {ledger_name} carried an exact round-number closing balance of {closing_net} at {fy}.
+    High-value round figures frequently indicate top-level management estimates,
+    unsupported journal entries, or artificial round-trip figures.
+  procedure:
+    - Inspect supporting documents and contracts for round-figure agreements
+    - Review the journal entries establishing the closing balance
+    - Inquire if balance represents an unscientific management provision
+
+- id: TB-05
+  name: Vague or generic ledger description with material balance
+  module: TB
+  status: implemented
+  requires: [trial_balance]
+  min_years: 1
+  branch: asset_misappropriation
+  scheme: 4
+  flag: yellow
+  weight: 3
+  confidence: 0.7
+  source: "ICAI Ch. 6.1.1 — Sundry and miscellaneous accounts masking leakage"
+  params:
+    keywords: ["misc", "sundry", "other", "adjustment", "imprest", "unknown", "general", "temporary"]
+    min_materiality_pct: 0.50
+  hypothesis: >
+    Ledger {ledger_name} with vague nomenclature carried a closing balance of {closing_net} at {fy}.
+    Generic ledger names can obscure improper payments, unauthorised perks, or non-business disbursements.
+  procedure:
+    - Extract itemised voucher register for this ledger
+    - Vouch 100% of transactions above 50% performance materiality
+    - Scrutinise approving authority and business justification
+
+- id: TB-06
+  name: Near-duplicate counterparty names within the same group
+  module: TB
+  status: implemented
+  requires: [trial_balance]
+  min_years: 1
+  branch: corruption
+  scheme: 7
+  flag: red
+  weight: 4
+  confidence: 0.8
+  source: "ICAI Ch. 6.1.2 — Duplicate vendor or customer masters / shell companies"
+  params:
+    fuzzy_threshold: 88
+  hypothesis: >
+    Ledgers '{name_1}' and '{name_2}' within group '{group}' have high phonetic/text similarity ({observed_value}).
+    Near-duplicate names often indicate duplicate payments, diversion of collections, or shell entity creation.
+  procedure:
+    - Compare GSTIN, PAN, bank account numbers, and registered addresses of both parties
+    - Check whether one ledger receives payment while the other supplies goods
+    - Verify whether vendor onboarding underwent independent background verification
+
+- id: TB-07
+  name: High-turnover ledger squaring to near-zero balance at year end
+  module: TB
+  status: implemented
+  requires: [trial_balance]
+  min_years: 1
+  branch: fraudulent_statements
+  scheme: 3
+  flag: red
+  weight: 4
+  confidence: 0.9
+  source: "ICAI Ch. 6.1.1 — Passthrough and round-tripping accounts"
+  params:
+    closing_pct_threshold: 0.01
+  hypothesis: >
+    Ledger {ledger_name} experienced turnover of {turnover_total} in {fy} but closed at {closing_net}.
+    High volume that squares to nil at year end is a hallmark of circular trading, accommodation entries, or bill discounting laundering.
+  procedure:
+    - Perform month-by-month and day-by-day turnover analysis
+    - Obtain bank statement contra entries for all major debits and credits
+    - Verify physical movement of goods via e-Way bills and lorry receipts
+
+- id: TB-08
+  name: Apparent individual/personal name in commercial expense or creditor group
+  module: TB
+  status: implemented
+  requires: [trial_balance]
+  min_years: 1
+  branch: corruption
+  scheme: 8
+  flag: yellow
+  weight: 3
+  confidence: 0.6
+  source: "ICAI Ch. 6.1.1 — Personal expenses or unverified individual contractors"
+  params:
+    token_min: 2
+    token_max: 3
+  hypothesis: >
+    Ledger '{ledger_name}' in group '{group}' appears to be an individual's personal name with balance {closing_net} at {fy}.
+    Payments to individuals without corporate standing require scrutiny for kickbacks, promoter personal expenses, or benami transactions.
+  procedure:
+    - Verify TDS deduction under section 194C / 194J
+    - Confirm employment / consultant agreement and scope of work
+    - Check for related-party affiliation with directors or key managerial personnel
+
+- id: TB-09
+  name: Ledger name token conflicts with assigned Schedule III group
+  module: TB
+  status: implemented
+  requires: [trial_balance]
+  min_years: 1
+  branch: fraudulent_statements
+  scheme: 6
+  flag: red
+  weight: 4
+  confidence: 0.7
+  source: "ICAI Ch. 6.1.1 — Misclassification of accounts"
+  params: {}
+  hypothesis: >
+    Ledger '{ledger_name}' classified under group '{group}' at {fy} conflicts with keyword '{token}'.
+    Misclassifying statutory liabilities, bank accounts, or operational expenses distorts financial presentation and liquidity analysis.
+  procedure:
+    - Review ledger grouping in the accounting software master chart of accounts
+    - Verify true economic nature of transactions recorded in this ledger
+    - Reclassify for analytical review and evaluate financial ratio impact
+
+- id: TB-10
+  name: Excessive cash on hand relative to scale of operations
+  module: TB
+  status: implemented
+  requires: [trial_balance]
+  min_years: 1
+  branch: asset_misappropriation
+  scheme: 9
+  flag: red
+  weight: 4
+  confidence: 0.9
+  source: "ICAI Ch. 6.1.1 — Inflated cash in hand masking unrecorded drawings"
+  params:
+    revenue_pct: 0.02
+    min_absolute: 500000
+  hypothesis: >
+    Total closing cash on hand of {observed_value} in {fy} exceeds threshold {threshold_value}.
+    Abnormally large cash balances frequently represent book entries masking cash siphoning or promoter drawings without physical currency.
+  procedure:
+    - Review surprise cash count certificates and year-end physical cash count reports
+    - Check cash insurance cover limits and bank cash withdrawal/deposit trends
+    - Verify denomination breakdown of cash balance on balance sheet date
+
+- id: TB-11
+  name: Material loans and advances extended to related parties
+  module: TB
+  status: implemented
+  requires: [trial_balance]
+  min_years: 1
+  branch: asset_misappropriation
+  scheme: 10
+  flag: red
+  weight: 5
+  confidence: 0.9
+  source: "ICAI Ch. 4.2.2 / Ch. 6.1.1 — Related party asset diversion"
+  params:
+    net_worth_pct: 0.10
+  hypothesis: >
+    Loans and advances to related entities of {observed_value} in {fy} represent {ratio_pct}% of net worth.
+    High exposure to related entities suggests capital diversion, non-arm's length fund transfers, or siphoning of corporate liquidity.
+  procedure:
+    - Inspect board resolutions and shareholder approvals under Section 185/186 of Companies Act 2013
+    - Verify interest charging terms and timely servicing of principal/interest
+    - Examine end-use of funds in the borrower entities' financial statements
+
+- id: TB-12
+  name: Benford's Law first-digit non-conformity in ledger balances
+  module: TB
+  status: implemented
+  requires: [trial_balance]
+  min_years: 1
+  branch: fraudulent_statements
+  scheme: 11
+  flag: yellow
+  weight: 3
+  confidence: 0.8
+  source: "ICAI Ch. 6.2.1 — Benford's Law first-digit digital analysis"
+  params:
+    min_records: 300
+    mad_threshold: 0.015
+  hypothesis: >
+    First-digit distribution of closing balances in {fy} exhibits Mean Absolute Deviation (MAD) of {observed_value} (threshold {threshold_value}).
+    Significant deviation from Benford's distribution indicates artificial manipulation or fabrication of account balances.
+  procedure:
+    - Identify specific digits showing excess frequencies
+    - Filter ledgers starting with anomalous digits and examine their source vouchers
+    - Perform second-digit or subset digital analysis on sub-ledgers
+
+- id: TB-13
+  name: Relative Size Factor (RSF) anomaly within group
+  module: TB
+  status: implemented
+  requires: [trial_balance]
+  min_years: 1
+  branch: fraudulent_statements
+  scheme: 12
+  flag: red
+  weight: 4
+  confidence: 0.8
+  source: "ICAI Ch. 6.2.2 — Relative Size Factor outlier detection"
+  params:
+    min_group_records: 5
+    rsf_threshold: 10.0
+  hypothesis: >
+    In group '{group}' for {fy}, largest ledger '{ledger_name}' ({observed_value}) is {rsf_ratio}x the second-largest ({second_value}).
+    An extreme RSF indicates an isolated disproportionate balance that may represent an unrecorded liability, fictitious asset, or outlier transaction.
+  procedure:
+    - Obtain transaction ledger and identify single largest postings
+    - Check authorization matrix for transactions exceeding normal group thresholds
+    - Seek external third-party confirmation for the outlier counterparty
+
+- id: TB-14
+  name: Equal high-volume debit and credit turnover with negligible balance
+  module: TB
+  status: implemented
+  requires: [trial_balance]
+  min_years: 1
+  branch: fraudulent_statements
+  scheme: 3
+  flag: red
+  weight: 4
+  confidence: 0.9
+  source: "ICAI Ch. 6.1.1 — Matched circular turnover"
+  params:
+    diff_pct_threshold: 0.02
+    closing_pct_threshold: 0.01
+  hypothesis: >
+    Ledger '{ledger_name}' had Dr turnover {turnover_dr} and Cr turnover {turnover_cr} in {fy} (matched within 2%) with closing balance {closing_net}.
+    Nearly identical high debit/credit volume with no closing balance indicates matched accommodation entries or circular wash trades.
+  procedure:
+    - Review transaction pairing and timestamps in general ledger
+    - Inspect bank statement debit/credit matching and clearing times
+    - Verify whether transactions represent genuine underlying commercial purchase/sale of goods
