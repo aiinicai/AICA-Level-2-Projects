@@ -1,0 +1,92 @@
+# AUTHORED from the firm's own Board's Report precedent (FY 2023-24).
+#
+# The precedent is a live client file. Wording is adapted; nothing specific
+# to that client is carried over.
+#
+# The precedent names the directors appointed and resigned, with DINs and
+# dates, in prose. Those are computed here from the client's director and
+# KMP registers, which already carry appointment and cessation dates — a
+# report that retypes them is a report that can disagree with the register.
+#
+# COMPUTED, NOT TYPED (§18.8). The entity `director_changes_in_year` has no
+# table: the rows are derived from the client's director register on every
+# render, by `app.services.engagement._director_changes_in_year`.
+#
+# This clause first wrote to a typed table, which meant the Board's Report
+# could name a director the register did not have, or omit one it did. It
+# cannot now: there is one source and the report reads it.
+#
+# The rows are read-only in the workspace. To change what the report says,
+# correct the director register on the client screen.
+
+id: bdr.directors.kmp
+document: directors_report
+order: 260
+number: ""
+title: "Directors and Key Managerial Personnel"
+clause_ref: "Rule 8(5)(iii), Companies (Accounts) Rules, 2014"
+effective_from: "2014-04-01"
+effective_to: null
+render_as: section
+
+needs_review: false
+
+input:
+  key: bdr.directors.kmp
+  label: "Changes in directors and key managerial personnel"
+  datatype: select
+  carry_forward: never
+  mandatory: true
+  options:
+    - { value: "changes", label: "Changes during the year" }
+    - { value: "none", label: "No change" }
+
+  # Read from the register, and overridable.
+  #
+  # It used to default to "no change" flatly. From decision 74 the register can
+  # be maintained -- a resignation during the year can finally be recorded --
+  # and the moment it could, the flat default became a contradiction: the table
+  # below this answer is DERIVED from the register, so a Board that had changed
+  # produced a report whose paragraph said "there was no change" directly above
+  # a table listing the appointment and the resignation.
+  #
+  # Leaving it unanswered is not the alternative: an unanswered input drops its
+  # whole clause, so the disclosure would vanish instead of being wrong, which
+  # is worse.
+  defaults:
+    - { when: "directors_changed_in_year", value: "changes" }
+    - { value: "none" }
+
+repeating_block:
+  # The table is asked for ONLY when the answer produces one. Without this
+  # guard `min_rows: 1` applied to every answer, so choosing the nil option
+  # printed the correct paragraph and still blocked export with "the table
+  # needs at least one row" -- which is why the firm's team typed the nil
+  # sentence into a name column to get past it.
+  # Computed from the director register; with no changes in the year there is nothing to tabulate.
+  when: "value == 'changes'"
+  entity: director_changes_in_year
+  min_rows: 1
+  carry_forward: never
+  columns:
+    - { key: name, label: "Name", datatype: text, required: true }
+    - { key: din, label: "DIN or PAN", datatype: text, required: true }
+    - { key: designation, label: "Designation", datatype: text, required: true }
+    - { key: change, label: "Nature of change", datatype: select, required: true, options: ["Appointed", "Resigned", "Re-appointed"] }
+    - { key: change_date, label: "Date", datatype: date, required: true }
+
+variants:
+  - when: "value == 'changes'"
+    body: >
+      Directors and Key Managerial Personnel
+
+      The Company witnessed the following changes in the composition of its Board of
+      Directors and Key Managerial Personnel during the year under review:
+    render_block: table
+
+  - when: "value == 'none'"
+    body: >
+      Directors and Key Managerial Personnel
+
+      There was no change in the composition of the Board of Directors or in the Key
+      Managerial Personnel of the Company during the year under review.

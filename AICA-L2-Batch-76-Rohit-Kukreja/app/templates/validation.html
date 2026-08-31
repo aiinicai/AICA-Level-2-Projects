@@ -1,0 +1,122 @@
+{% extends "base.html" %}
+{% set nav = 'clients' %}
+{% set csrf = request.cookies.get('auditcraft_csrf', '') %}
+
+{% block title %}Validation — AuditCraft{% endblock %}
+{% block heading %}Validation · FY {{ engagement.fy_code }}{% endblock %}
+{% block topbar_meta %}
+  {% if blocking_count %}<span class="badge red">{{ blocking_count }} blocking</span>
+  {% else %}<span class="badge green">no blocking findings</span>{% endif %}
+  {% if summary.warn %}<span class="badge amber">{{ summary.warn }} warning</span>{% endif %}
+  · {{ engagement.status.value.replace('_', ' ') }}
+{% endblock %}
+
+{% block content %}
+<div class="preview-pane wide">
+  {% if error %}<p class="badge red" role="alert">{{ error }}</p>{% endif %}
+
+  <section class="panel">
+    <h2>Findings</h2>
+    {% if findings %}
+    <table class="grid">
+      <thead><tr><th>Severity</th><th>Rule</th><th>Finding</th><th>Field</th></tr></thead>
+      <tbody>
+        {% for f in findings %}
+        <tr>
+          <td>{% if f.blocks %}<span class="badge red">block</span>
+              {% else %}<span class="badge amber">warn</span>{% endif %}</td>
+          <td class="mono small">{{ f.rule }}</td>
+          <td>{{ f.message }}</td>
+          <td>
+            {% if f.field_key %}
+            <a href="/engagements/{{ engagement.engagement_id }}#field-{{ f.field_key }}"
+               class="mono small">{{ f.field_key }}</a>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p class="empty">Nothing to report.</p>
+    {% endif %}
+    <p class="note">Export and status advancement stay disabled while any blocking finding exists.</p>
+  </section>
+
+  <section class="panel">
+    <h2>Review comments</h2>
+    <ul class="feed">
+      {% for c in comments %}
+      <li class="{% if c.parent_id %}reply{% endif %}">
+        <strong>{{ c.raised_by }}</strong>
+        <span class="badge {% if c.status.value == 'resolved' %}green{% else %}amber{% endif %}">{{ c.status.value }}</span>
+        {% if c.field_key %}<span class="mono small">{{ c.field_key }}</span>{% endif %}
+        <div>{{ c.body }}</div>
+        {% if c.status.value != 'resolved' %}
+        <form method="post" class="inline"
+              action="/engagements/{{ engagement.engagement_id }}/comments/{{ c.comment_id }}/resolve">
+          <input type="hidden" name="csrf_token" value="{{ csrf }}">
+          <button type="submit" class="linkish">Resolve</button>
+        </form>
+        {% endif %}
+      </li>
+      {% else %}<li class="empty">No comments.</li>{% endfor %}
+    </ul>
+
+    <form method="post" action="/engagements/{{ engagement.engagement_id }}/comments">
+      <input type="hidden" name="csrf_token" value="{{ csrf }}">
+      <p><input name="body" placeholder="Raise a review point" style="width:60%">
+         <input name="field_key" placeholder="field key (optional)" class="mono small">
+         <button type="submit">Add</button></p>
+    </form>
+  </section>
+
+  <section class="panel">
+    <h2>Status</h2>
+    <form method="post" action="/engagements/{{ engagement.engagement_id }}/status" class="filters">
+      <input type="hidden" name="csrf_token" value="{{ csrf }}">
+      <select name="target">
+        {% for s in statuses %}<option value="{{ s.value }}">{{ s.value.replace('_', ' ') }}</option>{% endfor %}
+      </select>
+      <button type="submit">Advance</button>
+    </form>
+
+    {% if not engagement.is_locked %}
+    <form method="post" action="/engagements/{{ engagement.engagement_id }}/finalise" class="filters">
+      <input type="hidden" name="csrf_token" value="{{ csrf }}">
+      <input name="udin" placeholder="UDIN (18 characters)" class="mono">
+      <button type="submit">Finalise and lock</button>
+    </form>
+    {% else %}
+    <form method="post" action="/engagements/{{ engagement.engagement_id }}/revision" class="filters">
+      <input type="hidden" name="csrf_token" value="{{ csrf }}">
+      <input name="reason" placeholder="Reason for revision" style="width:50%">
+      <button type="submit">Create revision</button>
+    </form>
+    <p class="note">Finalised. The only way to change it is a revision, which supersedes the issued documents and leaves them retrievable.</p>
+    {% endif %}
+  </section>
+
+  <section class="panel">
+    <h2>Documents</h2>
+    <form method="post" action="/engagements/{{ engagement.engagement_id }}/audit-pack" class="filters">
+      <input type="hidden" name="csrf_token" value="{{ csrf }}">
+      <button type="submit">Generate complete audit pack</button>
+    </form>
+    <table class="grid">
+      <thead><tr><th>Document</th><th>Version</th><th>Status</th><th>SHA-256</th><th></th></tr></thead>
+      <tbody>
+        {% for d in instances %}
+        <tr>
+          <td>{{ d.doc_type }}</td>
+          <td>{{ d.version_no }}</td>
+          <td>{{ d.status.value }}</td>
+          <td class="mono small">{{ d.content_sha256[:16] }}…</td>
+          <td><a href="/engagements/{{ engagement.engagement_id }}/documents/{{ d.doc_id }}/download">Download</a></td>
+        </tr>
+        {% else %}<tr><td colspan="5" class="empty">None generated yet.</td></tr>{% endfor %}
+      </tbody>
+    </table>
+  </section>
+</div>
+{% endblock %}

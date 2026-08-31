@@ -1,0 +1,70 @@
+# AUTHORED from the firm's own Board's Report precedent (FY 2023-24).
+#
+# The precedent is a live client file. Wording is adapted; nothing specific
+# to that client is carried over.
+
+# NOT IN RULE 8A. Rule 8(6) -- "This rule shall not apply to One Person Company
+# or Small Company" -- and Rule 8A then prescribes a closed, exhaustive list of
+# what the abridged Board's Report shall contain. s.134(3)(g) has no counterpart in
+# that list, so this paragraph is not required for an OPC or a small company.
+# Partner's decision of 20 Aug 2026: for those companies the clause is omitted
+# outright -- not defaulted, not left as a placeholder.
+
+id: bdr.loans.186
+document: directors_report
+order: 110
+number: ""
+title: "Particulars of Loans, Guarantees or Investments"
+clause_ref: "s.134(3)(g); s.186"
+effective_from: "2014-04-01"
+effective_to: null
+render_as: section
+
+applicability:
+  requires: [full_board_report]
+
+needs_review: false
+
+input:
+  key: bdr.loans.186
+  label: "Loans, guarantees, security and investments under section 186"
+  datatype: select
+  carry_forward: prompt
+  mandatory: true
+  options:
+    - { value: "none", label: "None given or made" }
+    - { value: "particulars", label: "Particulars to be given" }
+
+variants:
+  - when: "value == 'none'"
+    body: >
+      Particulars of Loans, Guarantees or Investments
+
+      During the year the Company has not given any loan or guarantee, provided any security
+      in connection with a loan to any other body corporate or person, or made any
+      investment, to which the provisions of Section 186 of the Companies Act, 2013 apply.
+
+  - when: "value == 'particulars'"
+    body: >
+      Particulars of Loans, Guarantees or Investments
+
+      The particulars of loans given, guarantees given, security provided and investments
+      made under Section 186 of the Companies Act, 2013 are set out below:
+    render_block: table
+
+repeating_block:
+  # The table is asked for ONLY when the answer produces one. Without this
+  # guard `min_rows: 1` applied to every answer, so choosing the nil option
+  # printed the correct paragraph and still blocked export with "the table
+  # needs at least one row" -- which is why the firm's team typed the nil
+  # sentence into a name column to get past it.
+  # Section 186 particulars. 'none' prints the nil paragraph the Board's Report needs for AOC-4 and has no table.
+  when: "value == 'particulars'"
+  entity: loan_186
+  min_rows: 1
+  carry_forward: prompt
+  columns:
+    - { key: party, label: "Name of the party", datatype: text, required: true }
+    - { key: nature, label: "Nature", datatype: select, required: true, options: ["Loan", "Guarantee", "Security", "Investment"] }
+    - { key: amount, label: "Amount", datatype: amount, required: true }
+    - { key: purpose, label: "Purpose", datatype: longtext }

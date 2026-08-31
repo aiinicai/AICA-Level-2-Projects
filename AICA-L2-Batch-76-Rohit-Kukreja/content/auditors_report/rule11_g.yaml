@@ -1,0 +1,109 @@
+# The firm reports Rule 11 as a numbered list under section 143(3)(g).
+# The clause id keeps the STATUTORY letter so the clause stays traceable
+# to the rule; `number` carries the firm's rendering. Both are needed:
+# a reviewer checks the statute by id and the document by number.
+#
+# SETTLED — the partner fixed the commencement at 1 April 2023 on 16 August
+# 2026. See docs/GATE_A_DECISIONS.md, decision 2.
+#
+# DO NOT "CORRECT" THE DATE BELOW TO 2023-04-01. The decision is expressed as
+# a financial year COMMENCEMENT; `effective_from` is compared against the
+# engagement's FY *END*. A financial year commencing 01-04-2023 ends
+# 31-03-2024, so the first in-force FY end is 2024-03-31 and the two are the
+# same rule stated from opposite ends. Setting 2023-04-01 here would pull the
+# clause into FY 2022-23, where it must not appear.
+#
+# `mrl.audit.trail` carries the same date and the two move together.
+# Pinned by tests/test_repository_state.py::TestGateADecisions.
+
+# PRESERVATION ADDED 21 Aug 2026, on the firm's team's observation.
+#
+# Rule 11(g) asks about three things -- that the software has the feature, that
+# it operated throughout the year, and that the trail "has been preserved by the
+# company as per the statutory requirements for record retention". The clean
+# variant asserted the first two and stopped. The input's LABEL said
+# "use, operation and preservation" the whole time, which is how it read as
+# covered without being covered.
+
+id: rule11.g
+document: auditors_report
+order: 350
+number: "(6)"
+title: "Audit Trail (Edit Log) Facility in Accounting Software"
+clause_ref: "Rule 11(g), Companies (Audit and Auditors) Rules, 2014"
+
+# A financial year commencing 01-04-2023 ends 31-03-2024. The loader filters on
+# FY *end* date, so the first in-force FY end is 2024-03-31.
+effective_from: "2024-03-31"
+effective_to: null
+
+needs_review: false
+
+input:
+  key: rule11.g.status
+  label: "Audit trail feature — use, operation and preservation"
+  datatype: select
+  carry_forward: prompt
+  mandatory: true
+  options:
+    - { value: throughout,   label: "Operated all year, not tampered with, and preserved" }
+    - { value: not_preserved, label: "Operated all year, but not preserved for the retention period" }
+    - { value: part_year,    label: "Not enabled for part of the year" }
+    - { value: not_enabled,  label: "Audit trail feature not enabled" }
+    - { value: tampered,     label: "Instances of tampering noted" }
+
+variants:
+  # AUTHORED — not sourced.
+  - when: "value == 'throughout'"
+    body: >
+      Based on our examination, which included test checks, the Company has used
+      accounting software for maintaining its books of account which has a feature of
+      recording audit trail (edit log) facility, and the same has operated throughout the
+      year for all relevant transactions recorded in the software. Further, during the
+      course of our audit we did not come across any instance of the audit trail feature
+      being tampered with. Additionally, the audit trail has been preserved by the
+      Company as per the statutory requirements for record retention.
+
+  # Operated all year, and NOT preserved. Rule 11(g) asks about three things --
+  # use, operation and preservation -- and the clean answer above asserts all
+  # three in one sentence. Without this option an auditor whose client keeps no
+  # retained trail had only the clean answer or a "not enabled" one, neither of
+  # which is true.
+  - when: "value == 'not_preserved'"
+    body: >
+      Based on our examination, which included test checks, the Company has used
+      accounting software for maintaining its books of account which has a feature of
+      recording audit trail (edit log) facility, and the same has operated throughout the
+      year for all relevant transactions recorded in the software. Further, during the
+      course of our audit we did not come across any instance of the audit trail feature
+      being tampered with. However, the audit trail has not been preserved by the Company
+      as per the statutory requirements for record retention, as described below:
+    requires_narrative: true
+    severity: exception
+
+  # AUTHORED — not sourced.
+  - when: "value == 'part_year'"
+    body: >
+      Based on our examination, which included test checks, the Company has used
+      accounting software for maintaining its books of account which has a feature of
+      recording audit trail (edit log) facility, except that the said feature was not
+      enabled for part of the year, as described below:
+    requires_narrative: true
+    severity: exception
+
+  # AUTHORED — not sourced.
+  - when: "value == 'not_enabled'"
+    body: >
+      Based on our examination, the accounting software used by the Company for
+      maintaining its books of account did not have a feature of recording audit trail
+      (edit log) facility operating during the year.
+    requires_narrative: true
+    severity: exception
+
+  # AUTHORED — not sourced.
+  - when: "value == 'tampered'"
+    body: >
+      Based on our examination, which included test checks, we came across the following
+      instances of the audit trail feature being tampered with during the year:
+    requires_narrative: true
+    severity: exception

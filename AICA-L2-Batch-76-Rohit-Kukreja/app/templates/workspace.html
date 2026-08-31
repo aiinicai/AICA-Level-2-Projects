@@ -1,0 +1,578 @@
+{% extends "base.html" %}
+{% set nav = 'clients' %}
+{% set csrf = request.cookies.get('auditcraft_csrf', '') %}
+
+{% block title %}{{ client.client_code }} {{ engagement.fy_code }} — AuditCraft{% endblock %}
+{% block heading %}
+  {{ profile.company_name if profile else client.client_code }} · FY {{ engagement.fy_code }}
+{% endblock %}
+{% block topbar_meta %}
+  <span class="badge {{ 'green' if readiness == 100 else 'amber' }}">Readiness {{ readiness }}%</span>
+  {# Alpine owns the indicator; the events come from HTMX. Nothing here is
+     required for the page to work — with JavaScript off the span stays
+     empty and every form still submits normally. #}
+  <span class="save-status" role="status" aria-live="polite"
+        x-data="{ state: '' }"
+        :class="state"
+        x-text="state === 'saving' ? 'Saving…' : (state === 'saved' ? 'Saved just now' : (state === 'failed' ? 'Not saved — press Save' : ''))"
+        @htmx:before-request.window="state = 'saving'"
+        @htmx:after-request.window="state = $event.detail.successful ? 'saved' : 'failed'"></span>
+  {{ engagement.status.value.replace('_', ' ') }}
+  {% if engagement.is_locked %}<span class="badge green">locked</span>{% endif %}
+{% endblock %}
+
+{% block content %}
+{# Engagement chrome — where this file is, and the other screens for it.
+   Full width, above the two panes: inside the form column it pushed the
+   first clause question 900px down the page (decision 48). #}
+<div class="engagement-header no-print">
+  {# Every other screen for THIS engagement (decision 44).
+
+     They were all reachable only from the dashboard's quick actions, which
+     point at whichever engagement was touched last -- so from inside a file
+     there was no way to reach its own Applicability, What Changed, roll
+     forward, or the Review screen that carries Finalise. Readiness could read
+     100% with nothing on the page to press.
+
+     The same shape as the workspace itself being unreachable earlier: a
+     MISSING link is not a broken one, and the sweep that caught that one was
+     written about the workspace rather than as a property. #}
+  <nav class="engagement-nav">
+    <span class="current">Data collection</span>
+    <a href="/engagements/{{ engagement.engagement_id }}/applicability">Applicability</a>
+    {% if prior_fy %}
+    <a href="/engagements/{{ engagement.engagement_id }}/what-changed">What changed</a>
+    {% endif %}
+    <a href="/engagements/{{ engagement.engagement_id }}/validation"
+       class="primary">Review &amp; finalise</a>
+    <a href="/engagements/{{ engagement.engagement_id }}/roll-forward">Roll forward</a>
+  </nav>
+
+  {# Where the file has got to (decision 36). Five steps, not the eight
+     statuses behind them: "Prepared" and "Approved" are one thing to a person
+     finishing a file, and a progress bar naming database states is a progress
+     bar nobody reads. #}
+  <ol class="stage-bar">
+    {% for stage in stages %}
+    <li class="{% if stage.done %}done{% elif stage.current %}current{% endif %}">
+      <span class="dot" aria-hidden="true"></span>{{ stage.label }}
+    </li>
+    {% endfor %}
+  </ol>
+</div>
+
+<div class="workspace">
+
+  {# ------------------------------------------------------- form panel #}
+  <div class="form-panel no-print">
+    {% if error %}<p class="badge red" role="alert">{{ error }}</p>{% endif %}
+
+    {% if engagement.is_locked %}
+    <p class="badge green">
+      This engagement is finalised and read-only. Corrections go through Create Revision.
+    </p>
+    {% endif %}
+
+    {# Each section carries its own state (decision 37), so what is left is
+       visible without opening every document in turn. #}
+    <nav class="doc-switch">
+      {% for doc_id, doc in documents.items() %}
+      {% set section = section_by_id.get(doc_id) %}
+      <a href="/engagements/{{ engagement.engagement_id }}?document={{ doc_id }}"
+         class="{% if doc_id == current_document %}active{% endif %} state-{{ section.state.value if section else 'not_started' }}"
+         title="{{ section.label if section else '' }}{% if section and section.total %} — {{ section.answered }} of {{ section.total }} answered{% endif %}">
+        <span class="doc-name">{{ doc.short_title or doc.title }}</span>
+        {% if section %}<span class="state-tag">{{ section.label }}</span>{% endif %}
+      </a>
+      {% endfor %}
+    </nav>
+
+    {# ------------------------------------------- applicability prompt #}
+    {# Decision 75. CARO, IFC, CSR, internal audit and secretarial audit are
+       DECLARED flags: the engine does not infer them, and until the auditor
+       states one, every clause hanging off it is simply absent from the
+       document with nothing on the page saying so.
+
+       The firm's team reported that they could not find "the applicability
+       screen for CSR, Internal Audit Report and Internal Financial Controls".
+       It was linked, as "Applicability" — which is not the words someone
+       hunting for "where do I say CSR applies?" is reading for. So the
+       question comes to them, named. #}
+    {% if awaiting_applicability %}
+    <div class="awaiting-applicability" role="alert">
+      <p>
+        <strong>{{ awaiting_applicability | length }}</strong>
+        {{ 'question is' if awaiting_applicability | length == 1 else 'questions are' }}
+        waiting on your answer:
+        <strong>{{ awaiting_applicability | join(', ') }}</strong>.
+      </p>
+      <p class="sub">
+        Until each is answered the clauses that depend on it are left out of
+        every document, and nothing in the text says they are missing.
+      </p>
+      <a class="primary"
+         href="/engagements/{{ engagement.engagement_id }}/applicability">Answer them now</a>
+    </div>
+    {% endif %}
+
+    {# --------------------------------------------------- page index #}
+    {# The Board's Report is 312 fields under 41 headings on one page more than
+       twenty screens tall. The team reported the statutory auditors' term field
+       as missing; it was 2,357 pixels down. A page nobody can traverse is a
+       page whose fields do not exist. #}
+    {% if index | length > 4 %}
+    <details class="page-index" open>
+      <summary>
+        On this page — {{ index | length }} sections,
+        {{ index | selectattr('outstanding') | list | length }} with something outstanding
+      </summary>
+      <ol>
+        {% for entry in index %}
+        <li{% if entry.outstanding %} class="outstanding"{% endif %}>
+          <a href="#{{ entry.anchor }}">{{ entry.title }}</a>
+        </li>
+        {% endfor %}
+      </ol>
+    </details>
+    {% endif %}
+
+    {# The clean defaults are shown, not stored — see the note on the select
+       below. This is how the auditor stores them: one deliberate act, logged
+       and attributed, rather than a page load answering on their behalf. #}
+    {% if not engagement.is_locked and unsaved_count %}
+    <form method="post"
+          action="/engagements/{{ engagement.engagement_id }}/accept-defaults"
+          class="accept-defaults">
+      <input type="hidden" name="csrf_token" value="{{ csrf }}">
+      <input type="hidden" name="document" value="{{ current_document }}">
+      <p>
+        <strong>{{ unsaved_count }}</strong>
+        {{ 'dropdown is' if unsaved_count == 1 else 'dropdowns are' }} showing a clean
+        default that has not been saved. Until saved they count as unanswered and
+        block export.
+      </p>
+      <button type="submit">Accept the {{ unsaved_count }} clean
+        {{ 'default' if unsaved_count == 1 else 'defaults' }} in this document</button>
+    </form>
+    {% endif %}
+
+    {# The one question that decides whether this document exists at all
+       (decisions 30 and 34). Shown for CARO and Annexure B, because every
+       clause in each requires one flag; derived, not listed, so the control
+       follows the repository. It writes the applicability OVERRIDE rather than
+       an answer, so this document, the paragraph in the auditor's report that
+       refers to it and the engagement letter's scope all move together. #}
+    {% if governing_flag and not engagement.is_locked %}
+    <form method="post" action="/engagements/{{ engagement.engagement_id }}/document-applicable"
+          class="applies-question">
+      <input type="hidden" name="csrf_token" value="{{ csrf }}">
+      <input type="hidden" name="document" value="{{ current_document }}">
+      <p><strong>{{ governing_question }}</strong></p>
+      <select name="choice" aria-label="{{ governing_question }}">
+        <option value="computed" {% if governing_state == 'computed' %}selected{% endif %}>
+          Decide from the financial figures — currently
+          {{ 'applicable' if governing_computed else 'not applicable' }}
+        </option>
+        <option value="applicable" {% if governing_state == 'applicable' %}selected{% endif %}>
+          Yes — prepare this document
+        </option>
+        <option value="not_applicable" {% if governing_state == 'not_applicable' %}selected{% endif %}>
+          No — do not prepare it
+        </option>
+      </select>
+      <button type="submit">Apply</button>
+      <span class="hint" tabindex="0" role="note"
+            title="Answering No hides every question in this section, so nothing here has to be filled in. Overruling the figures is recorded with a reason, because a reviewer needs to see that someone decided rather than that a threshold was crossed.">i</span>
+    </form>
+    {% endif %}
+
+    {# Engagement-level fields. Year-specific by definition, so none of
+       them carries forward — §6.1 `never`. #}
+    {# Collapsed by default (decision 48). These four are decided once and then
+       left alone, and expanded they put 567px of controls between the auditor
+       and the first clause question -- on CARO that meant scrolling most of a
+       screen before answering anything. The summary shows the current values,
+       so collapsing hides the controls and not the facts. #}
+    {# Opened when something required is still unset (decision 67). Collapsed is
+       right once these are decided, and wrong before: a new user does not know
+       the section exists, and the opinion type governs wording in three
+       documents. The summary line says "opinion not set" either way -- this
+       just stops it saying so behind a closed panel. #}
+    <details class="field engagement-level collapse"
+             {% if not engagement.opinion_type or not engagement.report_date %}open{% endif %}>
+      <summary>
+        <span class="sum-title">Engagement details</span>
+        <span class="sum-values">
+          {{ engagement.opinion_type.value.replace('_', ' ') if engagement.opinion_type else 'opinion not set' }}
+          · {{ engagement.going_concern.value.replace('_', ' ') }}
+          · {{ engagement.report_date.strftime('%d %b %Y') if engagement.report_date else 'no report date' }}
+          {%- if engagement.place %} · {{ engagement.place }}{% endif %}
+        </span>
+      </summary>
+      <div class="clause-ref">Opinion, going concern, report date and place</div>
+
+      {% for name, label, options in [
+          ('opinion_type', 'Audit opinion', opinion_types),
+          ('going_concern', 'Going concern', going_concerns)] %}
+      <form method="post" action="/engagements/{{ engagement.engagement_id }}/engagement-field"
+            class="autosave"
+            hx-post="/engagements/{{ engagement.engagement_id }}/engagement-field"
+            hx-select=".preview-pane" hx-target=".preview-pane" hx-swap="outerHTML"
+            hx-trigger="change, blur"
+            hx-indicator=".save-status">
+        <input type="hidden" name="csrf_token" value="{{ csrf }}">
+        <input type="hidden" name="field" value="{{ name }}">
+        <input type="hidden" name="document" value="{{ current_document }}">
+        <label for="eng-{{ name }}" class="sub">{{ label }}</label>
+        <select id="eng-{{ name }}" name="value" {% if engagement.is_locked %}disabled{% endif %}>
+          <option value="">— not decided —</option>
+          {% for opt in options %}
+          {% set chosen = engagement[name] and engagement[name].value == opt.value %}
+          <option value="{{ opt.value }}"{% if chosen %} selected{% endif %}>{{ opt.value.replace('_', ' ') }}</option>
+          {% endfor %}
+        </select>
+        <div class="field-foot">
+          <button type="submit" {% if engagement.is_locked %}disabled{% endif %}>Save</button>
+        </div>
+      </form>
+      {% endfor %}
+
+      {# Who signs THIS engagement (decision 50). The firm's team: partner A
+         signs client Y and partner B signs client Z under the same firm name,
+         and the tool named the same person on both because nothing ever set
+         `engagement.partner_id`. #}
+      <form method="post" action="/engagements/{{ engagement.engagement_id }}/engagement-field"
+            class="autosave"
+            hx-post="/engagements/{{ engagement.engagement_id }}/engagement-field"
+            hx-select=".preview-pane" hx-target=".preview-pane" hx-swap="outerHTML"
+            hx-trigger="change, blur"
+            hx-indicator=".save-status">
+        <input type="hidden" name="csrf_token" value="{{ csrf }}">
+        <input type="hidden" name="field" value="partner_id">
+        <input type="hidden" name="document" value="{{ current_document }}">
+        <label for="eng-partner" class="sub">Signing partner</label>
+        <select id="eng-partner" name="value" {% if engagement.is_locked %}disabled{% endif %}>
+          <option value="">— firm's first signatory —</option>
+          {% for partner in signing_partners %}
+          <option value="{{ partner.partner_id }}"
+            {% if engagement.partner_id == partner.partner_id %}selected{% endif %}>
+            {{ partner.partner_name }} (M. No. {{ partner.membership_no }})</option>
+          {% endfor %}
+        </select>
+        <div class="field-foot">
+          <button type="submit" {% if engagement.is_locked %}disabled{% endif %}>Save</button>
+        </div>
+      </form>
+
+      {% for name, label, kind in [
+          ('report_date', 'Report date', 'date'),
+          ('place', 'Place', 'text')] %}
+      <form method="post" action="/engagements/{{ engagement.engagement_id }}/engagement-field"
+            class="autosave"
+            hx-post="/engagements/{{ engagement.engagement_id }}/engagement-field"
+            hx-select=".preview-pane" hx-target=".preview-pane" hx-swap="outerHTML"
+            hx-trigger="change, blur"
+            hx-indicator=".save-status">
+        <input type="hidden" name="csrf_token" value="{{ csrf }}">
+        <input type="hidden" name="field" value="{{ name }}">
+        <input type="hidden" name="document" value="{{ current_document }}">
+        <label for="eng-{{ name }}" class="sub">{{ label }}</label>
+        <input id="eng-{{ name }}" name="value" type="{{ kind }}"
+               value="{{ engagement[name].isoformat() if kind == 'date' and engagement[name] else (engagement[name] or '') }}"
+               {% if engagement.is_locked %}disabled{% endif %}>
+        <div class="field-foot">
+          <button type="submit" {% if engagement.is_locked %}disabled{% endif %}>Save</button>
+        </div>
+      </form>
+      {% endfor %}
+    </details>
+
+    {# The clause questions for the document on screen, in a card of their own
+       (decision 48). Previously they ran straight on from the engagement
+       fields, so nothing on a 96-question CARO annexure said where one section
+       ended and the next began. #}
+    <section class="panel questions">
+      <div class="card-head">
+        <div>
+          <div class="eyebrow">{{ current_document.replace('_', ' ') }}</div>
+          <h2>{{ documents[current_document].title }}</h2>
+        </div>
+        {% set section = section_by_id.get(current_document) %}
+        {% if section %}
+        <span class="state-tag state-{{ section.state.value }}">{{ section.label }}</span>
+        {% endif %}
+      </div>
+
+    {% for state in states %}
+    {# `unsaved` marks only dropdowns: an empty textarea already looks empty,
+       whereas a select showing its preselected clean default looks answered
+       and is not. Marking every unanswered field put a border on 93 of 98 and
+       said nothing. #}
+    <div class="field {% if state.is_unconfirmed_carry_forward %}carried{% endif %}{% if state.datatype == 'select' and state.value is none %} unsaved{% endif %}"
+         id="field-{{ state.key }}">
+      <label for="input-{{ state.key }}">
+        {{ state.label }}{% if state.mandatory %} <span class="req">*</span>{% endif %}
+        {# Guidance (decision 40) built from what the tool actually knows: the
+           provision the question comes from, and what this application will do
+           with the answer. Deliberately NOT a plain-language restatement of the
+           statute — inventing an explanation of Indian law next to the box is
+           the same risk the whole clause repository exists to control, and a
+           tooltip is exactly where nobody would check it. #}
+        <span class="hint" tabindex="0" role="note"
+              title="{% if state.clause_ref %}Required by {{ state.clause_ref }}. {% endif %}{% if state.mandatory %}Must be answered before this document can be exported. {% else %}Optional. {% endif %}{% if state.carry_forward.value == 'always' %}Carried forward from last year automatically.{% elif state.carry_forward.value == 'prompt' %}Offered from last year on roll-forward, and must be confirmed for this year.{% else %}Answered afresh each year.{% endif %}">i</span>
+      </label>
+      {% if state.clause_ref %}<div class="clause-ref">{{ state.clause_ref }}</div>{% endif %}
+
+      {% if state.is_unconfirmed_carry_forward %}
+      <div class="cf-badge" title="Carried forward from the prior year and not yet confirmed for this year">
+        carried forward — confirm
+        <form method="post" action="/engagements/{{ engagement.engagement_id }}/confirm"
+              class="inline">
+          <input type="hidden" name="csrf_token" value="{{ csrf }}">
+          <input type="hidden" name="field_key" value="{{ state.key }}">
+          <input type="hidden" name="document" value="{{ current_document }}">
+          <button type="submit" class="linkish">Confirm</button>
+        </form>
+      </div>
+      {% endif %}
+
+      <form method="post" action="/engagements/{{ engagement.engagement_id }}/field"
+            class="autosave"
+            hx-post="/engagements/{{ engagement.engagement_id }}/field"
+            hx-select=".preview-pane" hx-target=".preview-pane" hx-swap="outerHTML"
+            hx-trigger="change, blur"
+            hx-indicator=".save-status">
+        <input type="hidden" name="csrf_token" value="{{ csrf }}">
+        <input type="hidden" name="field_key" value="{{ state.key }}">
+        <input type="hidden" name="document" value="{{ current_document }}">
+
+        {# §8.6 — every field typed and validated at entry. #}
+        {% if state.datatype == 'select' %}
+          <select id="input-{{ state.key }}" name="value"
+                  {% if engagement.is_locked %}disabled{% endif %}>
+            {# Every clause lists its clean answer first, so an unanswered
+               field opens on it: an audit is exception-based and the auditor
+               should be changing what is NOT clean, not confirming what is.
+               Nothing is stored until the field is saved, so a preselected
+               option is still an unanswered field for readiness and for the
+               §18.4 export block — it is a default, not an assertion. #}
+            {% for value, label in state.options %}
+            <option value="{{ value }}"
+              {% if state.raw == value or (not state.raw and loop.first) %}selected{% endif %}>
+              {{ label }}</option>
+            {% endfor %}
+            <option value="" {% if state.raw == "" and state.raw is not none %}selected{% endif %}>
+              — not answered —</option>
+          </select>
+          {# A preselected default and a saved answer looked identical, and the
+             form only autosaves on `change` — which an untouched dropdown never
+             fires. So the clean option showed, nothing was stored, and export
+             stayed blocked with nothing on screen to say why. #}
+          {% if state.value is none %}
+          <span class="not-saved" title="Showing the clean default. Nothing is stored until you save it, so this field still blocks export.">not saved</span>
+          {% endif %}
+        {% elif state.datatype == 'longtext' %}
+          <textarea id="input-{{ state.key }}" name="value" rows="4"
+                    {% if engagement.is_locked %}disabled{% endif %}>{{ state.raw }}</textarea>
+        {% elif state.datatype == 'date' %}
+          <input id="input-{{ state.key }}" name="value" type="date" value="{{ state.raw }}"
+                 {% if engagement.is_locked %}disabled{% endif %}>
+        {% elif state.datatype in ('amount', 'number') %}
+          <input id="input-{{ state.key }}" name="value" type="text" inputmode="decimal"
+                 value="{{ state.raw }}" {% if engagement.is_locked %}disabled{% endif %}>
+        {% else %}
+          <input id="input-{{ state.key }}" name="value" type="text" value="{{ state.raw }}"
+                 {% if engagement.is_locked %}disabled{% endif %}>
+        {% endif %}
+
+        <div class="field-foot">
+          <input name="wp_reference" type="text" value="{{ state.wp_reference }}"
+                 placeholder="WP ref" class="wp"
+                 {% if engagement.is_locked %}disabled{% endif %}>
+          <button type="submit" {% if engagement.is_locked %}disabled{% endif %}>Save</button>
+        </div>
+      </form>
+
+      {% if prior_fy %}
+      <div class="prior {% if state.changed_from_prior %}diff{% endif %}">
+        FY {{ prior_fy }}:
+        {% if state.prior_value is none %}—{% else %}{{ state.prior_value }}{% endif %}
+      </div>
+      {% endif %}
+    </div>
+    {% endfor %}
+
+    {# --------------------------------------------- fixed schedules #}
+    {# The rows are prescribed and only the figures are typed (decision 73).
+       Rendered as ONE form: the sub-totals are derived from every line, so
+       saving a line at a time would leave the schedule briefly disagreeing
+       with itself. #}
+    {% for clause, schedule, rows in schedules %}
+    <div class="field repeating" id="block-{{ clause.id }}">
+      <label>{{ clause.title }}</label>
+      <div class="clause-ref">{{ clause.clause_ref }}</div>
+
+      <form method="post"
+            action="/engagements/{{ engagement.engagement_id }}/schedule/{{ schedule.entity }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf }}">
+        <input type="hidden" name="document" value="{{ current_document }}">
+
+        <table class="grid small-grid schedule">
+          <thead><tr>
+            {% for col in schedule.columns %}<th>{{ col.label or col.key }}</th>{% endfor %}
+          </tr></thead>
+          <tbody>
+            {% for row in rows %}
+            <tr{% if row.computed %} class="derived"{% endif %}>
+              <td>{{ row.particulars }}</td>
+              {% for col in schedule.amount_columns %}
+              <td>
+                {% if row.computed %}
+                <span class="derived-value"
+                      title="Calculated from the lines above; not typed.">{{
+                  row['values'][col] | accounting or '—' }}</span>
+                {% else %}
+                <input name="f_{{ row.key }}_{{ col }}" type="text" inputmode="decimal"
+                       value="{{ row['values'][col] | accounting }}"
+                       aria-label="{{ row.particulars }} — {{ col.replace('_', ' ') }}"
+                       {% if engagement.is_locked %}disabled{% endif %}>
+                {% endif %}
+              </td>
+              {% endfor %}
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+
+        <p class="note">
+          The lines and their order are fixed. The three profit lines are
+          calculated from the figures above them. Enter a credit in brackets —
+          <span class="mono">(1,23,456)</span> — the way it is written in the
+          accounts.
+        </p>
+
+        {% if not engagement.is_locked %}
+        <button type="submit">Save schedule</button>
+        {% endif %}
+      </form>
+    </div>
+    {% endfor %}
+
+    {# ------------------------------------------------- child records #}
+    {% for clause, block, rows in repeating %}
+    <div class="field repeating" id="block-{{ clause.id }}">
+      <label>{{ clause.title }}</label>
+      <div class="clause-ref">{{ clause.clause_ref }}</div>
+
+      <table class="grid small-grid">
+        <thead><tr>
+          {% for col in block.columns %}<th>{{ col.label or col.key }}</th>{% endfor %}
+          <th></th>
+        </tr></thead>
+        <tbody>
+          {% for row in rows %}
+          <tr>
+            {% for cell in row.cells %}<td>{{ cell }}</td>{% endfor %}
+            <td>
+              {% if not engagement.is_locked and not computed(block.entity) %}
+              <form method="post" class="inline"
+                    action="/engagements/{{ engagement.engagement_id }}/rows/{{ block.entity }}/{{ row.pk }}/delete">
+                <input type="hidden" name="csrf_token" value="{{ csrf }}">
+                <input type="hidden" name="document" value="{{ current_document }}">
+                <button type="submit" class="linkish">Remove</button>
+              </form>
+              {% endif %}
+            </td>
+          </tr>
+          {% else %}
+          <tr><td colspan="{{ block.columns | length + 1 }}" class="empty">
+            No rows.{% if block.min_rows %} At least {{ block.min_rows }} required.{% endif %}
+          </td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+
+      {% if computed(block.entity) %}
+      <p class="note">
+        Computed from the client's director register, not typed here. Correct the
+        register on the client screen and this follows (§18.8).
+      </p>
+      {% elif not engagement.is_locked %}
+      <form method="post" action="/engagements/{{ engagement.engagement_id }}/rows/{{ block.entity }}"
+            class="add-row">
+        <input type="hidden" name="csrf_token" value="{{ csrf }}">
+        <input type="hidden" name="document" value="{{ current_document }}">
+        {% for col in block.columns %}
+        <label class="col-input">
+          <span>{{ col.label or col.key }}{% if col.required %} *{% endif %}</span>
+          {% if col.options %}
+          <select name="col_{{ col.key }}">
+            <option value=""></option>
+            {% for opt in col.options %}<option value="{{ opt }}">{{ opt }}</option>{% endfor %}
+          </select>
+          {% elif col.datatype.value == 'amount' %}
+          <input name="col_{{ col.key }}" type="text" inputmode="decimal">
+          {% elif col.datatype.value == 'date' %}
+          <input name="col_{{ col.key }}" type="date">
+          {% else %}
+          <input name="col_{{ col.key }}" type="text">
+          {% endif %}
+        </label>
+        {% endfor %}
+        <button type="submit">Add row</button>
+      </form>
+      {% endif %}
+    </div>
+    {% endfor %}
+    </section>
+  </div>
+
+  {# ------------------------------------------------------ preview pane #}
+  <div class="preview-pane">
+    {# Read the document on firm paper without waiting for the file to be
+       finished. Beside the preview rather than above the questions: it acts on
+       what is shown here. Nothing is frozen, hashed or registered by it — a
+       scratch render, stamped DRAFT, never entering the document register. #}
+    {# Decision 77. This used to offer the draft and nothing else, whatever
+       state the file was in -- so a firm that had finalised every report
+       downloaded from here and got a page stamped "DRAFT FOR DISCUSSION -- NOT
+       AN ISSUED DOCUMENT". The stamp was right; offering a scratch render as
+       the only way out of a finished file was not. #}
+    <p class="draft-export no-print">
+      {% if engagement.is_locked %}
+      <a href="/documents/{{ engagement.engagement_id }}/{{ current_document }}/issued">
+        Download the issued document (.docx)</a>
+      <span class="note">
+        The registered version, on the firm's letterhead. No DRAFT stamp.
+      </span>
+      {% else %}
+      <a href="/documents/{{ engagement.engagement_id }}/{{ current_document }}/draft">
+        Download on the firm's letterhead (.docx)</a>
+      <span class="note">Stamped DRAFT. Unanswered fields print as they stand.</span>
+      {% endif %}
+    </p>
+
+    {% if not built.exportable %}
+    <section class="findings no-print">
+      <h2>{{ built.blocking_count }} finding{{ '' if built.blocking_count == 1 else 's' }} blocking export</h2>
+      <ul>
+        {% for cid in built.unanswered %}<li><a href="#field-{{ cid }}">{{ cid }}</a> — not answered</li>{% endfor %}
+        {% for cid in built.missing_narratives %}<li>{{ cid }} — requires an explanation</li>{% endfor %}
+        {% for cid in built.missing_rows %}<li>{{ cid }} — the table needs at least one row</li>{% endfor %}
+        {% for token in built.placeholders %}<li>unresolved placeholder <code>{{ token }}</code></li>{% endfor %}
+      </ul>
+    </section>
+    {% endif %}
+
+    {% include "_letterhead.html" %}
+
+    {% include "_not_applicable.html" %}
+
+    {{ document_html | safe }}
+
+    {% include "_page_footer.html" %}
+  </div>
+
+</div>
+<script src="{{ asset_url('workspace.js') }}" defer></script>
+{% endblock %}

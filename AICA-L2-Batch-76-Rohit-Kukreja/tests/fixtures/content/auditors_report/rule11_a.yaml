@@ -1,0 +1,52 @@
+id: rule11.a
+document: auditors_report
+order: 610
+number: "(a)"
+title: "Impact of Pending Litigations on the Financial Position"
+clause_ref: "Rule 11(a), Companies (Audit and Auditors) Rules, 2014"
+effective_from: "2014-04-01"
+effective_to: null
+
+needs_review: true
+
+variants:
+  # AUTHORED — not sourced from an ICAI illustrative format.
+  - when: "value == 'none'"
+    body: >
+      The Company does not have any pending litigations which would impact its financial
+      position.
+
+  # AUTHORED — not sourced.
+  - when: "value == 'disclosed'"
+    body: >
+      The Company has disclosed the impact of pending litigations on its financial
+      position in its financial statements. The particulars of such litigations are as
+      follows:
+    render_block: table
+    severity: exception
+
+input:
+  key: rule11.a.status
+  label: "Pending litigations affecting the financial position"
+  datatype: select
+  carry_forward: prompt
+  mandatory: true
+  options:
+    - { value: none,      label: "No pending litigations affecting financial position" }
+    - { value: disclosed, label: "Pending litigations — disclosed in financial statements" }
+
+# Litigation is structured data, never free text (§19).
+repeating_block:
+  when: "value == 'disclosed'"
+  entity: litigation
+  min_rows: 1
+  carry_forward: prompt
+  columns:
+    - { key: forum,           label: "Court / Forum",          datatype: text,     required: true }
+    - { key: case_number,     label: "Case No.",               datatype: text }
+    - { key: nature,          label: "Nature of Dispute",      datatype: text,     required: true }
+    - { key: amount,          label: "Amount Involved (₹)",    datatype: amount }
+    - { key: period,          label: "Period / AY",            datatype: text }
+    - { key: status,          label: "Status",                 datatype: select,
+        options: [pending, decided, appealed, settled] }
+    - { key: mgmt_assessment, label: "Management Assessment",  datatype: longtext }

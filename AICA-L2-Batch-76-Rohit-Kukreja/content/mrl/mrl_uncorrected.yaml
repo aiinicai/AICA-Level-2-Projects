@@ -1,0 +1,60 @@
+# AUTHORED from the firm's own MRL precedent.
+#
+# The precedent is a live client file. Wording is adapted; nothing specific
+# to that client is carried over. See scripts note in the authoring script.
+#
+# The precedent says only "There are no uncorrected misstatements
+# identified." SA 450 para 14 requires the letter to state that the effects
+# of uncorrected misstatements are immaterial, and to attach a summary of
+# them. The nil case is the precedent's; the schedule is AUTHORED because
+# the precedent has none.
+
+id: mrl.uncorrected
+document: mrl
+order: 90
+number: ""
+title: "Uncorrected Misstatements"
+clause_ref: "SA 450 para 14"
+effective_from: "2014-04-01"
+effective_to: null
+
+needs_review: false
+
+input:
+  key: mrl.uncorrected
+  label: "Uncorrected misstatements"
+  datatype: select
+  carry_forward: never
+  mandatory: true
+  options:
+    - { value: "none", label: "None identified" }
+    - { value: "immaterial", label: "Identified — schedule attached, effects immaterial" }
+
+repeating_block:
+  # The table is asked for ONLY when the answer produces one. Without this
+  # guard `min_rows: 1` applied to every answer, so choosing the nil option
+  # printed the correct paragraph and still blocked export with "the table
+  # needs at least one row" -- which is why the firm's team typed the nil
+  # sentence into a name column to get past it.
+  # 'none' means there were no uncorrected misstatements at all.
+  when: "value == 'immaterial'"
+  entity: uncorrected_misstatement
+  min_rows: 1
+  carry_forward: never
+  columns:
+    - { key: description, label: "Description of the misstatement", datatype: longtext, required: true }
+    - { key: financial_statement_line, label: "Financial statement line item", datatype: text, required: true }
+    - { key: amount, label: "Amount", datatype: amount, required: true }
+    - { key: effect, label: "Effect on profit or loss", datatype: text }
+
+variants:
+  - when: "value == 'none'"
+    body: >
+      There are no uncorrected misstatements identified during the audit.
+
+  - when: "value == 'immaterial'"
+    body: >
+      We confirm that the effects of the uncorrected misstatements set out below,
+      individually and in the aggregate, are immaterial to the financial statements as a
+      whole:
+    render_block: table
