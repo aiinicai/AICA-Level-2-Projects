@@ -1,10 +1,12 @@
-# Upload Your Project Folder to the AICA Level 2 Projects Repository
+<div align="center">
+<img width="1200" height="475" alt="GHBanner" src="https://ai.google.dev/static/site-assets/images/share-ais-513315318.png" />
+</div>
 
-**Target repository:** [aiinicai/AICA-Level-2-Projects](https://github.com/aiinicai/AICA-Level-2-Projects)
+# Run and deploy your AI Studio app
 
-This guide explains how to contribute your complete project folder to the **AICA-Level-2-Projects** repository using GitHub’s **Fork + Pull Request** workflow.
+This contains everything you need to run your app locally.
 
-Two methods are covered:
+View your app in AI Studio: https://ai.studio/apps/31b21528-31d6-4768-be02-f0ef92331fd9
 
 1. **Website-only method** — no software installation required.
 2. **Git command-line method** — recommended for complete project folders and projects containing many files.
@@ -56,107 +58,119 @@ You will be redirected to your personal copy of the repository:
 ```text
 https://github.com/YOUR-USERNAME/AICA-Level-2-Projects
 ```
+## Run Locally
 
-Replace `YOUR-USERNAME` with your GitHub username.
+**Prerequisites:**  Node.js
 
-## Step 2: Upload Your Project Folder
 
-GitHub provides two ways to add a folder through the website.
+1. Install dependencies:
+   `npm install`
+2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
+3. Run the app:
+   `npm run dev`
+# 📊 Stock Statement + ICAI UDIN Automation Tool
 
-### Option A: Drag and Drop the Complete Folder
+**A Professional Automation Solution for Chartered Accountants**
 
-1. Open your fork of the repository.
-2. Click **Add file** → **Upload files**.
-3. Open the parent location of your project folder in File Explorer.
-4. Drag the **complete project folder**—not only the files inside it—into GitHub’s upload area.
-5. Wait until all the files appear in the upload list.
+## 🎯 Project Overview
 
-Modern browsers such as Google Chrome and Microsoft Edge generally preserve the folder structure during upload.
+This is an advanced **automation tool** designed specifically for **Chartered Accountants (CAs)** to streamline the process of:
 
-### Option B: Create the Folder Using a File Path
+- ✅ Generating **Stock Statements** 
+- ✅ Creating **Drawing Power Certificates**
+- ✅ Automating **ICAI UDIN** (Unique Document Identification Number) certificate registration
+- ✅ Managing multiple **bank clients** and financial data
+- ✅ Auto-filling **ICAI forms** with UDIN integration
 
-1. Open your fork of the repository.
-2. Click **Add file** → **Create new file**.
-3. In the filename box, enter:
+### 🌟 Key Features
 
-   ```text
-   MyProjectName/README.md
-   ```
+| Feature | Description |
+|---------|-------------|
+| **Browser Automation** | Uses Selenium + Microsoft Edge for ICAI website automation |
+| **Data Management** | JSON-based storage for clients, debtors, creditors, and stock information |
+| **UDIN Integration** | Automated UDIN certificate generation and submission to ICAI portal |
+| **Multi-Client Support** | Manage multiple clients with different banks and credit limits |
+| **CA Profile Storage** | Secure storage of CA credentials (ICAI username, FRN, membership details) |
+| **Form Recording** | Records user steps for debugging and process optimization |
+| **HTML Interface** | User-friendly web-based interface for data entry |
+| **Batch Processing** | Process multiple certificates in one session |
 
-   Typing `/` in the filename automatically creates the folder.
+---
 
-4. Add a short description of your project to the new `README.md` file.
-5. Click **Commit changes**.
-6. Open the newly created folder.
-7. Click **Add file** → **Upload files** and upload the remaining project files.
+## 🛠️ Tech Stack
 
-Replace `MyProjectName` with the name of your project.
+- **Backend**: Python 3 with Selenium WebDriver
+- **Frontend**: HTML5 + Angular (ng-select for dropdowns)
+- **Data Storage**: JSON files (structured data format)
+- **Browser Automation**: Microsoft Edge WebDriver
+- **Platform**: Windows (.bat files for execution)
 
-## Step 3: Commit the Upload
+---
 
-1. Scroll down to the **Commit changes** section.
-2. Enter a clear commit message, for example:
+## 📋 Prerequisites
 
-   ```text
-   Add <Your Name> - <Project Name> project folder
-   ```
+### System Requirements
+- Windows 10 or higher
+- Python 3.7+
+- Microsoft Edge browser
+- Internet connection (for ICAI portal access)
 
-3. Keep **Commit directly to the main branch** selected.
-4. Click **Commit changes**.
+### Software Dependencies
+- **Python Libraries**: 
+  - `selenium` (for browser automation)
+  - Additional dependencies auto-installed on first run
 
-Because this is your personal fork, committing directly to its `main` branch is acceptable for this submission workflow.
+### ICAI Credentials Required
+- ICAI Member Username (Email format: `MEMBERSHIP_NO@icai.org`)
+- ICAI Portal Password
+- Firm Registration Number (FRN)
+- CA Membership Number
 
-## Step 4: Open a Pull Request
+---
 
-1. Return to the main page of your fork.
-2. GitHub may display a banner stating:
+## 📦 Project Structure
 
-   ```text
-   This branch is X commits ahead of aiinicai:main
-   ```
+```
+Stock Statement UDIN Automation/
+│
+├── RUN_STOCK_STATEMENT_UDIN_V21_FIXED.py      # Main automation script
+├── Stock_Statement_Drawing_Power_UDIN_Integrated_v20.html  # UI Interface
+├── RUN_STOCK_STATEMENT_UDIN_V21.bat            # Batch file to run tool
+├── RECORD_ICAI_STEPS.bat                       # Batch file to record steps
+│
+├── StockStatementData/                         # Data folder (created automatically)
+│   ├── clients.json                            # Client master data
+│   ├── debtors.json                            # Sundry Debtors list
+│   ├── creditors.json                          # Sundry Creditors list
+│   ├── stock.json                              # Stock information
+│   ├── profiles.json                           # CA profile & credentials
+│   ├── stock-statement_*.json                  # Form state backups
+│   └── recordings/                             # Step recordings
+│
+├── README.md                                   # This file
+├── DOCUMENTATION.md                            # Detailed process guide
+└── DATA_STRUCTURE.md                           # Data format reference
 
-3. Click **Contribute** → **Open pull request**.
+```
 
-Alternatively:
+---
 
-1. Open the **Pull requests** tab.
-2. Click **New pull request**.
+## 🚀 Installation & Setup
 
-Before creating the Pull Request, confirm the following direction:
+### Step 1: Download Python
+1. Visit https://www.python.org/
+2. Download **Python 3.9 or higher**
+3. During installation, **TICK the checkbox** "Add Python to PATH"
+4. Click Install
 
-| Setting | Selection |
-| --- | --- |
-| Base repository | `aiinicai/AICA-Level-2-Projects` |
-| Base branch | `main` |
-| Head repository | `YOUR-USERNAME/AICA-Level-2-Projects` |
-| Compare branch | `main` |
+### Step 2: Extract Project Files
+- Extract all project files to a folder (e.g., `C:\StockStatementTool\`)
+- Keep all files together in the same folder
 
-Then:
-
-1. Enter a clear Pull Request title, for example:
-
-   ```text
-   Add AICA Level 2 Project - <Your Name>
-   ```
-
-2. In the description, briefly explain:
-   - The purpose of your project.
-   - Its main features.
-   - Any setup or usage instructions.
-3. Click **Create pull request**.
-
-## Step 5: Wait for Review and Merge
-
-The owner of the `aiinicai/AICA-Level-2-Projects` repository will receive your Pull Request.
-
-The repository owner may:
-
-- Review your project.
-- Ask questions.
-- Suggest changes.
-- Approve and merge the Pull Request.
-
-If changes are requested, update the files in your fork and commit them. Your existing Pull Request will update automatically.
+### Step 3: Prepare Your Data
+- Edit `StockStatementData/profiles.json` with your CA credentials
+- Add your clients in `StockStatementData/clients.json`
+- Update debtors and creditors data as needed
 
 After the Pull Request is merged, your project folder will become part of the official repository.
 Users can either drag files into the drop area or click to browse.
@@ -173,103 +187,160 @@ Users can either drag files into the drop area or click to browse.
 8. Parse the decoded QR text.
 9. Display one result row per scanned page/file.
 10. Export all found QR data to `qr-invoice-data.xlsx`.
+### Step 4: First Run
+- Double-click `RUN_STOCK_STATEMENT_UDIN_V21.bat`
+- The tool will:
+  1. Check for Python installation
+  2. Install Selenium (if not present)
+  3. Open the HTML interface
+  4. Launch Microsoft Edge for ICAI automation
 
 ## QR Parsing
 
-# Method 2: Git Command Line
+## 💻 Usage Guide
 
-This method is recommended when:
-
-- Your project contains many files.
-- You want to upload the complete folder structure reliably.
-- You are comfortable using Git commands.
-
-## Prerequisites
-
-Before beginning:
-
-- Install [Git](https://git-scm.com/downloads).
-- Create or log in to your GitHub account.
-- Fork the [AICA-Level-2-Projects repository](https://github.com/aiinicai/AICA-Level-2-Projects) as explained in Method 1.
-
-## Step 1: Clone Your Fork
-
-Open Terminal, Command Prompt, PowerShell, or Git Bash and run:
+### Running the Tool
 
 ```bash
-git clone https://github.com/YOUR-USERNAME/AICA-Level-2-Projects.git
+# Run the main application
+RUN_STOCK_STATEMENT_UDIN_V21.bat
+
+# Record ICAI steps for debugging
+RECORD_ICAI_STEPS.bat
 ```
 
-Then open the cloned repository:
+### Workflow
 
+1. **Launch Tool**: Double-click `.bat` file
+2. **Select CA Profile**: Choose from saved profiles (picks your CA credentials)
+3. **Enter Client Details**: 
+   - Select client name
+   - Enter statement date
+   - Choose certificate type (Stock Statement, Drawing Power, etc.)
+4. **Add Figures**:
+   - Sundry Debtors amount
+   - Stock value
+   - Sundry Creditors amount
+5. **Auto-Fill ICAI Form**: Tool automatically fills the ICAI portal
+6. **Enter CAPTCHA**: Manually enter CAPTCHA (shown in HTML interface, not Edge window)
+7. **Generate UDIN**: Submit and receive UDIN from ICAI
+8. **Save Certificate**: Download and store UDIN certificate
+
+---
+
+## 📊 Data Files Explained
+
+### `clients.json`
+Stores master client data with bank and credit details.
+
+**Fields**:
+- `name`: Company/Borrower name
+- `pan`: PAN number (10 characters)
+- `address`: Complete address
+- `gst`: GSTIN (15 characters)
+- `bank`: Bank name (e.g., "State Bank of India")
+- `branch`: Branch name
+- `loanAccountNo`: Loan/CC Account number
+- `sanctionLimit`: Credit limit in rupees
+
+### `debtors.json` / `creditors.json` / `stock.json`
+PDF backup of financial statements (base64 encoded).
+
+### `profiles.json`
+CA credentials and firm information.
+
+**Fields**:
+- `id`: Unique profile ID
+- `label`: Display name
+- `icaiUsername`: ICAI login (format: `MEMBERSHIP_NO@icai.org`)
+- `icaiPassword`: ICAI portal password
+- `firmName`: Registered firm name
+- `caName`: CA's full name
+- `membershipNo`: ICAI membership number
+- `frn`: Firm Registration Number
+- `certificatePlace`: Signing location (usually city name)
+
+---
+
+## 🔧 Troubleshooting
+
+### Issue: Python not found
+**Solution**: Reinstall Python and tick "Add Python to PATH"
+
+### Issue: Selenium not installing
+**Solution**: Open Command Prompt as Administrator and run:
 ```bash
-cd AICA-Level-2-Projects
+python -m pip install --upgrade selenium
 ```
 
-Replace `YOUR-USERNAME` with your GitHub username.
+### Issue: CAPTCHA auto-fill fails
+**Check**: Look at `udin_autofill_debug.png` in the project folder for debugging screenshot
 
-## Step 2: Copy Your Project Folder
+### Issue: ICAI login fails
+**Check**: 
+- Verify username format: `MEMBERSHIP_NO@icai.org`
+- Confirm password is correct
+- Check ICAI website is accessible: https://udin.icai.org/ICAI/login
 
-Copy your complete project folder into the cloned `AICA-Level-2-Projects` directory.
+### Issue: Form doesn't auto-fill
+**Solution**: Run `RECORD_ICAI_STEPS.bat` to record new steps for your workflow
 
-Recommended folder naming format:
+---
 
-```text
-YourName-ProjectName/
-```
+## 📁 File Locations & Portability
 
-Example:
+**Important**: Your data is saved in the `StockStatementData` folder next to this tool.
 
-```text
-Rahul-Sharma-AI-Invoice-Analyzer/
-```
+To move the tool to another computer:
+1. Copy the entire project folder
+2. The `StockStatementData` folder moves with it
+3. All your client data, profiles, and settings come along
 
-## Step 3: Review the Changes
+---
 
-Run:
+## 🔐 Security Notes
 
-```bash
-git status
-```
+⚠️ **Be Careful**:
+- `profiles.json` contains your ICAI credentials in **plain text**
+- Keep this file **SECURE** and **BACKED UP**
+- Never share this file with unauthorized persons
+- Consider encrypting sensitive data in production use
 
-Confirm that Git lists only the files and folders you intend to submit.
+---
 
-## Step 4: Stage and Commit the Project
+## 📌 ICAI Compliance
 
-Stage your project folder:
+✅ This tool is designed to assist CAs in compliance with:
+- ICAI guidelines for UDIN (Unique Document Identification Number)
+- Stock Statement audit requirements
+- Drawing Power Certificate generation
+- Banking regulations for credit audits
 
-```bash
-git add YourName-ProjectName/
-```
+⚠️ **Disclaimer**: This tool is a **helper application**. Final certificate submission and UDIN generation happens through the **official ICAI portal**. CAs remain responsible for all submitted documents.
 
-Commit the changes:
+---
 
-```bash
-git commit -m "Add <Your Name> - <Project Name> project folder"
-```
+## 🎓 For Beginners (Step-by-Step)
 
-## Step 5: Push the Changes to Your Fork
+If you're new to this tool, follow these steps:
 
-Run:
+1. Read `DOCUMENTATION.md` (detailed process guide)
+2. Check `DATA_STRUCTURE.md` (understand your data format)
+3. Run the tool with test client first
+4. Refer to troubleshooting section if any issue
 
-```bash
-git push origin main
-```
+---
 
-Your project folder will now appear in your fork on GitHub.
+## 🤝 Support & Maintenance
 
-## Step 6: Open a Pull Request
+For technical issues:
+- Check the `udin_autofill_debug.png` screenshot
+- Review step recordings in `StockStatementData/recordings/`
+- Run `RECORD_ICAI_STEPS.bat` to capture your specific workflow
 
-1. Open your fork on GitHub.
-2. Click **Contribute** → **Open pull request**.
-3. Confirm the base and compare repositories:
+---
 
-| Setting | Selection |
-| --- | --- |
-| Base repository | `aiinicai/AICA-Level-2-Projects` |
-| Base branch | `main` |
-| Head repository | `YOUR-USERNAME/AICA-Level-2-Projects` |
-| Compare branch | `main` |
+## 📝 Version Info
 
 4. Add a clear title and project description.
 5. Click **Create pull request**.
@@ -280,23 +351,33 @@ The parser recognizes the following formats:
 A three-part token whose first part matches the expected base64url-safe pattern is treated as a signed e-invoice QR.
 
 The payload is base64url-decoded, parsed as JSON, and—when a `data` property contains a string—parsed again.
+- **Tool Version**: V21 (Fixed)
+- **Last Updated**: August 2026
+- **Python Requirement**: 3.7+
+- **Selenium Version**: Latest (auto-updated)
 
 Common fields are given friendly labels:
 
-## Before Submitting
+## ✨ Features Roadmap
 
-Please verify the following:
+Future enhancements:
+- [ ] Batch UDIN generation for multiple clients
+- [ ] Excel import/export for client data
+- [ ] PDF certificate download automation
+- [ ] Email notification system
+- [ ] Data encryption for credentials
+- [ ] Web-based interface (non-browser dependent)
 
-- Your complete project is inside one clearly named folder.
-- Your folder includes a `README.md` explaining the project.
-- The project does not contain passwords, API keys, access tokens, or other confidential information.
-- Unnecessary generated files and dependency folders are excluded where applicable.
-- The project opens or runs using the instructions included in its `README.md`.
-- Your Pull Request targets `aiinicai/AICA-Level-2-Projects` on the `main` branch.
+---
 
-## Need to Update Your Submission?
+## 📞 Contact & Credits
 
-If your Pull Request is still open, make the required changes in the same fork and branch, then commit and push them. GitHub will automatically add the new commits to the existing Pull Request.
+**Developer**: Atul Talaviya (CA, ICAI Member #159692)  
+**Firm**: Shapy & Associates  
+**ICAI FRN**: 124286W  
+**Tool Purpose**: AICA Level 2 Capstone Project  
+
+---
 
 | Source key | Display label |
 |---|---|
@@ -450,3 +531,5 @@ Successful scans are displayed in the table with:
 - Parsed fields
 
 The complete decoded QR payload is retained as `Raw QR Data` for Excel export.
+**Last Modified**: August 26, 2026  
+**Status**: ✅ Production Ready
