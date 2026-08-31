@@ -1,0 +1,29 @@
+# Project TODO
+
+- [x] Create the INNFLOW owner/manager command-centre dashboard with operational and financial visibility.
+- [x] Create bottom-tab navigation for Home, Operations, Approvals, Messages, and More.
+- [x] Create a universal evidence-centric record detail experience with IDs, status, ownership, attachments, linked records, and audit events.
+- [x] Implement local-first record creation for service requests, maintenance issues, purchase requisitions, incidents, and tasks.
+- [x] Implement operations queues for rooms, guest care, maintenance, and stores with status changes and assignment.
+- [x] Implement a maker-checker approval inbox with approve/reject decisions, reason capture, and a recorded audit event.
+- [x] Implement departmental messages and conversion of a message into a formal work item.
+- [x] Implement searchable audit history and management oversight views.
+- [x] Implement local persistence and an offline/queued-sync status indicator.
+- [x] Add high-value alert, complaint, maintenance, stock, and compliance exception indicators.
+- [x] Apply INNFLOW brand colours, iOS-oriented spacing, status semantics, and accessibility labels.
+- [x] Generate and configure the custom INNFLOW icon across iOS, Android, splash, favicon, and app metadata.
+- [x] Add deterministic tests for core record, approval, and activity behaviours.
+- [x] Validate the TypeScript build and key user flows.
+- [x] Add the mobile-first India-ready ERP cockpit with local inventory, requisitions, purchase orders, receiving, stock counts, booking demand, guest preference briefs, finance matching, feature flags, and explainable recommendations.
+- [x] Add searchable reservations and guest lifecycle stages linked to booking demand, next actions, payment state, and consent-aware preference briefs.
+- [x] Add property setup controls for property identity, GSTIN/PAN, financial year, invoice numbering, day-end close, approval limits, templates, and operating areas.
+- [x] Add a feature-impact map and safe local migration notes for the master implementation prompt.
+- [ ] Design the future secure backend, property/department RBAC, integration, and master-data foundations.
+- [ ] Design the future full finance, procurement, inventory, HR, front office, housekeeping, F&B, engineering, security, sales, compliance, audit, guest portal, vendor portal, and web administration modules.
+- [x] Add camera photo capture and barcode scanning to formal evidence capture.
+- [x] Add a simulated sign-in flow with role, property, department, and permission-aware actions.
+- [x] Add realistic mock PMS and POS feeds to populate hotel operations queues and reporting views.
+- [x] Add “Developed and rights reserved with CA Ankit Tandon” ownership attribution in the mobile and web experiences.
+- [x] Add a web-based administration workspace for operational records, role oversight, and data review.
+- [x] Implement a layered security baseline with secure session simulation, authorization checks, audit events, security headers, input validation, and documented production controls.
+- [x] Add tests for authorization, evidence capture state, and mock PMS/POS data transformations.

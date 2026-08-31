@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sign in — HARSH's RestroReco</title>
+    <link rel="icon" type="image/png" href="/static/img/hsa-logo.png">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,400;0,14..32,500;0,14..32,600;0,14..32,700;0,14..32,800&family=Playfair+Display:wght@700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/css/style.css?v=fresh16">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <style>
+        html, body.login-body {
+            min-height: 100vh;
+            margin: 0;
+        }
+        body.login-body {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: auto;
+            font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+            background: #1c2433;
+        }
+        body.login-body::before {
+            content: "";
+            position: fixed;
+            inset: 0;
+            background: url("/static/img/login-scene.jpg") center / cover no-repeat;
+            z-index: 0;
+        }
+        body.login-body::after {
+            content: "";
+            position: fixed;
+            inset: 0;
+            background: linear-gradient(180deg, rgba(11, 31, 68, 0.22), rgba(247, 248, 250, 0.38));
+            z-index: 0;
+        }
+        .login-card {
+            width: 100%;
+            max-width: 420px;
+            margin: 1.5rem;
+            background: rgba(255, 255, 255, 0.96);
+            border: 1px solid rgba(255, 255, 255, 0.7);
+            border-radius: 18px;
+            padding: 1.85rem 1.8rem 1.3rem;
+            box-shadow: 0 22px 44px -20px rgba(15, 23, 42, 0.38);
+            position: relative;
+            z-index: 1;
+        }
+        .login-logo {
+            display: block;
+            width: 168px !important;
+            height: auto !important;
+            max-width: 70% !important;
+            max-height: none !important;
+            margin: 0 auto 0.95rem;
+            object-fit: contain;
+        }
+        .login-name { text-align: center; margin-bottom: 1.35rem; }
+        .login-name strong {
+            display: block;
+            font-family: "Playfair Display", Georgia, serif;
+            font-size: 2.15rem;
+            font-weight: 800;
+            letter-spacing: 0.01em;
+            color: #0b1f44;
+            line-height: 1;
+        }
+        .login-name span {
+            display: block;
+            margin-top: 0.28rem;
+            font-size: 1.02rem;
+            font-weight: 700;
+            letter-spacing: 0.14em;
+            text-transform: uppercase;
+            color: #8a8174;
+        }
+        .login-form { display: flex; flex-direction: column; gap: 1rem; }
+        .btn-block { width: 100%; padding: 0.8rem; font-size: 0.95rem; margin-top: 0.2rem; }
+        .login-foot {
+            margin-top: 1.15rem;
+            text-align: center;
+            color: #64748b;
+            font-size: 0.72rem;
+            line-height: 1.45;
+        }
+    </style>
+</head>
+<body class="login-body">
+    <div class="login-card">
+        <img class="login-logo" src="/static/img/hsa-logo.png" alt="Harsh Singhal &amp; Associates">
+        <div class="login-name">
+            <strong>HARSH's</strong>
+            <span>RestroReco</span>
+        </div>
+        <form class="login-form" id="loginForm" onsubmit="handleLogin(event)">
+            <div class="form-group">
+                <label class="form-label">Client</label>
+                <select id="loginClient" class="form-select"></select>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Username</label>
+                <input type="text" id="email" class="form-control" placeholder="Username" required autocomplete="username">
+            </div>
+            <div class="form-group">
+                <label class="form-label">Password</label>
+                <input type="password" id="password" class="form-control" placeholder="Password" required autocomplete="current-password">
+            </div>
+            <button type="submit" class="btn btn-primary btn-block"><i class="fa-solid fa-right-to-bracket"></i> Sign In</button>
+        </form>
+        <p class="login-foot">This Software is property of Harsh Singhal &amp; Associates©2026. All Rights Reserved.</p>
+    </div>
+    <script src="/static/js/app.js"></script>
+    <script>
+        async function loadLoginClients() {
+            const select = document.getElementById('loginClient');
+            if (!select) return;
+            try {
+                const data = await fetch('/api/clients').then((r) => r.json());
+                const clients = data.clients || [];
+                select.innerHTML = clients.map((c) =>
+                    `<option value="${c.id}" ${c.is_active ? 'selected' : ''}>${c.name}</option>`
+                ).join('') || '<option value="">Default Client</option>';
+            } catch (err) {
+                select.innerHTML = '<option value="">Default Client</option>';
+            }
+        }
+        async function handleLogin(event) {
+            event.preventDefault();
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            const clientId = document.getElementById('loginClient').value;
+            try {
+                if (clientId) {
+                    await fetch('/api/clients/select', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ id: clientId }),
+                    });
+                }
+                const res = await apiFetch('/api/auth/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email, password })
+                });
+                if (res && res.access_token) {
+                    showToast('Login successful! Redirecting...', 'success');
+                    setTimeout(() => window.location.href = '/dashboard', 600);
+                }
+            } catch (err) {
+                console.error(err);
+            }
+        }
+        document.addEventListener('DOMContentLoaded', loadLoginClients);
+    </script>
+</body>
+</html>

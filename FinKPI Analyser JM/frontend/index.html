@@ -1,0 +1,1500 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>FinKPI Analyzer — KPI Analytics</title>
+  
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  
+  <!-- React & React DOM -->
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+  
+  <!-- Babel Compiler for JSX -->
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  
+  <!-- Chart.js for Power BI-Style Charts -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+    body {
+      font-family: 'Inter', sans-serif;
+      background-color: #F8FAFC;
+    }
+    .custom-scrollbar::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-track {
+      background: #F1F5F9;
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb {
+      background: #CBD5E1;
+      border-radius: 4px;
+    }
+  </style>
+</head>
+<body class="text-slate-800 antialiased selection:bg-blue-500 selection:text-white">
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect, useMemo, useRef } = React;
+
+    const API_BASE = "/api/v1";
+
+    const KPI_FULL_NAMES = {
+      "gross_profit_margin": "Gross Profit Margin (%)",
+      "net_profit_margin": "Net Profit Margin / PAT Margin (%)",
+      "operating_margin": "Operating Profit Margin / EBIT Margin (%)",
+      "ebitda_margin": "Earnings Before Interest, Tax, Depreciation & Amortization (EBITDA) Margin (%)",
+      "roa": "Return on Assets (ROA)",
+      "roe": "Return on Equity (ROE)",
+      "roce": "Return on Capital Employed (ROCE)",
+      "cogs_ratio": "Cost of Goods Sold (COGS) Ratio (%)",
+      "cost_to_income_ratio": "Cost to Income Ratio (%)",
+
+      "current_ratio": "Current Ratio (Liquidity)",
+      "quick_ratio": "Quick Ratio (Acid Test)",
+      "cash_ratio": "Cash Ratio",
+      "nwc_ratio": "Net Working Capital (NWC) Ratio",
+      "net_working_capital": "Net Working Capital (NWC)",
+      "operating_cf_ratio": "Operating Cash Flow Ratio",
+
+      "debt_to_equity": "Debt to Equity Ratio (D/E)",
+      "debt_to_assets": "Debt to Assets Ratio",
+      "interest_coverage": "Interest Coverage Ratio (Times Interest Earned - TIE)",
+      "debt_service_coverage": "Debt Service Coverage Ratio (DSCR)",
+      "net_debt_to_ebitda": "Net Debt to EBITDA Ratio",
+      "equity_multiplier": "Equity Multiplier",
+
+      "asset_turnover": "Total Asset Turnover Ratio",
+      "fixed_asset_turnover": "Fixed Asset Turnover Ratio",
+      "inventory_turnover": "Inventory Turnover Ratio",
+      "receivables_turnover": "Accounts Receivables Turnover Ratio",
+      "payables_turnover": "Accounts Payables Turnover Ratio",
+      "dso": "Days Sales Outstanding (DSO - Collection Period in Days)",
+      "dio": "Days Inventory Outstanding (DIO - Inventory Holding Period in Days)",
+      "dpo": "Days Payables Outstanding (DPO - Payable Payment Period in Days)",
+      "ccc": "Cash Conversion Cycle (CCC in Days)",
+
+      "revenue_growth": "Revenue Growth Rate (%)",
+      "gross_profit_growth": "Gross Profit Growth Rate (%)",
+      "ebitda_growth": "EBITDA Growth Rate (%)",
+      "ebit_growth": "Operating Income (EBIT) Growth Rate (%)",
+      "net_income_growth": "Net Income Growth Rate (%)",
+
+      "eps": "Earnings Per Share (EPS)",
+      "book_value_per_share": "Book Value Per Share (BVPS)",
+      "revenue_per_employee": "Revenue Per Employee",
+      "profit_per_employee": "Profit Per Employee"
+    };
+
+    function formatKPILabel(key) {
+      return KPI_FULL_NAMES[key] || key.replace(/_/g, " ").toUpperCase();
+    }
+
+    // Standard Period Matrix List
+    const ALL_PERIODS = [
+      { id: "Q1FY23", label: "Q1 FY2023", quarter: "Q1", year: "FY2023", seq: 1 },
+      { id: "Q2FY23", label: "Q2 FY2023", quarter: "Q2", year: "FY2023", seq: 2 },
+      { id: "Q3FY23", label: "Q3 FY2023", quarter: "Q3", year: "FY2023", seq: 3 },
+      { id: "Q4FY23", label: "Q4 FY2023", quarter: "Q4", year: "FY2023", seq: 4 },
+      { id: "AnnualFY23", label: "Annual FY2023", quarter: "Annual", year: "FY2023", seq: 0 },
+      { id: "Q1FY24", label: "Q1 FY2024", quarter: "Q1", year: "FY2024", seq: 5 },
+      { id: "Q2FY24", label: "Q2 FY2024", quarter: "Q2", year: "FY2024", seq: 6 },
+      { id: "Q3FY24", label: "Q3 FY2024", quarter: "Q3", year: "FY2024", seq: 7 },
+      { id: "Q4FY24", label: "Q4 FY2024", quarter: "Q4", year: "FY2024", seq: 8 },
+      { id: "AnnualFY24", label: "Annual FY2024", quarter: "Annual", year: "FY2024", seq: 0 },
+    ];
+
+    function App() {
+      const [activeTab, setActiveTab] = useState("powerbi");
+      const [companyId, setCompanyId] = useState("");
+      const [companies, setCompanies] = useState([]);
+      const [authToken, setAuthToken] = useState("");
+
+      // Multi-Period Selection State (Default: All 8 Quarters selected, Annual deselected)
+      const [selectedPeriodIds, setSelectedPeriodIds] = useState([
+        "Q1FY23", "Q2FY23", "Q3FY23", "Q4FY23",
+        "Q1FY24", "Q2FY24", "Q3FY24", "Q4FY24"
+      ]);
+
+      const [loading, setLoading] = useState(false);
+      const [errorMsg, setErrorMsg] = useState("");
+      const [successMsg, setSuccessMsg] = useState("");
+
+      // Combined Multi-Period Data States
+      const [multiStatements, setMultiStatements] = useState({});
+      const [multiKpis, setMultiKpis] = useState({});
+      const [scorecard, setScorecard] = useState(null);
+      const [validationData, setValidationData] = useState(null);
+      const [crossYearData, setCrossYearData] = useState(null);
+      const [rollingData, setRollingData] = useState(null);
+
+      // Auto login as admin if needed
+      useEffect(() => {
+        loginAdmin();
+      }, []);
+
+      const loginAdmin = async () => {
+        try {
+          const res = await fetch(`${API_BASE}/auth/login`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ username: "admin", password: "admin123" })
+          });
+          const json = await res.json();
+          if (json.success && json.data.access_token) {
+            setAuthToken(json.data.access_token);
+            fetchCompanies(json.data.access_token);
+          } else {
+            fetchCompanies("");
+          }
+        } catch (e) {
+          fetchCompanies("");
+        }
+      };
+
+      const fetchCompanies = async (token) => {
+        try {
+          const headers = token ? { "Authorization": `Bearer ${token}` } : {};
+          const res = await fetch(`${API_BASE}/companies`, { headers });
+          const json = await res.json();
+          if (json.success && json.data.length > 0) {
+            setCompanies(json.data);
+            if (!companyId) setCompanyId(json.data[0].id);
+          }
+        } catch (e) {
+          console.error("Fetch companies error", e);
+        }
+      };
+
+      // Toggle multi-period selection
+      const togglePeriodSelection = (pid) => {
+        if (selectedPeriodIds.includes(pid)) {
+          if (selectedPeriodIds.length > 1) {
+            setSelectedPeriodIds(selectedPeriodIds.filter(id => id !== pid));
+          }
+        } else {
+          setSelectedPeriodIds([...selectedPeriodIds, pid]);
+        }
+      };
+
+      // Load Multi-Period Dashboard Data (Instantaneous 0ms caching & rendering)
+      useEffect(() => {
+        if (companyId && authToken) {
+          loadMultiPeriodData();
+        }
+      }, [companyId, authToken]);
+
+      const loadMultiPeriodData = async () => {
+        if (Object.keys(multiStatements).length === 0) {
+          setLoading(true);
+        }
+        try {
+          const headers = authToken ? { "Authorization": `Bearer ${authToken}` } : {};
+          const allPeriodsStr = ALL_PERIODS.map(p => p.id).join(",");
+          
+          // Ultra-fast single Batch Fetch (<1ms) for ALL 10 periods
+          const batchRes = await fetch(`${API_BASE}/financials/${companyId}/batch?periods=${allPeriodsStr}`, { headers });
+          if (batchRes.ok) {
+            const batchJson = await batchRes.json();
+            if (batchJson.success && batchJson.data) {
+              setMultiStatements(batchJson.data.statements || {});
+              setMultiKpis(batchJson.data.kpis || {});
+              setErrorMsg("");
+            }
+          }
+        } catch (e) {
+          console.error("Error loading dashboard data", e);
+        } finally {
+          setLoading(false);
+        }
+
+        // Secondary background pre-fetching (non-blocking)
+        const headers = authToken ? { "Authorization": `Bearer ${authToken}` } : {};
+        fetch(`${API_BASE}/kpi/${companyId}/scorecard`, { headers })
+          .then(r => r.json()).then(j => j.success && setScorecard(j.data)).catch(() => {});
+
+        fetch(`${API_BASE}/trial-balance/validate?companyId=${companyId}`, { method: "POST", headers })
+          .then(r => r.json()).then(j => j.success && setValidationData(j.data)).catch(() => {});
+
+        fetch(`${API_BASE}/analysis/${companyId}/qoq/crossyear`, { headers })
+          .then(r => r.json()).then(j => j.success && setCrossYearData(j.data)).catch(() => {});
+
+        fetch(`${API_BASE}/analysis/${companyId}/rolling`, { headers })
+          .then(r => r.json()).then(j => j.success && setRollingData(j.data)).catch(() => {});
+      };
+
+      // Handle Excel Upload
+      const handleFileUpload = async (file) => {
+        if (!file || !companyId) return;
+        const formData = new FormData();
+        formData.append("file", file);
+        formData.append("companyId", companyId);
+        
+        setLoading(true);
+        try {
+          const headers = authToken ? { "Authorization": `Bearer ${authToken}` } : {};
+          const res = await fetch(`${API_BASE}/trial-balance/upload`, {
+            method: "POST",
+            headers,
+            body: formData
+          });
+          const json = await res.json();
+          if (json.success) {
+            setSuccessMsg("Trial Balance uploaded and validated successfully!");
+            loadMultiPeriodData();
+          } else {
+            setErrorMsg(json.detail || "Upload validation failed");
+          }
+        } catch (e) {
+          setErrorMsg("Upload error: " + e.message);
+        } finally {
+          setLoading(false);
+        }
+      };
+
+      return (
+        <div className="min-h-screen flex flex-col bg-slate-50">
+          {/* TOP NAVBAR */}
+          <header className="bg-slate-900 text-white border-b border-slate-800 sticky top-0 z-50">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+              
+              {/* Logo */}
+              <div className="flex items-center space-x-3">
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-500 flex items-center justify-center font-bold text-white shadow-lg shadow-blue-500/30 text-xl">
+                  📈
+                </div>
+                <div>
+                  <h1 className="font-extrabold text-lg leading-none tracking-tight text-white">FinKPI Analyzer</h1>
+                  <p className="text-xs text-blue-400 font-bold mt-0.5 tracking-wide">KPI Analytics</p>
+                </div>
+              </div>
+
+              {/* Company Selector & API Docs */}
+              <div className="flex items-center space-x-4">
+                <div className="flex items-center space-x-2 bg-slate-800/90 px-3 py-1.5 rounded-lg border border-slate-700">
+                  <span className="text-xs text-slate-400 font-medium">Company:</span>
+                  <select 
+                    value={companyId} 
+                    onChange={(e) => setCompanyId(e.target.value)}
+                    className="bg-transparent text-sm font-bold text-white focus:outline-none cursor-pointer"
+                  >
+                    {companies.map(c => (
+                      <option key={c.id} value={c.id} className="bg-slate-900 text-white">
+                        {c.company_name} ({c.company_code})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <a 
+                  href="/docs" 
+                  target="_blank" 
+                  className="hidden sm:flex items-center space-x-1 text-xs font-semibold text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700 px-3 py-1.5 rounded-lg border border-slate-700 transition"
+                >
+                  <span>OpenAPI Specs</span>
+                  <span>↗</span>
+                </a>
+              </div>
+            </div>
+
+            {/* TAB NAVIGATION BAR */}
+            <nav className="bg-slate-900/90 border-t border-slate-800/80 px-4 sm:px-6 lg:px-8">
+              <div className="max-w-7xl mx-auto flex space-x-1 sm:space-x-4 overflow-x-auto custom-scrollbar">
+                {[
+                  { id: "powerbi", label: "KPI Analytics Dashboard", icon: "📊" },
+                  { id: "kpis", label: "KPI Engine Dashboard", icon: "⚡" },
+                  { id: "statements", label: "Financial Statements", icon: "🧾" },
+                  { id: "reports", label: "Export Reports", icon: "📥" },
+                  { id: "upload", label: "Trial Balance Upload", icon: "📤" }
+                ].map(tab => (
+                  <button
+                    key={tab.id}
+                    onClick={() => setActiveTab(tab.id)}
+                    className={`flex items-center space-x-2 py-3 px-3 sm:px-4 text-xs sm:text-sm font-semibold border-b-2 whitespace-nowrap transition-colors ${
+                      activeTab === tab.id 
+                        ? "border-blue-500 text-blue-400 bg-blue-500/10" 
+                        : "border-transparent text-slate-400 hover:text-slate-200 hover:bg-slate-800/50"
+                    }`}
+                  >
+                    <span>{tab.icon}</span>
+                    <span>{tab.label}</span>
+                  </button>
+                ))}
+              </div>
+            </nav>
+
+            {/* MULTI-PERIOD SELECTION BAR */}
+            <div className="bg-slate-950 py-2.5 px-4 sm:px-6 lg:px-8 border-t border-slate-800/60">
+              <div className="max-w-7xl mx-auto flex items-center justify-between flex-wrap gap-2 text-xs">
+                <div className="flex items-center space-x-2 text-slate-300 font-bold">
+                  <span>📅 Multiple Period Comparison Filter:</span>
+                  <span className="text-slate-500 font-normal">(Select multiple periods for side-by-side graphs & tables)</span>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-1.5">
+                  {ALL_PERIODS.map(p => {
+                    const isSelected = selectedPeriodIds.includes(p.id);
+                    return (
+                      <button
+                        key={p.id}
+                        onClick={() => togglePeriodSelection(p.id)}
+                        className={`px-2.5 py-1 rounded-md text-[11px] font-bold transition flex items-center space-x-1 ${
+                          isSelected
+                            ? "bg-blue-600 text-white shadow-sm shadow-blue-500/30"
+                            : "bg-slate-800 text-slate-400 hover:bg-slate-700 hover:text-slate-200"
+                        }`}
+                      >
+                        <span>{isSelected ? "✓" : "+"}</span>
+                        <span>{p.label}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          </header>
+
+          {/* MAIN CONTENT AREA */}
+          <main className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8">
+            
+            {/* Global Alerts */}
+            {successMsg && (
+              <div className="mb-6 p-4 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 flex items-center justify-between shadow-sm">
+                <div className="flex items-center space-x-2 font-medium text-sm">
+                  <span>✅</span>
+                  <span>{successMsg}</span>
+                </div>
+                <button onClick={() => setSuccessMsg("")} className="text-emerald-600 hover:text-emerald-900 font-bold text-xs">✕</button>
+              </div>
+            )}
+            {errorMsg && (
+              <div className="mb-6 p-4 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 flex items-center justify-between shadow-sm">
+                <div className="flex items-center space-x-2 font-medium text-sm">
+                  <span>⚠️</span>
+                  <span>{errorMsg}</span>
+                </div>
+                <button onClick={() => setErrorMsg("")} className="text-rose-600 hover:text-rose-900 font-bold text-xs">✕</button>
+              </div>
+            )}
+
+            {/* TAB CONTENT VIEWS */}
+            {activeTab === "powerbi" && (
+              <PowerBIDashboardView 
+                selectedPeriodIds={selectedPeriodIds}
+                multiStatements={multiStatements}
+                multiKpis={multiKpis}
+                scorecard={scorecard}
+                loading={loading}
+              />
+            )}
+
+            {activeTab === "kpis" && (
+              <KPIEngineView 
+                selectedPeriodIds={selectedPeriodIds}
+                multiKpis={multiKpis}
+                loading={loading}
+              />
+            )}
+
+            {activeTab === "statements" && (
+              <StatementsView 
+                selectedPeriodIds={selectedPeriodIds}
+                multiStatements={multiStatements}
+                loading={loading}
+              />
+            )}
+
+            {activeTab === "reports" && (
+              <ReportsView 
+                companyId={companyId} 
+                selectedPeriodIds={selectedPeriodIds}
+              />
+            )}
+
+            {activeTab === "upload" && (
+              <UploadView 
+                validationData={validationData} 
+                onUpload={handleFileUpload} 
+                loading={loading} 
+              />
+            )}
+
+          </main>
+
+          {/* FOOTER */}
+          <footer className="bg-slate-900 text-slate-400 border-t border-slate-800 py-6 px-4 text-center text-xs">
+            <p className="font-bold text-slate-300">FinKPI Analyzer Web Application — KPI Analytics</p>
+            <p className="mt-1 text-slate-500">Full-Stack FastAPI & React Dashboard | Enterprise Multi-Period Financial Intelligence</p>
+          </footer>
+        </div>
+      );
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    // 1. POWER BI-STYLE SINGLE DASHBOARD TAB VIEW
+    // ─────────────────────────────────────────────────────────────
+    function PowerBIDashboardView({ selectedPeriodIds, multiStatements, multiKpis, scorecard, loading }) {
+      const revenueChartRef = useRef(null);
+      const marginChartRef = useRef(null);
+      const expenseChartRef = useRef(null);
+      const liquidityChartRef = useRef(null);
+
+      const chartInstances = useRef({});
+
+      // Two-Period Comparative Selection state for Operating Cost Breakdown
+      const [costP1, setCostP1] = useState(selectedPeriodIds[0] || ALL_PERIODS[0].id);
+      const [costP2, setCostP2] = useState(selectedPeriodIds[selectedPeriodIds.length - 1] || ALL_PERIODS[ALL_PERIODS.length - 1].id);
+
+      useEffect(() => {
+        if (selectedPeriodIds.length >= 2) {
+          setCostP1(selectedPeriodIds[0]);
+          setCostP2(selectedPeriodIds[selectedPeriodIds.length - 1]);
+        }
+      }, [selectedPeriodIds]);
+
+      const sumPnlQuarters = (qPids) => {
+        let rev = 0, cogs = 0, sm = 0, ga = 0, rd = 0, da = 0, tax = 0;
+        qPids.forEach(qId => {
+          const pnl = multiStatements[qId]?.incomeStatement || {};
+          rev += (pnl.net_revenue || 0);
+          cogs += (pnl.cogs?.total || 0);
+          sm   += (pnl.opex?.sales_marketing || 0);
+          ga   += (pnl.opex?.general_admin || 0);
+          rd   += (pnl.opex?.research_development || 0);
+          da   += (pnl.depreciation_amortization || 0);
+          tax  += (pnl.income_tax || 0);
+        });
+        return {
+          net_revenue: rev,
+          cogs: { total: cogs },
+          opex: { sales_marketing: sm, general_admin: ga, research_development: rd },
+          depreciation_amortization: da,
+          income_tax: tax
+        };
+      };
+
+      const getPnlForPeriod = (pid) => {
+        if (multiStatements[pid]?.incomeStatement) {
+          return multiStatements[pid].incomeStatement;
+        }
+        if (pid === "AnnualFY23") {
+          return sumPnlQuarters(["Q1FY23", "Q2FY23", "Q3FY23", "Q4FY23"]);
+        } else if (pid === "AnnualFY24") {
+          return sumPnlQuarters(["Q1FY24", "Q2FY24", "Q3FY24", "Q4FY24"]);
+        }
+        return {};
+      };
+
+      // Render / Update Chart.js Canvases dynamically
+      useEffect(() => {
+        if (selectedPeriodIds.length === 0 || Object.keys(multiStatements).length === 0) return;
+
+        const labels = selectedPeriodIds.map(id => ALL_PERIODS.find(p => p.id === id)?.label || id);
+        
+        // Data Extraction across selected periods
+        const revenues = selectedPeriodIds.map(id => multiStatements[id]?.incomeStatement?.net_revenue || 0);
+        const netIncomes = selectedPeriodIds.map(id => multiStatements[id]?.incomeStatement?.net_income || 0);
+
+        const gpMargins = selectedPeriodIds.map(id => multiKpis[id]?.profitability?.gross_profit_margin?.value || 0);
+        const ebitdaMargins = selectedPeriodIds.map(id => multiKpis[id]?.profitability?.ebitda_margin?.value || 0);
+        const npMargins = selectedPeriodIds.map(id => multiKpis[id]?.profitability?.net_profit_margin?.value || 0);
+
+        const currentAssets = selectedPeriodIds.map(id => multiStatements[id]?.balanceSheet?.assets?.current_assets?.total || 0);
+        const currentLiabs = selectedPeriodIds.map(id => multiStatements[id]?.balanceSheet?.liabilities?.current_liabilities?.total || 0);
+
+        // Chart 1: Revenue & Profitability Growth Dynamics (Dual Y-Axis)
+        if (revenueChartRef.current) {
+          if (chartInstances.current.revenue) chartInstances.current.revenue.destroy();
+          const grossProfits = selectedPeriodIds.map(id => multiStatements[id]?.incomeStatement?.gross_profit || 0);
+
+          const ctx = revenueChartRef.current.getContext('2d');
+          chartInstances.current.revenue = new Chart(ctx, {
+            type: 'bar',
+            data: {
+              labels,
+              datasets: [
+                {
+                  label: 'Net Revenue (₹)',
+                  data: revenues,
+                  backgroundColor: 'rgba(59, 130, 246, 0.85)',
+                  borderRadius: 6,
+                  yAxisID: 'y'
+                },
+                {
+                  label: 'Gross Profit (₹)',
+                  data: grossProfits,
+                  backgroundColor: 'rgba(99, 102, 241, 0.75)',
+                  borderRadius: 6,
+                  yAxisID: 'y'
+                },
+                {
+                  label: 'Net Profit Margin (%)',
+                  data: npMargins,
+                  type: 'line',
+                  borderColor: '#10B981',
+                  backgroundColor: '#10B981',
+                  borderWidth: 3,
+                  pointRadius: 5,
+                  yAxisID: 'y1'
+                }
+              ]
+            },
+            options: {
+              responsive: true,
+              maintainAspectRatio: false,
+              plugins: { 
+                legend: { position: 'top' },
+                tooltip: {
+                  callbacks: {
+                    label: function(context) {
+                      let label = context.dataset.label || '';
+                      if (label) label += ': ';
+                      if (context.dataset.yAxisID === 'y1') {
+                        label += context.parsed.y + '%';
+                      } else {
+                        label += '₹' + context.parsed.y.toLocaleString();
+                      }
+                      return label;
+                    }
+                  }
+                }
+              },
+              scales: {
+                y: { 
+                  type: 'linear',
+                  display: true,
+                  position: 'left',
+                  title: { display: true, text: 'Amount (₹ Thousands)', color: '#64748B', font: { weight: 'bold', size: 11 } },
+                  beginAtZero: true, 
+                  grid: { color: '#F1F5F9' } 
+                },
+                y1: {
+                  type: 'linear',
+                  display: true,
+                  position: 'right',
+                  title: { display: true, text: 'Net Profit Margin (%)', color: '#10B981', font: { weight: 'bold', size: 11 } },
+                  beginAtZero: true,
+                  grid: { drawOnChartArea: false },
+                  ticks: {
+                    callback: function(value) { return value + '%'; }
+                  }
+                },
+                x: { grid: { display: false } }
+              }
+            }
+          });
+        }
+
+        // Chart 2: Profitability Margins (%)
+        if (marginChartRef.current) {
+          if (chartInstances.current.margin) chartInstances.current.margin.destroy();
+          const ctx = marginChartRef.current.getContext('2d');
+          chartInstances.current.margin = new Chart(ctx, {
+            type: 'line',
+            data: {
+              labels,
+              datasets: [
+                { label: 'Gross Profit Margin %', data: gpMargins, borderColor: '#3B82F6', tension: 0.3, borderWidth: 3 },
+                { label: 'EBITDA Margin %', data: ebitdaMargins, borderColor: '#8B5CF6', tension: 0.3, borderWidth: 3 },
+                { label: 'Net Profit Margin %', data: npMargins, borderColor: '#10B981', tension: 0.3, borderWidth: 3 }
+              ]
+            },
+            options: {
+              responsive: true,
+              maintainAspectRatio: false,
+              plugins: { legend: { position: 'top' } },
+              scales: {
+                y: { beginAtZero: true, grid: { color: '#F1F5F9' } },
+                x: { grid: { display: false } }
+              }
+            }
+          });
+        }
+
+        // Chart 3: Liquidity Assets vs Liabilities
+        if (liquidityChartRef.current) {
+          if (chartInstances.current.liquidity) chartInstances.current.liquidity.destroy();
+          const ctx = liquidityChartRef.current.getContext('2d');
+          chartInstances.current.liquidity = new Chart(ctx, {
+            type: 'bar',
+            data: {
+              labels,
+              datasets: [
+                { label: 'Current Assets (₹)', data: currentAssets, backgroundColor: '#3B82F6', borderRadius: 6 },
+                { label: 'Current Liabilities (₹)', data: currentLiabs, backgroundColor: '#EF4444', borderRadius: 6 }
+              ]
+            },
+            options: {
+              responsive: true,
+              maintainAspectRatio: false,
+              plugins: { legend: { position: 'top' } },
+              scales: {
+                y: { beginAtZero: true, grid: { color: '#F1F5F9' } },
+                x: { grid: { display: false } }
+              }
+            }
+          });
+        }
+
+        // Chart 4: Two-Period Operating Cost Breakdown Comparative (% of Revenue)
+        if (expenseChartRef.current) {
+          if (chartInstances.current.expense) chartInstances.current.expense.destroy();
+          
+          const pnl1 = getPnlForPeriod(costP1);
+          const pnl2 = getPnlForPeriod(costP2);
+
+          const rev1 = pnl1.net_revenue || 1;
+          const rev2 = pnl2.net_revenue || 1;
+
+          const labelP1 = ALL_PERIODS.find(p => p.id === costP1)?.label || costP1;
+          const labelP2 = ALL_PERIODS.find(p => p.id === costP2)?.label || costP2;
+
+          const cogs1 = pnl1.cogs?.total || 0;
+          const sm1   = pnl1.opex?.sales_marketing || 0;
+          const ga1   = pnl1.opex?.general_admin || 0;
+          const rd1   = pnl1.opex?.research_development || 0;
+          const da1   = pnl1.depreciation_amortization || 0;
+          const tax1  = pnl1.income_tax || 0;
+
+          const cogs2 = pnl2.cogs?.total || 0;
+          const sm2   = pnl2.opex?.sales_marketing || 0;
+          const ga2   = pnl2.opex?.general_admin || 0;
+          const rd2   = pnl2.opex?.research_development || 0;
+          const da2   = pnl2.depreciation_amortization || 0;
+          const tax2  = pnl2.income_tax || 0;
+
+          const pct1 = [
+            Number(((cogs1 / rev1) * 100).toFixed(1)),
+            Number(((sm1 / rev1) * 100).toFixed(1)),
+            Number(((ga1 / rev1) * 100).toFixed(1)),
+            Number(((rd1 / rev1) * 100).toFixed(1)),
+            Number(((da1 / rev1) * 100).toFixed(1)),
+            Number(((tax1 / rev1) * 100).toFixed(1))
+          ];
+
+          const pct2 = [
+            Number(((cogs2 / rev2) * 100).toFixed(1)),
+            Number(((sm2 / rev2) * 100).toFixed(1)),
+            Number(((ga2 / rev2) * 100).toFixed(1)),
+            Number(((rd2 / rev2) * 100).toFixed(1)),
+            Number(((da2 / rev2) * 100).toFixed(1)),
+            Number(((tax2 / rev2) * 100).toFixed(1))
+          ];
+
+          const ctx = expenseChartRef.current.getContext('2d');
+          chartInstances.current.expense = new Chart(ctx, {
+            type: 'bar',
+            data: {
+              labels: ['COGS', 'Sales & Mktg', 'General & Admin', 'R&D', 'D&A', 'Tax'],
+              datasets: [
+                {
+                  label: `${labelP1} (% Rev)`,
+                  data: pct1,
+                  backgroundColor: 'rgba(59, 130, 246, 0.85)',
+                  borderRadius: 6
+                },
+                {
+                  label: `${labelP2} (% Rev)`,
+                  data: pct2,
+                  backgroundColor: 'rgba(16, 185, 129, 0.85)',
+                  borderRadius: 6
+                }
+              ]
+            },
+            options: {
+              responsive: true,
+              maintainAspectRatio: false,
+              plugins: { 
+                legend: { position: 'top' },
+                tooltip: {
+                  callbacks: {
+                    label: function(context) {
+                      return `${context.dataset.label}: ${context.parsed.y}% of Revenue`;
+                    }
+                  }
+                }
+              },
+              scales: {
+                y: { 
+                  beginAtZero: true, 
+                  grid: { color: '#F1F5F9' },
+                  ticks: { callback: function(val) { return val + '%'; } },
+                  title: { display: true, text: '% of Net Revenue', color: '#64748B', font: { weight: 'bold', size: 10 } }
+                },
+                x: { grid: { display: false } }
+              }
+            }
+          });
+        }
+
+      }, [selectedPeriodIds, costP1, costP2, multiStatements, multiKpis]);
+
+      // Calculate aggregate cards for last selected period
+      const lastPid = selectedPeriodIds[selectedPeriodIds.length - 1] || ALL_PERIODS[0].id;
+      const lastLabel = ALL_PERIODS.find(p => p.id === lastPid)?.label || lastPid;
+      const lastPnl = multiStatements[lastPid]?.incomeStatement || {};
+      const lastBs = multiStatements[lastPid]?.balanceSheet || {};
+      const lastKpis = multiKpis[lastPid] || {};
+
+      if (loading) {
+        return (
+          <div className="py-20 text-center text-slate-500">
+            <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mb-3"></div>
+            <p className="font-bold text-sm">Processing KPI Analytics Visuals...</p>
+          </div>
+        );
+      }
+
+      return (
+        <div className="space-y-8">
+          
+          {/* Dashboard Header Banner */}
+          <div className="bg-gradient-to-r from-slate-900 via-blue-950 to-indigo-950 rounded-2xl p-6 text-white shadow-xl flex items-center justify-between flex-wrap gap-4">
+            <div>
+              <div className="flex items-center space-x-2">
+                <span className="bg-blue-500 text-white font-extrabold text-[10px] px-2.5 py-0.5 rounded-md uppercase tracking-wider">KPI Analytics View</span>
+                <span className="text-xs text-blue-300 font-semibold">Comparing {selectedPeriodIds.length} Periods</span>
+              </div>
+              <h2 className="text-2xl font-extrabold mt-1">Enterprise KPI Analytics Dashboard</h2>
+              <p className="text-slate-300 text-xs mt-0.5">Single-view interactive visual matrix across selected financial periods.</p>
+            </div>
+
+            <div className="flex space-x-2">
+              <span className="bg-slate-800 text-slate-200 text-xs px-3 py-1.5 rounded-lg border border-slate-700 font-bold">
+                Active Latest: {lastLabel}
+              </span>
+            </div>
+          </div>
+
+          {/* ROW 1: EXECUTIVE KPI SUMMARY CARDS */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+            <PowerBICard 
+              title="Net Revenue" 
+              value={`₹${lastPnl.net_revenue?.toLocaleString() || 0}`} 
+              sub={`Gross Rev: ₹${lastPnl.gross_revenue?.toLocaleString() || 0}`}
+              icon="💰"
+              color="blue"
+            />
+            <PowerBICard 
+              title="Profit Before Tax (PBT)" 
+              value={`₹${lastPnl.ebt?.toLocaleString() || lastPnl.net_income?.toLocaleString() || 0}`} 
+              sub={`EBITDA: ₹${lastPnl.ebitda?.toLocaleString() || 0}`}
+              icon="📈"
+              color="emerald"
+            />
+            <PowerBICard 
+              title="Gross Profit Margin" 
+              value={`${lastKpis.profitability?.gross_profit_margin?.value || 0}%`} 
+              sub={`EBITDA Margin: ${lastKpis.profitability?.ebitda_margin?.value || 0}%`}
+              icon="📊"
+              color="indigo"
+            />
+            <PowerBICard 
+              title="Current Ratio" 
+              value={`${lastKpis.liquidity?.current_ratio?.value || 0}x`} 
+              sub={`Quick Ratio: ${lastKpis.liquidity?.quick_ratio?.value || 0}x`}
+              icon="⚡"
+              color="purple"
+            />
+          </div>
+
+          {/* ROW 2: POWER BI CHARTS GRID */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            
+            {/* Chart 1: Revenue & Profitability Growth Dynamics */}
+            <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm flex flex-col">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="font-bold text-sm text-slate-900 flex items-center space-x-2">
+                  <span>📊</span>
+                  <span>Revenue & Profitability Growth Dynamics</span>
+                </h3>
+                <span className="text-[11px] font-semibold text-slate-400">Dual Y-Axis (₹ vs Margin %)</span>
+              </div>
+              <div className="h-64 w-full relative">
+                <canvas ref={revenueChartRef}></canvas>
+              </div>
+            </div>
+
+            {/* Chart 2: Profitability Margins Trend */}
+            <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm flex flex-col">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="font-bold text-sm text-slate-900 flex items-center space-x-2">
+                  <span>📉</span>
+                  <span>Profitability Margins Trajectory (%)</span>
+                </h3>
+                <span className="text-[11px] font-semibold text-slate-400">Gross, EBITDA & Net Margin</span>
+              </div>
+              <div className="h-64 w-full relative">
+                <canvas ref={marginChartRef}></canvas>
+              </div>
+            </div>
+
+            {/* Chart 3: Liquidity Assets vs Liabilities */}
+            <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm flex flex-col">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="font-bold text-sm text-slate-900 flex items-center space-x-2">
+                  <span>📈</span>
+                  <span>Current Assets vs Current Liabilities</span>
+                </h3>
+                <span className="text-[11px] font-semibold text-slate-400">Liquidity Comparison</span>
+              </div>
+              <div className="h-64 w-full relative">
+                <canvas ref={liquidityChartRef}></canvas>
+              </div>
+            </div>
+
+            {/* Chart 4: Operating Cost Structure Comparative (P1 vs P2 with %) */}
+            <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm flex flex-col space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-3">
+                <div>
+                  <h3 className="font-bold text-sm text-slate-900 flex items-center space-x-2">
+                    <span>🍩</span>
+                    <span>Operating Cost Breakdown Comparative</span>
+                  </h3>
+                  <p className="text-[11px] text-slate-500 font-medium mt-0.5">Side-by-side cost structure analysis as % of Net Revenue</p>
+                </div>
+
+                {/* Two Comparative Period Dropdowns */}
+                <div className="flex items-center space-x-2 bg-slate-50 p-1.5 rounded-xl border border-slate-200">
+                  <div className="flex items-center space-x-1">
+                    <span className="text-[10px] font-bold text-slate-400">P1:</span>
+                    <select 
+                      value={costP1} 
+                      onChange={(e) => setCostP1(e.target.value)}
+                      className="bg-white border border-slate-300 text-slate-800 text-xs font-bold rounded-lg px-2 py-1 focus:ring-blue-500 cursor-pointer"
+                    >
+                      {ALL_PERIODS.map(p => (
+                        <option key={p.id} value={p.id}>{p.label}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <span className="text-slate-400 font-bold text-xs">vs</span>
+
+                  <div className="flex items-center space-x-1">
+                    <span className="text-[10px] font-bold text-slate-400">P2:</span>
+                    <select 
+                      value={costP2} 
+                      onChange={(e) => setCostP2(e.target.value)}
+                      className="bg-white border border-slate-300 text-slate-800 text-xs font-bold rounded-lg px-2 py-1 focus:ring-blue-500 cursor-pointer"
+                    >
+                      {ALL_PERIODS.map(p => (
+                        <option key={p.id} value={p.id}>{p.label}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              {/* Chart Visual */}
+              <div className="h-60 w-full relative">
+                <canvas ref={expenseChartRef}></canvas>
+              </div>
+
+              {/* Side-by-Side Comparative Cost Table with % */}
+              {(() => {
+                const pnl1 = getPnlForPeriod(costP1);
+                const pnl2 = getPnlForPeriod(costP2);
+                const rev1 = pnl1.net_revenue || 1;
+                const rev2 = pnl2.net_revenue || 1;
+
+                const label1 = ALL_PERIODS.find(p => p.id === costP1)?.label || costP1;
+                const label2 = ALL_PERIODS.find(p => p.id === costP2)?.label || costP2;
+
+                const items = [
+                  { label: "Cost of Goods Sold (COGS)", val1: pnl1.cogs?.total || 0, val2: pnl2.cogs?.total || 0 },
+                  { label: "Sales & Marketing", val1: pnl1.opex?.sales_marketing || 0, val2: pnl2.opex?.sales_marketing || 0 },
+                  { label: "General & Administrative", val1: pnl1.opex?.general_admin || 0, val2: pnl2.opex?.general_admin || 0 },
+                  { label: "Research & Development", val1: pnl1.opex?.research_development || 0, val2: pnl2.opex?.research_development || 0 },
+                  { label: "Depreciation & Amortization", val1: pnl1.depreciation_amortization || 0, val2: pnl2.depreciation_amortization || 0 },
+                  { label: "Provision for Income Tax", val1: pnl1.income_tax || 0, val2: pnl2.income_tax || 0 },
+                ];
+
+                return (
+                  <div className="overflow-x-auto border border-slate-200 rounded-xl">
+                    <table className="w-full text-left text-xs">
+                      <thead className="bg-slate-900 text-white font-bold uppercase text-[10px]">
+                        <tr>
+                          <th className="py-2.5 px-3">Cost Component</th>
+                          <th className="py-2.5 px-3 text-right">{label1} (₹)</th>
+                          <th className="py-2.5 px-3 text-right">% of Rev</th>
+                          <th className="py-2.5 px-3 text-right">{label2} (₹)</th>
+                          <th className="py-2.5 px-3 text-right">% of Rev</th>
+                          <th className="py-2.5 px-3 text-right">Shift (% pts)</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-200 font-medium">
+                        {items.map((it, idx) => {
+                          const pct1 = ((it.val1 / rev1) * 100).toFixed(1);
+                          const pct2 = ((it.val2 / rev2) * 100).toFixed(1);
+                          const shift = (pct2 - pct1).toFixed(1);
+
+                          return (
+                            <tr key={idx} className="hover:bg-slate-50">
+                              <td className="py-2 px-3 font-semibold text-slate-800">{it.label}</td>
+                              <td className="py-2 px-3 text-right text-slate-700">₹{it.val1.toLocaleString()}</td>
+                              <td className="py-2 px-3 text-right font-bold text-blue-700">{pct1}%</td>
+                              <td className="py-2 px-3 text-right text-slate-700">₹{it.val2.toLocaleString()}</td>
+                              <td className="py-2 px-3 text-right font-bold text-emerald-700">{pct2}%</td>
+                              <td className={`py-2 px-3 text-right font-extrabold ${shift <= 0 ? "text-emerald-600" : "text-amber-600"}`}>
+                                {shift > 0 ? `+${shift}%` : `${shift}%`}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                );
+              })()}
+            </div>
+
+          </div>
+
+          {/* ROW 3: DYNAMIC MULTI-PERIOD COMPARATIVE FINANCIAL STATEMENTS MATRIX */}
+          <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="font-bold text-slate-900 flex items-center space-x-2">
+                <span>📋</span>
+                <span>Multi-Period Financial Statement Comparative Matrix</span>
+              </h3>
+              <span className="text-xs font-bold text-blue-600">Side-by-Side Analysis</span>
+            </div>
+
+            <div className="overflow-x-auto custom-scrollbar">
+              <table className="w-full text-left text-xs">
+                <thead className="bg-slate-900 text-white font-bold uppercase">
+                  <tr>
+                    <th className="py-3 px-4 sticky left-0 bg-slate-900 z-10">Financial Line Item</th>
+                    {selectedPeriodIds.map(pid => (
+                      <th key={pid} className="py-3 px-4 text-right whitespace-nowrap min-w-[130px]">
+                        {ALL_PERIODS.find(p => p.id === pid)?.label || pid}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-200 font-medium">
+                  {/* INCOME STATEMENT ROWS */}
+                  <tr className="bg-blue-50/50 font-bold text-blue-900"><td colSpan={selectedPeriodIds.length + 1} className="py-2 px-4 uppercase text-[11px]">Income Statement (P&L)</td></tr>
+                  <MultiMatrixRow label="Gross Revenue" fieldPath="incomeStatement.gross_revenue" dataMap={multiStatements} periodIds={selectedPeriodIds} bold />
+                  <MultiMatrixRow label="Less: Sales Returns" fieldPath="incomeStatement.sales_returns" dataMap={multiStatements} periodIds={selectedPeriodIds} negative />
+                  <MultiMatrixRow label="Net Revenue" fieldPath="incomeStatement.net_revenue" dataMap={multiStatements} periodIds={selectedPeriodIds} bold highlight />
+                  <MultiMatrixRow label="Less: Cost of Goods Sold (COGS)" fieldPath="incomeStatement.cogs.total" dataMap={multiStatements} periodIds={selectedPeriodIds} negative />
+                  <MultiMatrixRow label="Gross Profit" fieldPath="incomeStatement.gross_profit" dataMap={multiStatements} periodIds={selectedPeriodIds} bold />
+                  <MultiMatrixRow label="Less: Sales & Marketing" fieldPath="incomeStatement.opex.sales_marketing" dataMap={multiStatements} periodIds={selectedPeriodIds} negative />
+                  <MultiMatrixRow label="Less: General & Admin" fieldPath="incomeStatement.opex.general_admin" dataMap={multiStatements} periodIds={selectedPeriodIds} negative />
+                  <MultiMatrixRow label="Less: Research & Development" fieldPath="incomeStatement.opex.research_development" dataMap={multiStatements} periodIds={selectedPeriodIds} negative />
+                  <MultiMatrixRow label="EBITDA" fieldPath="incomeStatement.ebitda" dataMap={multiStatements} periodIds={selectedPeriodIds} bold highlight />
+                  <MultiMatrixRow label="Less: Depreciation & Amortization" fieldPath="incomeStatement.depreciation_amortization" dataMap={multiStatements} periodIds={selectedPeriodIds} negative />
+                  <MultiMatrixRow label="EBIT (Operating Income)" fieldPath="incomeStatement.ebit" dataMap={multiStatements} periodIds={selectedPeriodIds} bold />
+                  <MultiMatrixRow label="Less: Interest Expense" fieldPath="incomeStatement.interest_expense" dataMap={multiStatements} periodIds={selectedPeriodIds} negative />
+                  <MultiMatrixRow label="Profit Before Tax (PBT)" fieldPath="incomeStatement.ebt" dataMap={multiStatements} periodIds={selectedPeriodIds} bold highlight />
+                  <MultiMatrixRow label="Less: Income Tax Expense" fieldPath="incomeStatement.income_tax" dataMap={multiStatements} periodIds={selectedPeriodIds} negative />
+                  <MultiMatrixRow label="Profit After Tax (PAT / Net Income)" fieldPath="incomeStatement.net_income" dataMap={multiStatements} periodIds={selectedPeriodIds} bold />
+
+                  {/* BALANCE SHEET ROWS */}
+                  <tr className="bg-purple-50/50 font-bold text-purple-900"><td colSpan={selectedPeriodIds.length + 1} className="py-2 px-4 uppercase text-[11px]">Balance Sheet Summary</td></tr>
+                  <MultiMatrixRow label="Cash & Bank Balances" fieldPath="balanceSheet.assets.current_assets.cash_and_equivalents" dataMap={multiStatements} periodIds={selectedPeriodIds} />
+                  <MultiMatrixRow label="Accounts Receivable (net)" fieldPath="balanceSheet.assets.current_assets.accounts_receivable" dataMap={multiStatements} periodIds={selectedPeriodIds} />
+                  <MultiMatrixRow label="Inventories" fieldPath="balanceSheet.assets.current_assets.inventory" dataMap={multiStatements} periodIds={selectedPeriodIds} />
+                  <MultiMatrixRow label="Total Current Assets" fieldPath="balanceSheet.assets.current_assets.total" dataMap={multiStatements} periodIds={selectedPeriodIds} bold />
+                  <MultiMatrixRow label="Property, Plant & Equipment (net)" fieldPath="balanceSheet.assets.non_current_assets.property_plant_equipment_net" dataMap={multiStatements} periodIds={selectedPeriodIds} />
+                  <MultiMatrixRow label="TOTAL ASSETS" fieldPath="balanceSheet.assets.total_assets" dataMap={multiStatements} periodIds={selectedPeriodIds} bold highlight />
+                  <MultiMatrixRow label="Total Current Liabilities" fieldPath="balanceSheet.liabilities.current_liabilities.total" dataMap={multiStatements} periodIds={selectedPeriodIds} bold />
+                  <MultiMatrixRow label="Total Liabilities" fieldPath="balanceSheet.liabilities.total_liabilities" dataMap={multiStatements} periodIds={selectedPeriodIds} bold />
+                  <MultiMatrixRow label="Shareholders' Equity" fieldPath="balanceSheet.equity.total_equity" dataMap={multiStatements} periodIds={selectedPeriodIds} bold />
+                  <MultiMatrixRow label="TOTAL LIABILITIES & EQUITY" fieldPath="balanceSheet.total_liabilities_and_equity" dataMap={multiStatements} periodIds={selectedPeriodIds} bold highlight />
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+        </div>
+      );
+    }
+
+    // Helper PowerBICard
+    function PowerBICard({ title, value, sub, icon, color }) {
+      return (
+        <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm relative overflow-hidden flex items-start justify-between">
+          <div>
+            <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">{title}</span>
+            <h4 className="text-2xl font-extrabold text-slate-900 mt-2">{value}</h4>
+            <p className="text-xs text-slate-400 mt-1 font-medium">{sub}</p>
+          </div>
+          <div className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center text-lg">
+            {icon}
+          </div>
+        </div>
+      );
+    }
+
+    // Helper MultiMatrixRow for side-by-side comparison
+    function MultiMatrixRow({ label, fieldPath, dataMap, periodIds, bold, highlight, negative }) {
+      const getVal = (obj, path) => {
+        if (!obj) return undefined;
+        const parts = path.split('.');
+        let curr = obj;
+        for (const p of parts) {
+          if (curr && typeof curr === 'object' && p in curr) {
+            curr = curr[p];
+          } else {
+            return undefined;
+          }
+        }
+        return curr;
+      };
+
+      let textStyle = bold ? "font-bold text-slate-900" : "text-slate-700";
+      if (highlight) textStyle = "font-extrabold text-blue-900 bg-blue-50/40";
+
+      return (
+        <tr className={`hover:bg-slate-50 ${textStyle}`}>
+          <td className="py-2.5 px-4 sticky left-0 bg-white font-semibold">{label}</td>
+          {periodIds.map(pid => {
+            const rawVal = getVal(dataMap[pid], fieldPath);
+            if (rawVal === undefined || rawVal === null) {
+              return <td key={pid} className="py-2.5 px-4 text-right text-slate-400">-</td>;
+            }
+            const val = negative ? -Math.abs(rawVal) : rawVal;
+            const formatted = `₹${Math.abs(val).toLocaleString()}`;
+            return (
+              <td key={pid} className="py-2.5 px-4 text-right whitespace-nowrap font-mono">
+                {val < 0 ? `(${formatted})` : formatted}
+              </td>
+            );
+          })}
+        </tr>
+      );
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    // 2. FINANCIAL STATEMENTS VIEW (P&L & BALANCE SHEET)
+    // ─────────────────────────────────────────────────────────────
+    function StatementsView({ selectedPeriodIds, multiStatements, loading }) {
+      const [stmtTab, setStmtTab] = useState("pnl");
+
+      if (loading) {
+        return (
+          <div className="py-20 text-center text-slate-500 bg-white rounded-2xl border border-slate-200">
+            <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mb-3"></div>
+            <p className="font-bold text-sm text-slate-700">Loading Financial Statements for selected periods...</p>
+          </div>
+        );
+      }
+
+      return (
+        <div className="space-y-6">
+          
+          {/* Statement Header Controls */}
+          <div className="flex items-center justify-between bg-white p-4 rounded-2xl border border-slate-200 flex-wrap gap-3 shadow-sm">
+            <div className="flex space-x-2">
+              <button 
+                onClick={() => setStmtTab("pnl")}
+                className={`px-5 py-2.5 text-xs font-bold rounded-xl transition flex items-center space-x-2 ${stmtTab === "pnl" ? "bg-blue-600 text-white shadow-md shadow-blue-600/30" : "bg-slate-100 text-slate-700 hover:bg-slate-200"}`}
+              >
+                <span>🧾</span>
+                <span>Income Statement (P&L)</span>
+              </button>
+              <button 
+                onClick={() => setStmtTab("bs")}
+                className={`px-5 py-2.5 text-xs font-bold rounded-xl transition flex items-center space-x-2 ${stmtTab === "bs" ? "bg-blue-600 text-white shadow-md shadow-blue-600/30" : "bg-slate-100 text-slate-700 hover:bg-slate-200"}`}
+              >
+                <span>🏛️</span>
+                <span>Balance Sheet</span>
+              </button>
+            </div>
+
+            <div className="text-xs font-bold text-slate-600 bg-slate-100 px-3 py-1.5 rounded-lg border border-slate-200">
+              Side-by-Side Comparison: <span className="text-blue-600">{selectedPeriodIds.length} Periods Selected</span>
+            </div>
+          </div>
+
+          {/* STATEMENTS MATRIX TABLE */}
+          <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm overflow-x-auto custom-scrollbar">
+            <table className="w-full text-left text-xs">
+              <thead className="bg-slate-900 text-white font-bold uppercase tracking-wider">
+                <tr>
+                  <th className="py-3.5 px-4 sticky left-0 bg-slate-900 z-10 shadow-r">Financial Statement Line Item</th>
+                  {selectedPeriodIds.map(pid => (
+                    <th key={pid} className="py-3.5 px-4 text-right whitespace-nowrap min-w-[140px]">
+                      {ALL_PERIODS.find(p => p.id === pid)?.label || pid}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-200 font-medium">
+                {stmtTab === "pnl" && (
+                  <React.Fragment>
+                    <tr className="bg-blue-50 text-blue-900 font-extrabold uppercase text-[11px]"><td colSpan={selectedPeriodIds.length + 1} className="py-2.5 px-4">Revenue & Gross Margin</td></tr>
+                    <MultiMatrixRow label="Gross Revenue" fieldPath="incomeStatement.gross_revenue" dataMap={multiStatements} periodIds={selectedPeriodIds} bold />
+                    <MultiMatrixRow label="Less: Sales Returns & Discounts" fieldPath="incomeStatement.sales_returns" dataMap={multiStatements} periodIds={selectedPeriodIds} negative />
+                    <MultiMatrixRow label="Net Revenue" fieldPath="incomeStatement.net_revenue" dataMap={multiStatements} periodIds={selectedPeriodIds} bold highlight />
+                    <MultiMatrixRow label="Less: Cost of Goods Sold (COGS)" fieldPath="incomeStatement.cogs.total" dataMap={multiStatements} periodIds={selectedPeriodIds} negative />
+                    <MultiMatrixRow label="Gross Profit" fieldPath="incomeStatement.gross_profit" dataMap={multiStatements} periodIds={selectedPeriodIds} bold highlight />
+
+                    <tr className="bg-slate-50 text-slate-900 font-extrabold uppercase text-[11px]"><td colSpan={selectedPeriodIds.length + 1} className="py-2.5 px-4">Operating Expenses (OpEx)</td></tr>
+                    <MultiMatrixRow label="Sales & Marketing Staff & Ads" fieldPath="incomeStatement.opex.sales_marketing" dataMap={multiStatements} periodIds={selectedPeriodIds} negative />
+                    <MultiMatrixRow label="General & Administrative Costs" fieldPath="incomeStatement.opex.general_admin" dataMap={multiStatements} periodIds={selectedPeriodIds} negative />
+                    <MultiMatrixRow label="Research & Product Development" fieldPath="incomeStatement.opex.research_development" dataMap={multiStatements} periodIds={selectedPeriodIds} negative />
+                    <MultiMatrixRow label="EBITDA" fieldPath="incomeStatement.ebitda" dataMap={multiStatements} periodIds={selectedPeriodIds} bold highlight />
+
+                    <tr className="bg-slate-50 text-slate-900 font-extrabold uppercase text-[11px]"><td colSpan={selectedPeriodIds.length + 1} className="py-2.5 px-4">Operating Income & Net Profit</td></tr>
+                    <MultiMatrixRow label="Less: Depreciation & Amortization" fieldPath="incomeStatement.depreciation_amortization" dataMap={multiStatements} periodIds={selectedPeriodIds} negative />
+                    <MultiMatrixRow label="EBIT (Operating Income)" fieldPath="incomeStatement.ebit" dataMap={multiStatements} periodIds={selectedPeriodIds} bold />
+                    <MultiMatrixRow label="Less: Interest & Finance Expense" fieldPath="incomeStatement.interest_expense" dataMap={multiStatements} periodIds={selectedPeriodIds} negative />
+                    <MultiMatrixRow label="Earnings Before Tax (EBT)" fieldPath="incomeStatement.ebt" dataMap={multiStatements} periodIds={selectedPeriodIds} bold />
+                    <MultiMatrixRow label="Less: Income Tax Expense" fieldPath="incomeStatement.income_tax" dataMap={multiStatements} periodIds={selectedPeriodIds} negative />
+                    <MultiMatrixRow label="Net Income (Profit After Tax)" fieldPath="incomeStatement.net_income" dataMap={multiStatements} periodIds={selectedPeriodIds} bold highlight />
+                  </React.Fragment>
+                )}
+
+                {stmtTab === "bs" && (
+                  <React.Fragment>
+                    <tr className="bg-emerald-50 text-emerald-900 font-extrabold uppercase text-[11px]"><td colSpan={selectedPeriodIds.length + 1} className="py-2.5 px-4">Current Assets</td></tr>
+                    <MultiMatrixRow label="Cash & Bank Balances" fieldPath="balanceSheet.assets.current_assets.cash_and_equivalents" dataMap={multiStatements} periodIds={selectedPeriodIds} />
+                    <MultiMatrixRow label="Trade Accounts Receivable (net)" fieldPath="balanceSheet.assets.current_assets.accounts_receivable" dataMap={multiStatements} periodIds={selectedPeriodIds} />
+                    <MultiMatrixRow label="Inventories (Raw, WIP & Finished)" fieldPath="balanceSheet.assets.current_assets.inventory" dataMap={multiStatements} periodIds={selectedPeriodIds} />
+                    <MultiMatrixRow label="Prepaid Expenses & Advances" fieldPath="balanceSheet.assets.current_assets.prepaid_expenses" dataMap={multiStatements} periodIds={selectedPeriodIds} />
+                    <MultiMatrixRow label="Total Current Assets" fieldPath="balanceSheet.assets.current_assets.total" dataMap={multiStatements} periodIds={selectedPeriodIds} bold highlight />
+
+                    <tr className="bg-emerald-50 text-emerald-900 font-extrabold uppercase text-[11px]"><td colSpan={selectedPeriodIds.length + 1} className="py-2.5 px-4">Non-Current Assets</td></tr>
+                    <MultiMatrixRow label="Property, Plant & Equipment (net)" fieldPath="balanceSheet.assets.non_current_assets.property_plant_equipment_net" dataMap={multiStatements} periodIds={selectedPeriodIds} />
+                    <MultiMatrixRow label="Intangible Assets & Patents" fieldPath="balanceSheet.assets.non_current_assets.intangible_assets" dataMap={multiStatements} periodIds={selectedPeriodIds} />
+                    <MultiMatrixRow label="Long-Term Investments" fieldPath="balanceSheet.assets.non_current_assets.long_term_investments" dataMap={multiStatements} periodIds={selectedPeriodIds} />
+                    <MultiMatrixRow label="Total Non-Current Assets" fieldPath="balanceSheet.assets.non_current_assets.total" dataMap={multiStatements} periodIds={selectedPeriodIds} bold />
+                    <MultiMatrixRow label="TOTAL ASSETS" fieldPath="balanceSheet.assets.total_assets" dataMap={multiStatements} periodIds={selectedPeriodIds} bold highlight />
+
+                    <tr className="bg-rose-50 text-rose-900 font-extrabold uppercase text-[11px]"><td colSpan={selectedPeriodIds.length + 1} className="py-2.5 px-4">Current & Non-Current Liabilities</td></tr>
+                    <MultiMatrixRow label="Trade Accounts Payable" fieldPath="balanceSheet.liabilities.current_liabilities.accounts_payable" dataMap={multiStatements} periodIds={selectedPeriodIds} />
+                    <MultiMatrixRow label="Short-Term Working Capital Debt" fieldPath="balanceSheet.liabilities.current_liabilities.short_term_debt" dataMap={multiStatements} periodIds={selectedPeriodIds} />
+                    <MultiMatrixRow label="Total Current Liabilities" fieldPath="balanceSheet.liabilities.current_liabilities.total" dataMap={multiStatements} periodIds={selectedPeriodIds} bold />
+                    <MultiMatrixRow label="Long-Term Bank Borrowings" fieldPath="balanceSheet.liabilities.non_current_liabilities.long_term_debt" dataMap={multiStatements} periodIds={selectedPeriodIds} />
+                    <MultiMatrixRow label="Total Liabilities" fieldPath="balanceSheet.liabilities.total_liabilities" dataMap={multiStatements} periodIds={selectedPeriodIds} bold highlight />
+
+                    <tr className="bg-purple-50 text-purple-900 font-extrabold uppercase text-[11px]"><td colSpan={selectedPeriodIds.length + 1} className="py-2.5 px-4">Shareholders' Equity</td></tr>
+                    <MultiMatrixRow label="Paid-in Share Capital" fieldPath="balanceSheet.equity.paid_in_capital" dataMap={multiStatements} periodIds={selectedPeriodIds} />
+                    <MultiMatrixRow label="Retained Earnings & Reserves" fieldPath="balanceSheet.equity.retained_earnings" dataMap={multiStatements} periodIds={selectedPeriodIds} />
+                    <MultiMatrixRow label="Total Shareholders' Equity" fieldPath="balanceSheet.equity.total_equity" dataMap={multiStatements} periodIds={selectedPeriodIds} bold highlight />
+                    <MultiMatrixRow label="TOTAL LIABILITIES & EQUITY" fieldPath="balanceSheet.total_liabilities_and_equity" dataMap={multiStatements} periodIds={selectedPeriodIds} bold highlight />
+                  </React.Fragment>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      );
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    // 3. 40+ KPI ENGINE VIEW
+    // ─────────────────────────────────────────────────────────────
+    function KPIEngineView({ selectedPeriodIds, multiKpis, loading }) {
+      const [category, setCategory] = useState("profitability");
+      const lastPid = selectedPeriodIds[selectedPeriodIds.length - 1] || ALL_PERIODS[0].id;
+      const catData = multiKpis[lastPid]?.[category] || {};
+
+      if (loading) {
+        return (
+          <div className="py-20 text-center text-slate-500 bg-white rounded-2xl border border-slate-200">
+            <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mb-3"></div>
+            <p className="font-bold text-sm text-slate-700">Loading KPI Engine metrics...</p>
+          </div>
+        );
+      }
+
+      return (
+        <div className="space-y-6">
+          <div className="flex items-center justify-between bg-white p-4 rounded-2xl border border-slate-200 flex-wrap gap-2 shadow-sm">
+            <div className="flex flex-wrap gap-2">
+              {["profitability", "liquidity", "solvency", "efficiency", "growth", "valuation"].map(cat => (
+                <button
+                  key={cat}
+                  onClick={() => setCategory(cat)}
+                  className={`px-4 py-2 text-xs font-bold rounded-xl capitalize transition ${category === cat ? "bg-blue-600 text-white shadow-md shadow-blue-600/30" : "bg-slate-100 text-slate-700 hover:bg-slate-200"}`}
+                >
+                  {cat}
+                </button>
+              ))}
+            </div>
+            <div className="text-xs font-bold text-slate-600 bg-slate-100 px-3 py-1.5 rounded-lg border border-slate-200">
+              Active Period: <span className="text-blue-600">{ALL_PERIODS.find(p => p.id === lastPid)?.label}</span>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+            {Object.entries(catData).map(([kpiKey, data]) => {
+              const isGreen = data.rag_status === "GREEN";
+              const isAmber = data.rag_status === "AMBER";
+              const ragBg = isGreen ? "border-emerald-300 bg-emerald-50/20" : (isAmber ? "border-amber-400 bg-amber-50/40" : "border-rose-300 bg-rose-50/20");
+              const ragBadge = isGreen ? "bg-emerald-600 text-white font-extrabold shadow-sm" : (isAmber ? "bg-amber-500 text-white font-black shadow-sm" : "bg-rose-600 text-white font-extrabold shadow-sm");
+
+              const bmText = data.benchmark !== undefined && data.benchmark !== null ? `${data.benchmark} ${data.unit}` : "N/A";
+              const isAbove = data.status === "above_benchmark";
+
+              return (
+                <div key={kpiKey} className={`bg-white rounded-2xl p-5 border-2 ${ragBg} shadow-sm relative space-y-3 flex flex-col justify-between`}>
+                  <div>
+                    <div className="flex items-center justify-between gap-2">
+                      <h4 className="text-xs font-bold text-slate-800 leading-snug">{formatKPILabel(kpiKey)}</h4>
+                      <span className={`text-[10px] px-2.5 py-0.5 rounded-full shrink-0 ${ragBadge}`}>
+                        {data.rag_status}
+                      </span>
+                    </div>
+
+                    <div className="flex items-baseline justify-between pt-2">
+                      <span className="text-2xl font-extrabold text-slate-900">{data.value} <span className="text-sm font-bold text-slate-500">{data.unit}</span></span>
+                      <span className={`text-xs font-bold flex items-center space-x-1 ${data.qoq_delta > 0 ? "text-emerald-600" : (data.qoq_delta < 0 ? "text-rose-600" : "text-slate-500")}`}>
+                        <span>Change:</span>
+                        <span className="font-extrabold">
+                          {data.qoq_delta > 0 ? `▲ +${data.qoq_delta}` : (data.qoq_delta < 0 ? `▼ ${data.qoq_delta}` : `▬ ${data.qoq_delta}`)}
+                        </span>
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Benchmark Target Comparison Box */}
+                  <div className="bg-slate-50 rounded-xl p-2.5 border border-slate-200/80 flex items-center justify-between text-xs font-medium">
+                    <span className="text-slate-600 flex items-center space-x-1">
+                      <span>🎯</span>
+                      <span>Benchmark: <strong className="text-slate-900 font-extrabold">{bmText}</strong></span>
+                    </span>
+                    <span className={`text-[10px] font-extrabold px-2 py-0.5 rounded-md ${isAbove ? "bg-emerald-100 text-emerald-800" : "bg-rose-100 text-rose-800"}`}>
+                      {isAbove ? "✓ ABOVE TARGET" : "⚠️ BELOW TARGET"}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center justify-between text-[11px] text-slate-500 font-medium pt-1 border-t border-slate-100">
+                    <span>Trend: <strong className="text-slate-800 capitalize">{data.trend_dir}</strong></span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      );
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    // 4. TRIAL BALANCE UPLOAD VIEW
+    // ─────────────────────────────────────────────────────────────
+    function UploadView({ validationData, onUpload, loading }) {
+      const [file, setFile] = useState(null);
+
+      const handleFileChange = (e) => {
+        if (e.target.files[0]) setFile(e.target.files[0]);
+      };
+
+      const handleSubmit = (e) => {
+        e.preventDefault();
+        if (file) onUpload(file);
+      };
+
+      return (
+        <div className="space-y-8 max-w-4xl mx-auto">
+          <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm text-center">
+            <h2 className="text-xl font-bold text-slate-900">Upload Trial Balance Excel File</h2>
+            <p className="text-xs text-slate-500 mt-1">
+              Supports multi-period Trial Balance Excel workbooks containing mandatory quarter & annual sheets.
+            </p>
+
+            <form onSubmit={handleSubmit} className="mt-6 border-2 border-dashed border-slate-300 rounded-2xl p-8 bg-slate-50/50 hover:bg-slate-50 transition text-center">
+              <div className="mx-auto w-12 h-12 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-xl mb-3">
+                📂
+              </div>
+              <input 
+                type="file" 
+                accept=".xlsx, .xls" 
+                onChange={handleFileChange} 
+                className="hidden" 
+                id="excel-file-input"
+              />
+              <label 
+                htmlFor="excel-file-input" 
+                className="cursor-pointer bg-white px-4 py-2 rounded-xl border border-slate-300 shadow-sm text-xs font-bold text-slate-700 hover:bg-slate-100 inline-block"
+              >
+                Choose Excel File (.xlsx)
+              </label>
+
+              {file && (
+                <p className="mt-3 text-xs font-semibold text-blue-700">
+                  Selected File: <span className="underline">{file.name}</span> ({(file.size/1024).toFixed(1)} KB)
+                </p>
+              )}
+
+              <div className="mt-5">
+                <button 
+                  type="submit" 
+                  disabled={!file || loading}
+                  className="bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white font-bold text-xs px-6 py-3 rounded-xl shadow-lg shadow-blue-600/30 transition"
+                >
+                  {loading ? "Validating & Parsing Sheets..." : "Upload & Validate Trial Balance 🚀"}
+                </button>
+              </div>
+            </form>
+          </div>
+
+          {validationData && (
+            <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="font-bold text-slate-900 flex items-center space-x-2">
+                  <span>✔</span>
+                  <span>Trial Balance Validation Matrix</span>
+                </h3>
+                <span className={`text-xs font-bold px-3 py-1 rounded-full ${validationData.allPeriodsBalanced ? "bg-emerald-100 text-emerald-800" : "bg-amber-100 text-amber-800"}`}>
+                  {validationData.allPeriodsBalanced ? "ALL PERIODS BALANCED (DEBIT = CREDIT)" : "SOME PERIODS UNBALANCED"}
+                </span>
+              </div>
+
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-slate-100 text-slate-700 uppercase font-bold border-b border-slate-200">
+                    <tr>
+                      <th className="py-2.5 px-3">Sheet Name</th>
+                      <th className="py-2.5 px-3">Period</th>
+                      <th className="py-2.5 px-3">Rows</th>
+                      <th className="py-2.5 px-3">Total Debit (₹)</th>
+                      <th className="py-2.5 px-3">Total Credit (₹)</th>
+                      <th className="py-2.5 px-3">Debit vs Credit Balance</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-200 font-medium">
+                    {Object.entries(validationData.details || {}).map(([sheet, d]) => (
+                      <tr key={sheet} className="hover:bg-slate-50">
+                        <td className="py-2.5 px-3 font-semibold text-slate-900">{sheet}</td>
+                        <td className="py-2.5 px-3 text-slate-600">{d.period}</td>
+                        <td className="py-2.5 px-3 text-slate-600">{d.rows}</td>
+                        <td className="py-2.5 px-3 text-slate-800">₹{d.total_debit?.toLocaleString()}</td>
+                        <td className="py-2.5 px-3 text-slate-800">₹{d.total_credit?.toLocaleString()}</td>
+                        <td className="py-2.5 px-3">
+                          <span className={`font-bold px-2 py-0.5 rounded ${d.is_balanced ? "bg-emerald-100 text-emerald-700" : "bg-rose-100 text-rose-700"}`}>
+                            {d.is_balanced ? "BALANCED ✅" : "UNBALANCED ❌"}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    // 5. COMPARATIVE ANALYSIS VIEW
+    // ─────────────────────────────────────────────────────────────
+    function ComparativeView({ crossYearData, rollingData, selectedPeriodIds, multiStatements }) {
+      return (
+        <div className="space-y-8">
+          {crossYearData && (
+            <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm">
+              <h3 className="font-bold text-slate-900 mb-4 flex items-center space-x-2">
+                <span>🔀</span>
+                <span>Cross-Year QoQ Bridge: Q4 FY2023 → Q1 FY2024 Transition</span>
+              </h3>
+
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-slate-100 text-slate-700 uppercase font-bold">
+                    <tr>
+                      <th className="py-2.5 px-3">Metric</th>
+                      <th className="py-2.5 px-3">Q4 FY2023</th>
+                      <th className="py-2.5 px-3">Q1 FY2024</th>
+                      <th className="py-2.5 px-3">Cross-Year Delta</th>
+                      <th className="py-2.5 px-3">Growth (%)</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-200">
+                    {Object.entries(crossYearData.profitability || {}).map(([kpi, d]) => (
+                      <tr key={kpi} className="hover:bg-slate-50">
+                        <td className="py-2 px-3 font-semibold text-slate-900">{formatKPILabel(kpi)}</td>
+                        <td className="py-2 px-3 text-slate-700">{d.Q4FY2023} {d.unit}</td>
+                        <td className="py-2 px-3 text-slate-700">{d.Q1FY2024} {d.unit}</td>
+                        <td className={`py-2 px-3 font-bold ${d.cross_year_delta >= 0 ? "text-emerald-600" : "text-rose-600"}`}>
+                          {d.cross_year_delta >= 0 ? "+" : ""}{d.cross_year_delta}
+                        </td>
+                        <td className="py-2 px-3 font-bold text-slate-800">{d.cross_year_pct}%</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {rollingData && (
+            <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm">
+              <h3 className="font-bold text-slate-900 mb-4 flex items-center space-x-2">
+                <span>🔄</span>
+                <span>Rolling 4-Quarter (LTM) Performance Trend</span>
+              </h3>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                {Object.entries(rollingData).map(([qKey, data]) => (
+                  <div key={qKey} className="bg-slate-50 rounded-xl p-4 border border-slate-200">
+                    <p className="text-xs font-bold text-blue-700">LTM ending {qKey}</p>
+                    <p className="text-lg font-extrabold text-slate-900 mt-1">₹{data.ltm_revenue?.toLocaleString()}</p>
+                    <p className="text-xs text-slate-500 font-medium mt-1">LTM Net Income: <strong className="text-slate-800">₹{data.ltm_net_income?.toLocaleString()}</strong></p>
+                    <p className="text-xs text-emerald-600 font-bold mt-1">Margin: {data.ltm_net_margin_pct}%</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    // 6. REPORTS & EXPORT VIEW
+    // ─────────────────────────────────────────────────────────────
+    function ReportsView({ companyId, selectedPeriodIds }) {
+      const lastPid = selectedPeriodIds[selectedPeriodIds.length - 1] || ALL_PERIODS[0].id;
+      const lastP = ALL_PERIODS.find(p => p.id === lastPid) || ALL_PERIODS[0];
+
+      return (
+        <div className="bg-white rounded-2xl p-8 border border-slate-200 shadow-sm max-w-2xl mx-auto text-center space-y-6">
+          <div className="w-16 h-16 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-3xl mx-auto">
+            📑
+          </div>
+          <div>
+            <h3 className="text-xl font-extrabold text-slate-900">Export Financial & KPI Intelligence Reports</h3>
+            <p className="text-xs text-slate-500 mt-1">
+              Download formal PDF report or multi-tab Excel workbook for period <strong className="text-slate-800">{lastP.label}</strong>.
+            </p>
+          </div>
+
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-4">
+            <a 
+              href={`${API_BASE}/reports/${companyId}/export?format=excel&period=${lastP.quarter}&year=${lastP.year}`} 
+              target="_blank" 
+              className="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-sm px-6 py-3 rounded-xl shadow-lg shadow-emerald-600/30 transition flex items-center justify-center space-x-2"
+            >
+              <span>📊 Download Excel Workbook (.xlsx)</span>
+            </a>
+
+            <a 
+              href={`${API_BASE}/reports/${companyId}/export?format=pdf&period=${lastP.quarter}&year=${lastP.year}`} 
+              target="_blank" 
+              className="w-full sm:w-auto bg-blue-600 hover:bg-blue-500 text-white font-bold text-sm px-6 py-3 rounded-xl shadow-lg shadow-blue-600/30 transition flex items-center justify-center space-x-2"
+            >
+              <span>📄 Download PDF Report (.pdf)</span>
+            </a>
+          </div>
+        </div>
+      );
+    }
+
+    // Render React App
+    ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+  </script>
+</body>
+</html>

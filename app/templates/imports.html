@@ -1,0 +1,683 @@
+{% extends "base.html" %}
+
+{% block page_title %}Data Import Wizard{% endblock %}
+
+{% block content %}
+<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-bottom: 2rem;">
+    <!-- Daily Sales Import Card -->
+    <div class="glass-card">
+        <h3 style="margin-bottom: 1rem; font-size: 1.1rem;"><i class="fa-solid fa-file-excel" style="color: #10b981;"></i> Import Daily Branch Sales</h3>
+        <form id="dailySalesForm" onsubmit="uploadDailySales(event)">
+            <div class="form-group" style="margin-bottom: 1rem;">
+                <label class="form-label">Select Branch</label>
+                <select id="impDailyBranch" class="form-select" required>
+                    {% for b in branches %}
+                    <option value="{{ b.id }}">{{ b.name }} ({{ b.code }})</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="form-group" style="margin-bottom: 1.25rem;">
+                <label class="form-label">Select File (.xlsx, .csv, or 1–5 same-day photos)</label>
+                <input type="file" id="impDailyFile" class="form-control" accept=".xlsx, .xls, .csv, .png, .jpg, .jpeg, .bmp, .webp" multiple required>
+                <input type="password" id="impGeminiKey" class="form-control" placeholder="Gemini API key (paste once)" autocomplete="off" style="margin-top: 0.5rem; display: none;">
+            </div>
+            <button type="submit" class="btn btn-primary" style="width: 100%;"><i class="fa-solid fa-upload"></i> Upload & Process Sales</button>
+        </form>
+    </div>
+
+    <!-- Bank Statement Import Card -->
+    <div class="glass-card">
+        <h3 style="margin-bottom: 1rem; font-size: 1.1rem;"><i class="fa-solid fa-building-columns" style="color: #3b82f6;"></i> Import Bank Statement</h3>
+        <form id="bankForm" onsubmit="uploadBankStatement(event)">
+            <div class="form-group" style="margin-bottom: 1rem;">
+                <label class="form-label">Bank Account Name / Number</label>
+                <input type="text" id="impBankAccount" class="form-control" placeholder="HDFC Bank - 5010023412" required value="HDFC Main Account">
+            </div>
+            <div class="form-group" style="margin-bottom: 1.25rem;">
+                <label class="form-label">Select File (.xlsx, .csv, or image photo)</label>
+                <input type="file" id="impBankFile" class="form-control" accept=".xlsx, .xls, .csv, .png, .jpg, .jpeg, .bmp, .webp" required>
+            </div>
+            <button type="submit" class="btn btn-primary" style="width: 100%;"><i class="fa-solid fa-upload"></i> Upload Bank Statement</button>
+        </form>
+    </div>
+</div>
+
+<!-- Aggregator Settlement Import Card -->
+<div class="glass-card" style="margin-bottom: 2rem;">
+    <h3 style="margin-bottom: 1rem; font-size: 1.1rem;"><i class="fa-solid fa-motorcycle" style="color: #f59e0b;"></i> Import Aggregator Settlement File (Zomato / Swiggy / Dineout)</h3>
+    <form id="aggForm" onsubmit="uploadAggregatorSettlement(event)" style="display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 1rem; align-items: flex-end;">
+        <div class="form-group">
+            <label class="form-label">Aggregator</label>
+            <select id="impAggregatorId" class="form-select" required>
+                {% for a in aggregators %}
+                <option value="{{ a.id }}">{{ a.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="form-group">
+            <label class="form-label">Branch</label>
+            <select id="impAggBranchId" class="form-select" required>
+                {% for b in branches %}
+                <option value="{{ b.id }}">{{ b.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="form-group">
+            <label class="form-label">Period Start</label>
+            <input type="date" id="impAggStart" class="form-control" required value="2026-04-01">
+        </div>
+        <div class="form-group">
+            <label class="form-label">Period End</label>
+            <input type="date" id="impAggEnd" class="form-control" required value="2026-04-05">
+        </div>
+        <div class="form-group" style="grid-column: span 3;">
+            <label class="form-label">Settlement File (.xlsx, .csv, or image photo)</label>
+            <input type="file" id="impAggFile" class="form-control" accept=".xlsx, .xls, .csv, .png, .jpg, .jpeg, .bmp, .webp" required>
+        </div>
+        <button type="submit" class="btn btn-primary" style="height: 42px;"><i class="fa-solid fa-upload"></i> Process Settlement</button>
+    </form>
+</div>
+
+<!-- Import Batch Log History Table -->
+<div class="glass-card">
+    <h3 style="margin-bottom: 1rem; font-size: 1.1rem;"><i class="fa-solid fa-list-check"></i> Import Batch Log History</h3>
+    <div class="table-responsive">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Batch ID</th>
+                    <th>Uploaded At</th>
+                    <th>File Type</th>
+                    <th>Filename</th>
+                    <th>Source</th>
+                    <th>Total Rows</th>
+                    <th>Success</th>
+                    <th>Failed</th>
+                    <th>Duplicates</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody id="batchLogTbody">
+                <tr><td colspan="10" style="text-align: center;">Loading Import Batches...</td></tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Image Import Preview & Confirm Modal -->
+<div class="modal-backdrop" id="imagePreviewModal">
+    <div class="modal-card" style="max-width: 1000px; width: 95%;">
+        <div class="modal-header">
+            <h3 style="font-size: 1.15rem;">Check figures</h3>
+            <div style="display: flex; gap: 0.5rem; align-items: center;">
+                <button type="button" class="btn btn-secondary" style="padding: 0.35rem 0.75rem; font-size: 0.8rem;" onclick="openOcrDetailsDrawer()">Details</button>
+                <button class="modal-close" onclick="closeModal('imagePreviewModal')">&times;</button>
+            </div>
+        </div>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem; max-height: 75vh; overflow-y: auto;">
+            <div style="background: #0b1120; padding: 0.75rem; border-radius: var(--radius-md); border: 1px solid var(--border-color); display: flex; align-items: center; justify-content: center;">
+                <img id="imgPreviewPic" src="" alt="Day book photo" style="max-width: 100%; max-height: 520px; object-fit: contain; border-radius: 6px; background: #111827;">
+            </div>
+
+            <form id="imageConfirmForm" onsubmit="submitConfirmedImageImport(event)">
+                <input type="hidden" id="imgConfirmAuditId" value="">
+
+                <div id="imgTotalMismatchBanner" style="display: none; background: rgba(239, 68, 68, 0.12); border: 1px solid rgba(239, 68, 68, 0.3); border-radius: 6px; padding: 0.5rem 0.7rem; margin-bottom: 0.75rem; font-size: 0.82rem; color: #f87171;">
+                    <span id="imgTotalMismatchText">Sheet total does not match. Please check figures.</span>
+                </div>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.65rem; margin-bottom: 0.65rem;">
+                    <div class="form-group">
+                        <label class="form-label">Branch</label>
+                        <select id="imgConfirmBranch" class="form-select" required>
+                            {% for b in branches %}
+                            <option value="{{ b.id }}">{{ b.name }} ({{ b.code }})</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Date</label>
+                        <input type="date" id="imgConfirmDate" class="form-control" required>
+                    </div>
+                </div>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.65rem; margin-bottom: 0.65rem;">
+                    <div class="form-group">
+                        <label class="form-label">Cash (₹)</label>
+                        <input type="number" step="0.01" id="imgConfirmCash" class="form-control" oninput="calcModalSalesTotal()" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Card (₹)</label>
+                        <input type="number" step="0.01" id="imgConfirmCard" class="form-control" oninput="calcModalSalesTotal()" required>
+                    </div>
+                </div>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0.5rem; margin-bottom: 0.65rem;">
+                    <div class="form-group">
+                        <label class="form-label">Zomato (₹)</label>
+                        <input type="number" step="0.01" id="imgConfirmZomato" class="form-control" oninput="calcModalSalesTotal()" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Swiggy (₹)</label>
+                        <input type="number" step="0.01" id="imgConfirmSwiggy" class="form-control" oninput="calcModalSalesTotal()">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Dineout (₹)</label>
+                        <input type="number" step="0.01" id="imgConfirmDineout" class="form-control" oninput="calcModalSalesTotal()">
+                    </div>
+                </div>
+
+                <div style="background: rgba(16, 185, 129, 0.08); border: 1px solid rgba(16, 185, 129, 0.25); border-radius: var(--radius-sm); padding: 0.5rem 0.75rem; margin-bottom: 0.75rem; display: flex; align-items: center; justify-content: space-between;">
+                    <span style="font-size: 0.85rem; font-weight: 600; color: var(--status-green);">Total</span>
+                    <span id="imgConfirmTotalSalesBar" style="font-size: 1.05rem; font-weight: 800; color: var(--status-green);">₹ 0.00</span>
+                </div>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 0.5rem; margin-bottom: 1rem;">
+                    <div class="form-group">
+                        <label class="form-label">Opening (₹)</label>
+                        <input type="number" step="0.01" id="imgConfirmOpening" class="form-control" oninput="calcModalSalesTotal()">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Closing (₹)</label>
+                        <input type="number" step="0.01" id="imgConfirmClosing" class="form-control">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Expenses (₹)</label>
+                        <input type="number" step="0.01" id="imgConfirmExpenses" class="form-control" oninput="calcModalSalesTotal()">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Salary adv. (₹)</label>
+                        <input type="number" step="0.01" id="imgConfirmSalaryAdv" class="form-control" oninput="calcModalSalesTotal()">
+                    </div>
+                </div>
+
+                <div style="display: flex; justify-content: flex-end; gap: 0.75rem;">
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('imagePreviewModal')">Cancel</button>
+                    <button type="submit" class="btn btn-success">Save</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- OCR Details Inspection Drawer Modal -->
+<div class="modal-backdrop" id="ocrDetailsModal">
+    <div class="modal-card" style="max-width: 950px; width: 95%;">
+        <div class="modal-header">
+            <h3 style="font-size: 1.15rem;"><i class="fa-solid fa-microscope" style="color: var(--primary);"></i> Raw OCR Response & Field Mapping Audit</h3>
+            <button class="modal-close" onclick="closeModal('ocrDetailsModal')">&times;</button>
+        </div>
+        <div style="max-height: 75vh; overflow-y: auto; padding-right: 0.5rem;">
+            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
+                <div style="background: #0b1120; padding: 0.5rem; border-radius: 6px; text-align: center;">
+                    <p style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 0.3rem;"><i class="fa-solid fa-layer-group"></i> Row Bounding Boxes</p>
+                    <img id="ocrDetailsBoxesImg" src="" style="max-width: 100%; max-height: 240px; object-fit: contain; border-radius: 4px; border: 1px solid var(--border-color);">
+                </div>
+                <div style="background: #0b1120; padding: 0.5rem; border-radius: 6px; text-align: center;">
+                    <p style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 0.3rem;"><i class="fa-solid fa-adjust"></i> Contrast Normalized</p>
+                    <img id="ocrDetailsPrepImg" src="" style="max-width: 100%; max-height: 240px; object-fit: contain; border-radius: 4px; border: 1px solid var(--border-color);">
+                </div>
+                <div style="background: #0b1120; padding: 0.5rem; border-radius: 6px; text-align: center;">
+                    <p style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 0.3rem;"><i class="fa-solid fa-crop-simple"></i> Cropped Amount Column</p>
+                    <img id="ocrDetailsCropImg" src="" style="max-width: 100%; max-height: 240px; object-fit: contain; border-radius: 4px; border: 1px solid var(--border-color);">
+                </div>
+            </div>
+
+            <h4 style="font-size: 0.95rem; margin-bottom: 0.5rem;"><i class="fa-solid fa-table-list"></i> Reconstructed Physical Table Rows & Amount-Column Consensus</h4>
+            <div class="table-responsive" style="margin-bottom: 1rem;">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Row #</th>
+                            <th>Description</th>
+                            <th>Amount Crop</th>
+                            <th>Extracted Amount</th>
+                            <th>Candidates & Reasoning</th>
+                            <th>Numeric Validation</th>
+                            <th>Status</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody id="ocrDetailsRowsTbody">
+                    </tbody>
+                </table>
+            </div>
+
+            <h4 style="font-size: 0.95rem; margin-bottom: 0.5rem;"><i class="fa-solid fa-code"></i> Extraction Trace JSON Log</h4>
+            <pre id="ocrDetailsRawJson" style="background: #090d16; color: #38bdf8; padding: 0.75rem; border-radius: 6px; font-size: 0.75rem; overflow-x: auto; max-height: 220px;"></pre>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        loadBatchLogs();
+        hideGeminiKeyIfSaved();
+    });
+
+    async function hideGeminiKeyIfSaved() {
+        const el = document.getElementById('impGeminiKey');
+        if (!el) return;
+        try {
+            const st = await apiFetch('/api/imports/ai-ocr-status');
+            el.style.display = (st && st.configured) ? 'none' : 'block';
+        } catch (e) {
+            el.style.display = 'none';
+        }
+    }
+
+    async function deleteImportBatch(batchId, filename) {
+        if (!confirm(`Are you sure you want to delete import batch #${batchId} (${filename})?\n\nThis will remove all sales, bank transactions, or settlement data imported in this file.`)) return;
+
+        const res = await apiFetch(`/api/imports/batch/${batchId}`, { method: 'DELETE' });
+        if (res) {
+            showToast(`Import Batch #${batchId} deleted successfully!`, 'success');
+            loadBatchLogs();
+        }
+    }
+
+    async function loadBatchLogs() {
+        const batches = await apiFetch('/api/imports/batches');
+        if (!batches) return;
+
+        const tbody = document.getElementById('batchLogTbody');
+        tbody.innerHTML = '';
+
+        if (batches.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="11" style="text-align: center; color: var(--text-muted);">No import batches logged yet.</td></tr>`;
+            return;
+        }
+
+        batches.forEach(b => {
+            let statusBadge = b.status === 'COMPLETED' ? '<span class="badge badge-reconciled">Completed</span>' :
+                              '<span class="badge badge-amber">' + b.status + '</span>';
+
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td>#${b.id}</td>
+                <td>${new Date(b.uploaded_at).toLocaleString()}</td>
+                <td><small>${b.file_type}</small></td>
+                <td><strong>${b.filename}</strong></td>
+                <td>${b.source_name}</td>
+                <td>${b.total_rows}</td>
+                <td style="color: var(--status-green);">${b.success_rows}</td>
+                <td style="color: var(--status-red);">${b.failed_rows}</td>
+                <td>${b.duplicate_rows}</td>
+                <td>${statusBadge}</td>
+                <td>
+                    <button class="btn btn-outline-pdf" style="padding: 0.35rem 0.65rem; font-size: 0.78rem;" onclick="deleteImportBatch(${b.id}, '${b.filename.replace(/'/g, "\\'")}')">
+                        <i class="fa-solid fa-trash"></i> Delete
+                    </button>
+                </td>
+            `;
+            tbody.appendChild(tr);
+        });
+    }
+
+    function setFieldInput(elId, val) {
+        const el = document.getElementById(elId);
+        if (!el) return;
+        if (val !== null && val !== undefined) {
+            el.value = val;
+        } else {
+            el.value = ""; // Leave blank for NOT DETECTED
+        }
+    }
+
+    function calcModalSalesTotal() {
+        const cash = parseFloat(document.getElementById('imgConfirmCash').value || 0);
+        const card = parseFloat(document.getElementById('imgConfirmCard').value || 0);
+        const zomato = parseFloat(document.getElementById('imgConfirmZomato').value || 0);
+        const swiggy = parseFloat(document.getElementById('imgConfirmSwiggy').value || 0);
+        const dineout = parseFloat(document.getElementById('imgConfirmDineout').value || 0);
+        const total = cash + card + zomato + swiggy + dineout;
+        const el = document.getElementById('imgConfirmTotalSalesBar');
+        if (el) el.innerText = formatINR(total);
+    }
+
+    let globalActiveAuditData = null;
+
+    function renderStatusBadge(elId, srcElId, fieldObj) {
+        const bEl = document.getElementById(elId);
+        const sEl = document.getElementById(srcElId);
+        if (!bEl || !fieldObj) return;
+
+        const valScore = Math.round(fieldObj.numeric_validation_score || 85);
+        const ocrConf = Math.round((fieldObj.ocr_confidence || fieldObj.confidence || 0.85) * 100);
+
+        if (fieldObj.status === 'CONFIRMED') {
+            bEl.className = 'badge badge-reconciled';
+            bEl.innerText = `✓ CONFIRMED (Val: ${valScore}%)`;
+            bEl.style.display = 'inline-block';
+        } else if (fieldObj.status === 'REVIEW_REQUIRED' || (fieldObj.status && fieldObj.status.startsWith('AMBIGUOUS'))) {
+            bEl.className = 'badge badge-amber';
+            bEl.innerText = `⚠ REVIEW REQUIRED (Val: ${valScore}%)`;
+            bEl.style.display = 'inline-block';
+        } else {
+            bEl.className = 'badge badge-unmatched';
+            bEl.innerText = `NOT DETECTED`;
+            bEl.style.display = 'inline-block';
+        }
+
+        if (sEl) {
+            let srcText = '';
+            if (fieldObj.source_row_id) {
+                srcText = `Source: Row #${fieldObj.source_row_id} (${fieldObj.source_description || fieldObj.raw_description || ''})`;
+            } else if (fieldObj.source_row) {
+                srcText = `Source: ${fieldObj.source_row}`;
+            } else {
+                srcText = 'Not detected in sheet — please verify';
+            }
+
+            if (fieldObj.value !== null) {
+                srcText += ` | OCR: ${ocrConf}% | Numeric Validation: ${valScore}%`;
+            }
+            sEl.innerText = srcText;
+        }
+    }
+
+    async function reprocessRow(rowId, yTop, yBottom) {
+        const fileInput = document.getElementById('impDailyFile');
+        if (!fileInput.files[0]) {
+            showToast('Original image file not found in file input.', 'warning');
+            return;
+        }
+
+        showToast(`Reprocessing Row #${rowId}...`, 'info');
+        const formData = new FormData();
+        formData.append('file', fileInput.files[0]);
+        formData.append('row_id', rowId);
+        formData.append('y_top', yTop);
+        formData.append('y_bottom', yBottom);
+
+        const updatedRow = await apiFetch('/api/imports/reprocess-row', {
+            method: 'POST',
+            body: formData
+        });
+
+        if (updatedRow && globalActiveAuditData) {
+            const rows = globalActiveAuditData.parsed_rows || [];
+            const idx = rows.findIndex(r => r.row_id === rowId);
+            if (idx !== -1) {
+                rows[idx] = updatedRow;
+            }
+            showToast(`Row #${rowId} reprocessed! Amount: ${updatedRow.amount !== null ? formatINR(updatedRow.amount) : 'Not detected'}`, 'success');
+            openOcrDetailsDrawer();
+        }
+    }
+
+    async function openOcrDetailsDrawer() {
+        if (!globalActiveAuditData) {
+            showToast('No active OCR session found.', 'warning');
+            return;
+        }
+
+        const data = globalActiveAuditData;
+        const boxesImg = document.getElementById('ocrDetailsBoxesImg');
+        if (boxesImg) boxesImg.src = data.annotated_row_boxes_b64 || data.image_b64;
+        document.getElementById('ocrDetailsPrepImg').src = data.preprocessed_image_b64 || data.image_b64;
+        document.getElementById('ocrDetailsCropImg').src = data.amount_crop_b64 || data.image_b64;
+
+        // Render Rows Table
+        const tbody = document.getElementById('ocrDetailsRowsTbody');
+        tbody.innerHTML = '';
+        const rows = data.parsed_rows || [];
+
+        if (rows.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="8" style="text-align: center; color: var(--text-muted);">No structured table rows extracted.</td></tr>`;
+        } else {
+            rows.forEach(r => {
+                const tr = document.createElement('tr');
+                const valScore = Math.round(r.numeric_validation_score || 80);
+                const amtValStr = r.amount !== null ? formatINR(r.amount) : (r.amount_status && r.amount_status.startsWith('AMBIGUOUS') ? '⚠️ Ambiguous' : 'Not detected');
+                
+                const amtCropImg = r.amount_crop_b64 ? 
+                    `<img src="data:image/jpeg;base64,${r.amount_crop_b64.replace('data:image/jpeg;base64,','')}" style="max-height: 28px; max-width: 90px; object-fit: contain; border-radius: 3px; border: 1px solid var(--border-color); background: #000;">` : 
+                    (r.row_crop_b64 ? `<img src="${r.row_crop_b64}" style="max-height: 28px; max-width: 90px; object-fit: contain; border-radius: 3px;">` : '-');
+
+                let candHtml = '';
+                if (r.candidates && r.candidates.length > 0) {
+                    candHtml = '<ul style="margin: 0; padding-left: 1rem; font-size: 0.70rem; color: var(--text-muted);">' + 
+                        r.candidates.map(c => `<li>${c.pass || 'Pass'}: <strong>${c.ocr_text || c.value}</strong></li>`).join('') + 
+                        '</ul>';
+                }
+                if (r.why_selected) {
+                    candHtml += `<div style="font-size: 0.68rem; color: #38bdf8; margin-top: 0.2rem; white-space: pre-line;">${r.why_selected}</div>`;
+                }
+                if (!candHtml) candHtml = `<small style="color: var(--text-muted);">${r.amount_raw || '-'}</small>`;
+
+                const stBadge = r.amount_status === 'CONFIRMED' ? 
+                    '<span class="badge badge-reconciled">✓ CONFIRMED</span>' : 
+                    (r.amount_status === 'REVIEW_REQUIRED' ? '<span class="badge badge-amber">⚠ REVIEW</span>' : '<span class="badge badge-unmatched">NOT DETECTED</span>');
+
+                tr.innerHTML = `
+                    <td><strong>Row #${r.row_id || r.row}</strong></td>
+                    <td><strong>${r.description_raw || r.description || '-'}</strong></td>
+                    <td style="text-align: center;">${amtCropImg}</td>
+                    <td><strong style="color: #38bdf8; font-size: 0.95rem;">${amtValStr}</strong></td>
+                    <td>${candHtml}</td>
+                    <td><strong style="color: ${valScore >= 80 ? 'var(--status-green)' : 'var(--status-amber)'};">${valScore}%</strong></td>
+                    <td>${stBadge}</td>
+                    <td>
+                        <button class="btn btn-secondary" style="padding: 0.2rem 0.45rem; font-size: 0.7rem;" onclick="reprocessRow(${r.row_id || r.row}, ${r.y_top || 0}, ${r.y_bottom || 0})">
+                            <i class="fa-solid fa-rotate"></i> Reprocess
+                        </button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        // Render Full Extraction Trace JSON Log
+        const traceData = data.extraction_trace || {
+            raw_ocr_detections: data.raw_ocr_response || [],
+            reconstructed_rows: data.parsed_rows || [],
+            classified_fields: data.fields || {}
+        };
+        document.getElementById('ocrDetailsRawJson').innerText = JSON.stringify(traceData, null, 2);
+
+        openModal('ocrDetailsModal');
+    }
+
+    async function uploadDailySales(e) {
+        e.preventDefault();
+        const branch_id = document.getElementById('impDailyBranch').value;
+        const fileInput = document.getElementById('impDailyFile');
+
+        if (!fileInput.files[0]) return;
+        const file = fileInput.files[0];
+        const ext = file.name.split('.').pop().toLowerCase();
+
+        const submitBtn = e.target ? e.target.querySelector('button[type="submit"]') : null;
+        const origBtnHtml = submitBtn ? submitBtn.innerHTML : '';
+        if (submitBtn) {
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Reading Image & Figures...';
+        }
+
+        try {
+            // If Image File -> Trigger Preview & Confirm Modal
+            if (['jpg', 'jpeg', 'png', 'bmp', 'webp'].includes(ext)) {
+                const geminiKey = (document.getElementById('impGeminiKey') || {}).value || '';
+                if (geminiKey.trim()) {
+                    await apiFetch('/api/imports/ai-ocr-key', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ key: geminiKey.trim() })
+                    });
+                    document.getElementById('impGeminiKey').value = '';
+                    document.getElementById('impGeminiKey').style.display = 'none';
+                }
+                showToast('Reading image with AI...', 'info');
+                const localPreviewUrl = URL.createObjectURL(file);
+                const formData = new FormData();
+                formData.append('file', file);
+
+                const data = await apiFetch('/api/imports/preview-image', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (data) {
+                    if (data.status === 'ERROR') {
+                        URL.revokeObjectURL(localPreviewUrl);
+                        showToast(`Image Processing Failed: ${data.error_detail}`, 'error');
+                        if ((data.last_step || '').includes('not configured')) {
+                            const keyBox = document.getElementById('impGeminiKey');
+                            if (keyBox) keyBox.style.display = 'block';
+                        }
+                        alert(`IMAGE EXTRACTION FAILED\n\nLast Step: ${data.last_step || 'UNKNOWN'}\nError: ${data.error_detail}`);
+                        return;
+                    }
+
+                    globalActiveAuditData = data;
+                    document.getElementById('imgConfirmAuditId').value = data.audit_id || '';
+                    const previewEl = document.getElementById('imgPreviewPic');
+                    previewEl.src = localPreviewUrl;
+                    document.getElementById('imgConfirmBranch').value = branch_id;
+                    document.getElementById('imgConfirmDate').value = data.date || new Date().toISOString().split('T')[0];
+
+                    // Set field values safely without converting null/NOT DETECTED to 0.0
+                    setFieldInput('imgConfirmCash', data.cash);
+                    setFieldInput('imgConfirmCard', data.card_qr);
+                    setFieldInput('imgConfirmZomato', data.zomato);
+                    setFieldInput('imgConfirmSwiggy', data.swiggy);
+                    setFieldInput('imgConfirmDineout', data.dineout);
+                    setFieldInput('imgConfirmOpening', data.opening_balance);
+                    setFieldInput('imgConfirmExpenses', data.site_expenses);
+                    setFieldInput('imgConfirmSalaryAdv', data.salary_advance);
+                    let closingVal = data.closing_balance;
+                    if (closingVal === null || closingVal === undefined) {
+                        const op = parseFloat(data.opening_balance || 0);
+                        const cashAmt = parseFloat(data.cash || 0);
+                        const exp = parseFloat(data.site_expenses || 0);
+                        const adv = parseFloat(data.salary_advance || 0);
+                        closingVal = Math.round((op + cashAmt - exp - adv) * 100) / 100;
+                    }
+                    setFieldInput('imgConfirmClosing', closingVal);
+
+                    const banner = document.getElementById('imgTotalMismatchBanner');
+                    if (data.handwritten_total && Math.abs(data.total_difference) > 1.0) {
+                        document.getElementById('imgTotalMismatchText').innerText =
+                            `Sheet total ${formatINR(data.handwritten_total)} vs ${formatINR(data.calculated_total)} — please check.`;
+                        banner.style.display = 'block';
+                    } else {
+                        banner.style.display = 'none';
+                    }
+
+                    calcModalSalesTotal();
+                    openModal('imagePreviewModal');
+                }
+                return;
+            }
+
+            // Excel or CSV File Upload
+            const formData = new FormData();
+            formData.append('branch_id', branch_id);
+            formData.append('file', file);
+
+            showToast('Uploading daily sales file...', 'info');
+            const res = await apiFetch('/api/imports/daily-sales', {
+                method: 'POST',
+                body: formData
+            });
+
+            if (res) {
+                showToast(`Daily Sales Import Completed! Success: ${res.success_rows}, Duplicates: ${res.duplicate_rows}`, 'success');
+                loadBatchLogs();
+            }
+        } catch (err) {
+            showToast(err.message || 'Image import failed', 'error');
+        } finally {
+            if (submitBtn) {
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = origBtnHtml;
+            }
+        }
+    }
+
+    async function submitConfirmedImageImport(e) {
+        e.preventDefault();
+        const payload = {
+            audit_id: parseInt(document.getElementById('imgConfirmAuditId').value || 0) || null,
+            branch_id: parseInt(document.getElementById('imgConfirmBranch').value),
+            sale_date: document.getElementById('imgConfirmDate').value,
+            cash: parseFloat(document.getElementById('imgConfirmCash').value || 0),
+            card_qr: parseFloat(document.getElementById('imgConfirmCard').value || 0),
+            zomato: parseFloat(document.getElementById('imgConfirmZomato').value || 0),
+            swiggy: parseFloat(document.getElementById('imgConfirmSwiggy').value || 0),
+            dineout: parseFloat(document.getElementById('imgConfirmDineout').value || 0),
+            opening_balance: parseFloat(document.getElementById('imgConfirmOpening').value || 0),
+            site_expenses: parseFloat(document.getElementById('imgConfirmExpenses').value || 0),
+            salary_advance: parseFloat(document.getElementById('imgConfirmSalaryAdv').value || 0),
+            closing_balance: parseFloat(document.getElementById('imgConfirmClosing').value || 0)
+        };
+
+        const res = await apiFetch('/api/imports/confirm-image-import', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+
+        if (res) {
+            showToast('Image register data confirmed and saved to Day Book & Cash Rec!', 'success');
+            closeModal('imagePreviewModal');
+            loadBatchLogs();
+        }
+    }
+
+    async function uploadBankStatement(e) {
+        e.preventDefault();
+        const bank_account = document.getElementById('impBankAccount').value;
+        const fileInput = document.getElementById('impBankFile');
+
+        if (!fileInput.files[0]) return;
+
+        const formData = new FormData();
+        formData.append('bank_account', bank_account);
+        formData.append('file', fileInput.files[0]);
+
+        showToast('Uploading bank statement file...', 'info');
+        const res = await apiFetch('/api/imports/bank-statement', {
+            method: 'POST',
+            body: formData
+        });
+
+        if (res) {
+            showToast(`Bank Statement Import Completed! Success: ${res.success_rows}`, 'success');
+            loadBatchLogs();
+        }
+    }
+
+    async function uploadAggregatorSettlement(e) {
+        e.preventDefault();
+        const aggregator_id = document.getElementById('impAggregatorId').value;
+        const branch_id = document.getElementById('impAggBranchId').value;
+        const period_start_date = document.getElementById('impAggStart').value;
+        const period_end_date = document.getElementById('impAggEnd').value;
+        const fileInput = document.getElementById('impAggFile');
+
+        if (!fileInput.files[0]) return;
+
+        const formData = new FormData();
+        formData.append('aggregator_id', aggregator_id);
+        formData.append('branch_id', branch_id);
+        formData.append('period_start_date', period_start_date);
+        formData.append('period_end_date', period_end_date);
+        formData.append('file', fileInput.files[0]);
+
+        showToast('Processing Aggregator Settlement file...', 'info');
+        const res = await apiFetch('/api/imports/aggregator-settlement', {
+            method: 'POST',
+            body: formData
+        });
+
+        if (res) {
+            showToast(`Settlement Processed! Gross: ${formatINR(res.gross_sales)}, Payout: ${formatINR(res.payout)}`, 'success');
+            loadBatchLogs();
+        }
+    }
+</script>
+{% endblock %}

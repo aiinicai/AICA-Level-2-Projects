@@ -1,0 +1,268 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Invoice QR → Excel (Offline)</title>
+<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@4.8.69/legacy/build/pdf.min.mjs" type="module"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<style>
+  :root{--bg:#faf7f2;--fg:#231f1a;--mut:#7a7169;--bd:#e2d9cd;--card:#fff;--pri:#b4531f}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.5 ui-sans-serif,system-ui,sans-serif}
+  .wrap{max-width:1100px;margin:0 auto;padding:28px 20px}
+  header{border-bottom:1px solid var(--bd);background:
+    linear-gradient(var(--bd) 1px,transparent 1px) 0 0/100% 26px}
+  h1{margin:8px 0 6px;font-size:34px;letter-spacing:-.5px}
+  .kicker{font:11px/1 ui-monospace,monospace;letter-spacing:.25em;text-transform:uppercase;color:var(--mut)}
+  #drop{border:2px dashed var(--bd);background:var(--card);border-radius:14px;padding:46px;text-align:center;cursor:pointer;transition:.15s}
+  #drop.hot,#drop:hover{border-color:var(--pri);background:#fff6ef}
+  button{border:1px solid var(--bd);background:var(--card);padding:10px 18px;border-radius:8px;font:inherit;cursor:pointer}
+  button.primary{background:var(--pri);color:#fff;border-color:var(--pri)}
+  button:disabled{opacity:.4;cursor:default}
+  .bar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:22px 0}
+  .status{font:12px ui-monospace,monospace;color:var(--mut)}
+  table{width:100%;border-collapse:collapse;background:var(--card);border:1px solid var(--bd);border-radius:12px;overflow:hidden;font-size:14px}
+  th{font:11px ui-monospace,monospace;text-transform:uppercase;letter-spacing:.08em;color:var(--mut);background:#f3ede4;text-align:left}
+  th,td{padding:10px 12px;border-bottom:1px solid var(--bd);vertical-align:top}
+  .tag{font:11px ui-monospace,monospace;padding:2px 7px;border-radius:5px;background:#f0e7db;color:var(--mut)}
+  .tag.ok{background:#fbe9dc;color:var(--pri)}.tag.err{background:#fde8e8;color:#b3261e}
+  dl{display:grid;grid-template-columns:1fr 1fr;gap:2px 22px;margin:0}
+  dl div{display:flex;gap:6px}dt{color:var(--mut)}dd{margin:0;font-weight:600;word-break:break-all}
+  .more{background:none;border:0;color:var(--pri);text-decoration:underline;font:12px ui-monospace,monospace;padding:6px 0}
+  footer{color:var(--mut);font:12px ui-monospace,monospace;margin:34px 0}
+</style>
+</head>
+<body>
+<header><div class="wrap">
+  <p class="kicker">Offline · nothing leaves your device</p>
+  <h1>Invoice QR → Excel</h1>
+  <p style="max-width:640px;color:var(--mut)">Drop invoice PDFs or scanned images. The QR is located anywhere on the page, decoded, parsed (incl. GST e-invoice signed QRs) and exported to a spreadsheet.</p>
+</div></header>
+
+<div class="wrap">
+  <div id="drop">
+    <div style="font-size:26px">▦</div>
+    <p style="font-size:17px;font-weight:600;margin:10px 0 4px">Drop invoices here or click to browse</p>
+    <p style="color:var(--mut);margin:0">PDF, PNG, JPG, WEBP — multiple files and multi-page PDFs supported</p>
+    <input id="file" type="file" multiple accept="application/pdf,image/*" hidden />
+  </div>
+
+  <div class="bar">
+    <button id="xls" class="primary" disabled>Download Excel (0)</button>
+    <button id="clr" disabled>Clear</button>
+    <span id="status" class="status"></span>
+  </div>
+
+  <table id="tbl" hidden>
+    <thead><tr><th>File</th><th>Page</th><th>Type</th><th>Decoded data</th></tr></thead>
+    <tbody></tbody>
+  </table>
+
+  <footer>All scanning happens locally in your browser — files are never uploaded.</footer>
+</div>
+
+<script type="module">
+import * as pdfjs from "https://cdn.jsdelivr.net/npm/pdfjs-dist@4.8.69/legacy/build/pdf.min.mjs";
+pdfjs.GlobalWorkerOptions.workerSrc = "https://cdn.jsdelivr.net/npm/pdfjs-dist@4.8.69/legacy/build/pdf.worker.min.mjs";
+
+/* ---------- parsing ---------- */
+const LABELS = {Irn:"IRN",IrnDt:"IRN Date",SellerGstin:"Seller GSTIN",BuyerGstin:"Buyer GSTIN",
+  DocNo:"Invoice No",DocTyp:"Doc Type",DocDt:"Invoice Date",TotInvVal:"Total Invoice Value",
+  ItemCnt:"Item Count",MainHsnCode:"Main HSN"};
+
+const b64url = p => decodeURIComponent(atob((p.replace(/-/g,"+").replace(/_/g,"/"))
+  + "=".repeat((4 - p.length % 4) % 4)).split("").map(c=>"%"+c.charCodeAt(0).toString(16).padStart(2,"0")).join(""));
+
+function flatten(o, prefix="", out={}){
+  if (o && typeof o === "object" && !Array.isArray(o)) {
+    for (const [k,v] of Object.entries(o)) {
+      const l = LABELS[k] ?? k;
+      flatten(v, prefix ? `${prefix} ${l}` : l, out);
+    }
+  } else if (Array.isArray(o)) out[prefix] = JSON.stringify(o);
+  else if (o != null) out[prefix] = String(o);
+  return out;
+}
+
+function parseQr(text){
+  const t = text.trim(), parts = t.split(".");
+  if (parts.length === 3 && /^[A-Za-z0-9_-]+$/.test(parts[0])) {
+    try {
+      const pl = JSON.parse(b64url(parts[1]));
+      const inner = typeof pl.data === "string" ? JSON.parse(pl.data) : pl;
+      return { type:"e-Invoice (signed QR)", fields: flatten(inner) };
+    } catch {}
+  }
+  if (t[0] === "{" || t[0] === "[") { try { return { type:"JSON", fields: flatten(JSON.parse(t)) }; } catch {} }
+  if (/^upi:\/\//i.test(t)) {
+    const m = {pa:"Payee VPA",pn:"Payee Name",am:"Amount",tn:"Note",tr:"Ref"}, f = {};
+    new URLSearchParams(t.split("?")[1] ?? "").forEach((v,k)=>f[m[k] ?? k]=v);
+    return { type:"UPI payment QR", fields:f };
+  }
+  if (/^https?:\/\//i.test(t)) return { type:"URL", fields:{ URL:t } };
+  const lines = t.split(/[\r\n|]+/).filter(Boolean), kv = {}; let hits = 0;
+  for (const ln of lines) { const m = ln.match(/^\s*([\w .#/-]{1,40})\s*[:=]\s*(.+)$/); if (m){ kv[m[1].trim()] = m[2].trim(); hits++; } }
+  if (hits && hits >= lines.length/2) return { type:"Key-value text", fields:kv };
+  return { type:"Text", fields:{ Text:t } };
+}
+
+/* ---------- image processing ---------- */
+function otsu(d){
+  const px = new Uint8ClampedArray(d.data), h = new Uint32Array(256);
+  const gray = i => Math.round(px[i]*.299 + px[i+1]*.587 + px[i+2]*.114);
+  for (let i=0;i<px.length;i+=4) h[gray(i)]++;
+  const total = d.width*d.height; let sum=0; for(let i=0;i<256;i++) sum += i*h[i];
+  let wB=0,sB=0,best=0,th=128;
+  for (let i=0;i<256;i++){ wB+=h[i]; if(!wB) continue; const wF=total-wB; if(!wF) break;
+    sB+=i*h[i]; const v=wB*wF*((sB/wB)-((sum-sB)/wF))**2; if(v>best){best=v;th=i;} }
+  for (let i=0;i<px.length;i+=4){ const v = gray(i)<th?0:255; px[i]=px[i+1]=px[i+2]=v; px[i+3]=255; }
+  return new ImageData(px,d.width,d.height);
+}
+function scanData(d, enhance=false){
+  const r = jsQR(d.data,d.width,d.height,{inversionAttempts:"attemptBoth"});
+  if (r?.data || !enhance) return r?.data ?? null;
+  const t = otsu(d);
+  return jsQR(t.data,t.width,t.height,{inversionAttempts:"attemptBoth"})?.data ?? null;
+}
+async function native(canvas){
+  try { if (!self.BarcodeDetector) return null;
+    return (await new BarcodeDetector({formats:["qr_code"]}).detect(canvas))[0]?.rawValue ?? null;
+  } catch { return null; }
+}
+async function scanCanvas(canvas){
+  const ctx = canvas.getContext("2d",{willReadFrequently:true});
+  if (!ctx) return null;
+  const n = await native(canvas); if (n) return n;
+  const hit = scanData(ctx.getImageData(0,0,canvas.width,canvas.height)); if (hit) return hit;
+  for (const div of [2,4]) {
+    const w = Math.floor(canvas.width/div), h = Math.floor(canvas.height/div);
+    const sx = Math.max(1,Math.floor(w*.8)), sy = Math.max(1,Math.floor(h*.8));
+    const xs = [...new Set([...Array(Math.ceil((canvas.width-w)/sx)+1).keys()].map(i=>Math.min(i*sx,canvas.width-w)).concat(canvas.width-w))];
+    const ys = [...new Set([...Array(Math.ceil((canvas.height-h)/sy)+1).keys()].map(i=>Math.min(i*sy,canvas.height-h)).concat(canvas.height-h))];
+    for (const y of ys) for (const x of xs) {
+      const r = scanData(ctx.getImageData(x,y,w,h), div===4); if (r) return r;
+    }
+  }
+  return null;
+}
+
+/* ---------- file handling ---------- */
+async function imageCanvas(file, maxSide=4200){
+  const url = URL.createObjectURL(file);
+  try {
+    const img = await new Promise((res,rej)=>{ const el=new Image(); el.onload=()=>res(el); el.onerror=()=>rej(new Error("Could not read image")); el.src=url; });
+    const s = Math.min(1, maxSide/Math.max(img.width,img.height));
+    const c = document.createElement("canvas");
+    c.width = Math.max(1,Math.round(img.width*s)); c.height = Math.max(1,Math.round(img.height*s));
+    c.getContext("2d").drawImage(img,0,0,c.width,c.height);
+    return c;
+  } finally { URL.revokeObjectURL(url); }
+}
+
+async function scanPdf(file, onPage){
+  const doc = await pdfjs.getDocument({ data: await file.arrayBuffer() }).promise;
+  const rows = [];
+  for (let p=1;p<=doc.numPages;p++){
+    onPage?.(p, doc.numPages);
+    const page = await doc.getPage(p);
+    let text = null;
+    for (const scale of [3,5]) {
+      const vp = page.getViewport({scale});
+      const c = document.createElement("canvas");
+      c.width = Math.round(vp.width); c.height = Math.round(vp.height);
+      const ctx = c.getContext("2d",{willReadFrequently:true});
+      ctx.fillStyle = "#fff"; ctx.fillRect(0,0,c.width,c.height);
+      await page.render({ canvasContext: ctx, viewport: vp }).promise;
+      text = await scanCanvas(c); if (text) break;
+    }
+    rows.push(text
+      ? { file:file.name, page:p, status:"Found", raw:text, ...parseQr(text) }
+      : { file:file.name, page:p, status:"No QR found", type:"-", raw:"", fields:{} });
+  }
+  return rows;
+}
+
+async function scanFile(file, onProgress){
+  try {
+    if (file.type === "application/pdf" || /\.pdf$/i.test(file.name)) return await scanPdf(file, onProgress);
+    const text = await scanCanvas(await imageCanvas(file));
+    return [ text
+      ? { file:file.name, page:1, status:"Found", raw:text, ...parseQr(text) }
+      : { file:file.name, page:1, status:"No QR found", type:"-", raw:"", fields:{} } ];
+  } catch (e) {
+    return [{ file:file.name, page:"-", status:"Error", type:"-", raw:String(e?.message ?? e), fields:{} }];
+  }
+}
+
+/* ---------- excel ---------- */
+function exportExcel(rows){
+  const keys = [];
+  rows.forEach(r => Object.keys(r.fields).forEach(k => keys.includes(k) || keys.push(k)));
+  const data = rows.map(r => {
+    const o = { File:r.file, Page:r.page, Status:r.status, "QR Type":r.type };
+    keys.forEach(k => o[k] = r.fields[k] ?? "");
+    o["Raw QR Data"] = r.raw; return o;
+  });
+  const ws = XLSX.utils.json_to_sheet(data);
+  ws["!cols"] = Object.keys(data[0] ?? {File:""}).map(k => ({ wch: Math.min(40, Math.max(12, k.length+4)) }));
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "QR Data");
+  XLSX.writeFile(wb, "qr-invoice-data.xlsx");
+}
+
+/* ---------- UI ---------- */
+const rows = [], $ = s => document.querySelector(s);
+const drop = $("#drop"), input = $("#file"), tbl = $("#tbl"), tbody = tbl.querySelector("tbody");
+const statusEl = $("#status"), xls = $("#xls"), clr = $("#clr");
+let openRow = null;
+
+const esc = s => String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+
+function render(){
+  tbl.hidden = rows.length === 0;
+  tbody.innerHTML = rows.map((r,i) => {
+    const e = Object.entries(r.fields), open = openRow === i, show = open ? e : e.slice(0,4);
+    const cls = r.status === "Found" ? "ok" : r.status === "Error" ? "err" : "";
+    const body = e.length === 0
+      ? `<span style="color:var(--mut)">${esc(r.raw || "—")}</span>`
+      : `<dl>${show.map(([k,v])=>`<div><dt>${esc(k)}:</dt><dd>${esc(v)}</dd></div>`).join("")}</dl>` +
+        (e.length > 4 ? `<button class="more" data-i="${i}">${open ? "show less" : `+${e.length-4} more fields`}</button>` : "");
+    return `<tr><td>${esc(r.file)}</td><td>${esc(r.page)}</td>
+      <td><span class="tag ${cls}">${esc(r.status === "Found" ? r.type : r.status)}</span></td>
+      <td>${body}</td></tr>`;
+  }).join("");
+  const found = rows.filter(r => r.status === "Found").length;
+  xls.textContent = `Download Excel (${found})`;
+  xls.disabled = found === 0; clr.disabled = rows.length === 0;
+}
+tbody.addEventListener("click", e => {
+  const b = e.target.closest(".more"); if (!b) return;
+  const i = +b.dataset.i; openRow = openRow === i ? null : i; render();
+});
+
+async function handle(files){
+  const list = [...files]; if (!list.length) return;
+  xls.disabled = clr.disabled = true;
+  for (let i=0;i<list.length;i++){
+    const f = list[i];
+    statusEl.textContent = `Scanning ${i+1}/${list.length}: ${f.name}`;
+    const res = await scanFile(f, (p,t) => statusEl.textContent = `Scanning ${i+1}/${list.length}: ${f.name} — page ${p}/${t}`);
+    rows.push(...res); render();
+  }
+  const found = rows.filter(r => r.status === "Found").length;
+  statusEl.textContent = `Done — ${found} QR code${found===1?"":"s"} found`;
+  render();
+}
+
+drop.addEventListener("click", () => input.click());
+drop.addEventListener("dragover", e => { e.preventDefault(); drop.classList.add("hot"); });
+drop.addEventListener("dragleave", () => drop.classList.remove("hot"));
+drop.addEventListener("drop", e => { e.preventDefault(); drop.classList.remove("hot"); handle(e.dataTransfer.files); });
+input.addEventListener("change", e => { handle(e.target.files); e.target.value = ""; });
+xls.addEventListener("click", () => exportExcel(rows));
+clr.addEventListener("click", () => { rows.length = 0; openRow = null; statusEl.textContent = ""; render(); });
+</script>
+</body>
+</html>

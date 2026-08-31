@@ -1,0 +1,279 @@
+{% extends "base.html" %}
+
+{% block page_title %}Users &amp; Rights{% endblock %}
+{% block page_kicker %}Add sub-users and decide what they can view, enter, or change after save{% endblock %}
+
+{% block content %}
+<div class="glass-card">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; gap: 1rem; flex-wrap: wrap;">
+        <div>
+            <h3 style="font-size: 1.1rem;"><i class="fa-solid fa-user-shield"></i> System users</h3>
+            <p class="field-source">Administrator can add staff and lock screens after data is entered.</p>
+        </div>
+        <button type="button" class="btn btn-primary" onclick="openUserModal()"><i class="fa-solid fa-plus"></i> Add user</button>
+    </div>
+    <div class="table-responsive">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>Email</th>
+                    <th>Role</th>
+                    <th>Branch</th>
+                    <th>Active</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody id="userTbody">
+                <tr><td colspan="6" style="text-align: center;">Loading users…</td></tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div class="modal-backdrop" id="userModal">
+    <div class="modal-card" style="max-width: 820px; width: 95%;">
+        <div class="modal-header">
+            <h3 style="font-size: 1.15rem;"><span id="userModalTitle">Add user</span></h3>
+            <button class="modal-close" onclick="closeModal('userModal')">&times;</button>
+        </div>
+        <form id="userForm" onsubmit="saveUser(event)">
+            <input type="hidden" id="userId" value="">
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; margin-bottom: 0.75rem;">
+                <div class="form-group">
+                    <label class="form-label">Full name</label>
+                    <input type="text" id="userName" class="form-control" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Email / login</label>
+                    <input type="text" id="userEmail" class="form-control" required autocomplete="off">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Password</label>
+                    <input type="password" id="userPassword" class="form-control" placeholder="Leave blank to keep current" autocomplete="new-password">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Role</label>
+                    <select id="userRole" class="form-select" required onchange="applyRoleDefaults()">
+                        {% for r in roles %}
+                        <option value="{{ r.id }}" data-name="{{ r.name }}">{{ r.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Branch (optional)</label>
+                    <select id="userBranch" class="form-select">
+                        <option value="">All / none</option>
+                        {% for b in branches %}
+                        <option value="{{ b.id }}">{{ b.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Active</label>
+                    <select id="userActive" class="form-select">
+                        <option value="true">Yes</option>
+                        <option value="false">No</option>
+                    </select>
+                </div>
+            </div>
+            <h4 style="font-size: 0.95rem; margin: 0.4rem 0 0.5rem;">What this user can do</h4>
+            <p class="field-source" style="margin-bottom: 0.55rem;">View opens the screen. Add / import lets them enter new figures. Edit after save lets them change a day that is already posted.</p>
+            <div class="table-responsive">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Screen</th>
+                            <th>View</th>
+                            <th>Add / import</th>
+                            <th>Edit after save</th>
+                        </tr>
+                    </thead>
+                    <tbody id="permTbody"></tbody>
+                </table>
+            </div>
+            <div style="display: flex; justify-content: flex-end; gap: 0.75rem; margin-top: 1rem;">
+                <button type="button" class="btn btn-secondary" onclick="closeModal('userModal')">Cancel</button>
+                <button type="submit" class="btn btn-primary">Save user</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="modal-backdrop" id="userDeleteModal" onclick="if (event.target === this) closeDeleteUser()">
+    <div class="modal-card" style="max-width: 480px;">
+        <div class="modal-header">
+            <h3><i class="fa-solid fa-triangle-exclamation" style="color:#9f1c14;"></i> Delete user?</h3>
+            <button type="button" class="modal-close" onclick="closeDeleteUser()"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+        <div class="warn-box">
+            <strong id="userDeleteName">This user</strong>
+            <p>Deleting removes this login. They will no longer be able to sign in. This cannot be undone.</p>
+            <p>Activity history stays in the audit log. You cannot delete your own login or the last Administrator.</p>
+        </div>
+        <div style="display:flex; gap:0.5rem; justify-content:flex-end; margin-top:1rem;">
+            <button type="button" class="btn btn-secondary" onclick="closeDeleteUser()">Cancel</button>
+            <button type="button" class="btn btn-danger" id="userDeleteConfirm" onclick="confirmDeleteUser()">Delete user</button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    let userCatalog = null;
+
+    document.addEventListener('DOMContentLoaded', () => {
+        loadUsers();
+        loadUserCatalog();
+    });
+
+    async function loadUserCatalog() {
+        userCatalog = await apiFetch('/api/users/catalog');
+        renderPermGrid();
+    }
+
+    function renderPermGrid(perms) {
+        const tbody = document.getElementById('permTbody');
+        if (!tbody || !userCatalog) return;
+        const source = perms || {};
+        tbody.innerHTML = userCatalog.modules.map((mod) => {
+            const row = source[mod.key] || { view: true, enter: false, edit_saved: false };
+            return `<tr>
+                <td><strong>${mod.label}</strong></td>
+                <td><input type="checkbox" class="perm-box" data-module="${mod.key}" data-action="view" ${row.view ? 'checked' : ''}></td>
+                <td><input type="checkbox" class="perm-box" data-module="${mod.key}" data-action="enter" ${row.enter ? 'checked' : ''}></td>
+                <td><input type="checkbox" class="perm-box" data-module="${mod.key}" data-action="edit_saved" ${row.edit_saved ? 'checked' : ''}></td>
+            </tr>`;
+        }).join('');
+    }
+
+    function collectPermissions() {
+        const perms = {};
+        document.querySelectorAll('.perm-box').forEach((box) => {
+            const mod = box.dataset.module;
+            if (!perms[mod]) perms[mod] = {};
+            perms[mod][box.dataset.action] = box.checked;
+        });
+        return perms;
+    }
+
+    function applyRoleDefaults() {
+        if (!userCatalog) return;
+        const opt = document.getElementById('userRole').selectedOptions[0];
+        const roleName = opt ? opt.dataset.name : '';
+        renderPermGrid((userCatalog.role_defaults || {})[roleName]);
+    }
+
+    async function loadUsers() {
+        const rows = await apiFetch('/api/users');
+        if (!rows) return;
+        const tbody = document.getElementById('userTbody');
+        const currentId = Number((window.APP_USER && window.APP_USER.id) || 0);
+        const activeAdmins = rows.filter((u) => u.role_name === 'Administrator' && u.is_active).length;
+        tbody.innerHTML = rows.map((u) => {
+            const isSelf = Number(u.id) === currentId;
+            const lastAdmin = u.role_name === 'Administrator' && u.is_active && activeAdmins < 2;
+            const deleteBtn = (isSelf || lastAdmin)
+                ? ''
+                : `<button type="button" class="btn btn-secondary btn-sm" data-user-id="${u.id}" data-user-name="${escUser(u.full_name)}" onclick="askDeleteUser(this)">Delete</button>`;
+            return `
+            <tr>
+                <td><strong>${escUser(u.full_name)}</strong></td>
+                <td>${escUser(u.email)}</td>
+                <td>${escUser(u.role_name)}</td>
+                <td>${escUser(u.branch_name || '—')}</td>
+                <td><span class="badge ${u.is_active ? 'badge-reconciled' : 'badge-pending'}">${u.is_active ? 'Active' : 'Inactive'}</span></td>
+                <td style="white-space:nowrap; text-align:right;">
+                    <button type="button" class="btn btn-secondary btn-sm" onclick='openUserModal(${JSON.stringify(u)})'>Edit</button>
+                    ${deleteBtn}
+                </td>
+            </tr>`;
+        }).join('');
+    }
+
+    function escUser(value) {
+        return String(value || '').replace(/[&<>"']/g, (ch) => ({
+            '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+        }[ch]));
+    }
+
+    let pendingUserDelete = { id: '', name: '' };
+
+    function askDeleteUser(btn) {
+        pendingUserDelete = {
+            id: btn && btn.dataset ? (btn.dataset.userId || '') : '',
+            name: btn && btn.dataset ? (btn.dataset.userName || 'this user') : 'this user'
+        };
+        document.getElementById('userDeleteName').textContent = pendingUserDelete.name;
+        document.getElementById('userDeleteModal').classList.add('active');
+    }
+
+    function closeDeleteUser() {
+        pendingUserDelete = { id: '', name: '' };
+        document.getElementById('userDeleteModal').classList.remove('active');
+    }
+
+    async function confirmDeleteUser() {
+        const id = pendingUserDelete.id;
+        if (!id) return;
+        const btn = document.getElementById('userDeleteConfirm');
+        btn.disabled = true;
+        try {
+            const res = await apiFetch(`/api/users/${encodeURIComponent(id)}`, { method: 'DELETE' });
+            if (!res) return;
+            showToast('User deleted', 'success');
+            closeDeleteUser();
+            await loadUsers();
+        } catch (err) {
+            /* apiFetch already shows the error */
+        } finally {
+            btn.disabled = false;
+        }
+    }
+
+    function openUserModal(user) {
+        document.getElementById('userId').value = user && user.id ? user.id : '';
+        document.getElementById('userModalTitle').innerText = user && user.id ? 'Edit user' : 'Add user';
+        document.getElementById('userName').value = user && user.full_name ? user.full_name : '';
+        document.getElementById('userEmail').value = user && user.email ? user.email : '';
+        document.getElementById('userPassword').value = '';
+        document.getElementById('userPassword').required = !(user && user.id);
+        document.getElementById('userPassword').placeholder = user && user.id ? 'Leave blank to keep current' : 'Minimum 5 characters';
+        if (user && user.role_id) document.getElementById('userRole').value = user.role_id;
+        document.getElementById('userBranch').value = user && user.branch_id ? user.branch_id : '';
+        document.getElementById('userActive').value = user && user.is_active === false ? 'false' : 'true';
+        if (user && user.permissions) renderPermGrid(user.permissions);
+        else applyRoleDefaults();
+        openModal('userModal');
+    }
+
+    async function saveUser(e) {
+        e.preventDefault();
+        const id = document.getElementById('userId').value;
+        const payload = {
+            full_name: document.getElementById('userName').value,
+            email: document.getElementById('userEmail').value,
+            role_id: parseInt(document.getElementById('userRole').value, 10),
+            branch_id: document.getElementById('userBranch').value ? parseInt(document.getElementById('userBranch').value, 10) : null,
+            is_active: document.getElementById('userActive').value === 'true',
+            permissions: collectPermissions()
+        };
+        const password = document.getElementById('userPassword').value;
+        if (password) payload.password = password;
+        if (!id && !password) {
+            showToast('Set a password for the new user.', 'error');
+            return;
+        }
+        const res = await apiFetch(id ? `/api/users/${id}` : '/api/users', {
+            method: id ? 'PUT' : 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+        if (!res) return;
+        showToast(id ? 'User updated' : 'User created', 'success');
+        closeModal('userModal');
+        loadUsers();
+    }
+</script>
+{% endblock %}
