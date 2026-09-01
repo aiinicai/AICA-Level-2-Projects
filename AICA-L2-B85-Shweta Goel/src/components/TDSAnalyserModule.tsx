@@ -28,6 +28,12 @@ export const TDSAnalyserModule: React.FC<TDSAnalyserModuleProps> = ({
 }) => {
   const isShortOrMissed = data.isShortDeduction || data.isTDSMissed || data.tdsVariance > 0;
 
+  // Filter out any obsolete Section 206AB recommendations (omitted effective April 1, 2025)
+  const validRecommendations = (data.caAuditRecommendations || []).filter((rec) => {
+    const lower = (rec || '').toLowerCase();
+    return !lower.includes('206ab') && !lower.includes('206 ab') && !(lower.includes('206') && lower.includes('non-filer'));
+  });
+
   return (
     <div className="space-y-4">
       
@@ -269,17 +275,17 @@ export const TDSAnalyserModule: React.FC<TDSAnalyserModuleProps> = ({
       </div>
 
       {/* Actionable CA Audit Recommendations */}
-      {data.caAuditRecommendations && data.caAuditRecommendations.length > 0 && (
+      {validRecommendations && validRecommendations.length > 0 && (
         <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs space-y-2.5">
           <div className="flex items-center gap-2">
             <ShieldAlert className="w-4 h-4 text-amber-600" />
             <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider">
-              Statutory Audit Recommendations &amp; Risk Mitigation ({data.caAuditRecommendations.length})
+              Statutory Audit Recommendations &amp; Risk Mitigation ({validRecommendations.length})
             </h4>
           </div>
 
           <div className="space-y-2">
-            {data.caAuditRecommendations.map((rec, i) => (
+            {validRecommendations.map((rec, i) => (
               <div 
                 key={i}
                 className="p-3 rounded-xl bg-slate-50 border border-slate-200 text-xs flex items-start gap-3"

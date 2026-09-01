@@ -16,7 +16,6 @@ import {
   Car,
   UtensilsCrossed,
   Building2,
-  Lock,
   ArrowRight
 } from 'lucide-react';
 
@@ -411,15 +410,6 @@ export const GSTBlockedCreditWindow: React.FC<GSTBlockedCreditWindowProps> = ({
               })}
             </tbody>
           </table>
-        </div>
-
-        {/* Section 17(5) Statutory Guidance Footnote */}
-        <div className="p-3 bg-slate-900 text-slate-300 text-[11px] border-t border-slate-800 flex items-start gap-2">
-          <Lock className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
-          <div>
-            <strong className="text-white">Why the App Flags This: </strong>
-            Under Section 17(5) of the Central Goods and Services Tax (CGST) Act, 2017, Input Tax Credit cannot be availed on specified negative-list supplies (such as passenger motor vehicles $\le 13$ seats and food/outdoor catering) even when received for business purposes and supported by valid tax invoices. Claiming blocked ITC in GSTR-3B Table 4(A)(5) triggers automated scrutiny notices under Section 73/74 with mandatory 18% p.a. interest.
-          </div>
         </div>
       </div>
 

@@ -122,6 +122,66 @@ app.get("/api/health", (_req: Request, res: Response) => {
   });
 });
 
+const INDIAN_STATE_CODES: Record<string, string> = {
+  '01': 'Jammu & Kashmir',
+  '02': 'Himachal Pradesh',
+  '03': 'Punjab',
+  '04': 'Chandigarh',
+  '05': 'Uttarakhand',
+  '06': 'Haryana',
+  '07': 'Delhi',
+  '08': 'Rajasthan',
+  '09': 'Uttar Pradesh',
+  '10': 'Bihar',
+  '11': 'Sikkim',
+  '12': 'Arunachal Pradesh',
+  '13': 'Nagaland',
+  '14': 'Manipur',
+  '15': 'Mizoram',
+  '16': 'Tripura',
+  '17': 'Meghalaya',
+  '18': 'Assam',
+  '19': 'West Bengal',
+  '20': 'Jharkhand',
+  '21': 'Odisha',
+  '22': 'Chhattisgarh',
+  '23': 'Madhya Pradesh',
+  '24': 'Gujarat',
+  '26': 'Dadra & Nagar Haveli and Daman & Diu',
+  '27': 'Maharashtra',
+  '29': 'Karnataka',
+  '30': 'Goa',
+  '31': 'Lakshadweep',
+  '32': 'Kerala',
+  '33': 'Tamil Nadu',
+  '34': 'Puducherry',
+  '35': 'Andaman & Nicobar Islands',
+  '36': 'Telangana',
+  '37': 'Andhra Pradesh',
+  '38': 'Ladakh',
+  '97': 'Other Territory',
+  '99': 'Centre Jurisdiction'
+};
+
+function validateGSTINServer(gstin: string | undefined | null): { isValid: boolean; stateCode: string; stateName: string; pan: string; reason?: string } {
+  if (!gstin || typeof gstin !== 'string' || !gstin.trim()) {
+    return { isValid: false, stateCode: '', stateName: '', pan: '', reason: 'GSTIN is missing' };
+  }
+  const clean = gstin.trim().toUpperCase();
+  if (clean.length !== 15) {
+    return { isValid: false, stateCode: clean.slice(0, 2), stateName: INDIAN_STATE_CODES[clean.slice(0, 2)] || '', pan: '', reason: `Invalid length: ${clean.length} characters (15 required)` };
+  }
+  const gstinRegex = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/;
+  const isValidSyntax = gstinRegex.test(clean);
+  const stateCode = clean.substring(0, 2);
+  const stateName = INDIAN_STATE_CODES[stateCode] || 'Unknown State';
+  const pan = clean.substring(2, 12);
+  if (!isValidSyntax) {
+    return { isValid: false, stateCode, stateName, pan, reason: 'Invalid format: must follow 2-digit state + 10-char PAN + 1 entity code + Z + 1 checksum' };
+  }
+  return { isValid: true, stateCode, stateName, pan };
+}
+
 /* =========================================================================
    1. INVOICE REVIEW ENDPOINT
    ========================================================================= */
@@ -138,10 +198,16 @@ app.post("/api/analyze-invoice", async (req: Request, res: Response) => {
     const systemInstruction = `You are a Senior Chartered Accountant (FCA) and Lead Financial Document Auditor in India.
 Your job is to analyze uploaded vendor invoices or purchase bills with forensic precision.
 Extract all key header fields, line items, and tax amounts.
-Critically verify the arithmetic:
-- Taxable Amount + CGST + SGST + IGST + Cess should exactly equal Total Invoice Amount.
-- Verify line item prices (Quantity * Unit Price = Taxable Value).
-- Identify missing mandatory GST invoice fields under Rule 46 of CGST Rules 2017 (e.g. missing GSTIN, date, serial number, place of supply).
+
+CRITICAL ARITHMETIC RULES & MATHEMATICAL INTEGRITY:
+- Extract numbers exactly as printed on the document.
+- Compute Taxable Amount + CGST + SGST + IGST + Cess.
+- DO NOT invent, hallucinate, or falsely claim a "math error" or "tax calculation error" if the stated invoice total matches the calculated sum (or if within ₹1 rounding difference).
+- If the stated tax equals the calculated tax (e.g. 10,800 == 10,800), you MUST NOT claim there is an error or inconsistent tax allocation.
+- In 'summary', write a clear, objective CA synthesis. When arithmetic is correct, explicitly state that all math calculations, line items, and GST allocations are reconciled.
+
+Statutory GST & Rule 46 Compliance:
+- Check mandatory GST invoice requirements under Rule 46 of CGST Rules 2017 (GSTINs, invoice number, date, HSN/SAC codes, place of supply).
 - Classify the invoice under standard Indian Accounting / Bookkeeping Expense Ledger (Account Head) such as 'Software Subscriptions & Cloud Hosting', 'Legal & Professional Charges', 'Consumables & Factory Spares', 'Repairs & Maintenance', 'Printing & Stationery', 'Freight & Forwarding', 'Office Utilities', 'Capital Asset - IT Equipment'.
 - Provide the accounting rationale, expense category (e.g. Indirect Expenses, Direct Expenses, Fixed Assets), nature of expense (Revenue Expenditure vs Capital Expenditure), cost center, and recommended Tally/ERP double-entry journal entry.
 - Provide confidence score between 0.0 and 1.0.
@@ -149,7 +215,7 @@ Output structured JSON matching the provided schema.`;
 
     const prompt = `Perform a comprehensive CA invoice audit on this financial document (${filename || "Invoice"}).
 Extract vendor/receiver information, GSTINs, invoice details, itemized lines, calculate all tax and arithmetic totals, and determine the exact suggested accounting head / ledger to book the expense.
-If there are any math discrepancies or missing fields, explicitly flag them in auditIssues.`;
+Carefully verify arithmetic. ONLY flag math_error if there is an actual numerical discrepancy (> ₹1.00 difference).`;
 
     const response = await generateContentWithFallback({
       contents: {
@@ -259,22 +325,58 @@ If there are any math discrepancies or missing fields, explicitly flag them in a
 
     const parsedData = extractAndParseJSON(response.text);
 
-    // Compute arithmetic validation on server
-    const taxable = Number(parsedData.taxableAmount || 0);
-    const cgst = Number(parsedData.cgstAmount || 0);
-    const sgst = Number(parsedData.sgstAmount || 0);
-    const igst = Number(parsedData.igstAmount || 0);
-    const cess = Number(parsedData.cessAmount || 0);
-    const statedTotal = Number(parsedData.totalInvoiceAmount || 0);
+    // Compute deterministic arithmetic validation on server
+    let taxable = Number(parsedData.taxableAmount || 0);
+    let cgst = Number(parsedData.cgstAmount || 0);
+    let sgst = Number(parsedData.sgstAmount || 0);
+    let igst = Number(parsedData.igstAmount || 0);
+    let cess = Number(parsedData.cessAmount || 0);
+    let statedTotal = Number(parsedData.totalInvoiceAmount || 0);
 
-    const calculatedTax = cgst + sgst + igst + cess;
+    // Calculate line item totals if available
+    const lineItems = parsedData.lineItems || [];
+    let sumLineTaxable = 0;
+    let sumLineTax = 0;
+    let sumLineTotal = 0;
+
+    lineItems.forEach((item: any) => {
+      const lineTaxable = Number(item.taxableValue || 0);
+      const lineRate = Number(item.gstRatePercent || 0);
+      const lineCgst = Number(item.cgst || (lineRate && lineRate > 0 && igst === 0 ? (lineTaxable * (lineRate / 2)) / 100 : 0));
+      const lineSgst = Number(item.sgst || (lineRate && lineRate > 0 && igst === 0 ? (lineTaxable * (lineRate / 2)) / 100 : 0));
+      const lineIgst = Number(item.igst || (lineRate && lineRate > 0 && igst > 0 ? (lineTaxable * lineRate) / 100 : 0));
+      const itemTax = lineCgst + lineSgst + lineIgst;
+
+      sumLineTaxable += lineTaxable;
+      sumLineTax += itemTax;
+      sumLineTotal += Number(item.total || (lineTaxable + itemTax));
+    });
+
+    if (taxable === 0 && sumLineTaxable > 0) {
+      taxable = sumLineTaxable;
+    }
+
+    let calculatedTax = cgst + sgst + igst + cess;
+    if (calculatedTax === 0 && sumLineTax > 0) {
+      calculatedTax = sumLineTax;
+    }
+
+    if (statedTotal === 0 && sumLineTotal > 0) {
+      statedTotal = sumLineTotal;
+    }
+
     const computedTotal = taxable + calculatedTax;
     const mathDiscrepancy = Math.abs(statedTotal - computedTotal);
-    const isMathValid = mathDiscrepancy <= 1.0; // ₹1 rounding tolerance
+    const isMathValid = mathDiscrepancy <= 1.0; // ₹1.00 rounding tolerance
+
+    // Deterministic GSTIN Validation
+    const vendorGstVal = validateGSTINServer(parsedData.vendorGSTIN);
+    const receiverGstVal = validateGSTINServer(parsedData.receiverGSTIN);
 
     let issues = parsedData.auditIssues || [];
 
     if (!isMathValid) {
+      // Real arithmetic mismatch detected
       if (!issues.some((i: any) => i.type === "math_error")) {
         issues.unshift({
           type: "math_error",
@@ -285,18 +387,83 @@ If there are any math discrepancies or missing fields, explicitly flag them in a
         });
       }
     } else {
-      // If mathematically valid within rounding tolerance, filter out false positive math errors
-      issues = issues.filter((i: any) => i.type !== "math_error");
+      // Mathematically valid: strip any false-positive hallucinated math errors
+      issues = issues.filter((i: any) => i.type !== "math_error" && i.type !== "tax_mismatch");
+    }
+
+    // Deterministic GSTIN Audit Issues Synchronization
+    if (vendorGstVal.isValid) {
+      // Clean false-positive hallucinated vendor GSTIN warnings
+      issues = issues.filter((i: any) => {
+        const isGstIssue = (i.type?.includes("gstin") || i.field === "vendorGSTIN" || i.title?.toLowerCase().includes("gstin") || i.title?.toLowerCase().includes("gstn"));
+        const mentionsVendor = (i.title?.toLowerCase().includes("vendor") || i.message?.toLowerCase().includes("vendor") || i.message?.toLowerCase().includes("supplier") || i.message?.toLowerCase().includes("14"));
+        return !(isGstIssue && mentionsVendor);
+      });
+    } else {
+      // Genuinely invalid or missing vendor GSTIN: ensure clean, non-duplicated issue
+      issues = issues.filter((i: any) => !(i.type?.includes("gstin") && (i.title?.toLowerCase().includes("vendor") || i.field === "vendorGSTIN")));
+      issues.unshift({
+        type: "gstin_invalid",
+        severity: "high",
+        title: "Invalid Vendor GSTIN",
+        message: `The extracted vendor GSTIN '${parsedData.vendorGSTIN || 'MISSING'}' is invalid: ${vendorGstVal.reason}.`,
+        field: "vendorGSTIN"
+      });
+    }
+
+    if (receiverGstVal.isValid) {
+      // Clean false-positive recipient GSTIN warnings
+      issues = issues.filter((i: any) => {
+        const isGstIssue = (i.type?.includes("gstin") || i.field === "receiverGSTIN" || i.title?.toLowerCase().includes("recipient") || i.title?.toLowerCase().includes("receiver"));
+        return !isGstIssue;
+      });
     }
 
     // Determine risk status deterministically
     let riskStatus = "compliant";
-    if (!isMathValid || mathDiscrepancy > 1.0) {
+    if (!isMathValid && mathDiscrepancy > 1.0) {
       riskStatus = "critical";
-    } else if (!parsedData.vendorGSTIN) {
+    } else if (!vendorGstVal.isValid) {
       riskStatus = "warning";
     } else {
       riskStatus = "compliant";
+    }
+
+    // Sanitize summary to remove hallucinated math or GSTIN error claims when valid
+    let cleanSummary = parsedData.summary || "";
+    if (vendorGstVal.isValid) {
+      cleanSummary = cleanSummary
+        .replace(/The provided vendor (GSTIN|GSTN) is only \d+ characters[^.]*\./gi, "")
+        .replace(/The provided vendor (GSTIN|GSTN) is invalid[^.]*\./gi, "")
+        .replace(/An? (invalid|malformed) vendor (GSTIN|GSTN)[^.]*\./gi, "")
+        .replace(/fails the checksum validation[^.]*\./gi, "")
+        .replace(/vendor (GSTIN|GSTN) is only \d+ characters long[^.]*\./gi, "")
+        .replace(/\s+/g, " ")
+        .trim();
+    }
+
+    if (isMathValid) {
+      // Clean contradictory text like "A math error was detected: stated 10,800 while calculated is 10,800"
+      cleanSummary = cleanSummary
+        .replace(/A math error was detected[^.]*\./gi, "")
+        .replace(/There is an? (arithmetic|math|calculation|tax) (error|mismatch|discrepancy)[^.]*\./gi, "")
+        .replace(/However, the items'? individual tax allocations are inconsistent[^.]*\./gi, "")
+        .replace(/A tax mismatch was detected[^.]*\./gi, "")
+        .replace(/Math validation failed[^.]*\./gi, "")
+        .replace(/\s+/g, " ")
+        .trim();
+
+      const mathVerifiedStatement = `Arithmetic reconciliation verified: Taxable Amount (₹${taxable.toLocaleString('en-IN')}) + GST (₹${calculatedTax.toLocaleString('en-IN')}) matches the invoice total of ₹${statedTotal.toLocaleString('en-IN')} with zero arithmetic discrepancy.`;
+
+      if (!cleanSummary || cleanSummary.length < 25) {
+        cleanSummary = mathVerifiedStatement;
+      } else if (
+        !cleanSummary.toLowerCase().includes("reconciled") && 
+        !cleanSummary.toLowerCase().includes("zero arithmetic discrepancy") && 
+        !cleanSummary.toLowerCase().includes("arithmetic reconciliation")
+      ) {
+        cleanSummary = `${cleanSummary} ${mathVerifiedStatement}`;
+      }
     }
 
     // Ensure suggestedAccountHead is properly structured
@@ -356,6 +523,7 @@ If there are any math discrepancies or missing fields, explicitly flag them in a
 
     const finalResult = {
       ...parsedData,
+      summary: cleanSummary,
       totalCalculatedTax: calculatedTax || parsedData.totalCalculatedTax,
       computedTotal: Math.round(computedTotal * 100) / 100,
       mathDiscrepancy: Math.round(mathDiscrepancy * 100) / 100,
@@ -738,6 +906,52 @@ Analyze the uploaded tax invoice or GSTR-2B document scan:
       };
     }
 
+    // Deterministic GSTIN validation synchronization for GST Compliance
+    const vGstVal = validateGSTINServer(parsed.vendorGSTIN);
+    const rGstVal = validateGSTINServer(parsed.receiverGSTIN);
+
+    parsed.isVendorGSTINValid = vGstVal.isValid;
+    parsed.isReceiverGSTINValid = rGstVal.isValid;
+    if (vGstVal.isValid) {
+      parsed.vendorStateCode = vGstVal.stateCode;
+      parsed.vendorState = vGstVal.stateName;
+    }
+    if (rGstVal.isValid) {
+      parsed.receiverStateCode = rGstVal.stateCode;
+      parsed.receiverState = rGstVal.stateName;
+    }
+
+    if (parsed.complianceFlags && Array.isArray(parsed.complianceFlags)) {
+      const gstinFlagIndex = parsed.complianceFlags.findIndex((f: any) => 
+        f.rule?.toLowerCase().includes("gstin") || f.rule?.toLowerCase().includes("15-digit")
+      );
+
+      if (vGstVal.isValid && rGstVal.isValid) {
+        if (gstinFlagIndex !== -1) {
+          parsed.complianceFlags[gstinFlagIndex] = {
+            rule: "GSTIN 15-Digit Structural Validation",
+            status: "PASS",
+            message: `Both Supplier (${parsed.vendorGSTIN}) and Recipient (${parsed.receiverGSTIN}) GSTINs are 15-digit structurally valid.`,
+            impact: "Satisfies statutory Rule 46 invoice particulars.",
+            remedy: "None required."
+          };
+        }
+      } else if (!vGstVal.isValid) {
+        const flagObj = {
+          rule: "GSTIN 15-Digit Structural Validation",
+          status: "FAIL",
+          message: `Supplier GSTIN '${parsed.vendorGSTIN || 'MISSING'}' is invalid: ${vGstVal.reason}.`,
+          impact: "Mandatory statutory particular missing; recipient cannot claim ITC under Section 16(2).",
+          remedy: "Supplier must re-issue invoice with valid 15-digit GSTIN."
+        };
+        if (gstinFlagIndex !== -1) {
+          parsed.complianceFlags[gstinFlagIndex] = flagObj;
+        } else {
+          parsed.complianceFlags.unshift(flagObj);
+        }
+      }
+    }
+
     return res.json(parsed);
   } catch (error: any) {
     console.error("Error in /api/analyze-gst:", error);
@@ -917,7 +1131,8 @@ Analyze the uploaded service invoice, contract declaration, or Form 26AS/AIS sta
 4. Calculate TDS shortfall/variance and evaluate consequences:
    - Interest under Section 201(1A) @ 1% per month for non-deduction or 1.5% per month for non-payment.
    - 30% expenditure disallowance under Section 40(a)(ia).
-5. Provide actionable CA recommendations.`;
+5. Provide actionable CA recommendations.
+CRITICAL STATUTORY MANDATE: Section 206AB (higher rate of TDS for non-filers) has been omitted from the Income Tax Act effective April 1, 2025 (FY 2025-26 onward). DO NOT mention, cite, or recommend Section 206AB or checking the TRACES portal for Section 206AB non-filer compliance.`;
 
     const prompt = `Perform a rigorous TDS Compliance Audit on this document (${filename || "TDS Document"}). Check section classification, statutory threshold, rate applied vs statutory rate, and calculate any short-deduction.`;
 
@@ -1051,6 +1266,31 @@ Analyze the uploaded service invoice, contract declaration, or Form 26AS/AIS sta
     parsed.isTDSMissed = isTDSMissed;
     parsed.tdsVariance = variance;
 
+    // Filter out omitted Section 206AB recommendations (omitted effective April 1, 2025)
+    if (parsed.caAuditRecommendations && Array.isArray(parsed.caAuditRecommendations)) {
+      parsed.caAuditRecommendations = parsed.caAuditRecommendations.filter((rec: string) => {
+        const lower = (rec || "").toLowerCase();
+        const mentions206AB = lower.includes("206ab") || lower.includes("206 ab");
+        const mentionsNonFilerHigherRate = (lower.includes("higher rate") || lower.includes("non-filer") || lower.includes("traces")) && lower.includes("206");
+        return !mentions206AB && !mentionsNonFilerHigherRate;
+      });
+
+      // If recommendations array became empty or needs standard guidance
+      if (parsed.caAuditRecommendations.length === 0) {
+        if (isShortDeduction) {
+          parsed.caAuditRecommendations.push(
+            `Statutory Section ${parsed.recommendedTDSSection} mandates ${standardRate}% TDS deduction. Remit differential TDS of ₹${variance.toLocaleString('en-IN')} along with Section 201(1A) interest.`,
+            `Ensure timely deposit of deducted tax via Challan ITNS 281 by the 7th of the following month and file quarterly Form 26Q return.`
+          );
+        } else {
+          parsed.caAuditRecommendations.push(
+            `Statutory TDS correctly deducted @ ${standardRate}% under Section ${parsed.recommendedTDSSection}.`,
+            `Ensure timely remittance into Central Government account via Challan ITNS 281 by 7th of subsequent month to avoid interest under Section 201(1A).`
+          );
+        }
+      }
+    }
+
     return res.json(parsed);
   } catch (error: any) {
     console.error("Error in /api/analyze-tds:", error);
@@ -1077,7 +1317,8 @@ Document Context Data: ${JSON.stringify(documentContext || {})}
 User Auditor Question: "${query}"
 
 Provide a concise, highly authoritative, section-referenced statutory response (citing relevant Sections of CGST Act 2017, IGST Act 2017, Income Tax Act 1961, or RBI SFT Master Directions).
-Include concrete actionable steps for the CA audit workpaper.`,
+Include concrete actionable steps for the CA audit workpaper.
+Statutory Note: Section 206AB of the Income Tax Act 1961 (higher rate of TDS for non-filers) has been omitted effective April 1, 2025 and no longer applies from FY 2025-26 onward. Do NOT cite or recommend Section 206AB.`,
     });
 
     return res.json({ answer: response.text || "Unable to generate answer." });

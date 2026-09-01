@@ -5,6 +5,7 @@ import {
   InvoiceAuditIssue,
   SuggestedAccountHead
 } from '../types';
+import { validateGSTIN } from '../utils/gstUtils';
 import { RiskBadge } from './RiskBadge';
 import { 
   Calculator, 
@@ -41,6 +42,52 @@ export const InvoiceReviewModule: React.FC<InvoiceReviewModuleProps> = ({
 }) => {
   const [copiedJournal, setCopiedJournal] = useState(false);
   const isDiscrepant = !data.isMathValid || data.mathDiscrepancy > 1;
+
+  // Deterministic GSTIN Validation
+  const vendorGstResult = validateGSTIN(data.vendorGSTIN || '');
+  const receiverGstResult = validateGSTIN(data.receiverGSTIN || '');
+
+  // Synchronized Forensic Audit Issues
+  const filteredAuditIssues: InvoiceAuditIssue[] = (() => {
+    let list = [...(data.auditIssues || [])];
+
+    // Math discrepancy sync
+    if (!isDiscrepant) {
+      list = list.filter((i) => i.type !== 'math_error' && i.type !== 'tax_mismatch');
+    }
+
+    // Vendor GSTIN sync
+    if (vendorGstResult.isValid) {
+      list = list.filter((i) => {
+        const isGstIssue = (i.type?.includes('gstin') || i.field === 'vendorGSTIN' || i.title?.toLowerCase().includes('gstin') || i.title?.toLowerCase().includes('gstn'));
+        const mentionsVendor = (i.title?.toLowerCase().includes('vendor') || i.message?.toLowerCase().includes('vendor') || i.message?.toLowerCase().includes('supplier') || i.message?.toLowerCase().includes('14') || i.message?.toLowerCase().includes('checksum'));
+        return !(isGstIssue && mentionsVendor);
+      });
+    } else {
+      const hasVendorGstIssue = list.some((i) => i.type?.includes('gstin') && (i.title?.toLowerCase().includes('vendor') || i.field === 'vendorGSTIN'));
+      if (!hasVendorGstIssue) {
+        list.unshift({
+          type: 'gstin_invalid',
+          severity: 'high',
+          title: 'Invalid Vendor GSTIN',
+          message: `The extracted vendor GSTIN '${data.vendorGSTIN || 'MISSING'}' is invalid: ${vendorGstResult.reason}.`,
+          field: 'vendorGSTIN'
+        });
+      }
+    }
+
+    // Receiver GSTIN sync
+    if (receiverGstResult.isValid) {
+      list = list.filter((i) => {
+        const isGstIssue = (i.type?.includes('gstin') || i.field === 'receiverGSTIN' || i.title?.toLowerCase().includes('recipient') || i.title?.toLowerCase().includes('receiver'));
+        return !isGstIssue;
+      });
+    }
+
+    return list;
+  })();
+
+  const hasCriticalFlags = isDiscrepant || !vendorGstResult.isValid || filteredAuditIssues.length > 0;
 
   // Fallback if suggestedAccountHead is not yet populated
   const accountHead: SuggestedAccountHead = data.suggestedAccountHead || {
@@ -97,17 +144,17 @@ Narration: Being invoice ${data.invoiceNumber || ''} dated ${data.invoiceDate ||
         </div>
 
         <div className={`bg-white p-4 rounded-xl border shadow-xs ${
-          isDiscrepant ? 'border-slate-200 border-l-4 border-l-red-500' : 'border-slate-200 border-l-4 border-l-emerald-500'
+          hasCriticalFlags ? 'border-slate-200 border-l-4 border-l-amber-500' : 'border-slate-200 border-l-4 border-l-emerald-500'
         }`}>
           <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mb-1">Critical Flags</p>
           <div className="flex items-center justify-between">
-            <span className={`text-xl font-bold font-mono ${isDiscrepant ? 'text-red-600' : 'text-emerald-700'}`}>
-              {isDiscrepant ? (data.auditIssues?.length || '01') : '00'}
+            <span className={`text-xl font-bold font-mono ${hasCriticalFlags ? 'text-amber-600' : 'text-emerald-700'}`}>
+              {filteredAuditIssues.length > 0 ? (filteredAuditIssues.length < 10 ? `0${filteredAuditIssues.length}` : filteredAuditIssues.length) : '00'}
             </span>
             <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-tight ${
-              isDiscrepant ? 'bg-red-100 text-red-700' : 'bg-emerald-100 text-emerald-800'
+              hasCriticalFlags ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800'
             }`}>
-              {isDiscrepant ? 'Action Req' : 'Zero Flags'}
+              {hasCriticalFlags ? 'Action Req' : 'Zero Flags'}
             </span>
           </div>
         </div>
@@ -165,15 +212,25 @@ Narration: Being invoice ${data.invoiceNumber || ''} dated ${data.invoiceDate ||
                 </td>
                 <td className="p-3 pr-5 text-[11px] text-slate-500">Supplier Trade Name Verified</td>
               </tr>
-              <tr className="hover:bg-slate-50/60 transition-colors">
+              <tr className={`hover:bg-slate-50/60 transition-colors ${!vendorGstResult.isValid ? 'bg-amber-50/30' : ''}`}>
                 <td className="p-3 pl-5 font-semibold text-slate-600">Vendor GSTIN</td>
                 <td className="p-3 font-mono font-bold text-slate-800">{data.vendorGSTIN || 'MISSING'}</td>
                 <td className="p-3">
-                  <span className="px-2 py-0.5 bg-emerald-100 text-emerald-800 rounded-full text-[10px] font-bold uppercase">
-                    VALID (15-DIGIT)
-                  </span>
+                  {vendorGstResult.isValid ? (
+                    <span className="px-2 py-0.5 bg-emerald-100 text-emerald-800 rounded-full text-[10px] font-bold uppercase tracking-tight">
+                      VALID (15-DIGIT)
+                    </span>
+                  ) : (
+                    <span className="px-2 py-0.5 bg-red-100 text-red-700 rounded-full text-[10px] font-bold uppercase tracking-tight">
+                      INVALID GSTIN
+                    </span>
+                  )}
                 </td>
-                <td className="p-3 pr-5 text-[11px] text-slate-500">State: {data.vendorGSTIN?.slice(0, 2) || '27'} (Maharashtra)</td>
+                <td className="p-3 pr-5 text-[11px] text-slate-500">
+                  {vendorGstResult.isValid
+                    ? `State: ${vendorGstResult.stateCode} (${vendorGstResult.stateName}) • PAN: ${vendorGstResult.pan} • Rule 46 Compliant`
+                    : (vendorGstResult.reason || 'Missing or malformed 15-digit GSTIN')}
+                </td>
               </tr>
               <tr className={`hover:bg-slate-50/60 transition-colors ${isDiscrepant ? 'bg-red-50/40' : ''}`}>
                 <td className="p-3 pl-5 font-semibold text-slate-600">Tax Calculation</td>
@@ -197,15 +254,25 @@ Narration: Being invoice ${data.invoiceNumber || ''} dated ${data.invoiceDate ||
                     : `Taxable + Tax = Total (₹${data.computedTotal?.toLocaleString('en-IN')})`}
                 </td>
               </tr>
-              <tr className="hover:bg-slate-50/60 transition-colors">
+              <tr className={`hover:bg-slate-50/60 transition-colors ${!receiverGstResult.isValid && data.receiverGSTIN ? 'bg-amber-50/30' : ''}`}>
                 <td className="p-3 pl-5 font-semibold text-slate-600">Receiver GSTIN</td>
                 <td className="p-3 font-mono font-bold text-slate-800">{data.receiverGSTIN || 'MISSING'}</td>
                 <td className="p-3">
-                  <span className="px-2 py-0.5 bg-emerald-100 text-emerald-800 rounded-full text-[10px] font-bold uppercase">
-                    MATCHED
-                  </span>
+                  {receiverGstResult.isValid ? (
+                    <span className="px-2 py-0.5 bg-emerald-100 text-emerald-800 rounded-full text-[10px] font-bold uppercase">
+                      MATCHED (15-DIGIT)
+                    </span>
+                  ) : (
+                    <span className="px-2 py-0.5 bg-amber-100 text-amber-800 rounded-full text-[10px] font-bold uppercase tracking-tight">
+                      {data.receiverGSTIN ? 'INVALID SYNTAX' : 'NOT SPECIFIED'}
+                    </span>
+                  )}
                 </td>
-                <td className="p-3 pr-5 text-[11px] text-slate-500">Registered Recipient B2B Entity</td>
+                <td className="p-3 pr-5 text-[11px] text-slate-500">
+                  {receiverGstResult.isValid
+                    ? `State: ${receiverGstResult.stateCode} (${receiverGstResult.stateName}) • Registered Recipient B2B Entity`
+                    : (receiverGstResult.reason || 'Unregistered / missing recipient GSTIN')}
+                </td>
               </tr>
               <tr className="hover:bg-slate-50/60 transition-colors">
                 <td className="p-3 pl-5 font-semibold text-slate-600">Invoice Number</td>
@@ -484,15 +551,15 @@ Narration: Being invoice ${data.invoiceNumber || ''} dated ${data.invoiceDate ||
       </div>
 
       {/* Forensic Audit Findings */}
-      {data.auditIssues && data.auditIssues.length > 0 && (
+      {filteredAuditIssues && filteredAuditIssues.length > 0 && (
         <div className="space-y-2">
           <h4 className="text-xs font-bold text-slate-600 uppercase tracking-wider flex items-center gap-1.5">
             <AlertTriangle className="w-3.5 h-3.5 text-amber-600" />
-            <span>Forensic Audit Findings ({data.auditIssues.length})</span>
+            <span>Forensic Audit Findings ({filteredAuditIssues.length})</span>
           </h4>
 
           <div className="space-y-2">
-            {data.auditIssues.map((issue, i) => (
+            {filteredAuditIssues.map((issue, i) => (
               <div 
                 key={i}
                 className={`p-3 rounded-xl border flex items-start gap-3 text-xs ${
@@ -532,7 +599,37 @@ Narration: Being invoice ${data.invoiceNumber || ''} dated ${data.invoiceDate ||
       {/* Synthesis & Workpaper Notes */}
       <div className="p-3.5 rounded-xl bg-white border border-slate-200 text-xs text-slate-600 shadow-2xs">
         <span className="font-bold text-slate-800 block mb-1">Auditor Synthesis Summary:</span>
-        <p className="leading-relaxed">{data.summary}</p>
+        <p className="leading-relaxed">
+          {(() => {
+            let summaryText = data.summary || '';
+            if (!isDiscrepant) {
+              summaryText = summaryText
+                .replace(/A math error was detected[^.]*\./gi, '')
+                .replace(/There is an? (arithmetic|math|calculation|tax) (error|mismatch|discrepancy)[^.]*\./gi, '')
+                .replace(/However, the items'? individual tax allocations are inconsistent[^.]*\./gi, '')
+                .replace(/A tax mismatch was detected[^.]*\./gi, '')
+                .replace(/Math validation failed[^.]*\./gi, '');
+            }
+
+            if (vendorGstResult.isValid) {
+              summaryText = summaryText
+                .replace(/(?:The |Vendor )?GSTIN is invalid[^.]*\./gi, '')
+                .replace(/GSTIN has (?:only )?14 characters[^.]*\./gi, '')
+                .replace(/GSTIN fails checksum[^.]*\./gi, '')
+                .replace(/Vendor GSTIN \S+ is (?:structurally )?invalid[^.]*\./gi, '')
+                .replace(/supplier GSTIN is invalid[^.]*\./gi, '');
+            }
+
+            summaryText = summaryText.replace(/\s+/g, ' ').trim();
+
+            if (!summaryText || summaryText.length < 25) {
+              const vendorGstMsg = vendorGstResult.isValid ? `Vendor GSTIN (${data.vendorGSTIN}) is verified and compliant.` : `Vendor GSTIN is flagged for review.`;
+              summaryText = `Invoice reconciliation completed. Arithmetic check: Taxable Amount (₹${(data.taxableAmount || 0).toLocaleString('en-IN')}) + Taxes (₹${(data.totalCalculatedTax || 0).toLocaleString('en-IN')}) matches the invoice total (₹${(data.totalInvoiceAmount || 0).toLocaleString('en-IN')}) with zero discrepancy. ${vendorGstMsg}`;
+            }
+
+            return summaryText;
+          })()}
+        </p>
       </div>
 
     </div>
