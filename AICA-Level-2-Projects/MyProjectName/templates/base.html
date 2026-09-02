@@ -1,0 +1,433 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en-IN" data-theme="{{ current_theme|default:'' }}">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{% block title %}Home{% endblock %} | Fixed Asset Register</title>
+<script>
+  // Applied before any CSS loads, so there is no flash of the wrong theme.
+  (function () {
+    var html = document.documentElement;
+    var serverTheme = html.getAttribute('data-theme');
+    if (serverTheme) {
+      try { localStorage.setItem('far_theme', serverTheme); } catch (e) {}
+    } else {
+      var saved = null;
+      try { saved = localStorage.getItem('far_theme'); } catch (e) {}
+      html.setAttribute('data-theme', saved || 'navy');
+    }
+  })();
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Sora:wght@600;700;800&display=swap" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+<style>
+  /* ============ Theme tokens ============ */
+  :root,
+  html[data-theme="navy"] {
+    --bg: #f3f5f9;
+    --surface: #ffffff;
+    --surface-alt: #ffffff;
+    --border: #e3e7ee;
+    --text: #1c2434;
+    --text-muted: #667085;
+    --primary: #0b2545;
+    --primary-hover: #143a6b;
+    --primary-soft: #e8edf6;
+    --accent: #1d8fa8;
+    --grad-1: #0b2545;
+    --grad-2: #17588a;
+    --shadow: 0 1px 2px rgba(16, 24, 40, .06), 0 1px 3px rgba(16, 24, 40, .08);
+    --shadow-lg: 0 8px 24px rgba(16, 24, 40, .10);
+  }
+  html[data-theme="midnight"] {
+    --bg: #0d111b;
+    --surface: #161c2b;
+    --surface-alt: #121826;
+    --border: #263049;
+    --text: #e7ecf7;
+    --text-muted: #93a0bd;
+    --primary: #4f8dfb;
+    --primary-hover: #6ea1ff;
+    --primary-soft: #1c2a48;
+    --accent: #34d3d8;
+    --grad-1: #0a0e18;
+    --grad-2: #16233f;
+    --shadow: 0 1px 2px rgba(0, 0, 0, .4), 0 1px 3px rgba(0, 0, 0, .5);
+    --shadow-lg: 0 12px 28px rgba(0, 0, 0, .5);
+  }
+  html[data-theme="emerald"] {
+    --bg: #f2f9f5;
+    --surface: #ffffff;
+    --surface-alt: #ffffff;
+    --border: #d7ebe0;
+    --text: #142a20;
+    --text-muted: #5c7568;
+    --primary: #0d7a4e;
+    --primary-hover: #0a6340;
+    --primary-soft: #e2f4ea;
+    --accent: #2fae7a;
+    --grad-1: #0b5c3b;
+    --grad-2: #12925c;
+    --shadow: 0 1px 2px rgba(16, 40, 28, .07), 0 1px 3px rgba(16, 40, 28, .09);
+    --shadow-lg: 0 8px 24px rgba(16, 40, 28, .12);
+  }
+  html[data-theme="slate"] {
+    --bg: #f1f3f6;
+    --surface: #ffffff;
+    --surface-alt: #ffffff;
+    --border: #dde2e9;
+    --text: #1d2531;
+    --text-muted: #66707d;
+    --primary: #35415a;
+    --primary-hover: #232c40;
+    --primary-soft: #e7eaf0;
+    --accent: #6b7a92;
+    --grad-1: #1e2739;
+    --grad-2: #3a475f;
+    --shadow: 0 1px 2px rgba(20, 26, 38, .06), 0 1px 3px rgba(20, 26, 38, .08);
+    --shadow-lg: 0 8px 24px rgba(20, 26, 38, .10);
+  }
+  html[data-theme="indigo"] {
+    --bg: #f5f4fc;
+    --surface: #ffffff;
+    --surface-alt: #ffffff;
+    --border: #e3e0f6;
+    --text: #251c47;
+    --text-muted: #6d6389;
+    --primary: #4c3a9e;
+    --primary-hover: #3c2e82;
+    --primary-soft: #ece8fb;
+    --accent: #8562f2;
+    --grad-1: #3a2b80;
+    --grad-2: #5c3fc9;
+    --shadow: 0 1px 2px rgba(40, 24, 80, .07), 0 1px 3px rgba(40, 24, 80, .09);
+    --shadow-lg: 0 8px 24px rgba(40, 24, 80, .13);
+  }
+  html[data-theme="amber"] {
+    --bg: #fbf7f0;
+    --surface: #ffffff;
+    --surface-alt: #ffffff;
+    --border: #f1e3cc;
+    --text: #3b2a14;
+    --text-muted: #8a7658;
+    --primary: #b45309;
+    --primary-hover: #92400e;
+    --primary-soft: #fbead2;
+    --accent: #f2994a;
+    --grad-1: #8a3d0a;
+    --grad-2: #c2650f;
+    --shadow: 0 1px 2px rgba(60, 40, 10, .07), 0 1px 3px rgba(60, 40, 10, .09);
+    --shadow-lg: 0 8px 24px rgba(60, 40, 10, .12);
+  }
+
+  /* ============ Base ============ */
+  * { transition: background-color .18s ease, border-color .18s ease, color .18s ease; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: "Inter", system-ui, -apple-system, sans-serif;
+  }
+  h1, h2, h3, h4, h5, h6, .brand-font { font-family: "Sora", "Inter", sans-serif; }
+  a { color: var(--primary); text-decoration: none; }
+  a:hover { color: var(--primary-hover); }
+  ::selection { background: var(--primary-soft); color: var(--text); }
+  ::-webkit-scrollbar { width: 10px; height: 10px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 6px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
+
+  /* ============ Navbar ============ */
+  .navbar-far {
+    background: linear-gradient(120deg, var(--grad-1), var(--grad-2));
+    box-shadow: 0 2px 10px rgba(0,0,0,.15);
+    padding-top: .65rem;
+    padding-bottom: .65rem;
+  }
+  .navbar-far .navbar-brand {
+    color: #fff !important;
+    font-family: "Sora", sans-serif;
+    font-weight: 700;
+    font-size: 1.15rem;
+    letter-spacing: .01em;
+    display: flex;
+    align-items: center;
+    gap: .55rem;
+  }
+  .navbar-far .navbar-brand .brand-icon {
+    width: 34px; height: 34px; border-radius: 9px;
+    background: rgba(255,255,255,.16);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.05rem;
+  }
+  .navbar-far .nav-link, .navbar-far .navbar-text { color: rgba(255,255,255,.92) !important; }
+  .user-chip {
+    background: rgba(255,255,255,.12);
+    border-radius: 999px;
+    padding: .3rem .8rem;
+    font-size: .82rem;
+    color: #fff;
+    display: flex; align-items: center; gap: .4rem;
+  }
+
+  /* ============ Theme picker ============ */
+  .theme-toggle-btn {
+    width: 36px; height: 36px; border-radius: 999px; border: 2px solid rgba(255,255,255,.5);
+    background: linear-gradient(135deg, var(--primary), var(--accent));
+    display: inline-flex; align-items: center; justify-content: center; color: #fff;
+    cursor: pointer;
+  }
+  .theme-menu { min-width: 268px; padding: .6rem; border-radius: .9rem; border: 1px solid var(--border); box-shadow: var(--shadow-lg); }
+  .theme-menu-title { font-size: .72rem; text-transform: uppercase; letter-spacing: .06em; color: var(--text-muted); padding: .3rem .5rem; }
+  .theme-option {
+    display: flex; align-items: center; gap: .6rem; width: 100%; border: none; background: transparent;
+    padding: .5rem .55rem; border-radius: .55rem; text-align: left; font-size: .88rem; color: var(--text);
+  }
+  .theme-option:hover { background: var(--primary-soft); }
+  .theme-option.active { background: var(--primary-soft); font-weight: 600; }
+  .theme-swatch { width: 26px; height: 26px; border-radius: 999px; flex-shrink: 0; box-shadow: inset 0 0 0 2px rgba(255,255,255,.5); }
+  .theme-swatch-navy { background: linear-gradient(135deg, #0b2545, #1d8fa8); }
+  .theme-swatch-midnight { background: linear-gradient(135deg, #0a0e18, #4f8dfb); }
+  .theme-swatch-emerald { background: linear-gradient(135deg, #0b5c3b, #2fae7a); }
+  .theme-swatch-slate { background: linear-gradient(135deg, #1e2739, #6b7a92); }
+  .theme-swatch-indigo { background: linear-gradient(135deg, #3a2b80, #8562f2); }
+  .theme-swatch-amber { background: linear-gradient(135deg, #8a3d0a, #f2994a); }
+  .theme-check { margin-left: auto; color: var(--primary); }
+
+  /* ============ Sidebar ============ */
+  .sidebar { min-height: calc(100vh - 62px); background: var(--surface-alt); border-right: 1px solid var(--border); padding-top: 1.1rem; }
+  .sidebar a {
+    color: var(--text); opacity: .82; padding: .5rem .8rem; border-radius: .55rem; display: flex;
+    align-items: center; gap: .6rem; font-size: .89rem; margin: .05rem .5rem;
+  }
+  .sidebar a i { width: 18px; text-align: center; color: var(--text-muted); }
+  .sidebar a.active, .sidebar a:hover { background: var(--primary-soft); opacity: 1; text-decoration: none; }
+  .sidebar a.active { font-weight: 600; }
+  .sidebar a.active i { color: var(--primary); }
+  .sidebar h6 { font-size: .68rem; text-transform: uppercase; letter-spacing: .07em; color: var(--text-muted); margin: 1.1rem 1rem .35rem; font-weight: 700; }
+
+  /* ============ Content & cards ============ */
+  .content-wrap { padding: 1.6rem; animation: fadeUp .35s ease; }
+  @keyframes fadeUp { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+  .stat-card {
+    background: var(--surface); border: 1px solid var(--border); border-radius: .85rem;
+    box-shadow: var(--shadow);
+  }
+  .stat-card.hoverable { transition: transform .18s ease, box-shadow .18s ease; }
+  .stat-card.hoverable:hover { transform: translateY(-2px); box-shadow: var(--shadow-lg); }
+  .badge-status { font-size: .72rem; }
+  footer.far-footer { color: var(--text-muted); font-size: .8rem; padding: 1.2rem 1.6rem; }
+
+  table.table thead th {
+    font-size: .74rem; text-transform: uppercase; letter-spacing: .04em; color: var(--text-muted);
+    border-top: none; border-bottom: 1px solid var(--border);
+  }
+  table.table td, table.table th { border-color: var(--border); }
+  .table-hover > tbody > tr:hover > * { background-color: var(--primary-soft); }
+
+  .card, .card-body { background: var(--surface); color: var(--text); border-color: var(--border); }
+  .list-group-item {
+    background: var(--surface); color: var(--text); border-color: var(--border);
+  }
+  .list-group-item-action:hover, .list-group-item-action:focus { background: var(--primary-soft); color: var(--text); }
+  .form-control, .form-select {
+    background: var(--surface); color: var(--text); border-color: var(--border);
+  }
+  .form-control:focus, .form-select:focus {
+    border-color: var(--primary); box-shadow: 0 0 0 .2rem var(--primary-soft);
+  }
+  .form-control::placeholder { color: var(--text-muted); opacity: .7; }
+  .form-control:disabled, .form-select:disabled { background: var(--bg); color: var(--text-muted); }
+  .modal-content { background: var(--surface); color: var(--text); border-color: var(--border); }
+  .modal-header, .modal-footer { border-color: var(--border); }
+  .dropdown-menu { background: var(--surface); color: var(--text); border-color: var(--border); box-shadow: var(--shadow-lg); }
+  .dropdown-item { color: var(--text); }
+  .dropdown-item:hover, .dropdown-item:focus { background: var(--primary-soft); color: var(--text); }
+  .nav-tabs { border-color: var(--border); }
+  .nav-tabs .nav-link { color: var(--text-muted); border-color: transparent; }
+  .nav-tabs .nav-link.active { background: var(--surface); color: var(--text); border-color: var(--border) var(--border) var(--surface); }
+  .badge.bg-light { background: var(--primary-soft) !important; color: var(--text) !important; }
+  .table {
+    --bs-table-bg: var(--surface);
+    --bs-table-color: var(--text);
+    --bs-table-striped-bg: var(--primary-soft);
+    --bs-table-striped-color: var(--text);
+    --bs-table-hover-bg: var(--primary-soft);
+    --bs-table-hover-color: var(--text);
+    color: var(--text);
+  }
+  .pagination .page-link { background: var(--surface); color: var(--text); border-color: var(--border); }
+  .pagination .page-item.active .page-link { background: var(--primary); border-color: var(--primary); color: #fff; }
+  hr { border-color: var(--border); }
+  .text-muted { color: var(--text-muted) !important; }
+
+  /* Buttons themed explicitly so every theme's brand color shows through, */
+  /* independent of Bootstrap's own compiled primary color. */
+  .btn-primary { background: var(--primary); border-color: var(--primary); }
+  .btn-primary:hover, .btn-primary:focus, .btn-primary:active { background: var(--primary-hover) !important; border-color: var(--primary-hover) !important; }
+  .btn-outline-primary { color: var(--primary); border-color: var(--primary); }
+  .btn-outline-primary:hover { background: var(--primary); border-color: var(--primary); }
+  .btn-outline-secondary { color: var(--text-muted); border-color: var(--border); }
+  .btn-outline-secondary:hover { background: var(--text-muted); border-color: var(--text-muted); }
+
+  .qr-frame { border: 2px dashed var(--border); border-radius: .6rem; padding: .5rem; display:inline-block; background: var(--surface); }
+
+  .alert { border: 1px solid var(--border); border-radius: .65rem; }
+
+  @media (max-width: 767.98px) {
+    .sidebar { min-height: auto; }
+  }
+</style>
+{% block extra_head %}{% endblock %}
+</head>
+<body>
+<nav class="navbar navbar-expand-lg navbar-far px-3">
+  <a class="navbar-brand" href="{% url 'dashboard' %}">
+    <span class="brand-icon"><i class="bi bi-diagram-3"></i></span>
+    Fixed Asset Register
+  </a>
+  <div class="ms-auto d-flex align-items-center gap-2">
+    <div class="dropdown">
+      <button class="theme-toggle-btn" type="button" data-bs-toggle="dropdown" aria-expanded="false" title="Choose a theme">
+        <i class="bi bi-palette2"></i>
+      </button>
+      <div class="dropdown-menu dropdown-menu-end theme-menu">
+        <div class="theme-menu-title">Choose a theme</div>
+        {% for value, label in THEME_CHOICES %}
+        <button type="button" class="theme-option" data-theme-value="{{ value }}">
+          <span class="theme-swatch theme-swatch-{{ value }}"></span>
+          <span>{{ label }}</span>
+          <i class="bi bi-check-lg theme-check d-none"></i>
+        </button>
+        {% endfor %}
+      </div>
+    </div>
+    {% if user.is_authenticated %}
+      <span class="user-chip">
+        <i class="bi bi-person-circle"></i>
+        {{ user.get_full_name|default:user.username }}
+        {% if is_admin_cfo %}<span class="badge bg-warning text-dark ms-1">Admin/CFO</span>{% endif %}
+      </span>
+      <form method="post" action="{% url 'accounts:logout' %}" class="m-0">
+        {% csrf_token %}
+        <button type="submit" class="btn btn-sm btn-outline-light">Log out</button>
+      </form>
+    {% else %}
+      <a href="{% url 'accounts:login' %}" class="btn btn-sm btn-outline-light">Log in</a>
+    {% endif %}
+  </div>
+</nav>
+
+<div class="container-fluid">
+  <div class="row">
+    {% if user.is_authenticated %}
+    <nav class="col-12 col-md-2 sidebar py-3" id="far-sidebar">
+      <h6>Register</h6>
+      <a href="{% url 'dashboard' %}"><i class="bi bi-speedometer2"></i>Dashboard</a>
+      <a href="{% url 'assets:list' %}"><i class="bi bi-boxes"></i>Asset master</a>
+      <a href="{% url 'assets:cwip_list' %}"><i class="bi bi-tools"></i>CWIP & capitalisation</a>
+      <a href="{% url 'assets:capex_list' %}"><i class="bi bi-clipboard-check"></i>Capex requisitions</a>
+      <h6>Lifecycle</h6>
+      <a href="{% url 'verification:scan_home' %}"><i class="bi bi-qr-code-scan"></i>QR scan</a>
+      <a href="{% url 'verification:cycle_list' %}"><i class="bi bi-check2-square"></i>Physical verification</a>
+      <a href="{% url 'transfers:list' %}"><i class="bi bi-arrow-left-right"></i>Transfers</a>
+      <a href="{% url 'disposal:list' %}"><i class="bi bi-trash3"></i>Disposal / write-off</a>
+      <a href="{% url 'assets:revaluation_list' %}"><i class="bi bi-graph-up-arrow"></i>Revaluation & impairment</a>
+      <h6>Location</h6>
+      <a href="{% url 'locations:tree' %}"><i class="bi bi-geo-alt"></i>Location map</a>
+      <a href="{% url 'locations:locator' %}"><i class="bi bi-search"></i>Asset locator</a>
+      <h6>Governance</h6>
+      <a href="{% url 'assets:approval_inbox' %}"><i class="bi bi-inboxes"></i>Approvals inbox</a>
+      <a href="{% url 'assets:bulk_import' %}"><i class="bi bi-upload"></i>Bulk import / export</a>
+      <h6>Compliance</h6>
+      <a href="{% url 'compliance:home' %}"><i class="bi bi-file-earmark-bar-graph"></i>Reports & exports</a>
+      {% if user.is_staff %}
+      <h6>Admin</h6>
+      <a href="/admin/"><i class="bi bi-gear"></i>Django admin</a>
+      {% endif %}
+    </nav>
+    <main class="col-12 col-md-10 content-wrap">
+    {% else %}
+    <main class="col-12 content-wrap">
+    {% endif %}
+      {% if messages %}
+        {% for message in messages %}
+          <div class="alert alert-{{ message.tags|default:'info' }} alert-dismissible fade show far-alert" role="alert">
+            {{ message }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+          </div>
+        {% endfor %}
+      {% endif %}
+      {% block content %}{% endblock %}
+    </main>
+  </div>
+</div>
+
+<footer class="far-footer">
+  Fixed Asset Register — built for Companies Act 2013 · Ind AS · CARO 2020 compliance.
+  Reference-only tooling; confirm statutory positions with your auditor / PCS.
+</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+  // --- Theme picker: instant apply, localStorage, and server persistence for signed-in users ---
+  (function () {
+    function getCookie(name) {
+      var value = "; " + document.cookie;
+      var parts = value.split("; " + name + "=");
+      if (parts.length === 2) return parts.pop().split(";").shift();
+      return null;
+    }
+    function markActive(theme) {
+      document.querySelectorAll(".theme-option").forEach(function (btn) {
+        var isActive = btn.getAttribute("data-theme-value") === theme;
+        btn.classList.toggle("active", isActive);
+        btn.querySelector(".theme-check").classList.toggle("d-none", !isActive);
+      });
+    }
+    var current = document.documentElement.getAttribute("data-theme") || "navy";
+    markActive(current);
+
+    document.querySelectorAll(".theme-option").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        var theme = btn.getAttribute("data-theme-value");
+        document.documentElement.setAttribute("data-theme", theme);
+        try { localStorage.setItem("far_theme", theme); } catch (e) {}
+        markActive(theme);
+        {% if user.is_authenticated %}
+        fetch("{% url 'accounts:set_theme' %}", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "X-CSRFToken": getCookie("csrftoken") },
+          body: JSON.stringify({ theme: theme }),
+        }).catch(function () {});
+        {% endif %}
+      });
+    });
+  })();
+
+  // --- Highlight the current section in the sidebar ---
+  (function () {
+    var path = window.location.pathname;
+    document.querySelectorAll("#far-sidebar a").forEach(function (a) {
+      var href = a.getAttribute("href");
+      if (href && href !== "/" && path.indexOf(href) === 0) a.classList.add("active");
+      if (href === "/" && path === "/") a.classList.add("active");
+    });
+  })();
+
+  // --- Auto-dismiss alerts after a few seconds ---
+  (function () {
+    document.querySelectorAll(".far-alert").forEach(function (el) {
+      setTimeout(function () {
+        var alert = bootstrap.Alert.getOrCreateInstance(el);
+        if (alert) alert.close();
+      }, 6000);
+    });
+  })();
+</script>
+{% block extra_js %}{% endblock %}
+</body>
+</html>

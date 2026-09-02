@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block title %}Depreciation run{% endblock %}
+{% block content %}
+<h4>Run depreciation</h4>
+<p class="text-muted small">Posts a frozen, re-creatable snapshot for the period — Schedule II (books) or Income Tax Act (block/WDV), run independently.</p>
+<form method="post" class="row g-3 mb-4">
+  {% csrf_token %}
+  <div class="col-md-3">
+    <label class="form-label small">Entity</label>
+    <select name="entity" class="form-select" required>{% for e in entities %}<option value="{{ e.pk }}">{{ e.name }}</option>{% endfor %}</select>
+  </div>
+  <div class="col-md-2">
+    <label class="form-label small">Book</label>
+    <select name="book" class="form-select">
+      <option value="SCHEDULE_II">Schedule II (books)</option>
+      <option value="INCOME_TAX">Income Tax Act</option>
+    </select>
+  </div>
+  <div class="col-md-3">
+    <label class="form-label small">Period start</label>
+    <input type="date" name="period_start" class="form-control" required>
+  </div>
+  <div class="col-md-3">
+    <label class="form-label small">Period end</label>
+    <input type="date" name="period_end" class="form-control" required>
+  </div>
+  <div class="col-md-1 d-flex align-items-end"><button class="btn btn-primary w-100">Run</button></div>
+</form>
+
+<h6>Recent runs</h6>
+<div class="card stat-card p-3">
+<table class="table table-sm">
+  <thead><tr><th>Book</th><th>Entity</th><th>Period</th><th>Run by</th><th>Run at</th></tr></thead>
+  <tbody>
+  {% for r in recent_runs %}
+    <tr><td>{{ r.get_book_display }}</td><td>{{ r.entity }}</td><td>{{ r.period_start }} → {{ r.period_end }}</td><td>{{ r.run_by }}</td><td>{{ r.run_at }}</td></tr>
+  {% empty %}<tr><td colspan="5" class="text-muted">No runs yet.</td></tr>{% endfor %}
+  </tbody>
+</table>
+</div>
+{% endblock %}
