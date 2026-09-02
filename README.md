@@ -1,26 +1,14 @@
-# Ledger Reconciliation & Reporting Desktop App
+# Upload Your Project Folder to the AICA Level 2 Projects Repository
 
-## Files
-- `reconciliation_app.py` - desktop application
-- `requirements.txt` - Python dependencies
-- `Install_and_Run.bat` - installs dependencies and opens the app
+**Target repository:** [aiinicai/AICA-Level-2-Projects](https://github.com/aiinicai/AICA-Level-2-Projects)
 
-## Usage
-1. Install Python 3.10+.
-2. Double-click `Install_and_Run.bat`.
-3. Select Company Books and Party Books.
-4. Enter the reconciliation/cut-off date.
-5. Select an output folder.
-6. Click Run Reconciliation & Generate Reports.
+This guide explains how to contribute your complete project folder to the **AICA-Level-2-Projects** repository using GitHub’s **Fork + Pull Request** workflow.
 
-## Supported input
-Excel, CSV, PDF and JPEG/PNG images.
+Two methods are covered:
 
-## Important OCR note
-For image OCR, install the Tesseract OCR Windows engine separately and ensure it is available in PATH. The application does not fabricate unreadable transactions. Complex scanned PDFs may require manual review.
+1. **Website-only method** — no software installation required.
+2. **Git command-line method** — recommended for complete project folders and projects containing many files.
 
-## Current matching logic
-The app normalizes dates, references, narrations, debit/credit values and balances, then attempts evidence-based transaction matching. Ambiguous matches are flagged as review items rather than silently accepted.
 ---
 
 ## Fork + Pull Request Workflow
@@ -278,4 +266,3 @@ Please verify the following:
 
 If your Pull Request is still open, make the required changes in the same fork and branch, then commit and push them. GitHub will automatically add the new commits to the existing Pull Request.
 
-This is a practical starter version and should be validated against your accounting workflow before relying on it for statutory or final financial reporting.
