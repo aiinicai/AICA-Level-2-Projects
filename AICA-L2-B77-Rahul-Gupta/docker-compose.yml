@@ -1,0 +1,40 @@
+version: "3.9"
+
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: companyval
+      POSTGRES_PASSWORD: companyval
+      POSTGRES_DB: companyval
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+  backend:
+    build: ./backend
+    environment:
+      DATABASE_URL: postgresql+psycopg://companyval:companyval@db:5432/companyval
+      FRONTEND_URL: http://localhost:5173
+      UPLOAD_DIR: /storage/uploads
+      RENDER_DIR: /storage/rendered_pages
+      REPORT_DIR: /storage/reports
+    volumes:
+      - ./storage:/storage
+    ports:
+      - "8000:8000"
+    depends_on:
+      - db
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "5173:5173"
+    environment:
+      VITE_API_URL: http://localhost:8000
+    depends_on:
+      - backend
+
+volumes:
+  pgdata:

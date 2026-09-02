@@ -1,0 +1,164 @@
+# MASTER EXECUTION PROMPT: PII MASKING & UNMASKING TOOL (PRODUCTION FINAL V4)
+## Client / Project: CA Arpan Jhaveri | ICAI Level 2 AI Capstone Project
+
+You are the complete senior engineering team: Lead Software Architect, Principal Python Developer, Cybersecurity & Privacy Engineer, Cryptography Specialist, UI/UX Designer, and DevSecOps Engineer.
+
+Your task is to generate the complete, production-grade, executive-level, single-file Python desktop application:
+"PII Masking and Unmasking Tool - CA Arpan Jhaveri" (PII_Masking_Unmasking_Tool_CA_Arpan_Jhaveriv4.py).
+
+---
+
+### 1. CORE MISSION & NON-NEGOTIABLE PRINCIPLES
+1. 100% Offline & Sovereign: Zero cloud, zero external API calls, zero LLM integration, zero telemetry, zero analytics, zero auto-update. All data parsing, masking, encryption, and unmasking occur strictly on the local machine.
+2. Single-File Delivery: Deliver the entire application in ONE self-contained .py file compatible with Python 3.11 - 3.14+ on Windows 10/11 x64.
+3. Pure GUI Portability: Use Python built-in tkinter and ttk for the graphical interface (zero external GUI framework dependencies like PyQt/PySide), styled with modern executive themes and high-contrast visuals.
+4. Resilient Bootstrap with Standard-Library Fallbacks:
+   - Provide a first-run user-consented bootstrap for optional accelerators (cryptography, argon2-cffi, pypdf, Pillow, pytesseract).
+   - If missing or declined, the tool must function 100% using standard-library fallbacks (hashlib.scrypt, hmac, secrets, pure Python string/XML manipulation).
+5. Priority Order:
+   Security > Privacy > Data Integrity > Document Format Fidelity > Usability > Performance
+
+---
+
+### 2. ARCHITECTURE & SECURITY CONTROLS (SG01 - SG40)
+
+1. Offline Enforcement Kernel (SG01/SG02):
+   - Monkey-patch socket.socket.connect, connect_ex, sendto, getaddrinfo, and socket.create_connection to immediately raise NetworkBlocked for any non-loopback IO/hostname (127.0.0.1, ::1, localhost).
+   - Include a live probe method OfflineKernel.probe() to verify that socket requests to the outside world are unconditionally blocked.
+2. In-Memory Security & Secret Wrapping (SG07/SG08/SG40):
+   - Implement a Secret container wrapping sensitive strings in a bytearray.
+   - Provide explicit zeroization / shredding (shred()) and sanitize representations (<SECRET:len>) to prevent leakage in debug logs or memory traces.
+3. Secure Ephemeral Storage & DoD 5220.22-M Shredder (SG03/SG04/SG05/SG06):
+   - Implement SessionTemp for isolated temporary directories, automatically purged on exit.
+   - Prevent Path Traversal by resolving canonical paths (is_relative_to).
+   - Perform atomic file writing via temporary files + rename.
+   - Implement 3-pass DoD 5220.22-M secure file shredding (0x00, 0xFF, secrets.token_bytes) before file deletion.
+4. PII-Safe Cryptographic Audit Logging (SG27):
+   - Implement an audit logger that pseudonymizes all logged entities using HMAC-SHA256 with an ephemeral per-session key.
+   - Log structured JSON-Lines with timestamps, operation types, file sizes, and detection metrics - never plaintext PII.
+5. ReDoS Linter & Safe Regex Engine (SG32):
+   - Static analysis of regex patterns before compilation to detect exponential catastrophic backtracking (nested quantifiers, overlapping alternatives).
+6. Dual Mapping Formats (Plain CSV & Encrypted .piimap):
+   - Default CSV Mapping Table (.csv): Generates a 4-column CSV (Category, Original Value, Masked Placeholder / Masked Value, Context / Location) for transparency and interoperability.
+   - Encrypted .piimap Container: AES-256-GCM authenticated encryption (or stdlib scrypt + HMAC-CTR fallback) with Argon2id / PBKDF2 password derivation, 96-bit IV, and tamper-verification headers.
+   - Mandatory Encryption Guard (SG43): Warn or require password protection when high-risk identifiers (Aadhaar, PAN, Bank Accounts, Credit Cards) are present.
+
+---
+
+### 3. INDIA-FIRST DETECTIONENGINE (25+ CATEGORIES + CHECKSUMS)
+
+Implement a six-signal score fusion detection engine (Base Score + Checksum/Validator Bonus + Keyword Context Bonus + Structured Field Bonus - Negative Suppression):
+
+1. PAN (Permanent Account Number):
+   - Pattern: [A-Z]+5}[0-9]{4}[A-Z]
+   - Validator: 4th character entity validation (P=Person, C=Company, H=HUF, F=Firm, A=AOP, T=Trust, B=BOI, L=Local Authority, J=AJP, G=Govt).
+2. Aadhaar Number:
+   - Pattern: \b[2-9][0-9]{3}[ -]?[0-9]{4}[ -][0-9]{4}\b
+   - Validator: Strict Verhoeff algorithm checksum, first digit 2-9, non-repeating consecutive blocks.
+3. GSTIN (Goods and Services Tax ID):
+   - Pattern: \b[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][0-9A-Z]Z0-9A-Z]\b
+   - Validator: 2-digit valid State Code (01-38, 97, 99) + embedded PAN validation + Modulo-36 check character.
+4. TAN (Tax Deduction and Collection Account Number):
+   - Pattern: [A-Z]{4}[0-9]{5}[A-Z] with 3-letter jurisdiction code and 4th letter entity status.
+5. CIN (Corporate Identity Number):
+   - Pattern: [LU][0-9]{5}[A-Z]{2}[0-9]{4}[A-Z]{3}[0-9]{6} (21 characters) validating Listed/Unlisted flag, industry code, State code, incorporation year, and ownership code (PTC, PLC, etc.).
+6. DIN (Director Identification Number): 8 digits with context keywords.
+7. Voter ID (EPIC): [A-Z]{3}[0-9]{7} with context keywords.
+8. Indian Passport: [A-PR-WYZ][0-9]{7} with passport context keywords.
+9. Driving Licence (DL): [A-Z]{2}[0-9]{2}[ -]?(?:19|20)[0-9]{2}[0-9]{7} with State code and year validation.
+10. EPFO UAN: 12 digits starting with '1'.
+11. ESIC Number: 17 digits.
+12. Bank Account Number: 9 to 18 digits with contextual keywords (account, a/c, acct, bank, khata).
+13. IFSC Code: [A-Z]{4}0[A-Z0-9]{6} with 5th character strictly '0'.
+14. UPI ID / VPA: [A-Za-z0-9._-]{2,49}@[A-Za+z][A-Za-z0-9]{1,29} with payment handles.
+15. Credit / Debit Cards: 13-19 digits validated with the Luhn algorithm.
+16. Vehicle Registration / RC Number: Indian state format (MH 01 AB 1234) and Bharat Series (22 BH 1234 AA).
+17. Phone / Mobile: Indian mobile (+91 [6-9]\d{9}, [6-9]\d{9}) and international E.164 formats.
+18. Email Address: RFC 5322 regex.
+19. PIN Code: 6 digits starting with 1-9 with geographic/postal context.
+20. Dates (DOB / Incorporation): DD/MM/YYYY, DD-MM-YYYY, YYYY-TM-DD with keyword proximity.
+21. Person Names: Honorifics (Mr, Mrs, Ms, Shri, Smt, Dr, CA, Adv, etc.) + capitalized words + user dictionary.
+22. Entity / Company Names: M/s, Pvt Ltd, Private Limited, Limited, LLP, LLC, Enterprises, etc.
+23. Addresses: Flat, Plot, House, Street, Road, Building regex + context patterns.
+24. IP Addresses: IPv4 dotted decimal.
+25. Negative Left-Context Suppression: Suppress false positives for financial keywords (Invoice No, Bill No, Challan, Section, Receipt, Order No, GSTR, Form No, Notification).
+
+---
+
+### 4. MASKING STRATEGIES & PRIOR MAPPING REUSE
+
+1. Masking Modes:
+   - Full Sequential Tokens: [PAN_001], [AADHAAR_001], [NAME_001], [PHONE_001], etc.
+   - Partial Masking:
+     - PAN: XXXXX1234F or AXXXXXX4F
+     - Aadhaar: XXXX-XXXX-1234
+     - Phone: +91 XXXXX X3210 or XXXXXX1234
+     - Credit Card: XXXX-XXXX-XXXX-1234
+     - Email: j`***e@domain.com
+     - Bank Account: XXXXXXXX1234
+     - GSTIN: 27XXXXX1234X1Z5
+   - Blackout / Redaction: [REDACTED]
+   - Synthetic Mock Data: Deterministic synthetic pseudonyms.
+2. Prior Mapping Table Upload & Reuse:
+   - Allow uploading an existing .csv, .json, or .piimap mapping table from a prior masking run.
+   - When masking new documents, automatically reuse existing placeholders for recognized entities, ensuring cross-document referential integrity across multi-file audit dossiers.
+
+---
+
+### 5. FILE FORMAT HANDLERS (FIDELITY & PRESERVATION)
+
+1. OOXML Formats (DOCX, XLSX, PPTX):
+   - Modify the internal XML structures (word/document.xml, xl/sharedStrings.xml, xl/worksheets/sheet*.xml, ppt/slides/slide*.xml) directly inside the zip container.
+   - Preserve 100% of formatting, cell styles, fonts, alignments, colors, tables, charts, and Excel formulas.
+2. PDF Documents:
+   - Dual-mode handling:
+     - Direct text extraction and reconstruction.
+     - High-security flatten-and-burn rasterization with solid redaction boxes + .masked.txt sidecar.
+3. Structured Formats (CSV, JSON, XML):
+   - Full parser preserving column headers, delimiters, JSON tree hierarchies, and XML tag structures.
+4. Plain Text / Markdown / HTML:
+   - Direct UTF-8 stream processing.
+5. Scanned Images:
+   - OCR processing via Tesseract/Pillow with bounding-box coordinate tracking and visual burn-in redaction.
+
+---
+
+### 6. UNMASKING PIPELINES (MANDATORY 3 MODES)
+
+1. Mode 1 - Direct Document Unmasking: Upload masked file + upload .piimap or .csv mapping file -> reconstructs the original document.
+2. Mode 2 - AI-Processed / Modified Document Unmasking:
+   - Upload a document that was edited, summarized, translated, or restructured by an external AI model (ChatGPT/Claude/Gemini/DeepSeek) containing placeholders.
+   - Upload the mapping table -> Replaces placeholders with real original values while preserving all AI-generated modifications!
+3. Mode 3 - Pasted AI Text Response Unmasking (Text Tab / Unmask Tab):
+   - Provide a dedicated text area to paste raw AI chat responses containing placeholders.
+   - Click 'Unmask Text' -> Instantly substitutes placeholders with original sensitive data directly in the UI.
+
+---
+
+### 7. UI / UX DESIGN SYSTEM & WORKFLOWS
+
+1. Modern Executive Visual System:
+   - Professional palettes: 'Aurora Slate' (Dark) and 'Paper Indigo' (Light) with high-contrast borders and executive styling.
+   - High-Contrast Visible Scrollbars: Custom ttk scrollbars with distinct thumb contrast and gutter visibility across all treeviews, textboxes, and canvas viewports.
+   - SAP-Style 4-Sided Navigation Controls: Dedicated directional controls ([Top], [Bottom], [Left], [Right], [Up], [Down]) for rapid scrolling and navigation on all large tables and preview panes.
+2. Dual Download Action (1-Click Productivity):
+   - On the Mask Tab, provide a primary 'Download Masked File + CSV Mapping Table' action that saves both files in one click to the target directory.
+   - Automatic timestamped suffixes: <basename>-masked-YYYYMMDD-HHMMSS.<ext> and <basename>-mapping-YYYYMMDD-HHMMSS.csv.
+   - Provide separate buttons for exporting the CSV mapping table or encrypted .piimap.
+3. Seven Dedicated Application Tabs:
+   - Tab 1: Mask Tab: File drag/browse, format badge, entity detection preview treeview with checkboxes, strategy selector, prior mapping upload, and the Dual Download action.
+   - Tab 2: Unmask Tab: Masked file selector, mapping table upload (.csv/.piimap), AI text unmasking input/output areas, and Unmasked file download.
+   - Tab 3: Side-by-Side Diff Tab: Dual-pane synchronized text viewer (Original vs. Masked) with synchronized scrolling and visual color-tag highlighting of replaced entities.
+   - Tab 4: Dictionary Tab: Custom term/regex management, categorization, import/export of CSV dictionary templates.
+   - Tab 5: Security Guardrails Tab: Interactive verification dashboard running 40+ automated security probes (SG01 - SG40) asynchronously with live PASS/FAIL status without UI freezing.
+   - Tab 6: Reports & Audit Tab: Summary metrics, entity breakdown charts/tables, compliance export (PDF/HTML/CSV), and PII-safe audit logs.
+   - Tab 7: Settings Tab: Theme switch (Light/Dark toggle), font scaling, partial masking defaults, and worker thread configuration.
+4. Asynchronous Non-Freezing Execution:
+   - All file processing, detection, OCR, and guardrail runs must execute in background worker threads (threading.Thread + queue.Queue + root.after()), ensuring the UI never hangs or freezes.
+
+---
+
+### 8. IMPLEMENTATION & DELIVERABLE SPECIFICATION
+- Produce the single complete Python file: PII_Masking_Unmasking_Tool_CA_Arpan_Jhaveriv4.py.
+- Include the complete source code with all classes: OfflineKernel, Secret, SessionTemp, AuditLog, Config, DetectionEngine, PlaceholderAllocator, MappingContainer, BaseHandler, OoxmlHandler, PdfHandler, CsvHandler, JsonHandler, XmlHandler, PlainHandler, ImageHandler, MaskPipeline, UnmaskPipeline, SapNavContainer, ScrollableTabFrame, MaskTab, UnmaskTab, SideBySideDiffTab, DictionaryTab, GuardrailsTab, ReportsTab, SettingsTab, and Application.
+- Ensure zero truncated blocks, complete error handling with user-friendly dialogs, and immediate execution readiness when invoked with `python PII_Masking_Unmasking_Tool_CA_Arpan_Jhaveriv4.py`.

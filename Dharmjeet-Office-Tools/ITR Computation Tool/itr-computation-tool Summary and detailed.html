@@ -1,0 +1,736 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>ITR Computation of Income Generator — Offline Tool</title>
+<style>
+  :root{
+    --ink:#12211c; --muted:#5d6f68; --line:#dfe6e2; --paper:#ffffff;
+    --bg:#f4f2ec; --accent:#0f5c47; --accent-soft:#e7f0ec; --warn:#8a5a12;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.55 "Segoe UI",system-ui,Arial,sans-serif}
+  header{background:var(--accent);color:#fff;padding:18px 22px}
+  header h1{margin:0;font-size:20px;letter-spacing:.2px}
+  header p{margin:4px 0 0;font-size:13px;opacity:.85}
+  .wrap{max-width:1080px;margin:0 auto;padding:18px 22px 60px}
+  .panel{background:var(--paper);border:1px solid var(--line);border-radius:10px;padding:16px;margin-bottom:16px}
+  .drop{border:2px dashed #b9c8c2;border-radius:10px;padding:26px;text-align:center;background:#fbfdfc;cursor:pointer}
+  .drop.hot{background:var(--accent-soft);border-color:var(--accent)}
+  .row{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+  button{font:inherit;padding:8px 14px;border-radius:7px;border:1px solid var(--accent);background:var(--accent);color:#fff;cursor:pointer}
+  button.sec{background:#fff;color:var(--accent)}
+  button:disabled{opacity:.45;cursor:not-allowed}
+  label.chk{font-size:13px;color:var(--muted);display:inline-flex;gap:6px;align-items:center}
+  input[type=text]{font:inherit;padding:7px 9px;border:1px solid var(--line);border-radius:6px}
+  .msg{font-size:13px;color:var(--warn);margin-top:8px;white-space:pre-wrap}
+  /* Computation sheet */
+  #sheet{background:#fff;border:1px solid var(--line);border-radius:10px;padding:28px 30px}
+  #sheet h2{font-size:18px;text-align:center;margin:0 0 2px;text-transform:uppercase;letter-spacing:.6px}
+  #sheet h3{font-size:13px;text-align:center;margin:0 0 16px;font-weight:400;color:var(--muted)}
+  table{width:100%;border-collapse:collapse;margin-bottom:14px}
+  th,td{border:1px solid #cfd8d4;padding:6px 9px;vertical-align:top;font-size:13.5px}
+  th{background:var(--accent-soft);text-align:left;font-weight:600}
+  td.amt{text-align:right;white-space:nowrap;width:150px;font-variant-numeric:tabular-nums}
+  tr.total td{font-weight:700;background:#f3f7f5}
+  tr.sub td:first-child{padding-left:26px;color:#33453e}
+  .cap{font-weight:700;margin:18px 0 6px;font-size:14px;text-transform:uppercase;letter-spacing:.4px;color:var(--accent)}
+  .meta td:first-child{width:34%;color:var(--muted)}
+  [contenteditable=true]:focus{outline:2px solid var(--accent);background:#fffbe8}
+  .foot{margin-top:18px;font-size:11.5px;color:var(--muted);border-top:1px solid var(--line);padding-top:8px}
+  .sign{margin-top:22px;page-break-inside:avoid}
+  .sign .decl{font-size:13px;margin-bottom:18px}
+  .sign .cols{display:flex;gap:30px;flex-wrap:wrap}
+  .sign .col{flex:1 1 220px;font-size:13px}
+  .sign .line{border-bottom:1px solid #6b7a75;height:52px;margin-bottom:6px}
+  .sign .lbl{font-weight:600}
+  .sign .sub{color:var(--muted);font-size:12px}
+  .hide{display:none}
+  @media print{
+    body{background:#fff}
+    header,.panel,.noprint{display:none !important}
+    .wrap{max-width:none;padding:0}
+    #sheet{border:0;padding:0}
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>Computation of Income from ITR JSON</h1>
+  <p>Fully offline · ITR-1 to ITR-7 · all assessment years · export to Word &amp; PDF</p>
+</header>
+
+<div class="wrap">
+  <div class="panel noprint">
+    <div id="drop" class="drop">
+      <strong>Drop your ITR JSON here</strong><br />
+      <span style="color:#5d6f68;font-size:13px">or click to choose the file downloaded from the Income Tax e-Filing portal. Nothing leaves your computer.</span>
+      <input id="file" type="file" accept=".json,application/json" class="hide" />
+    </div>
+    <div class="row" style="margin-top:12px">
+      <button id="btnWord" disabled>Download Word (.doc)</button>
+      <button id="btnPdf" class="sec" disabled>Download PDF</button>
+      <button id="btnJsonTree" class="sec" disabled>Show all detected fields</button>
+      <label class="chk"><input type="checkbox" id="hideZero" checked /> Hide nil amounts</label>
+      <label class="chk"><input type="checkbox" id="summaryMode" /> Summary (one-page computation)</label>
+      <label class="chk"><input type="checkbox" id="editMode" /> Edit mode (amounts &amp; labels)</label>
+      <input type="text" id="prepBy" placeholder="Prepared by (optional)" />
+      <input type="text" id="signPlace" placeholder="Place (optional)" />
+      <label class="chk"><input type="checkbox" id="showSign" checked /> Signing panel</label>
+    </div>
+    <div id="msg" class="msg"></div>
+  </div>
+
+  <div id="sheet" class="hide"></div>
+
+  <div class="panel noprint hide" id="rawPanel">
+    <div class="cap">All numeric fields detected in the JSON</div>
+    <div id="rawOut" style="max-height:420px;overflow:auto;font:12px/1.5 ui-monospace,Consolas,monospace"></div>
+  </div>
+</div>
+
+<script>
+/* ------------------------------------------------------------------ utils */
+const fmt = n => {
+  if (n === null || n === undefined || n === "" || isNaN(n)) return "";
+  const neg = n < 0; let s = Math.round(Math.abs(n)).toString();
+  let last3 = s.slice(-3), rest = s.slice(0, -3);
+  if (rest) rest = rest.replace(/\B(?=(\d{2})+(?!\d))/g, ",");
+  s = rest ? rest + "," + last3 : last3;
+  return (neg ? "(" : "") + s + (neg ? ")" : "");
+};
+const num = v => (typeof v === "number" ? v : (typeof v === "string" && v.trim() !== "" && !isNaN(v) ? +v : null));
+
+/* Breadth-first search for a key anywhere inside an object */
+function findKey(root, name) {
+  const q = [root];
+  while (q.length) {
+    const o = q.shift();
+    if (!o || typeof o !== "object") continue;
+    if (!Array.isArray(o)) {
+      for (const k of Object.keys(o)) if (k.toLowerCase() === name.toLowerCase()) return o[k];
+      for (const k of Object.keys(o)) q.push(o[k]);
+    } else o.forEach(x => q.push(x));
+  }
+  return undefined;
+}
+/* Follow a loose path: each segment is searched anywhere below the previous hit */
+function loose(root, path) {
+  let cur = root;
+  for (const seg of path) { cur = findKey(cur, seg); if (cur === undefined) return undefined; }
+  return cur;
+}
+/* First candidate path that yields a number */
+function pickNum(root, paths) {
+  for (const p of paths) { const v = num(loose(root, Array.isArray(p) ? p : [p])); if (v !== null) return v; }
+  return null;
+}
+function pickStr(root, paths) {
+  for (const p of paths) {
+    const v = loose(root, Array.isArray(p) ? p : [p]);
+    if (typeof v === "string" && v.trim()) return v.trim();
+    if (typeof v === "number") return String(v);
+  }
+  return "";
+}
+function collectNumbers(obj, prefix, out) {
+  if (!obj || typeof obj !== "object") return out;
+  for (const k of Object.keys(obj)) {
+    const v = obj[k], p = prefix ? prefix + " › " + k : k;
+    if (typeof v === "object" && v !== null) collectNumbers(v, p, out);
+    else if (num(v) !== null && num(v) !== 0) out.push([p, num(v)]);
+  }
+  return out;
+}
+
+/* ------------------------------------------------------- ITR form detection */
+const FORMS = ["ITR1","ITR2","ITR3","ITR4","ITR5","ITR6","ITR7"];
+function detectForm(json) {
+  const s = JSON.stringify(json).slice(0, 4000);
+  const holder = json.ITR || json.itr || json;
+  for (const f of FORMS) {
+    if (holder && typeof holder === "object" && (holder[f] || holder[f.replace("ITR","ITR_")])) return { code: f, body: holder[f] || holder[f.replace("ITR","ITR_")] };
+  }
+  for (const f of FORMS) if (findKey(json, "Form_" + f) !== undefined) return { code: f, body: json };
+  for (const f of FORMS) if (s.includes('"' + f + '"')) return { code: f, body: json };
+  return { code: "ITR", body: json };
+}
+const FORM_LABEL = {
+  ITR1:"ITR-1 (Sahaj)", ITR2:"ITR-2", ITR3:"ITR-3", ITR4:"ITR-4 (Sugam)",
+  ITR5:"ITR-5", ITR6:"ITR-6", ITR7:"ITR-7", ITR:"ITR"
+};
+
+/* ------------------------------------------------------------ field mapping */
+/* Each row: [label, [candidate loose-paths], options] — first hit wins.       */
+const INCOME_ROWS = [
+  ["Gross Salary", [["Salary","GrossSalary"], ["ITR1_IncomeDeductions","GrossSalary"], ["GrossSalary"], ["TotalGrossSalary"]], {sub:true}],
+  ["Less: Allowances exempt u/s 10", [["AllwncExtentExemptUs10"], ["AllowancesExemptUs10","TotalAllowancesExemptUs10"], ["TotalExemptAllowance"]], {sub:true, neg:true}],
+  ["Less: Standard Deduction u/s 16(ia)", [["DeductionUnderSection16ia"], ["StandardDeduction"], ["DeductionUS16ia"]], {sub:true, neg:true}],
+  ["Less: Professional Tax u/s 16(iii)", [["ProfessionalTaxUs16iii"], ["ProfessionalTax"]], {sub:true, neg:true}],
+  ["Less: Entertainment Allowance u/s 16(ii)", [["EntertainmntalwnceUs16ii"]], {sub:true, neg:true}],
+  ["Income from Salary / Pension", [
+    ["PartB-TI","Salaries"], ["PartB_TI","Salaries"],
+    ["ITR1_IncomeDeductions","IncomeFromSal"], ["IncomeDeductions","IncomeFromSal"],
+    ["Salaries"]
+  ]],
+
+  ["Income from House Property", [
+    ["PartB-TI","IncomeFromHP"], ["PartB_TI","IncomeFromHP"],
+    ["ITR1_IncomeDeductions","TotalIncomeOfHP"], ["IncomeDeductions","TotalIncomeOfHP"],
+    ["IncomeFromHP"], ["TotalIncomeOfHP"]
+  ]],
+  ["Profits and Gains of Business or Profession", [
+    ["PartB-TI","ProfitsGainsBusProf"], ["PartB_TI","ProfitsGainsBusProf"],
+    ["PartB-TI","ProfBusGain","IncChargeableProfGain"], ["ProfBusGain","IncChargeableProfGain"],
+    ["IncomeDeductions","IncomeFromBusinessProf"], ["ProfitsGainsBusProf"]
+  ]],
+  ["— Non-speculative business income", [["ProfBusGain","ProfGainNoSpecBus"]], {sub:true}],
+  ["— Speculative business income", [["ProfBusGain","ProfGainSpecBus"]], {sub:true}],
+  ["Capital Gains", [
+    ["PartB-TI","CapGain","TotalCapGains"], ["PartB_TI","CapGain","TotalCapGains"],
+    ["CapGain","TotalCapGains"], ["TotalCapGains"]
+  ]],
+  ["— Short Term Capital Gains", [
+    ["PartB-TI","CapGain","ShortTerm","ShortTermTotal"], ["CapGain","ShortTerm","ShortTermTotal"],
+    ["CapGain","ShortTermTotal"], ["TotalSTCG"]
+  ], {sub:true}],
+  ["— Long Term Capital Gains", [
+    ["PartB-TI","CapGain","LongTerm","LongTermTotal"], ["CapGain","LongTerm","LongTermTotal"],
+    ["CapGain","LongTermTotal"], ["TotalLTCG"]
+  ], {sub:true}],
+  ["Income from Other Sources", [
+    ["PartB-TI","IncFromOS","TotIncFromOS"], ["PartB_TI","IncFromOS","TotIncFromOS"],
+    ["ITR1_IncomeDeductions","IncomeOthSrc"], ["IncomeDeductions","IncomeOthSrc"],
+    ["IncFromOS","TotIncFromOS"], ["TotIncFromOS"], ["IncomeOthSrc"]
+  ]],
+  ["Total of Head-wise Income", [["PartB-TI","TotalTI"], ["PartB_TI","TotalTI"], ["TotalTI"]], {total:true}],
+  ["Less: Current Year Loss Set-off", [
+    ["PartB-TI","CurrentYearLoss"], ["CurrentYearLoss"], ["TotalLossSetOff"]
+  ], {neg:true}],
+  ["Balance after set-off of current year losses", [
+    ["PartB-TI","BalanceAfterSetoffLosses"], ["BalanceAfterSetoffLosses"]
+  ]],
+  ["Less: Brought Forward Losses Set-off", [
+    ["PartB-TI","BroughtFwdLossesSetoff"], ["BroughtFwdLossesSetoff"]
+  ], {neg:true}],
+  ["Gross Total Income", [
+    ["PartB-TI","GrossTotalIncome"], ["PartB_TI","GrossTotalIncome"],
+    ["ITR1_IncomeDeductions","GrossTotIncome"], ["IncomeDeductions","GrossTotIncome"],
+    ["GrossTotalIncome"], ["GrossTotIncome"]
+  ], {total:true}],
+  ["Less: Deductions under Chapter VI-A", [
+    ["PartB-TI","DeductionsUnderScheduleVIA"], ["PartB_TI","DeductionsUnderScheduleVIA"],
+    ["ITR1_IncomeDeductions","TotalIncomeDeductions"], ["IncomeDeductions","TotalIncomeDeductions"],
+    ["DeductionsUnderScheduleVIA"], ["DeductUndChapVIA","TotalChapVIADeductions"],
+    ["TotalChapVIADeductions"]
+  ], {neg:true}],
+  ["Deduction u/s 10AA / other special deductions", [
+    ["PartB-TI","DeductionsUs10AA"], ["DeductionsUs10AA"]
+  ], {neg:true}],
+  ["Income chargeable to tax at Special Rates", [
+    ["PartB-TI","IncChargeTaxSplRate111A112"], ["IncChargeTaxSplRate111A112"]
+  ]],
+  ["Net Agricultural Income / other income for rate purposes", [
+    ["PartB-TI","NetAgriIncOrOthrIncRule7"], ["NetAgriIncOrOthrIncRule7"]
+  ]],
+  ["TOTAL INCOME (rounded off u/s 288A)", [
+    ["PartB-TI","TotalIncome"], ["PartB_TI","TotalIncome"],
+    ["ITR1_IncomeDeductions","TotalIncome"], ["IncomeDeductions","TotalIncome"],
+    ["TotalIncome"]
+  ], {total:true}],
+  ["Deemed Total Income u/s 115JB / 115JC", [
+    ["PartB-TI","DeemedIncomeUs115JB"], ["DeemedIncomeUs115JC"], ["DeemedIncomeUs115JB"]
+  ]],
+  ["Losses of current year carried forward", [
+    ["PartB-TI","LossesOfCurrentYearCarriedFwd"], ["LossesOfCurrentYearCarriedFwd"]
+  ]]
+];
+
+const TAX_ROWS = [
+  ["Tax at normal rates", [["ComputationOfTaxLiability","TaxPayableOnTI","TaxAtNormalRatesOnAggrInc"], ["TaxAtNormalRatesOnAggrInc"], ["ITR1_TaxComputation","TotalTaxPayable"]]],
+  ["Tax at special rates", [["TaxPayableOnTI","TaxAtSpecialRates"], ["TaxAtSpecialRates"]]],
+  ["Less: Rebate on agricultural income", [["TaxPayableOnTI","RebateOnAgriInc"], ["RebateOnAgriInc"]], {neg:true}],
+  ["Tax payable on Total Income", [["TaxPayableOnTI","TaxPayableOnTotInc"], ["TaxPayableOnTotInc"]], {total:true}],
+  ["Less: Rebate u/s 87A", [["ComputationOfTaxLiability","Rebate87A"], ["Rebate87A"], ["ITR1_TaxComputation","Rebate87A"]], {neg:true}],
+  ["Tax after Rebate", [["ComputationOfTaxLiability","TaxPayableOnRebate"], ["TaxPayableOnRebate"]]],
+  ["Add: Surcharge", [["ComputationOfTaxLiability","Surcharge"], ["SurchargeOnAboveCrore"], ["Surcharge25ofSI"], ["TotalSurcharge"], ["Surcharge"]]],
+  ["Add: Health &amp; Education Cess", [["ComputationOfTaxLiability","EducationCess"], ["EducationCess"], ["ITR1_TaxComputation","EducationCess"]]],
+  ["Gross Tax Liability", [["ComputationOfTaxLiability","GrossTaxLiability"], ["GrossTaxLiability"], ["ITR1_TaxComputation","TotalTaxAndCess"], ["TotalTaxAndCess"], ["ITR1_TaxComputation","TotalTaxPayable"]], {total:true}],
+  ["Less: Relief u/s 89 / 90 / 90A / 91", [["TaxRelief","TotTaxRelief"], ["TotTaxRelief"], ["Section89"], ["Section90"]], {neg:true}],
+  ["Net Tax Liability", [["NetTaxLiability"], ["ComputationOfTaxLiability","NetTaxLiability"]], {total:true}],
+  ["Add: Interest u/s 234A", [["IntrstPay","IntrstPayUs234A"], ["IntrstPayUs234A"]]],
+  ["Add: Interest u/s 234B", [["IntrstPay","IntrstPayUs234B"], ["IntrstPayUs234B"]]],
+  ["Add: Interest u/s 234C", [["IntrstPay","IntrstPayUs234C"], ["IntrstPayUs234C"]]],
+  ["Add: Fee u/s 234F", [["IntrstPay","LateFilingFee234F"], ["LateFilingFee234F"], ["FeeUs234F"]]],
+  ["Aggregate Tax, Interest and Fee Payable", [["TotalTaxPenaltyIntrst","TotTaxPlusIntrstPay"], ["TotTaxPlusIntrstPay"], ["AggregateTaxInterestLiability"]], {total:true}]
+];
+
+const PAID_ROWS = [
+  ["Advance Tax", [["TaxPaid","TaxesPaid","AdvanceTax"], ["TaxesPaid","AdvanceTax"], ["AdvanceTax"]]],
+  ["TDS — Salary / Non-Salary", [["TaxesPaid","TDS"], ["TDS"]]],
+  ["TCS", [["TaxesPaid","TCS"], ["TCS"]]],
+  ["Self-Assessment Tax", [["TaxesPaid","SelfAssessmentTax"], ["SelfAssessmentTax"]]],
+  ["Total Taxes Paid", [["TaxesPaid","TotalTaxesPaid"], ["TotalTaxesPaid"]], {total:true}],
+  ["Balance Tax Payable", [["TaxPaid","BalTaxPayable"], ["BalTaxPayable"]], {total:true}],
+  ["Refund Due", [["Refund","RefundDue"], ["RefundDue"]], {total:true}]
+];
+
+/* ------------------------------------------------------------------ render */
+let STATE = { json:null, form:null };
+
+function rowsHtml(root, defs, hideZero, opts) {
+  const o2 = opts || {};
+  let html = "", shown = 0;
+  for (const [label, paths, opt] of defs) {
+    const o = opt || {};
+    if (o2.skipSub && o.sub) continue;
+    if (o2.only && !o2.only.includes(label)) continue;
+    let v = pickNum(root, paths);
+    if (v === null || (hideZero && v === 0)) continue;
+    if (o.neg && v > 0) v = -v;
+    shown++;
+    html += `<tr class="${o.total ? "total" : ""} ${o.sub ? "sub" : ""}">
+      <td class="lbl">${label}</td><td class="amt">${fmt(v)}</td></tr>`;
+  }
+  return { html, shown };
+}
+
+/* Labels kept in the one-page summary view */
+const SUMMARY_TAX_LABELS = [
+  "Tax payable on Total Income",
+  "Less: Rebate u/s 87A",
+  "Add: Surcharge",
+  "Add: Health &amp; Education Cess",
+  "Gross Tax Liability",
+  "Less: Relief u/s 89 / 90 / 90A / 91",
+  "Net Tax Liability",
+  "Add: Interest u/s 234A",
+  "Add: Interest u/s 234B",
+  "Add: Interest u/s 234C",
+  "Add: Fee u/s 234F",
+  "Aggregate Tax, Interest and Fee Payable"
+];
+
+
+function chapterVIA(root, hideZero) {
+  const via = loose(root, ["DeductUndChapVIA"]) || loose(root, ["ScheduleVIA","DeductUndChapVIA"]) ||
+              loose(root, ["ITR1_IncomeDeductions","DeductUndChapVIA"]);
+  if (!via || typeof via !== "object") return "";
+  let rows = "";
+  for (const k of Object.keys(via)) {
+    const v = num(via[k]);
+    if (v === null) continue;
+    if (hideZero && v === 0) continue;
+    const total = /total/i.test(k);
+    const label = k
+      .replace(/^TotalChapVIADeductions$/i, "Total Deductions under Chapter VI-A")
+      .replace(/^Section/i, "Section ")
+      .replace(/^Us/i, "u/s ")
+      .replace(/([a-z])([A-Z])/g, "$1 $2");
+    rows += `<tr class="${total ? "total" : ""}"><td class="lbl">${label}</td><td class="amt">${fmt(v)}</td></tr>`;
+  }
+  if (!rows) return "";
+  return `<div class="cap">Deductions under Chapter VI-A</div>
+    <table><tr><th>Section</th><th class="amt">Amount (₹)</th></tr>${rows}</table>`;
+}
+
+function tdsSchedules(root, hideZero) {
+  const out = [];
+  /* pick a scalar for a column: direct key first, then anywhere inside the row */
+  const cell = (r, keys) => {
+    for (const k of keys) { const v = r?.[k]; if (v !== undefined && typeof v !== "object") return v; }
+    for (const k of keys) { const v = findKey(r, k); if (v !== undefined && typeof v !== "object") return v; }
+    return "";
+  };
+  const push = (title, arr, cols) => {
+    if (!Array.isArray(arr) || !arr.length) return;
+    let body = "";
+    arr.forEach(r => {
+      const cells = cols.map(c => {
+        const val = cell(r, c.keys);
+        return c.amt ? `<td class="amt">${fmt(num(val))}</td>` : `<td>${String(val)}</td>`;
+      }).join("");
+      body += `<tr>${cells}</tr>`;
+    });
+    out.push(`<div class="cap">${title}</div><table><tr>${cols.map(c=>`<th class="${c.amt?"amt":""}">${c.h}</th>`).join("")}</tr>${body}</table>`);
+  };
+  const sal = loose(root, ["TDSonSalaries","TDSonSalary"]) || loose(root, ["ScheduleTDS1","TDSonSalary"]);
+  push("Schedule TDS-1 — Tax deducted at source from Salary", sal, [
+    {h:"TAN", keys:["TAN"]},
+    {h:"Employer / Deductor", keys:["EmployerOrDeductorOrCollecterName","NameOfEmployer","EmployerOrDeductorOrCollectDetl"]},
+    {h:"Income chargeable", keys:["IncChrgSal","IncomeChargeableUnderSal"], amt:true},
+    {h:"Tax Deducted", keys:["TotalTDSSal","TotalTDSOnSalaries"], amt:true}
+  ]);
+
+  const oth = loose(root, ["TDSonOthThanSals","TDSonOthThanSal"]) || loose(root, ["TDSonOthThanSals"]);
+  push("Schedule TDS-2 — Tax deducted at source other than Salary", oth, [
+    {h:"TAN", keys:["TANOfDeductor","TAN"]},
+    {h:"Deductor", keys:["NameOfDeductor","EmployerOrDeductorOrCollectDetl"]},
+    {h:"Gross Amount", keys:["GrossAmount","AmtForTaxDeduct"], amt:true},
+    {h:"Tax Deducted", keys:["TotTDSOnAmtPaid","TaxDeductCreditDtls","TotalTDSOnAmtPaid"], amt:true}
+  ]);
+  const tcs = loose(root, ["TCS"]);
+  if (Array.isArray(tcs)) push("Schedule TCS — Tax collected at source", tcs, [
+    {h:"TAN of Collector", keys:["TAN","EmployerOrDeductorOrCollectTAN"]},
+    {h:"Collector", keys:["NameOfCollector","EmployerOrDeductorOrCollectDetl"]},
+    {h:"Tax Collected", keys:["AmtTCSDeduct","TotalTCS"], amt:true}
+  ]);
+  const at = loose(root, ["TaxPayment","TaxPaymentsAdvanceTaxSelfAsstTax"]) || loose(root, ["TaxPayments"]);
+  push("Advance Tax / Self-Assessment Tax Paid", at, [
+    {h:"BSR Code", keys:["BSRCode"]},
+    {h:"Date of Deposit", keys:["DateDep","DateOfDeposit"]},
+    {h:"Challan No.", keys:["SrlNoOfChaln","SerialNumberOfChallan"]},
+    {h:"Amount", keys:["Amt","AmountPaid"], amt:true}
+  ]);
+  return out.join("");
+}
+
+function build() {
+  const { json } = STATE;
+  const { code, body } = STATE.form;
+  const root = body || json;
+  const hideZero = document.getElementById("hideZero").checked;
+
+  const name = pickStr(root, [["AssesseeName","SurNameOrOrgName"], ["PersonalInfo","AssesseeName","SurNameOrOrgName"], ["NameOfAssessee"], ["SurNameOrOrgName"]]);
+  const first = pickStr(root, [["AssesseeName","FirstName"], ["FirstName"]]);
+  const middle = pickStr(root, [["AssesseeName","MiddleName"], ["MiddleName"]]);
+  const fullName = [first, middle, name].filter(Boolean).join(" ") || "—";
+  const pan = pickStr(root, [["PersonalInfo","PAN"], ["PAN"]]);
+  const ay = pickStr(root, [["Form_" + code, "AssessmentYear"], ["AssessmentYear"], ["CreationInfo","AssessmentYear"]]);
+  const ayTxt = ay && /^\d{4}$/.test(ay) ? `${ay}-${String(+ay + 1).slice(2)}` : (ay || "—");
+  const fyTxt = ay && /^\d{4}$/.test(ay) ? `${+ay - 1}-${String(+ay).slice(2)}` : "—";
+  const dob = pickStr(root, [["PersonalInfo","DOB"], ["DOB"], ["DateOfBirth"], ["DateOfIncorporation"]]);
+  const secCode = pickStr(root, [["FilingStatus","ReturnFileSec"], ["ReturnFileSec"]]);
+  const SEC = {11:"139(1) — on or before due date",12:"139(4) — belated return",13:"139(5) — revised return",14:"139(5) — revised return",15:"142(1)",16:"148",17:"139(4A)",18:"139(4B)",19:"139(4C)",20:"139(4D)",21:"92CD — modified return",22:"119(2)(b)",23:"139(8A) — updated return"};
+  const status = secCode ? (SEC[+secCode] ? "Section " + SEC[+secCode] : "Code " + secCode) : "";
+  const resStatus = pickStr(root, [["FilingStatus","ResidentialStatus"], ["ResidentialStatus"]]);
+  const regime = detectRegime(root, ay ? +ay : null, code);
+
+  const ack = pickStr(root, [["AcknowledgementNumber"], ["ReceiptNo"], ["FilingStatus","ReceiptNo"]]);
+  const filedOn = pickStr(root, [["FilingStatus","OrigRetFiledDate"], ["DateOfFiling"], ["CreationInfo","CreationDate"]]);
+  const address = [
+    pickStr(root, [["Address","ResidenceNo"], ["ResidenceNo"]]),
+    pickStr(root, [["Address","ResidenceName"], ["ResidenceName"]]),
+    pickStr(root, [["Address","RoadOrStreet"], ["RoadOrStreet"]]),
+    pickStr(root, [["Address","LocalityOrArea"], ["LocalityOrArea"]]),
+    pickStr(root, [["Address","CityOrTownOrDistrict"], ["CityOrTownOrDistrict"]]),
+    pickStr(root, [["Address","PinCode"], ["PinCode"]])
+  ].filter(Boolean).join(", ");
+
+  const summary = document.getElementById("summaryMode").checked;
+  const inc = rowsHtml(root, INCOME_ROWS, hideZero, summary ? {skipSub:true} : null);
+  const tax = rowsHtml(root, TAX_ROWS, hideZero, summary ? {only:SUMMARY_TAX_LABELS} : null);
+  const paid = rowsHtml(root, PAID_ROWS, hideZero);
+
+  const html = `
+  <h2>Computation of Total Income${summary ? " — Summary" : ""}</h2>
+  <h3>${FORM_LABEL[code] || code} &nbsp;·&nbsp; Assessment Year ${ayTxt} &nbsp;·&nbsp; Financial Year ${fyTxt}</h3>
+
+  <table class="meta">
+    <tr><td>Name of Assessee</td><td><b>${fullName}</b></td></tr>
+    <tr><td>PAN</td><td>${pan || "—"}</td></tr>
+    ${!summary && address ? `<tr><td>Address</td><td>${address}</td></tr>` : ""}
+    ${!summary && dob ? `<tr><td>Date of Birth / Incorporation</td><td>${dob}</td></tr>` : ""}
+    ${resStatus ? `<tr><td>Residential Status</td><td>${resStatus}</td></tr>` : ""}
+    <tr><td>Tax Regime</td><td>${regime}</td></tr>
+    ${status ? `<tr><td>Return filed under section</td><td>${status}</td></tr>` : ""}
+    ${!summary && ack ? `<tr><td>Acknowledgement No.</td><td>${ack}</td></tr>` : ""}
+    ${!summary && filedOn ? `<tr><td>Date of Filing</td><td>${filedOn}</td></tr>` : ""}
+  </table>
+
+  <div class="cap">Computation of Income</div>
+  <table><tr><th>Particulars</th><th class="amt">Amount (₹)</th></tr>
+  ${inc.shown ? inc.html : `<tr><td colspan="2">No income figures could be read from this file.</td></tr>`}
+  </table>
+
+  ${summary ? "" : sourcesOfIncome(root)}
+
+  ${summary ? "" : chapterVIA(root, hideZero)}
+
+  ${tax.shown ? `<div class="cap">Computation of Tax Liability</div>
+  <table><tr><th>Particulars</th><th class="amt">Amount (₹)</th></tr>${tax.html}</table>` : ""}
+
+  ${paid.shown ? `<div class="cap">Taxes Paid</div>
+  <table><tr><th>Particulars</th><th class="amt">Amount (₹)</th></tr>${paid.html}</table>` : ""}
+
+  ${summary ? "" : tdsSchedules(root, hideZero)}
+
+
+  ${signPanel(fullName, pan, code)}
+
+  <div class="foot">
+    Prepared from the ITR JSON filed on the Income Tax e-Filing portal. Figures are as reported in the return.
+    ${document.getElementById("prepBy").value ? "Prepared by: " + document.getElementById("prepBy").value + ". " : ""}
+    Generated on ${new Date().toLocaleDateString("en-IN", {day:"2-digit", month:"long", year:"numeric"})}.
+  </div>`;
+
+  const sheet = document.getElementById("sheet");
+  sheet.innerHTML = html;
+  sheet.classList.remove("hide");
+  applyEdit();
+}
+
+/* ------------------------------------- Sources of income (names / parties) */
+/* ------------------------------------------- Tax regime (old / new) detection */
+function detectRegime(root, ay, code) {
+  const yn = v => (typeof v === "string" ? v.trim().toUpperCase() : (typeof v === "number" ? String(v) : ""));
+  const flag = names => { for (const n of names) { const v = findKey(root, n); if (v !== undefined && typeof v !== "object" && yn(v) !== "") return yn(v); } return ""; };
+
+  /* Companies: sections 115BAA / 115BAB / 115BA */
+  if (code === "ITR6") {
+    const s = flag(["SecSTRRegime","SectionSTRRegime","TaxRegime115BAA","OptedSection"]);
+    if (/115BAB/i.test(s)) return "Concessional regime u/s 115BAB";
+    if (/115BAA/i.test(s)) return "Concessional regime u/s 115BAA";
+    if (/115BA\b/i.test(s)) return "Concessional regime u/s 115BA";
+    if (/NOTOPT|NORMAL|11$/i.test(s)) return "Normal provisions (no concessional regime opted)";
+    if (flag(["OptOut115BAA"]) === "Y") return "Opted out of section 115BAA — Normal provisions";
+  }
+  /* Firms / co-op societies: 115BAD / 115BAE */
+  if (code === "ITR5") {
+    if (flag(["OptedSection115BAE","Opt115BAE"]) === "Y") return "Concessional regime u/s 115BAE";
+    if (flag(["OptedSection115BAD","Opt115BAD","Section115BAD"]) === "Y") return "Concessional regime u/s 115BAD";
+  }
+
+  /* Individuals / HUF / AOP — section 115BAC */
+  const newAY = ay && ay >= 2024;                    /* new regime is the default from AY 2024-25 */
+  const bacLabel = newAY ? "New Tax Regime u/s 115BAC(1A)" : "New Tax Regime u/s 115BAC";
+  const oldLabel = "Old Tax Regime (normal slab rates)";
+
+  const optOut = flag(["OptOutNewTaxRegime","OptOutNewTaxRegimeFlag"]);
+  if (optOut === "Y") return newAY ? "Opted out of the new regime — " + oldLabel : bacLabel;
+  if (optOut === "N") return newAY ? bacLabel : oldLabel;
+
+  const nr = flag(["NewTaxRegime","OptingNewTaxRegime","Opting115BAC","ItrFileduSection115BAC","FiledUs115BAC"]);
+  if (nr === "Y" || /115BAC/i.test(nr)) return bacLabel;
+  if (nr === "N") return oldLabel;
+
+  /* Form 10-IE / 10-IEA presence */
+  if (findKey(root, "Form10IEAAckNo") !== undefined || flag(["Form10IEAFiledFlag","Form10IEAFlag"]) === "Y")
+    return "Form 10-IEA filed — " + oldLabel;
+  if (findKey(root, "Form10IEAckNum") !== undefined || flag(["Form10IEFiledFlag","Form10IEFlag"]) === "Y")
+    return "Form 10-IE filed — " + bacLabel;
+
+  /* Fallback heuristic: regime-restricted Chapter VI-A deductions imply the old regime */
+  const via = findKey(root, "DeductUndChapVIA") || findKey(root, "DeductionsUnderScheduleVIA");
+  if (via && typeof via === "object") {
+    const restricted = Object.keys(via).filter(k => /^(Section|Us)?80(C|CC(?!D2)|D|DD|E|EE|G|GG|TT|U)/i.test(k) && num(via[k]));
+    if (restricted.length) return oldLabel + " (based on deductions claimed)";
+  }
+  if (ay) return newAY ? bacLabel + " (default regime, no opt-out flag in the return)" : oldLabel + " (no regime flag in the return)";
+  return "—";
+}
+
+function sourcesOfIncome(root) {
+  const esc = s => String(s).replace(/[<>&]/g, c => ({"<":"&lt;",">":"&gt;","&":"&amp;"}[c]));
+  const val = (r, keys) => {
+    for (const k of keys) { const v = r?.[k]; if (v !== undefined && v !== null && typeof v !== "object") return v; }
+    for (const k of keys) { const v = findKey(r, k); if (v !== undefined && v !== null && typeof v !== "object") return v; }
+    return "";
+  };
+  const out = [];
+  const table = (title, arr, cols) => {
+    if (!Array.isArray(arr)) arr = arr ? [arr] : [];
+    const rows = [];
+    arr.forEach(r => {
+      const vals = cols.map(c => val(r, c.keys));
+      const hasText = vals.some((v, i) => !cols[i].amt && String(v).trim() !== "");
+      const hasAmt = vals.some((v, i) => cols[i].amt && num(v) !== null && num(v) !== 0);
+      if (!hasText && !hasAmt) return;
+      rows.push("<tr>" + cols.map((c, i) => c.amt
+        ? `<td class="amt">${fmt(num(vals[i]))}</td>`
+        : `<td>${String(vals[i]).trim() === "" ? "—" : esc(vals[i])}</td>`).join("") + "</tr>");
+    });
+    if (!rows.length) return;
+    out.push(`<div class="cap">${title}</div><table><tr>${cols.map(c=>`<th class="${c.amt?"amt":""}">${c.h}</th>`).join("")}</tr>${rows.join("")}</table>`);
+  };
+
+  /* Salary — employers */
+  const sal = loose(root, ["ScheduleS","Salaries"]) || loose(root, ["Salaries"]);
+  table("Sources of Salary Income — Employer(s)", sal, [
+    {h:"Name of Employer", keys:["NameOfEmployer","EmployerOrDeductorOrCollecterName","EmployerName"]},
+    {h:"TAN", keys:["TANofEmployer","TAN"]},
+    {h:"Category", keys:["NatureOfEmployment","EmployerCategory"]},
+    {h:"Salary (₹)", keys:["GrossSalary","Salarys","TotalGrossSalary"], amt:true}
+  ]);
+  if (!sal) {
+    const tds1 = loose(root, ["TDSonSalaries","TDSonSalary"]) || loose(root, ["ScheduleTDS1","TDSonSalary"]);
+    table("Sources of Salary Income — Employer(s) as per Schedule TDS-1", tds1, [
+      {h:"Name of Employer", keys:["EmployerOrDeductorOrCollecterName","NameOfEmployer"]},
+      {h:"TAN", keys:["TAN"]},
+      {h:"Income chargeable (₹)", keys:["IncChrgSal","IncomeChargeableUnderSal"], amt:true}
+    ]);
+  }
+
+  /* House property — address / tenant / co-owner */
+  const hp = loose(root, ["ScheduleHP","PropertyDetails"]) || loose(root, ["PropertyDetails"]);
+  table("Sources of House Property Income", hp, [
+    {h:"Property / Address", keys:["AddrDetail","ResidenceNo","LocalityOrArea","CityOrTownOrDistrict"]},
+    {h:"Ownership", keys:["OwnerPercent","ifLetOut","PropertyOwnerType"]},
+    {h:"Name of Tenant", keys:["NameOfTenant","TenantName"]},
+    {h:"Rent Received (₹)", keys:["RentReceived","AnnualLetableValue","AnnualRentReceived"], amt:true}
+  ]);
+
+  /* Business / profession — trade names & nature */
+  const nob = loose(root, ["NatureOfBusiness","NatOfBus"]) || loose(root, ["NatureOfBusiness"]);
+  table("Sources of Business / Professional Income", nob, [
+    {h:"Name of Business / Trade Name", keys:["TradeName1","TradeName","NameOfBusiness","TradeName2"]},
+    {h:"Business Code", keys:["Code","CodeAD","BusinessCode"]},
+    {h:"Description", keys:["Description","NatureOfBusiness","SubSector"]}
+  ]);
+
+  /* Interest & other sources — payer / bank names */
+  const intSrc = loose(root, ["ScheduleOS","IntrstFrmSavingBank"]) || loose(root, ["OthersInc"]) || loose(root, ["IncOthThanOwnRaceHorse","OthersInc"]);
+  table("Sources of Income from Other Sources", intSrc, [
+    {h:"Nature / Payer", keys:["OthSrcNatureDesc","NatureDesc","SourceDescription","OthNatOfInc"]},
+    {h:"Amount (₹)", keys:["OthSrcOthAmount","Amount","OthAmount"], amt:true}
+  ]);
+
+  /* Bank accounts (interest-bearing / refund) */
+  const banks = loose(root, ["BankAccountDtls","AddtnlBankDetails"]) || loose(root, ["AddtnlBankDetails"]) || loose(root, ["BankDetails"]);
+  table("Bank Accounts as reported in the return", banks, [
+    {h:"Name of Bank", keys:["BankName","NameOfBank"]},
+    {h:"IFSC Code", keys:["IFSCCode","IFSC"]},
+    {h:"Account Number", keys:["BankAccountNumber","AccountNumber"]},
+    {h:"Type", keys:["BankAccountType","AccountType"]}
+  ]);
+
+
+  if (!out.length) return "";
+  return `<div class="cap" style="margin-top:14px">Sources of Income</div>${out.join("")}`;
+}
+
+function signPanel(fullName, pan, code) {
+  if (!document.getElementById("showSign").checked) return "";
+  const place = document.getElementById("signPlace").value.trim();
+  const today = new Date().toLocaleDateString("en-IN", {day:"2-digit", month:"long", year:"numeric"});
+  const isEntity = !["ITR1","ITR2","ITR3","ITR4"].includes(code);
+  const capacity = isEntity ? "Authorised Signatory / Principal Officer" : "Assessee";
+  return `<div class="sign">
+    <div class="cap">Declaration &amp; Signature</div>
+    <div class="decl">
+      I, <b>${fullName}</b>${pan ? ` (PAN ${pan})` : ""}, do hereby declare that the particulars of income,
+      deductions and taxes set out in this computation are true and correct to the best of my knowledge and belief,
+      and that they are in agreement with the return of income filed by me for the assessment year stated above.
+    </div>
+    <table class="meta">
+      <tr><td>Place</td><td>${place || "&nbsp;"}</td></tr>
+      <tr><td>Date</td><td>${today}</td></tr>
+    </table>
+    <div class="cols">
+      <div class="col">
+        <div class="line"></div>
+        <div class="lbl">Signature of the ${capacity}</div>
+        <div class="sub">${fullName}${pan ? " · PAN " + pan : ""}</div>
+      </div>
+      <div class="col">
+        <div class="line"></div>
+        <div class="lbl">Signature of the Preparer</div>
+        <div class="sub">${document.getElementById("prepBy").value.trim() || "&nbsp;"}</div>
+      </div>
+    </div>
+  </div>`;
+}
+
+function applyEdit() {
+  const on = document.getElementById("editMode").checked;
+  document.querySelectorAll("#sheet td, #sheet h2, #sheet h3, #sheet .decl, #sheet .lbl, #sheet .sub").forEach(el => {
+    el.setAttribute("contenteditable", on ? "true" : "false");
+  });
+}
+
+/* ------------------------------------------------------------------ export */
+function sheetStyles() {
+  return `body{font-family:"Times New Roman",serif;color:#000;font-size:12pt}
+  h2{text-align:center;font-size:15pt;margin:0 0 2px;text-transform:uppercase}
+  h3{text-align:center;font-size:10.5pt;font-weight:normal;margin:0 0 14px}
+  table{width:100%;border-collapse:collapse;margin-bottom:12px}
+  th,td{border:1px solid #666;padding:4px 7px;font-size:10.5pt;vertical-align:top}
+  th{background:#e7f0ec;text-align:left}
+  td.amt{text-align:right;white-space:nowrap}
+  tr.total td{font-weight:bold;background:#f2f2f2}
+  tr.sub td:first-child{padding-left:22px}
+  .cap{font-weight:bold;margin:14px 0 5px;font-size:11pt;text-transform:uppercase}
+  .meta td:first-child{width:34%}
+  .foot{margin-top:14px;font-size:8.5pt;border-top:1px solid #999;padding-top:6px}
+  .sign{margin-top:20px;page-break-inside:avoid}
+  .sign .decl{font-size:10.5pt;margin-bottom:16px;text-align:justify}
+  .sign .cols{width:100%;display:table;table-layout:fixed}
+  .sign .col{display:table-cell;width:50%;padding-right:18px;font-size:10.5pt;vertical-align:bottom}
+  .sign .line{border-bottom:1px solid #000;height:48px;margin-bottom:5px}
+  .sign .lbl{font-weight:bold}
+  .sign .sub{font-size:9.5pt}`;
+}
+function fileBase() {
+  const t = document.querySelector("#sheet h3")?.textContent || "computation";
+  const name = document.querySelector("#sheet .meta b")?.textContent || "Assessee";
+  return (name + " " + t).replace(/[^\w\s-]/g, " ").replace(/\s+/g, "_").slice(0, 80);
+}
+function downloadWord() {
+  const content = document.getElementById("sheet").innerHTML;
+  const doc = `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40">
+  <head><meta charset="utf-8"><title>Computation of Income</title>
+  <!--[if gte mso 9]><xml><w:WordDocument><w:View>Print</w:View></w:WordDocument></xml><![endif]-->
+  <style>@page{size:21cm 29.7cm;margin:2cm}${sheetStyles()}</style></head>
+  <body>${content}</body></html>`;
+  const blob = new Blob(["\ufeff", doc], { type: "application/msword" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = fileBase() + ".doc";
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+}
+function downloadPdf() {
+  const content = document.getElementById("sheet").innerHTML;
+  const w = window.open("", "_blank");
+  if (!w) { alert("Please allow pop-ups to export the PDF."); return; }
+  w.document.write(`<html><head><title>${fileBase()}</title>
+    <style>@page{size:A4;margin:16mm}${sheetStyles()}</style></head>
+    <body>${content}</body></html>`);
+  w.document.close();
+  w.focus();
+  setTimeout(() => { w.print(); }, 350);
+}
+
+/* -------------------------------------------------------------------- wire */
+const msg = document.getElementById("msg");
+function loadJson(text) {
+  let json;
+  try { json = JSON.parse(text); }
+  catch (e) { msg.textContent = "That file is not valid JSON: " + e.message; return; }
+  STATE.json = json;
+  STATE.form = detectForm(json);
+  build();
+  const warn = [];
+  if (STATE.form.code === "ITR") warn.push("Could not identify the ITR form number — figures were located by field name instead.");
+  msg.textContent = warn.join(" ");
+  ["btnWord","btnPdf","btnJsonTree"].forEach(id => document.getElementById(id).disabled = false);
+  window.scrollTo({ top: 240, behavior: "smooth" });
+}
+
+const drop = document.getElementById("drop"), fileInp = document.getElementById("file");
+drop.onclick = () => fileInp.click();
+fileInp.onchange = e => { const f = e.target.files[0]; if (f) f.text().then(loadJson); };
+["dragenter","dragover"].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.add("hot"); }));
+["dragleave","drop"].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.remove("hot"); }));
+drop.addEventListener("drop", e => { const f = e.dataTransfer.files[0]; if (f) f.text().then(loadJson); });
+
+document.getElementById("btnWord").onclick = downloadWord;
+document.getElementById("btnPdf").onclick = downloadPdf;
+document.getElementById("hideZero").onchange = () => STATE.json && build();
+document.getElementById("summaryMode").onchange = () => STATE.json && build();
+document.getElementById("prepBy").oninput = () => STATE.json && build();
+document.getElementById("signPlace").oninput = () => STATE.json && build();
+document.getElementById("showSign").onchange = () => STATE.json && build();
+document.getElementById("editMode").onchange = applyEdit;
+document.getElementById("btnJsonTree").onclick = () => {
+  const panel = document.getElementById("rawPanel");
+  panel.classList.toggle("hide");
+  if (panel.classList.contains("hide")) return;
+  const list = collectNumbers(STATE.json, "", []);
+  document.getElementById("rawOut").innerHTML =
+    `<table>${list.map(([k, v]) => `<tr><td>${k}</td><td class="amt">${fmt(v)}</td></tr>`).join("")}</table>`;
+};
+</script>
+</body>
+</html>

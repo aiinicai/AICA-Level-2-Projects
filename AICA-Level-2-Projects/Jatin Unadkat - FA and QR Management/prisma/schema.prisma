@@ -1,0 +1,467 @@
+// AssetTrace — Fixed Asset Verification & QR Management
+// Schema mirrors the design dossier, Section F, plus the SAP Integration
+// Addendum (ADD06–ADD08): SAP is the system of record for financial/asset
+// master data (SapAssetData, read-only in the app); AssetTrace is the
+// system of record for physical-verification activity (everything else).
+//
+// Local dev runs on SQLite for zero-config setup; switch `provider` to
+// "postgresql" and `url` to a Postgres connection string for production —
+// no model changes are required.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+enum RoleName {
+  ADMIN
+  LOCATION_HEAD
+  READ_ONLY
+  VERIFIER
+}
+
+enum AssetSourceType {
+  SAP_IMPORTED
+  PORTAL_UNREGISTERED
+}
+
+enum AssetStatus {
+  ACTIVE
+  UNDER_REPAIR
+  RETIRED
+  DISPOSED
+}
+
+enum VerificationStatus {
+  NOT_VERIFIED
+  VERIFIED
+  NOT_FOUND
+  LOCATION_MISMATCH
+  DAMAGED
+  RELOCATED
+  UNDER_INVESTIGATION
+}
+
+enum VerificationResult {
+  VERIFIED
+  NOT_FOUND
+  DAMAGED
+  RELOCATED
+}
+
+enum CampaignStatus {
+  DRAFT
+  ACTIVE
+  CLOSED
+}
+
+enum ExceptionType {
+  NOT_FOUND
+  FOUND_ELSEWHERE
+  DAMAGED
+  DUPLICATE_TAG
+  QR_UNREADABLE
+  INCORRECT_DETAILS
+  UNRECORDED_ASSET
+}
+
+enum ExceptionStatus {
+  OPEN
+  ASSIGNED
+  RESOLVED
+}
+
+enum LocationChangeSource {
+  MASTER_EDIT
+  VERIFICATION
+}
+
+enum PhotoType {
+  MASTER
+  VERIFICATION
+}
+
+model Role {
+  id    String   @id @default(cuid())
+  name  RoleName @unique
+  users User[]
+}
+
+model User {
+  id                String   @id @default(cuid())
+  email             String   @unique
+  passwordHash      String
+  fullName          String
+  roleId            String
+  role              Role     @relation(fields: [roleId], references: [id])
+  isActive          Boolean  @default(true)
+  lastLoginAt       DateTime?
+  createdAt         DateTime @default(now())
+
+  custodianOf         Asset[]                @relation("Custodian")
+  lastVerifiedAssets  Asset[]                @relation("LastVerifiedBy")
+  qrGenerated         QrCode[]               @relation("QrGeneratedBy")
+  verifications       VerificationRecord[]   @relation("Verifier")
+  locationChanges     AssetLocationHistory[] @relation("LocationChangedBy")
+  photosUploaded      AssetPhotograph[]      @relation("PhotoUploadedBy")
+  exceptionsAssigned  Exception[]            @relation("ExceptionAssignedTo")
+  exceptionsResolved  Exception[]            @relation("ExceptionResolvedBy")
+  exceptionsReviewed  Exception[]            @relation("ExceptionReviewedBy")
+  auditLogs           AuditLog[]
+  sapImportsRun       SapImportBatch[]       @relation("SapImportedBy")
+  sapExportsRun       SapExportBatch[]       @relation("SapGeneratedBy")
+  locationHeadScopes  LocationHeadAssignment[] @relation("LocationHeadUser")
+  locationHeadGrants  LocationHeadAssignment[] @relation("LocationHeadAssignedBy")
+  bulkQrJobsRun       BulkQrJob[]            @relation("BulkQrRequestedBy")
+}
+
+model AssetCategory {
+  id               String          @id @default(cuid())
+  name             String
+  parentCategoryId String?
+  parentCategory   AssetCategory?  @relation("CategoryTree", fields: [parentCategoryId], references: [id])
+  subCategories    AssetCategory[] @relation("CategoryTree")
+  isActive         Boolean         @default(true)
+  assets           Asset[]
+}
+
+model Department {
+  id             String  @id @default(cuid())
+  name           String
+  costCenterCode String?
+  isActive       Boolean @default(true)
+  assets         Asset[]
+}
+
+model Vendor {
+  id          String  @id @default(cuid())
+  name        String
+  contactInfo String?
+  isActive    Boolean @default(true)
+  assets      Asset[]
+}
+
+model Location {
+  id               String     @id @default(cuid())
+  name             String
+  levelNumber      Int
+  parentLocationId String?
+  parentLocation   Location?  @relation("LocationTree", fields: [parentLocationId], references: [id])
+  children         Location[] @relation("LocationTree")
+  fullPath         String
+  isActive         Boolean    @default(true)
+
+  assetsBooked        Asset[]                  @relation("BookLocation")
+  verifiedIn          VerificationRecord[]
+  historyFrom         AssetLocationHistory[]   @relation("FromLocation")
+  historyTo           AssetLocationHistory[]   @relation("ToLocation")
+  headAssignments     LocationHeadAssignment[]
+
+  @@index([parentLocationId])
+}
+
+// Portal core record — one row per physical asset. Holds only what the
+// portal itself owns, plus a denormalized display/search copy of a few
+// SAP-sourced fields (kept in sync on every import) so existing list/search
+// code doesn't need to join SapAssetData for routine display. The
+// authoritative values for those fields live in SapAssetData; this copy is
+// never independently editable once sourceType is SAP_IMPORTED (ADD16).
+model Asset {
+  id                    String   @id @default(cuid())
+  assetNumber           String   @unique
+  description           String
+  assetType             String?
+  serialNumber          String?
+  manufacturer          String?
+  modelNumber           String?
+  sourceType            AssetSourceType @default(PORTAL_UNREGISTERED)
+  categoryId            String?
+  category              AssetCategory? @relation(fields: [categoryId], references: [id])
+  departmentId          String?
+  department            Department?    @relation(fields: [departmentId], references: [id])
+  vendorId              String?
+  vendor                Vendor?        @relation(fields: [vendorId], references: [id])
+  assetStatus           AssetStatus @default(ACTIVE)
+  verificationStatus    VerificationStatus @default(NOT_VERIFIED)
+  physicalCondition     String?
+  lastVerifiedAt        DateTime?
+  lastVerifiedById      String?
+  lastVerifiedBy        User?    @relation("LastVerifiedBy", fields: [lastVerifiedById], references: [id])
+  custodianUserId       String?
+  custodian             User?    @relation("Custodian", fields: [custodianUserId], references: [id])
+  currentLocationId     String?
+  currentLocation       Location? @relation("BookLocation", fields: [currentLocationId], references: [id])
+  remarks               String?
+  photoKey              String?
+  isActive              Boolean  @default(true)
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  sapAssetData          SapAssetData?
+  qrCodes               QrCode[]
+  verificationRecords   VerificationRecord[]
+  locationHistory       AssetLocationHistory[]
+  photographs           AssetPhotograph[]
+  exceptions            Exception[]
+  sapExportRecords      SapExportRecord[]
+
+  @@index([verificationStatus])
+  @@index([currentLocationId])
+}
+
+// SAP Fixed Asset Register data — read-only in the app (ADD06). Written
+// exclusively by the SAP Import pipeline (src/actions/sapImport.ts); no
+// other code path may create or update this table.
+model SapAssetData {
+  id                    String   @id @default(cuid())
+  assetId               String   @unique
+  asset                 Asset    @relation(fields: [assetId], references: [id])
+  description1          String?
+  description2          String?
+  assetClassCode        String?
+  assetClassDescription String?
+  serialNumber          String?
+  inventoryNumber       String?
+  capitalized           Boolean?
+  netBookValue          Float?
+  grossBookValue        Float?
+  custom01              String?
+  custom02              String?
+  custom03              String?
+  custom04              String?
+  custom05              String?
+  custom06              String?
+  custom07              String?
+  custom08              String?
+  custom09              String?
+  custom10              String?
+  custom11              String?
+  custom12              String?
+  custom13              String?
+  custom14              String?
+  custom15              String?
+  lastImportBatchId     String?
+  lastImportBatch       SapImportBatch? @relation(fields: [lastImportBatchId], references: [id])
+  updatedAt             DateTime @updatedAt
+}
+
+// Admin-configurable display label for each of the 15 fixed custom-field
+// slots (ADD06 §02) — the slot itself never changes, only its heading.
+model SapCustomFieldConfig {
+  id           String  @id @default(cuid())
+  slotNumber   Int     @unique
+  displayLabel String?
+  dataType     String  @default("TEXT")
+  isVisible    Boolean @default(true)
+}
+
+model SapImportBatch {
+  id               String   @id @default(cuid())
+  fileName         String
+  importedById     String?
+  importedBy       User?    @relation("SapImportedBy", fields: [importedById], references: [id])
+  importedAt       DateTime @default(now())
+  totalRows        Int
+  newRecords       Int
+  updatedRecords   Int
+  unchangedRecords Int
+  errorRecords     Int
+  status           String
+
+  errors           SapImportError[]
+  sapAssetData     SapAssetData[]
+}
+
+model SapImportError {
+  id          String   @id @default(cuid())
+  batchId     String
+  batch       SapImportBatch @relation(fields: [batchId], references: [id])
+  rowNumber   Int
+  assetNumber String?
+  errorType   String
+  errorDetail String
+  rawRowJson  String?
+}
+
+// A Location Head's scope: every location whose fullPath starts with one
+// of their assigned locations' fullPath is in scope (ADD07 §03).
+model LocationHeadAssignment {
+  id           String   @id @default(cuid())
+  userId       String
+  user         User     @relation("LocationHeadUser", fields: [userId], references: [id])
+  locationId   String
+  location     Location @relation(fields: [locationId], references: [id])
+  assignedById String?
+  assignedBy   User?    @relation("LocationHeadAssignedBy", fields: [assignedById], references: [id])
+  assignedAt   DateTime @default(now())
+
+  @@unique([userId, locationId])
+}
+
+// Admin-configurable SAP export column mapping (ADD10 §01). portalSourceField
+// is one of a fixed set of resolvable expressions handled in src/lib/sapExport.ts.
+model SapExportTemplateField {
+  id                String  @id @default(cuid())
+  sapFieldName      String
+  portalSourceField String
+  columnOrder       Int
+  format            String?
+  isRequired        Boolean @default(false)
+}
+
+model SapExportBatch {
+  id              String   @id @default(cuid())
+  generatedById   String?
+  generatedBy     User?    @relation("SapGeneratedBy", fields: [generatedById], references: [id])
+  generatedAt     DateTime @default(now())
+  templateVersion String   @default("v1")
+  fileName        String
+  filePath        String
+  status          String   @default("GENERATED")
+
+  records         SapExportRecord[]
+}
+
+model SapExportRecord {
+  id              String   @id @default(cuid())
+  batchId         String
+  batch           SapExportBatch @relation(fields: [batchId], references: [id])
+  assetId         String
+  asset           Asset    @relation(fields: [assetId], references: [id])
+  included        Boolean  @default(true)
+  exclusionReason String?
+}
+
+// Sized for course-project scale: generation runs synchronously inside the
+// action and this row is created already COMPLETED. The shape (filters,
+// status, result path) matches what a real async job queue would need, so
+// swapping in actual background processing later doesn't require a
+// data-model change (ADD11).
+model BulkQrJob {
+  id              String   @id @default(cuid())
+  requestedById   String?
+  requestedBy     User?    @relation("BulkQrRequestedBy", fields: [requestedById], references: [id])
+  filterJson      String   @default("{}")
+  sizePreset      String
+  assetCount      Int
+  status          String   @default("COMPLETED")
+  resultFilePath  String?
+  createdAt       DateTime @default(now())
+}
+
+model QrCode {
+  id            String   @id @default(cuid())
+  assetId       String
+  asset         Asset    @relation(fields: [assetId], references: [id])
+  token         String   @unique
+  sizePreset    String   @default("MEDIUM")
+  isActive      Boolean  @default(true)
+  generatedAt   DateTime @default(now())
+  generatedById String?
+  generatedBy   User?    @relation("QrGeneratedBy", fields: [generatedById], references: [id])
+  reprintCount  Int      @default(0)
+}
+
+model VerificationCampaign {
+  id           String   @id @default(cuid())
+  name         String
+  startDate    DateTime
+  endDate      DateTime
+  status       CampaignStatus @default(DRAFT)
+  scopeJson    String   @default("{}")
+  createdAt    DateTime @default(now())
+
+  records      VerificationRecord[]
+}
+
+model VerificationRecord {
+  id                 String   @id @default(cuid())
+  assetId            String
+  asset              Asset    @relation(fields: [assetId], references: [id])
+  campaignId         String?
+  campaign           VerificationCampaign? @relation(fields: [campaignId], references: [id])
+  verifierId         String
+  verifier           User     @relation("Verifier", fields: [verifierId], references: [id])
+  result             VerificationResult
+  condition          String?
+  observedSerialNumber String?
+  verifiedLocationId String?
+  verifiedLocation   Location? @relation(fields: [verifiedLocationId], references: [id])
+  remarks            String?
+  gpsLat             Float?
+  gpsLng             Float?
+  verifiedAt         DateTime @default(now())
+
+  photographs        AssetPhotograph[]
+  exceptions         Exception[]
+
+  @@index([assetId, verifiedAt])
+}
+
+model AssetLocationHistory {
+  id             String   @id @default(cuid())
+  assetId        String
+  asset          Asset    @relation(fields: [assetId], references: [id])
+  fromLocationId String?
+  fromLocation   Location? @relation("FromLocation", fields: [fromLocationId], references: [id])
+  toLocationId   String
+  toLocation     Location @relation("ToLocation", fields: [toLocationId], references: [id])
+  changedById    String?
+  changedBy      User?    @relation("LocationChangedBy", fields: [changedById], references: [id])
+  changedAt      DateTime @default(now())
+  source         LocationChangeSource
+}
+
+model AssetPhotograph {
+  id             String   @id @default(cuid())
+  assetId        String
+  asset          Asset    @relation(fields: [assetId], references: [id])
+  verificationId String?
+  verification   VerificationRecord? @relation(fields: [verificationId], references: [id])
+  storageKey     String
+  thumbnailKey   String
+  photoType      PhotoType
+  takenAt        DateTime @default(now())
+  uploadedById   String?
+  uploadedBy     User?    @relation("PhotoUploadedBy", fields: [uploadedById], references: [id])
+}
+
+model Exception {
+  id               String   @id @default(cuid())
+  assetId          String
+  asset            Asset    @relation(fields: [assetId], references: [id])
+  verificationId   String?
+  verification     VerificationRecord? @relation(fields: [verificationId], references: [id])
+  type             ExceptionType
+  status           ExceptionStatus @default(OPEN)
+  assignedToId     String?
+  assignedTo       User?    @relation("ExceptionAssignedTo", fields: [assignedToId], references: [id])
+  reviewedById     String?
+  reviewedBy       User?    @relation("ExceptionReviewedBy", fields: [reviewedById], references: [id])
+  reviewDecision   String?
+  reviewedAt       DateTime?
+  resolutionNotes  String?
+  resolvedById     String?
+  resolvedBy       User?    @relation("ExceptionResolvedBy", fields: [resolvedById], references: [id])
+  resolvedAt       DateTime?
+  createdAt        DateTime @default(now())
+}
+
+model AuditLog {
+  id           String   @id @default(cuid())
+  userId       String?
+  user         User?    @relation(fields: [userId], references: [id])
+  action       String
+  entityType   String
+  entityId     String
+  oldValueJson String?
+  newValueJson String?
+  occurredAt   DateTime @default(now())
+  source       String   @default("WEB")
+
+  @@index([entityType, entityId])
+}

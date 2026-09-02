@@ -1,0 +1,58 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  cross-platform-verify:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v5
+        with:
+          global-json-file: global.json
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.19.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: web/pnpm-lock.yaml
+      - name: Verify on Windows
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: .\deploy\scripts\practice.ps1 verify
+      - name: Verify on macOS or Linux
+        if: runner.os != 'Windows'
+        shell: bash
+        run: ./deploy/scripts/practice.sh verify
+      - name: Validate Compose definition
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          cp .env.example .env
+          docker compose --env-file .env -f deploy/compose/compose.yml config --quiet
+      - name: Build native Windows Server package
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: .\deploy\windows-server\Publish-Release.ps1 -NoArchive
+      - name: Verify Docker migration and recovery
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          trap 'docker compose --env-file .env -f deploy/compose/compose.yml down --volumes' EXIT
+          ./deploy/scripts/practice.sh start
+          curl --fail --retry 12 --retry-delay 2 http://127.0.0.1:8088/health/ready
+          ./deploy/scripts/database.sh migrate
+          ./deploy/scripts/database.sh backup backups/ci-current.dump
+          ./deploy/scripts/database.sh verify-backup backups/ci-current.dump
