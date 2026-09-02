@@ -1,0 +1,200 @@
+{% extends "base.html" %}
+{% block content %}
+  <div class="fs-page-header">
+    <h1 class="fs-page-title">Accounting Review</h1>
+    {% if engagement %}
+      <p class="fs-page-subtitle">{{ engagement.entity_name }} &middot; FY {{ engagement.financial_year }}</p>
+    {% else %}
+      <p class="fs-page-subtitle">Framework-treatment analytical checks against your validated, confirmed-mapped data.</p>
+    {% endif %}
+  </div>
+
+  <div class="fs-panel">
+    <p class="fs-muted">
+      This module assesses whether accounting data/treatment appears <strong>inconsistent</strong> with the
+      applicable accounting framework, using standards-informed analytical checks. It never states that
+      something is non-compliant or that a violation is confirmed — findings are always labeled
+      <strong>Potential Accounting Exception</strong>, <strong>Review Required</strong>,
+      <strong>Potential Inconsistency</strong>, or <strong>Insufficient Data</strong>, for a professional to
+      review and confirm. It runs only against data you have already validated and confirmed on the Mapping
+      and Data Quality screens — nothing unvalidated is read.
+    </p>
+  </div>
+
+  {% if not engagement %}
+    <div class="fs-empty-banner">
+      <span>&#9432;</span>
+      <span>
+        No current engagement selected.
+        <a href="{{ url_for('engagement.index') }}">Select or create one first</a> to run the review — the
+        rule catalogue below is still visible.
+      </span>
+    </div>
+  {% elif error %}
+    <div class="fs-empty-banner">
+      <span>&#9432;</span>
+      <span>{{ error }}</span>
+    </div>
+  {% else %}
+    {% if review and review.framework %}
+      <div class="fs-empty-banner">
+        <span>&#9432;</span>
+        <span>
+          This engagement's accounting framework is <strong>{{ 'Ind AS' if review.framework == 'IND_AS' else 'AS' }}</strong>
+          — only rules seeded for that framework are selected. A rule never runs, and never produces a
+          reference, for the other framework.
+        </span>
+      </div>
+    {% endif %}
+
+    {% if ran %}
+      <div class="fs-empty-banner fs-empty-banner-ok">
+        <span>&#10003;</span>
+        <span>
+          Review run and saved. {{ review.persisted_exception_count }} exception(s) recorded this run
+          {% if review.preserved_exception_count %}
+            &middot; {{ review.preserved_exception_count }} previously-reviewed exception(s) left untouched
+          {% endif %}.
+        </span>
+      </div>
+    {% endif %}
+
+    <form method="post" class="fs-form-actions">
+      {{ csrf_field() }}
+      <button type="submit" class="fs-btn fs-btn-primary" data-loading-text="Running Accounting Review...">Run Accounting Review &amp; Save Exceptions</button>
+      <span class="fs-muted">The results below already reflect the current data — running just saves them.</span>
+    </form>
+
+    {% if review %}
+      <div class="fs-panel">
+        <h2>This Run's Results, by Rule</h2>
+        {% for rule_id, outcome in review.rule_outcomes.items() %}
+          <details class="fs-panel" style="margin-bottom: 0.75rem;">
+            <summary>
+              <strong>{{ rule_id }}</strong>
+              &middot; evaluated {{ outcome.evaluated_count }} item(s)
+              {% if outcome.insufficient_data_reason %}
+                <span class="fs-badge fs-badge-neutral">Insufficient Data</span>
+              {% elif outcome.exceptions %}
+                <span class="fs-badge fs-badge-high">{{ outcome.exceptions | length }} finding(s)</span>
+              {% else %}
+                <span class="fs-badge fs-badge-low">No findings</span>
+              {% endif %}
+            </summary>
+
+            {% if outcome.insufficient_data_reason %}
+              <div class="fs-empty-banner fs-empty-banner-warning">
+                <span>&#9432;</span>
+                <span>
+                  <strong>Insufficient Data —</strong> {{ outcome.insufficient_data_reason }}
+                  <a href="{{ url_for('upload.index') }}" class="fs-link">Upload the missing data to complete this check &rarr;</a>
+                </span>
+              </div>
+            {% endif %}
+
+            {% if outcome.partial_insufficient_data_notes %}
+              <p class="fs-muted"><strong>Partially insufficient data:</strong></p>
+              <ul>
+                {% for note in outcome.partial_insufficient_data_notes %}<li class="fs-muted">{{ note }}</li>{% endfor %}
+              </ul>
+            {% endif %}
+
+            {% for finding in outcome.exceptions %}
+              <div class="fs-table-wrap" style="margin-top: 0.5rem;">
+                <table class="fs-table">
+                  <tbody>
+                    <tr><th style="width: 12rem;">Label</th><td><span class="fs-badge fs-badge-medium">{{ finding.label }}</span></td></tr>
+                    <tr><th>Trigger</th><td>{{ finding.trigger_condition }}</td></tr>
+                    <tr><th>Explanation</th><td>{{ finding.explanation }}</td></tr>
+                    <tr><th>Suggested Query</th><td>{{ finding.suggested_query }}</td></tr>
+                    <tr><th>Risk Level</th><td>{{ finding.risk_level }}</td></tr>
+                    {% if finding.amount_paise is not none %}
+                      <tr><th>Amount</th><td>{{ finding.amount_paise | paise_display }}</td></tr>
+                    {% endif %}
+                    <tr><th>Data Used (file IDs)</th><td>{{ finding.data_sources | join(', ') if finding.data_sources else '—' }}</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            {% endfor %}
+          </details>
+        {% endfor %}
+      </div>
+    {% endif %}
+
+    <div class="fs-panel">
+      <h2>Persisted Exceptions (this engagement)</h2>
+      {% if not persisted_exceptions %}
+        <p class="fs-muted">No accounting exceptions have been saved for this engagement yet.</p>
+      {% else %}
+        <div class="fs-table-wrap">
+          <table class="fs-table">
+            <thead>
+              <tr>
+                <th>Rule</th>
+                <th>Source</th>
+                <th>Trigger</th>
+                <th>Explanation</th>
+                <th>Suggested Query</th>
+                <th>Risk</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for item in persisted_exceptions %}
+                <tr>
+                  <td>{{ item.exception.rule_id }}<br><span class="fs-muted">{{ item.exception.area }}</span></td>
+                  <td>{{ item.exception.standard_reference or '—' }}</td>
+                  <td>{{ item.exception.trigger_condition }}</td>
+                  <td>{{ item.exception.description }}</td>
+                  <td>{{ item.query.question_text if item.query else '—' }}</td>
+                  <td>
+                    {% if item.exception.risk_level == 'HIGH' or item.exception.risk_level == 'CRITICAL' %}
+                      <span class="fs-badge fs-badge-high">{{ item.exception.risk_level }}</span>
+                    {% elif item.exception.risk_level == 'MEDIUM' %}
+                      <span class="fs-badge fs-badge-medium">{{ item.exception.risk_level }}</span>
+                    {% else %}
+                      <span class="fs-badge fs-badge-low">{{ item.exception.risk_level }}</span>
+                    {% endif %}
+                  </td>
+                  <td><span class="fs-badge fs-badge-neutral">{{ item.exception.status }}</span></td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% endif %}
+    </div>
+  {% endif %}
+
+  <div class="fs-panel">
+    <h2>Rule Catalogue</h2>
+    <div class="fs-table-wrap">
+      <table class="fs-table">
+        <thead>
+          <tr>
+            <th>Rule ID</th>
+            <th>Framework</th>
+            <th>Topic</th>
+            <th>Standard</th>
+            <th>Risk (default)</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for entry in catalogue %}
+            <tr>
+              <td>{{ entry.rule.rule_id }}</td>
+              <td>{{ 'Ind AS' if entry.rule.framework == 'IND_AS' else entry.rule.framework }}</td>
+              <td>{{ entry.rule.topic }}</td>
+              <td>{{ entry.standard.code ~ ' — ' ~ entry.standard.title if entry.standard else '—' }}</td>
+              <td>{{ entry.rule.risk_level_default }}</td>
+              <td><span class="fs-badge {{ entry.status_class }}">{{ entry.status_label }}</span></td>
+            </tr>
+          {% else %}
+            <tr><td colspan="6" class="fs-muted">No accounting rules have been seeded yet.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+{% endblock %}

@@ -1,0 +1,161 @@
+{% extends "base.html" %}
+{% block content %}
+  <div class="fs-page-header">
+    <h1 class="fs-page-title">Unified Findings Centre</h1>
+    {% if engagement %}
+      <p class="fs-page-subtitle">{{ engagement.entity_name }} &middot; FY {{ engagement.financial_year }}</p>
+    {% else %}
+      <p class="fs-page-subtitle">Accounting, Audit and Tax findings together — each still shown with its own professional detail.</p>
+    {% endif %}
+  </div>
+
+  {% if not engagement %}
+    <div class="fs-empty-banner">
+      <span>&#9432;</span>
+      <span>
+        No current engagement selected.
+        <a href="{{ url_for('engagement.index') }}">Select or create one first</a>.
+      </span>
+    </div>
+  {% else %}
+    <div class="fs-panel">
+      <p class="fs-muted">
+        This lists every currently-saved finding from a Unified Review run (or an individual module run — the
+        underlying data is the same). It is a read/filter view; updating a finding's status or notes is done
+        from the Exceptions screen. A finding here always links back to the module's own rule detail — nothing
+        is re-worded to look identical across modules.
+      </p>
+    </div>
+
+    {% if dashboard_summary %}
+      <div class="fs-panel">
+        <h2>Review Summary</h2>
+        <div class="fs-panel-grid" style="grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0.75rem;">
+          <div class="fs-panel">
+            <div class="fs-panel-title">Total Findings</div>
+            <div class="fs-panel-body" style="font-size: 1.6rem; font-weight: 700;">{{ dashboard_summary.total_findings }}</div>
+          </div>
+          {% for m in modules %}
+            <div class="fs-panel">
+              <div class="fs-panel-title">{{ m | title }}</div>
+              <div class="fs-panel-body" style="font-size: 1.6rem; font-weight: 700;">{{ dashboard_summary.per_module.get(m, 0) }}</div>
+            </div>
+          {% endfor %}
+        </div>
+        {% if dashboard_summary.per_risk_level %}
+          <p class="fs-muted" style="margin-top: 0.75rem;">
+            Risk distribution:
+            {% for level, count in dashboard_summary.per_risk_level.items() %}
+              <span class="fs-badge fs-badge-neutral">{{ level }}: {{ count }}</span>
+            {% endfor %}
+          </p>
+        {% endif %}
+      </div>
+    {% endif %}
+
+    <form method="get" class="fs-panel">
+      <h2>Filters</h2>
+      <div class="fs-panel-grid" style="grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0.75rem;">
+        <div class="fs-field" style="margin-bottom:0;">
+          <label for="module">Module</label>
+          <select name="module" id="module">
+            <option value="">All modules</option>
+            {% for m in modules %}
+              <option value="{{ m }}" {% if selected_module == m %}selected{% endif %}>{{ m | title }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="fs-field" style="margin-bottom:0;">
+          <label for="status">Status</label>
+          <select name="status" id="status">
+            <option value="">All statuses</option>
+            {% for s in statuses %}
+              <option value="{{ s }}" {% if selected_status == s %}selected{% endif %}>{{ s }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="fs-field" style="margin-bottom:0;">
+          <label for="risk_level">Risk</label>
+          <select name="risk_level" id="risk_level">
+            <option value="">All risk levels</option>
+            {% for r in risk_levels %}
+              <option value="{{ r }}" {% if selected_risk_level == r %}selected{% endif %}>{{ r }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="fs-field" style="margin-bottom:0;">
+          <label for="rule_id">Rule ID</label>
+          <select name="rule_id" id="rule_id">
+            <option value="">All rules</option>
+            {% for r in rule_ids %}
+              <option value="{{ r }}" {% if selected_rule_id == r %}selected{% endif %}>{{ r }}</option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+      <div class="fs-form-actions fs-form-actions-tight">
+        <button type="submit" class="fs-btn fs-btn-primary">Apply Filters</button>
+        <a href="{{ url_for('review.findings') }}" class="fs-link">Clear</a>
+      </div>
+    </form>
+
+    {% if grouped_by_transaction %}
+      <div class="fs-empty-banner">
+        <span>&#9432;</span>
+        <span>
+          {{ grouped_by_transaction | length }} transaction(s) have findings from more than one module — these
+          are different professional perspectives on the same source data, not duplicates. See each finding's
+          detail page.
+        </span>
+      </div>
+    {% endif %}
+
+    <div class="fs-panel">
+      <h2>Findings ({{ findings | length }})</h2>
+      {% if not findings %}
+        <p class="fs-muted">No findings match the current filters.</p>
+      {% else %}
+        <div class="fs-table-wrap">
+          <table class="fs-table">
+            <thead>
+              <tr>
+                <th>Module</th>
+                <th>Finding ID</th>
+                <th>Rule</th>
+                <th>Title</th>
+                <th>Why Flagged</th>
+                <th>Risk</th>
+                <th>Status</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for f in findings %}
+                <tr>
+                  <td>{{ f.module | title }}</td>
+                  <td>{{ f.finding_id }}</td>
+                  <td>{{ f.rule_id or '—' }}</td>
+                  <td>{{ f.title }}</td>
+                  <td>{{ f.trigger_condition or '—' }}</td>
+                  <td>
+                    {% if f.risk_level == 'HIGH' or f.risk_level == 'CRITICAL' %}
+                      <span class="fs-badge fs-badge-high">{{ f.risk_level }}</span>
+                    {% elif f.risk_level == 'MEDIUM' %}
+                      <span class="fs-badge fs-badge-medium">{{ f.risk_level }}</span>
+                    {% elif f.risk_level %}
+                      <span class="fs-badge fs-badge-low">{{ f.risk_level }}</span>
+                    {% else %}
+                      &mdash;
+                    {% endif %}
+                  </td>
+                  <td><span class="fs-badge fs-badge-neutral">{{ f.status }}</span></td>
+                  <td><a href="{{ url_for('review.finding_detail', module=f.module, finding_id=f.finding_id) }}" class="fs-link">Detail</a></td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% endif %}
+    </div>
+  {% endif %}
+{% endblock %}

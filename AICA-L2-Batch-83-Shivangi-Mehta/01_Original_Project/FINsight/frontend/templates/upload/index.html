@@ -1,0 +1,327 @@
+{% extends "base.html" %}
+{% block content %}
+  <div class="fs-page-header">
+    <h1 class="fs-page-title">Data Upload</h1>
+    {% if engagement %}
+      <p class="fs-page-subtitle">{{ engagement.entity_name }} &middot; FY {{ engagement.financial_year }}</p>
+    {% else %}
+      <p class="fs-page-subtitle">Select an engagement to upload data against.</p>
+    {% endif %}
+  </div>
+
+  {% if not engagement %}
+    <div class="fs-empty-banner">
+      <span>&#9432;</span>
+      <span>
+        No current engagement selected.
+        <a href="{{ url_for('engagement.index') }}">Select or create one first</a>.
+      </span>
+    </div>
+  {% else %}
+    {% with current_step = 1 %}{% include "partials/step_indicator.html" %}{% endwith %}
+    <div class="fs-panel">
+      <h2 class="fs-panel-title">Upload Client Data</h2>
+      <p class="fs-muted">
+        Accepted formats: {{ allowed_extensions | join(", ") }}. Each file is stored locally only — nothing here is
+        sent to any external or cloud service. Select one or more files — Trial Balance, General Ledger, Bank
+        Statement, Sales Register, and so on — then set the Data Type for each one below before uploading.
+      </p>
+
+      {% if errors._engagement %}<p class="fs-field-error">{{ errors._engagement }}</p>{% endif %}
+      {% if delete_error %}<p class="fs-field-error">{{ delete_error }}</p>{% endif %}
+
+      <form method="post" enctype="multipart/form-data" class="fs-form" id="fs-upload-form">
+        {{ csrf_field() }}
+        <div class="fs-field">
+          <label for="file">File(s)</label>
+          <input type="file" id="file" name="file" accept="{{ allowed_extensions | join(',') }}" multiple>
+          {% if errors.file %}<p class="fs-field-error">{{ errors.file }}</p>{% endif %}
+          {% if errors.file_type %}<p class="fs-field-error">{{ errors.file_type }}</p>{% endif %}
+          <noscript><p class="fs-field-error">Selecting a Data Type per file requires JavaScript. Please upload one file at a time with JavaScript disabled.</p></noscript>
+        </div>
+
+        <div class="fs-table-wrap" id="fs-upload-file-list" hidden>
+          <table class="fs-table">
+            <thead>
+              <tr>
+                <th>File Name</th>
+                <th>File Type</th>
+              </tr>
+            </thead>
+            <tbody id="fs-upload-file-list-body"></tbody>
+          </table>
+        </div>
+
+        <template id="fs-file-type-options-template">
+          <option value="" selected disabled>Select...</option>
+          {% for code in file_types %}
+            <option value="{{ code }}">{{ file_type_labels[code] }}</option>
+          {% endfor %}
+        </template>
+
+        <div class="fs-form-actions">
+          <button type="submit" class="fs-btn fs-btn-primary" data-loading-text="Uploading...">Upload Files</button>
+        </div>
+      </form>
+    </div>
+
+    {% if auto_confirm_results is not none %}
+      <div class="fs-panel">
+        <h2 class="fs-panel-title">Confirmed</h2>
+        <p class="fs-muted">
+          {{ auto_confirm_results | length }} file(s) mapped and checked automatically.
+        </p>
+        {% if auto_confirm_results %}
+          <div class="fs-table-wrap">
+            <table class="fs-table">
+              <thead>
+                <tr>
+                  <th>File Name</th>
+                  <th>Columns Mapped</th>
+                  <th>Result</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for item in auto_confirm_results %}
+                  <tr>
+                    <td>{{ item.filename }}</td>
+                    <td>{{ item.mapped_count }}</td>
+                    <td>
+                      {% if item.status == "VALIDATED" %}
+                        <span class="fs-badge fs-badge-low">Ready</span>
+                      {% else %}
+                        <span class="fs-badge fs-badge-critical">Needs Attention</span>
+                      {% endif %}
+                    </td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        {% endif %}
+      </div>
+    {% endif %}
+
+    {% if previews %}
+      <div class="fs-panel">
+        <h2 class="fs-panel-title">Ready to Confirm</h2>
+        <p class="fs-muted">
+          FinSight has automatically worked out the columns and checked the data for the file(s) below.
+          Review the summary, then click "Looks Good — Confirm &amp; Continue" to accept it for all of them in
+          one step. If a file needs a closer look, you can still open it individually below.
+        </p>
+        <div class="fs-table-wrap">
+          <table class="fs-table">
+            <thead>
+              <tr>
+                <th>File Name</th>
+                <th>Sheet</th>
+                <th>Columns Detected</th>
+                <th>Data Check</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for preview in previews %}
+                <tr>
+                  <td>{{ preview.upload.original_filename }}</td>
+                  <td>
+                    {% if preview.sheet_name %}
+                      {{ preview.sheet_name }}
+                      {% if preview.auto_picked_sheet %}
+                        <span class="fs-muted">(first sheet, chosen automatically — this workbook has more than one)</span>
+                      {% endif %}
+                    {% else %}
+                      <span class="fs-muted">—</span>
+                    {% endif %}
+                  </td>
+                  <td>
+                    {% if preview.error %}
+                      <span class="fs-badge fs-badge-critical">Could not read file</span>
+                    {% elif preview.already_mapped %}
+                      <span class="fs-badge fs-badge-neutral">Already mapped</span>
+                      {{ preview.mapped_count }} column(s)
+                    {% elif preview.can_auto_confirm %}
+                      {{ preview.mapped_count }} column(s) matched
+                      {% if preview.unmapped_columns %}
+                        <span class="fs-muted">({{ preview.unmapped_columns | length }} column(s) not matched)</span>
+                      {% endif %}
+                    {% else %}
+                      <span class="fs-badge fs-badge-medium">Couldn't auto-match any columns</span>
+                    {% endif %}
+                    {% if preview.mismatch_warning %}
+                      <p class="fs-muted">{{ preview.mismatch_warning }}</p>
+                    {% endif %}
+                  </td>
+                  <td>
+                    {% if preview.error %}
+                      <span class="fs-muted">{{ preview.error }}</span>
+                    {% elif preview.validation_status == "VALIDATED" %}
+                      <span class="fs-badge fs-badge-low">Looks Good</span>
+                    {% elif preview.validation_status == "ERROR" %}
+                      <span class="fs-badge fs-badge-critical">Needs Attention</span>
+                    {% else %}
+                      <span class="fs-muted">Not yet checked</span>
+                    {% endif %}
+                    <div>
+                      <a href="{{ url_for('mapping.detail', file_id=preview.upload.file_id) }}" class="fs-link">Review manually</a>
+                    </div>
+                  </td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% set any_auto_confirmable = previews | selectattr('can_auto_confirm') | list | length > 0 %}
+        {% if any_auto_confirmable %}
+          <form method="post" class="fs-form">
+            {{ csrf_field() }}
+            <input type="hidden" name="action" value="confirm_auto">
+            <div class="fs-form-actions">
+              <button type="submit" class="fs-btn fs-btn-primary" data-loading-text="Confirming...">Looks Good — Confirm &amp; Continue</button>
+            </div>
+          </form>
+        {% endif %}
+      </div>
+    {% endif %}
+
+    {% if readiness and readiness.ready %}
+      <div class="fs-panel">
+        <h2 class="fs-panel-title">Run Review</h2>
+        <p class="fs-muted">All uploaded files are mapped and checked. You're ready to run the review.</p>
+        <form method="post" action="{{ url_for('review.index') }}" class="fs-inline-form">
+          {{ csrf_field() }}
+          <input type="hidden" name="run_source" value="upload_quick_action">
+          <button type="submit" class="fs-btn fs-btn-primary" data-loading-text="Running...">Run Review</button>
+        </form>
+      </div>
+    {% elif readiness and not readiness.ready and uploads %}
+      {% set blocking = uploads | rejectattr('upload_status', 'equalto', 'VALIDATED') | list %}
+      {% if blocking %}
+        <div class="fs-panel">
+          <h2 class="fs-panel-title">Not Ready for Run Review Yet</h2>
+          <p class="fs-muted">
+            Run Review needs every uploaded file to be Validated first. The file(s) below are still holding
+            it up — open "Map" or "Data Quality" to fix one, or "Remove" it if it was uploaded with the wrong
+            Data Type and you'd rather leave it out.
+          </p>
+          <div class="fs-table-wrap">
+            <table class="fs-table">
+              <thead>
+                <tr>
+                  <th>File</th>
+                  <th>Status</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for upload in blocking %}
+                  <tr>
+                    <td>{{ upload.original_filename }}</td>
+                    <td><span class="fs-badge fs-badge-medium">{{ upload.upload_status }}</span></td>
+                    <td class="fs-table-actions">
+                      <a href="{{ url_for('mapping.detail', file_id=upload.file_id) }}" class="fs-link">Map</a>
+                      <a href="{{ url_for('validation.detail', file_id=upload.file_id) }}" class="fs-link">Data Quality</a>
+                      <form method="post" class="fs-inline-form"
+                            onsubmit="return confirm('Remove {{ upload.original_filename }}? You can re-upload it later with a different Data Type if needed.');">
+                        {{ csrf_field() }}
+                        <input type="hidden" name="action" value="delete_file">
+                        <input type="hidden" name="file_id" value="{{ upload.file_id }}">
+                        <button type="submit" class="fs-link-btn fs-link-danger">Remove</button>
+                      </form>
+                    </td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      {% endif %}
+    {% endif %}
+
+    {% if batch_results %}
+      <div class="fs-panel">
+        <h2 class="fs-panel-title">Upload Result</h2>
+        <p class="fs-muted">
+          {{ batch_results | selectattr('status', 'equalto', 'success') | list | length }} of
+          {{ batch_results | length }} file(s) uploaded successfully. Files that failed were not uploaded — the
+          files that succeeded above were kept; nothing is rolled back.
+        </p>
+        <div class="fs-table-wrap">
+          <table class="fs-table">
+            <thead>
+              <tr>
+                <th>File Name</th>
+                <th>Result</th>
+                <th>Detail</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for item in batch_results %}
+                <tr>
+                  <td>{{ item.filename }}</td>
+                  <td>
+                    {% if item.status == "success" %}
+                      <span class="fs-badge fs-badge-low">Uploaded</span>
+                    {% else %}
+                      <span class="fs-badge fs-badge-critical">Failed</span>
+                    {% endif %}
+                  </td>
+                  <td class="fs-muted">{{ item.message }}</td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    {% endif %}
+
+    {% if not uploads %}
+      <div class="fs-empty-banner">
+        <span>&#9432;</span>
+        <span>No files uploaded yet for this engagement.</span>
+      </div>
+    {% else %}
+      <div class="fs-table-wrap">
+        <table class="fs-table">
+          <thead>
+            <tr>
+              <th>File</th>
+              <th>Data Type</th>
+              <th>Rows</th>
+              <th>Status</th>
+              <th>Uploaded</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for upload in uploads %}
+              <tr>
+                <td>{{ upload.original_filename }}</td>
+                <td>{{ file_type_labels.get(upload.file_type, upload.file_type) }}</td>
+                <td>{{ upload.row_count if upload.row_count is not none else "—" }}</td>
+                <td><span class="fs-badge fs-badge-neutral">{{ upload.upload_status }}</span></td>
+                <td>{{ upload.uploaded_at }}</td>
+                <td class="fs-table-actions">
+                  <a href="{{ url_for('mapping.detail', file_id=upload.file_id) }}" class="fs-link">Map</a>
+                  <a href="{{ url_for('validation.detail', file_id=upload.file_id) }}" class="fs-link">Data Quality</a>
+                  {% if upload.upload_status != "VALIDATED" %}
+                    <form method="post" class="fs-inline-form"
+                          onsubmit="return confirm('Remove {{ upload.original_filename }}? You can re-upload it later with a different Data Type if needed.');">
+                      {{ csrf_field() }}
+                      <input type="hidden" name="action" value="delete_file">
+                      <input type="hidden" name="file_id" value="{{ upload.file_id }}">
+                      <button type="submit" class="fs-link-btn fs-link-danger">Remove</button>
+                    </form>
+                  {% endif %}
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% endif %}
+  {% endif %}
+{% endblock %}
+{% block scripts %}
+  <script src="{{ url_for('static', filename='js/upload.js') }}"></script>
+{% endblock %}

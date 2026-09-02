@@ -1,0 +1,108 @@
+{% extends "base.html" %}
+{% block content %}
+  <div class="fs-page-header">
+    <h1 class="fs-page-title">Dashboard</h1>
+    <p class="fs-page-subtitle">FinSight &middot; Offline Financial Review &amp; Compliance Assistant &mdash; Accounting &bull; Audit &bull; Tax</p>
+  </div>
+
+  {% if not dashboard.engagement %}
+    <div class="fs-empty-banner">
+      <span>&#9432;</span>
+      <span>
+        <strong>No engagements yet.</strong>
+        <a href="{{ url_for('engagement.index') }}">Create or select an engagement</a> to get started.
+      </span>
+    </div>
+
+    <div class="fs-panel">
+      <h2 class="fs-panel-title">Quick Actions</h2>
+      <div class="fs-quick-actions" style="margin-top: 0.75rem;">
+        <a href="{{ url_for('engagement.new') }}" class="fs-btn fs-btn-primary">+ New Engagement</a>
+      </div>
+    </div>
+  {% else %}
+    <div class="fs-panel">
+      <h2 class="fs-panel-title">Current Engagement</h2>
+      <dl class="fs-about-block" style="margin-top: 0.6rem;">
+        <dt>Entity</dt>
+        <dd>{{ dashboard.engagement.entity_name }}</dd>
+        <dt>Financial Year</dt>
+        <dd>{{ dashboard.engagement.financial_year }}</dd>
+        <dt>Status</dt>
+        <dd>{{ dashboard.engagement.status }}</dd>
+        <dt>Review Readiness</dt>
+        <dd>
+          {% if dashboard.readiness.ready %}
+            <span class="fs-badge fs-badge-low">Ready</span>
+            <span class="fs-muted">&mdash; data mapping and validation are complete ({{ dashboard.readiness.upload_count }} file(s) uploaded).</span>
+          {% else %}
+            <span class="fs-badge fs-badge-neutral">Not Ready</span>
+            <span class="fs-muted">&mdash; {{ dashboard.readiness.reason }}</span>
+          {% endif %}
+        </dd>
+      </dl>
+    </div>
+
+    <div class="fs-stat-grid">
+      <div class="fs-stat-card">
+        <div class="fs-stat-value">{{ dashboard.review_summary.total_findings }}</div>
+        <div class="fs-stat-label">Total Findings</div>
+      </div>
+      <div class="fs-stat-card">
+        <div class="fs-stat-value">{{ dashboard.high_risk_items }}</div>
+        <div class="fs-stat-label">High-Risk Items</div>
+      </div>
+      <div class="fs-stat-card">
+        <div class="fs-stat-value">{{ dashboard.open_queries }}</div>
+        <div class="fs-stat-label">Open Queries</div>
+      </div>
+      <div class="fs-stat-card">
+        <div class="fs-stat-value">{{ dashboard.resolved_queries }}</div>
+        <div class="fs-stat-label">Resolved Queries</div>
+      </div>
+    </div>
+
+    <div class="fs-panel-grid">
+      <div class="fs-panel">
+        <div class="fs-panel-header">
+          <h2 class="fs-panel-title">Review Overview</h2>
+          <p class="fs-panel-subtitle">Findings recorded by module, from the most recent review run(s).</p>
+        </div>
+        <div class="fs-panel-body" id="fs-chart-exceptions-module"></div>
+      </div>
+
+      <div class="fs-panel">
+        <div class="fs-panel-header">
+          <h2 class="fs-panel-title">Risk Distribution</h2>
+          <p class="fs-panel-subtitle">Findings by risk level (only levels that actually occur are shown).</p>
+        </div>
+        <div class="fs-panel-body" id="fs-chart-risk-distribution"></div>
+      </div>
+
+      <div class="fs-panel">
+        <div class="fs-panel-header">
+          <h2 class="fs-panel-title">Review Status</h2>
+          <p class="fs-panel-subtitle">Query &amp; Working Papers status breakdown.</p>
+        </div>
+        <div class="fs-panel-body" id="fs-chart-query-status"></div>
+      </div>
+    </div>
+
+    <div class="fs-panel">
+      <h2 class="fs-panel-title">Quick Actions</h2>
+      <div class="fs-quick-actions" style="margin-top: 0.75rem;">
+        <a href="{{ url_for('upload.index') }}" class="fs-btn fs-btn-secondary">Upload Data</a>
+        <a href="{{ url_for('review.index') }}" class="fs-btn fs-btn-primary">Run Review</a>
+        <a href="{{ url_for('review.findings') }}" class="fs-btn fs-btn-secondary">Findings Centre</a>
+        <a href="{{ url_for('queries.index') }}" class="fs-btn fs-btn-secondary">Query &amp; Working Papers</a>
+      </div>
+    </div>
+
+    <script type="application/json" id="fs-dashboard-data">{{ dashboard | tojson }}</script>
+  {% endif %}
+{% endblock %}
+
+{% block scripts %}
+  <script src="{{ url_for('static', filename='js/charts.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
+{% endblock %}
