@@ -1,0 +1,226 @@
+{% extends "base.html" %}
+{% block content %}
+  <div class="fs-page-header">
+    <h1 class="fs-page-title">Audit Review</h1>
+    {% if engagement %}
+      <p class="fs-page-subtitle">{{ engagement.entity_name }} &middot; FY {{ engagement.financial_year }}</p>
+    {% else %}
+      <p class="fs-page-subtitle">Audit risk indicators against your validated, confirmed-mapped data.</p>
+    {% endif %}
+  </div>
+
+  <div class="fs-panel">
+    <p class="fs-muted">
+      This module identifies <strong>audit risk indicators</strong> — unusual transactions/patterns, cut-off
+      and journal-entry risk, related-party candidates, and estimate/judgement areas warranting attention —
+      using standards-informed analytical checks tagged to specific audit assertions. It never turns a risk
+      indicator into an automatic accounting exception, and never states that an audit procedure is mandatory.
+      Findings are always labeled <strong>Audit Attention Required</strong>, <strong>Potential Audit Risk</strong>,
+      <strong>Review Required</strong>, or <strong>Insufficient Data</strong>, for a professional to review and
+      confirm. It runs only against data you have already validated and confirmed on the Mapping and Data
+      Quality screens — nothing unvalidated is read, and no framework precondition applies here (audit
+      procedures apply regardless of AS/Ind AS).
+    </p>
+    <p class="fs-muted">
+      <strong>SA Reference</strong> below is the authoritative ICAI Standard on Auditing citation for the
+      audit area a rule sits within. <strong>FinSight Analytical Test</strong> is the specific heuristic and
+      threshold FinSight created to implement that check. The presence of an SA Reference never means the
+      cited SA prescribes that specific threshold or test — every threshold shown (day-count windows,
+      materiality fallbacks, percentage-movement triggers, minimum-voucher counts, ageing days, and similar)
+      is a FinSight-configurable analytical parameter, not an SA requirement.
+    </p>
+  </div>
+
+  {% if not engagement %}
+    <div class="fs-empty-banner">
+      <span>&#9432;</span>
+      <span>
+        No current engagement selected.
+        <a href="{{ url_for('engagement.index') }}">Select or create one first</a> to run the review — the
+        rule catalogue below is still visible.
+      </span>
+    </div>
+  {% elif error %}
+    <div class="fs-empty-banner">
+      <span>&#9432;</span>
+      <span>{{ error }}</span>
+    </div>
+  {% else %}
+    {% if ran %}
+      <div class="fs-empty-banner fs-empty-banner-ok">
+        <span>&#10003;</span>
+        <span>
+          Review run and saved. {{ review.persisted_exception_count }} exception(s) recorded this run
+          {% if review.preserved_exception_count %}
+            &middot; {{ review.preserved_exception_count }} previously-reviewed exception(s) left untouched
+          {% endif %}.
+        </span>
+      </div>
+    {% endif %}
+
+    <form method="post" class="fs-form-actions">
+      {{ csrf_field() }}
+      <button type="submit" class="fs-btn fs-btn-primary" data-loading-text="Running Audit Review...">Run Audit Review &amp; Save Exceptions</button>
+      <span class="fs-muted">The results below already reflect the current data — running just saves them.</span>
+    </form>
+
+    {% if review %}
+      <div class="fs-panel">
+        <h2>This Run's Results, by Rule</h2>
+        {% for rule_id, outcome in review.rule_outcomes.items() %}
+          {% set rule = rules_by_id.get(rule_id) %}
+          <details class="fs-panel" style="margin-bottom: 0.75rem;">
+            <summary>
+              <strong>{{ rule_id }}</strong> &middot; {{ rule.audit_area if rule else '' }}
+              &middot; evaluated {{ outcome.evaluated_count }} item(s)
+              {% if outcome.insufficient_data_reason %}
+                <span class="fs-badge fs-badge-neutral">Insufficient Data</span>
+              {% elif outcome.exceptions %}
+                <span class="fs-badge fs-badge-high">{{ outcome.exceptions | length }} finding(s)</span>
+              {% else %}
+                <span class="fs-badge fs-badge-low">No findings</span>
+              {% endif %}
+            </summary>
+
+            {% if rule %}
+              <p class="fs-muted">
+                <strong>SA Reference (authoritative):</strong> {{ rule.related_sa or '—' }}
+                &middot; <strong>Assertions:</strong>
+                {{ assertion_codes_by_rule_id.get(rule_id) | join(', ') if assertion_codes_by_rule_id.get(rule_id) else '—' }}
+              </p>
+              <p class="fs-muted">
+                <strong>FinSight Analytical Test:</strong> {{ rule.logic_summary or '—' }}
+              </p>
+            {% endif %}
+
+            {% if outcome.insufficient_data_reason %}
+              <div class="fs-empty-banner fs-empty-banner-warning">
+                <span>&#9432;</span>
+                <span>
+                  <strong>Insufficient Data —</strong> {{ outcome.insufficient_data_reason }}
+                  <a href="{{ url_for('upload.index') }}" class="fs-link">Upload the missing data to complete this check &rarr;</a>
+                </span>
+              </div>
+            {% endif %}
+
+            {% if outcome.partial_insufficient_data_notes %}
+              <p class="fs-muted"><strong>Partially insufficient data:</strong></p>
+              <ul>
+                {% for note in outcome.partial_insufficient_data_notes %}<li class="fs-muted">{{ note }}</li>{% endfor %}
+              </ul>
+            {% endif %}
+
+            {% for finding in outcome.exceptions %}
+              <div class="fs-table-wrap" style="margin-top: 0.5rem;">
+                <table class="fs-table">
+                  <tbody>
+                    <tr><th style="width: 14rem;">Label</th><td><span class="fs-badge fs-badge-medium">{{ finding.label }}</span></td></tr>
+                    <tr><th>Audit Area</th><td>{{ rule.audit_area if rule else finding.area }}</td></tr>
+                    <tr><th>SA Reference (authoritative)</th><td>{{ rule.related_sa if rule else '—' }}</td></tr>
+                    <tr><th>FinSight Analytical Test</th><td>{{ rule.logic_summary if rule else '—' }}</td></tr>
+                    <tr><th>Assertion(s)</th><td>{{ assertion_codes_by_rule_id.get(rule_id) | join(', ') if assertion_codes_by_rule_id.get(rule_id) else '—' }}</td></tr>
+                    <tr><th>Trigger / Why Flagged</th><td>{{ finding.trigger_condition }}</td></tr>
+                    <tr><th>Explanation</th><td>{{ finding.explanation }}</td></tr>
+                    <tr><th>Suggested Audit Procedure</th><td>{{ rule.suggested_audit_procedure if rule else '—' }}</td></tr>
+                    <tr><th>Suggested Evidence</th><td>{{ rule.suggested_evidence if rule else '—' }}</td></tr>
+                    <tr><th>Suggested Query</th><td>{{ finding.suggested_query }}</td></tr>
+                    <tr><th>Risk Level</th><td>{{ finding.risk_level }}</td></tr>
+                    {% if finding.amount_paise is not none %}
+                      <tr><th>Amount</th><td>{{ finding.amount_paise | paise_display }}</td></tr>
+                    {% endif %}
+                    <tr><th>Data Used (file IDs)</th><td>{{ finding.data_sources | join(', ') if finding.data_sources else '—' }}</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            {% endfor %}
+          </details>
+        {% endfor %}
+      </div>
+    {% endif %}
+
+    <div class="fs-panel">
+      <h2>Persisted Exceptions (this engagement)</h2>
+      {% if not persisted_exceptions %}
+        <p class="fs-muted">No audit exceptions have been saved for this engagement yet.</p>
+      {% else %}
+        <div class="fs-table-wrap">
+          <table class="fs-table">
+            <thead>
+              <tr>
+                <th>Rule</th>
+                <th>SA Reference (authoritative)</th>
+                <th>FinSight Analytical Test</th>
+                <th>Assertion(s)</th>
+                <th>Trigger</th>
+                <th>Explanation</th>
+                <th>Suggested Query</th>
+                <th>Risk</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for item in persisted_exceptions %}
+                {% set item_rule = rules_by_id.get(item.exception.rule_id) %}
+                <tr>
+                  <td>{{ item.exception.rule_id }}<br><span class="fs-muted">{{ item.exception.area }}</span></td>
+                  <td>{{ item.exception.standard_reference or '—' }}</td>
+                  <td>{{ item_rule.logic_summary if item_rule else '—' }}</td>
+                  <td>{{ item.assertions | join(', ') if item.assertions else '—' }}</td>
+                  <td>{{ item.exception.trigger_condition }}</td>
+                  <td>{{ item.exception.description }}</td>
+                  <td>{{ item.query.question_text if item.query else '—' }}</td>
+                  <td>
+                    {% if item.exception.risk_level == 'HIGH' or item.exception.risk_level == 'CRITICAL' %}
+                      <span class="fs-badge fs-badge-high">{{ item.exception.risk_level }}</span>
+                    {% elif item.exception.risk_level == 'MEDIUM' %}
+                      <span class="fs-badge fs-badge-medium">{{ item.exception.risk_level }}</span>
+                    {% else %}
+                      <span class="fs-badge fs-badge-low">{{ item.exception.risk_level }}</span>
+                    {% endif %}
+                  </td>
+                  <td><span class="fs-badge fs-badge-neutral">{{ item.exception.status }}</span></td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% endif %}
+    </div>
+  {% endif %}
+
+  <div class="fs-panel">
+    <h2>Rule Catalogue</h2>
+    <div class="fs-table-wrap">
+      <table class="fs-table">
+        <thead>
+          <tr>
+            <th>Rule ID</th>
+            <th>Audit Area</th>
+            <th>Topic</th>
+            <th>SA Reference (authoritative)</th>
+            <th>FinSight Analytical Test</th>
+            <th>Risk (default)</th>
+            <th>Suggested Evidence</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for entry in catalogue %}
+            <tr>
+              <td>{{ entry.rule.rule_id }}</td>
+              <td>{{ entry.rule.audit_area or '—' }}</td>
+              <td>{{ entry.rule.topic }}</td>
+              <td>{{ entry.rule.related_sa or '—' }}</td>
+              <td>{{ entry.rule.logic_summary or '—' }}</td>
+              <td>{{ entry.rule.risk_level_default }}</td>
+              <td>{{ entry.rule.suggested_evidence or '—' }}</td>
+              <td><span class="fs-badge {{ entry.status_class }}">{{ entry.status_label }}</span></td>
+            </tr>
+          {% else %}
+            <tr><td colspan="8" class="fs-muted">No audit rules have been seeded yet.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+{% endblock %}

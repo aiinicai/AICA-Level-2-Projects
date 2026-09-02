@@ -1,0 +1,51 @@
+services:
+  db:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DJANGO_DB_NAME:-far_db}
+      POSTGRES_USER: ${DJANGO_DB_USER:-far_user}
+      POSTGRES_PASSWORD: ${DJANGO_DB_PASSWORD:-far_password}
+    volumes:
+      - far_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DJANGO_DB_USER:-far_user}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  web:
+    build: .
+    restart: unless-stopped
+    command: >
+      sh -c "python manage.py migrate &&
+             python manage.py bootstrap_roles &&
+             python manage.py seed_reference_data &&
+             gunicorn config.wsgi:application --bind 0.0.0.0:8000 --workers 3"
+    volumes:
+      - far_media:/app/media
+      - far_static:/app/staticfiles
+    ports:
+      - "8000:8000"
+    environment:
+      DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:?set a real secret key in .env}
+      DJANGO_DEBUG: "False"
+      DJANGO_ALLOWED_HOSTS: ${DJANGO_ALLOWED_HOSTS:-*}
+      DJANGO_CSRF_TRUSTED_ORIGINS: ${DJANGO_CSRF_TRUSTED_ORIGINS:-}
+      DJANGO_DB_ENGINE: postgresql
+      DJANGO_DB_NAME: ${DJANGO_DB_NAME:-far_db}
+      DJANGO_DB_USER: ${DJANGO_DB_USER:-far_user}
+      DJANGO_DB_PASSWORD: ${DJANGO_DB_PASSWORD:-far_password}
+      DJANGO_DB_HOST: db
+      DJANGO_DB_PORT: 5432
+      DJANGO_SECURE_COOKIES: ${DJANGO_SECURE_COOKIES:-False}
+      FAR_COMPANY_NAME: ${FAR_COMPANY_NAME:-Demo Listed Company Ltd.}
+      FAR_QR_BASE_URL: ${FAR_QR_BASE_URL:-https://far.yourcompany.com}
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  far_pgdata:
+  far_media:
+  far_static:

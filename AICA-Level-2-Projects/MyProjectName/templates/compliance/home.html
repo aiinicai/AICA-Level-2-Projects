@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% block title %}Compliance reports{% endblock %}
+{% block content %}
+<h4 class="mb-3">Compliance outputs, generated on demand</h4>
+
+<form method="get" class="row g-2 mb-4" style="max-width:600px;">
+  <div class="col-auto">
+    <select name="entity" class="form-select form-select-sm" onchange="this.form.submit()">
+      {% for e in entities %}<option value="{{ e.pk }}" {% if entity.pk == e.pk %}selected{% endif %}>{{ e.name }}</option>{% endfor %}
+    </select>
+  </div>
+  <div class="col-auto">
+    <select name="fy" class="form-select form-select-sm" onchange="this.form.submit()">
+      {% for f in fys %}<option value="{{ f.pk }}" {% if fy.pk == f.pk %}selected{% endif %}>{{ f.label }}</option>{% endfor %}
+    </select>
+  </div>
+</form>
+{% if not fy %}<div class="alert alert-warning">No financial years set up for this entity yet — add one from the Django admin (Compliance → Financial years).</div>{% endif %}
+
+<div class="row g-3">
+  <div class="col-md-4"><div class="card stat-card p-3 h-100">
+    <h6>Schedule III PP&E schedule</h6>
+    <p class="small text-muted">Gross block, additions, disposals, accumulated depreciation, net block — financial-statement note format.</p>
+    <a href="{% url 'compliance:schedule_iii' %}?entity={{ entity.pk }}&fy={{ fy.pk }}" class="btn btn-sm btn-outline-primary">View</a>
+    <a href="{% url 'compliance:schedule_iii' %}?entity={{ entity.pk }}&fy={{ fy.pk }}&format=csv" class="btn btn-sm btn-outline-secondary">Download CSV</a>
+  </div></div>
+
+  <div class="col-md-4"><div class="card stat-card p-3 h-100">
+    <h6>Ind AS 16 para 73(e) roll-forward</h6>
+    <p class="small text-muted">Full movement reconciliation for the notes to accounts, including revaluation and impairment.</p>
+    <a href="{% url 'compliance:ind_as_16' %}?entity={{ entity.pk }}&fy={{ fy.pk }}" class="btn btn-sm btn-outline-primary">View</a>
+    <a href="{% url 'compliance:ind_as_16' %}?entity={{ entity.pk }}&fy={{ fy.pk }}&format=csv" class="btn btn-sm btn-outline-secondary">Download CSV</a>
+  </div></div>
+
+  <div class="col-md-4"><div class="card stat-card p-3 h-100">
+    <h6>CARO 3(i) evidence pack</h6>
+    <p class="small text-muted">Records-completeness %, verification coverage %, title-deed status, revaluation register, Benami declaration.</p>
+    <a href="{% url 'compliance:caro_pack' %}?entity={{ entity.pk }}&fy={{ fy.pk }}" class="btn btn-sm btn-outline-primary">View</a>
+  </div></div>
+
+  <div class="col-md-4"><div class="card stat-card p-3 h-100">
+    <h6>Physical verification working papers</h6>
+    <p class="small text-muted">Exportable scan logs and discrepancy resolution notes for the auditor's file.</p>
+    <a href="{% url 'compliance:verification_papers' %}?entity={{ entity.pk }}" class="btn btn-sm btn-outline-secondary">Download CSV</a>
+  </div></div>
+
+  <div class="col-md-4"><div class="card stat-card p-3 h-100">
+    <h6>XBRL-ready export</h6>
+    <p class="small text-muted">PP&E note data structured for AOC-4 XBRL filing (data-readiness export, not a signed instance document).</p>
+    <a href="{% url 'compliance:xbrl_export' %}?entity={{ entity.pk }}&fy={{ fy.pk }}" class="btn btn-sm btn-outline-secondary">Download CSV</a>
+  </div></div>
+
+  <div class="col-md-4"><div class="card stat-card p-3 h-100">
+    <h6>Section 188 related-party flag</h6>
+    <p class="small text-muted">Related-party vendors and disposal buyers are flagged automatically wherever they appear — see the Asset master and Disposal list.</p>
+    <a href="{% url 'assets:list' %}" class="btn btn-sm btn-outline-secondary">Go to Asset master</a>
+  </div></div>
+</div>
+{% endblock %}

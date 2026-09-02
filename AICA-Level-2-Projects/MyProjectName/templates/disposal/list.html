@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% load humanize %}
+{% block title %}Disposal / write-off{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between mb-3">
+  <h4 class="mb-0">Disposal / write-off / sale</h4>
+  <a href="{% url 'disposal:create' %}" class="btn btn-primary btn-sm">New disposal request</a>
+</div>
+<div class="card stat-card p-3">
+<table class="table table-sm table-hover">
+  <thead><tr><th>Asset</th><th>Mode</th><th class="text-end">NBV</th><th class="text-end">Proceeds</th><th class="text-end">P&L</th><th>Sec. 180?</th><th>Status</th><th>Decide</th></tr></thead>
+  <tbody>
+  {% for d in items %}
+    <tr>
+      <td><a href="{{ d.asset.get_absolute_url }}">{{ d.asset.asset_id }}</a></td>
+      <td>{{ d.get_mode_display }}</td>
+      <td class="text-end">₹{{ d.net_book_value_at_request|intcomma }}</td>
+      <td class="text-end">₹{{ d.sale_or_scrap_value|intcomma }}</td>
+      <td class="text-end {% if d.profit_or_loss < 0 %}text-danger{% else %}text-success{% endif %}">₹{{ d.profit_or_loss|intcomma }}</td>
+      <td>{% if d.is_material_section_180 %}<span class="badge bg-danger">Flagged ({{ d.section_180_threshold_pct|floatformat:1 }}%)</span>{% else %}No{% endif %}</td>
+      <td><span class="badge bg-light text-dark">{{ d.get_status_display }}</span></td>
+      <td>
+        {% if d.status == 'PENDING_APPROVAL' %}
+        <form method="post" action="{% url 'disposal:decide' d.pk %}" class="d-flex gap-1">
+          {% csrf_token %}
+          {% if d.is_material_section_180 %}<input type="text" name="board_resolution_reference" class="form-control form-control-sm" placeholder="Board/shareholder res. ref">{% endif %}
+          <button name="decision" value="approve" class="btn btn-sm btn-success">Approve</button>
+          <button name="decision" value="reject" class="btn btn-sm btn-outline-danger">Reject</button>
+        </form>
+        {% endif %}
+      </td>
+    </tr>
+  {% empty %}<tr><td colspan="8" class="text-muted">No disposal requests yet.</td></tr>{% endfor %}
+  </tbody>
+</table>
+</div>
+{% endblock %}

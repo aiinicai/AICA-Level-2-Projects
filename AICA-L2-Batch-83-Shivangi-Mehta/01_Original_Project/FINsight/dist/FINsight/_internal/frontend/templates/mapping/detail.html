@@ -1,0 +1,121 @@
+{% extends "base.html" %}
+{% block content %}
+  <div class="fs-page-header">
+    <h1 class="fs-page-title">Map Columns</h1>
+    <p class="fs-page-subtitle">
+      {{ upload.original_filename }} &middot; {{ file_type_label }}
+      {% if sheet_name %} &middot; Sheet: {{ sheet_name }}{% endif %}
+    </p>
+  </div>
+
+  {% if structure.header_row_index != 0 %}
+    <div class="fs-empty-banner fs-empty-banner-warning">
+      <span>&#9888;</span>
+      <span>
+        <strong>Detected Header Row: Row {{ structure.header_row_index + 1 }}</strong>
+        <br>The system detected Row {{ structure.header_row_index + 1 }} as the header. Please verify this before confirming mappings.
+      </span>
+    </div>
+  {% else %}
+    <div class="fs-empty-banner fs-empty-banner-ok">
+      <span>&#10003;</span>
+      <span><strong>Detected Header Row: Row 1</strong></span>
+    </div>
+  {% endif %}
+
+  {% if structure.warnings %}
+    <div class="fs-empty-banner">
+      <span>&#9888;</span>
+      <span>
+        {% for warning in structure.warnings %}{{ warning }}{% if not loop.last %}<br>{% endif %}{% endfor %}
+      </span>
+    </div>
+  {% endif %}
+
+  {% if mismatch_warning %}
+    <div class="fs-empty-banner fs-empty-banner-warning">
+      <span>&#9888;</span>
+      <span>{{ mismatch_warning }}</span>
+    </div>
+  {% endif %}
+
+  {% if errors._duplicate_target %}<p class="fs-field-error">{{ errors._duplicate_target }}</p>{% endif %}
+  {% if errors._file_type %}<p class="fs-field-error">{{ errors._file_type }}</p>{% endif %}
+  {% if errors._mappings %}<p class="fs-field-error">{{ errors._mappings }}</p>{% endif %}
+
+  <div class="fs-panel">
+    <p class="fs-muted">
+      Each row below is one physical column exactly as it appears in the file, with FinSight's
+      suggested field and confidence shown alongside — never applied automatically. Nothing is used
+      downstream until you confirm and save.
+    </p>
+
+    <form method="post" class="fs-form" style="max-width: none;">
+      {{ csrf_field() }}
+      {% if sheet_name %}<input type="hidden" name="sheet" value="{{ sheet_name }}">{% endif %}
+
+      <div class="fs-table-wrap">
+        <table class="fs-table">
+          <thead>
+            <tr>
+              <th>Source Column</th>
+              <th>Suggested Field</th>
+              <th>Confidence</th>
+              <th>Map To</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for row in rows %}
+              <tr>
+                <td>
+                  {{ row.column.raw_name if row.column.raw_name else row.column.column_key }}
+                  {% if row.column.is_duplicate %}<br><span class="fs-badge fs-badge-medium">Duplicate header</span>{% endif %}
+                  {% if row.is_confirmed %}<br><span class="fs-badge fs-badge-low">Confirmed</span>{% endif %}
+                </td>
+                <td>{{ row.suggestion.target_label if row.suggestion and row.suggestion.target_field else "—" }}</td>
+                <td>
+                  {% if row.suggestion and row.suggestion.confidence is not none %}
+                    {% set pct = (row.suggestion.confidence * 100) | round | int %}
+                    {% if row.suggestion.confidence >= 0.75 %}
+                      <span class="fs-badge fs-badge-low">High &middot; {{ pct }}%</span>
+                    {% elif row.suggestion.confidence >= 0.5 %}
+                      <span class="fs-badge fs-badge-medium">Medium &middot; {{ pct }}%</span>
+                    {% else %}
+                      <span class="fs-badge fs-badge-high">Low &middot; {{ pct }}%</span>
+                    {% endif %}
+                  {% else %}
+                    <span class="fs-badge fs-badge-critical">Unmapped</span>
+                  {% endif %}
+                </td>
+                <td>
+                  <select name="target_field__{{ row.column.position }}">
+                    <option value="" {% if not row.selected_field %}selected{% endif %}>Skip / do not map</option>
+                    {% for field_name in candidate_fields %}
+                      <option value="{{ field_name }}" {% if row.selected_field == field_name %}selected{% endif %}>
+                        {{ canonical_fields[field_name][0] }}
+                      </option>
+                    {% endfor %}
+                  </select>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+      {% if mismatch_warning %}
+        <div class="fs-field" style="margin-top: 1rem;">
+          <label>
+            <input type="checkbox" name="file_type_reviewed" {% if request.form.get('file_type_reviewed') == 'on' %}checked{% endif %}>
+            I have reviewed the file type warning above and confirm the selected data type is correct.
+          </label>
+        </div>
+      {% endif %}
+
+      <div class="fs-form-actions">
+        <button type="submit" class="fs-btn fs-btn-primary">Confirm Mappings</button>
+        <a href="{{ url_for('mapping.index') }}" class="fs-btn fs-btn-secondary">Cancel</a>
+      </div>
+    </form>
+  </div>
+{% endblock %}
