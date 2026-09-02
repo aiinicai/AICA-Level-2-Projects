@@ -1,11 +1,11 @@
-# DCF Valuation Professional v3.0.5
+# DCF Valuation Professional v3.0.6
 
 ## AICA Level 2 – Batch 104 Capstone Project
 
 **Participant:** Rajesh Kamath  
 **ICAI Membership No.:** 100524  
 **Batch:** AICA Level 2 – Batch 104  
-**Project:** DCF Valuation Professional v3.0.5  
+**Project:** DCF Valuation Professional v3.0.6  
 
 ---
 
