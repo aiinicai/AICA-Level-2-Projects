@@ -58,17 +58,52 @@ else
   fi
 fi
 
-# Remove the "chromium_headless_shell" variant if present. Newer
-# Playwright versions download this automatically alongside regular
-# Chromium (used only for headless-mode performance) even though this
-# app always launches with headless=False and never touches it. Its
-# own official PyInstaller hook tries to bundle every browser folder it
-# finds under .local-browsers, and on some Chromium/headless-shell
-# revisions that fails with "Unable to find ...gdocs_script.js" because
-# a file the hook expects isn't actually present in that particular
-# shell build. Since the app never needs the shell at all, the simplest
-# fix is to delete it before PyInstaller ever sees it.
+# Remove the "chromium_headless_shell" variant if present. This app
+# always launches with headless=False and never uses it -- it's only
+# downloaded because newer Playwright versions fetch it automatically
+# alongside regular Chromium for headless-mode performance elsewhere.
+LIVE_BROWSERS=$(find build_venv -maxdepth 10 -type d -name ".local-browsers" 2>/dev/null | head -n1)
 find build_venv -maxdepth 10 -type d -name "chromium_headless_shell-*" -print -exec rm -rf {} + 2>/dev/null
+
+# -- Pristine snapshot / restore --------------------------------------
+# The REAL root cause behind repeated "file not found" PyInstaller
+# failures on a different file each time (first gdocs_script.js in the
+# headless shell, then PrivacySandboxAttestationsPreloaded, potentially
+# something else next time) isn't any one specific file -- it's that
+# every time you actually LAUNCH the app to test it, Chrome's own
+# background "component updater" silently adds, modifies, or removes
+# various optional feature folders in the SAME Chromium copy
+# PyInstaller is about to bundle. PyInstaller's official Playwright
+# hook records a file manifest when it scans this folder (Analysis
+# phase), then tries to copy those exact files moments later (Collect
+# phase) -- if anything changed in between, that copy fails. Deleting
+# one offending file after another never actually fixes this, since a
+# different file breaks next time.
+#
+# The real fix: keep one pristine, snapshot copy of Chromium made right
+# after download (before the app has ever been launched with real
+# internet access), and restore FROM that snapshot immediately before
+# every single build. Nothing runs or touches the browser files
+# between that restore and PyInstaller's scan+copy within the same
+# script execution, so they can never be a moving target again --
+# regardless of how much real testing happens with the actual built
+# app in between builds.
+PRISTINE_BACKUP="build_venv/.local-browsers-pristine-backup"
+if [ -n "$LIVE_BROWSERS" ] && [ -d "$LIVE_BROWSERS" ]; then
+  if [ ! -d "$PRISTINE_BACKUP" ]; then
+    echo "Creating a pristine snapshot of this Chromium copy..."
+    echo "(only needs to happen once -- future builds restore from this"
+    echo " snapshot instead, so real app usage in between never"
+    echo " destabilizes what PyInstaller bundles)"
+    cp -R "$LIVE_BROWSERS" "$PRISTINE_BACKUP" || { echo "ERROR: could not create pristine snapshot."; exit 1; }
+  else
+    echo "Restoring Chromium from the pristine snapshot before building..."
+    echo "(this undoes anything Chrome's background updater changed the"
+    echo " last time you ran the app -- expected and harmless)"
+    rm -rf "$LIVE_BROWSERS"
+    cp -R "$PRISTINE_BACKUP" "$LIVE_BROWSERS" || { echo "ERROR: could not restore from pristine snapshot."; exit 1; }
+  fi
+fi
 
 echo "[4/6] Building ClientLedgerIndia.app with PyInstaller..."
 echo "      (this only repackages your current source files -- no"

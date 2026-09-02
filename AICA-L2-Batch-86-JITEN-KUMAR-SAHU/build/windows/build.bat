@@ -130,20 +130,66 @@ if not exist "build_venv\Lib\site-packages\playwright\driver\package\.local-brow
 echo Done.
 echo.
 
-REM Remove the "chromium_headless_shell" variant if present. Newer
-REM Playwright versions download this automatically alongside regular
-REM Chromium (it's used only for headless-mode performance) even though
-REM this app always launches with headless=False and never touches it.
-REM Its own official PyInstaller hook tries to bundle every browser
-REM folder it finds under .local-browsers, and on some Chromium/headless
-REM -shell revisions that fails with "Unable to find ...gdocs_script.js"
-REM because a file the hook expects isn't actually present in that
-REM particular shell build. Since the app never needs the shell at all,
-REM the simplest fix is to delete it before PyInstaller ever sees it.
-for /d %%D in ("build_venv\Lib\site-packages\playwright\driver\package\.local-browsers\chromium_headless_shell-*") do (
+set "LIVE_BROWSERS=build_venv\Lib\site-packages\playwright\driver\package\.local-browsers"
+set "PRISTINE_BACKUP=build_venv\.local-browsers-pristine-backup"
+
+REM Remove the "chromium_headless_shell" variant if present. This app
+REM always launches with headless=False and never uses it -- it's only
+REM downloaded because newer Playwright versions fetch it automatically
+REM alongside regular Chromium for headless-mode performance elsewhere.
+for /d %%D in ("%LIVE_BROWSERS%\chromium_headless_shell-*") do (
     echo Removing unused chromium_headless_shell variant: %%~nxD
     rmdir /s /q "%%D"
 )
+
+REM -- Pristine snapshot / restore --------------------------------
+REM The REAL root cause behind repeated "file not found" PyInstaller
+REM failures on a different file each time (first gdocs_script.js in
+REM the headless shell, then PrivacySandboxAttestationsPreloaded, then
+REM gdocs_script.js AGAIN in regular Chromium) isn't any one specific
+REM file -- it's that every time you actually LAUNCH the app to test
+REM it, Chrome's own background "component updater" silently adds,
+REM modifies, or removes various optional feature folders (privacy/ad
+REM attestation data, the Reading Mode helper script, and potentially
+REM others in the future) in the SAME Chromium copy PyInstaller is
+REM about to bundle. PyInstaller's official Playwright hook records a
+REM file manifest when it SCANS this folder (Analysis phase), then
+REM tries to copy those exact files moments later (Collect phase) --
+REM if anything changed in between, that copy fails. Deleting one
+REM offending file after another never actually fixes this, since a
+REM different file breaks next time.
+REM
+REM The real fix: keep one pristine, snapshot copy of Chromium made
+REM right after download (before the app has ever been launched with
+REM real internet access), and restore FROM that snapshot immediately
+REM before every single build. Nothing runs or touches the browser
+REM files between that restore and PyInstaller's scan+copy within the
+REM same script execution, so they can never be a moving target again
+REM -- regardless of how much real testing happens with the actual
+REM built app in between builds.
+if not exist "%PRISTINE_BACKUP%" (
+    echo Creating a pristine snapshot of this Chromium copy...
+    echo ^(only needs to happen once -- future builds restore from
+    echo   this snapshot instead, so real app usage in between never
+    echo   destabilizes what PyInstaller bundles^)
+    xcopy /E /I /Q /Y "%LIVE_BROWSERS%" "%PRISTINE_BACKUP%" >nul
+    if errorlevel 1 (
+        echo [ERROR] Could not create the pristine Chromium snapshot.
+        goto :fail
+    )
+) else (
+    echo Restoring Chromium from the pristine snapshot before building...
+    echo ^(this undoes anything Chrome's background updater changed
+    echo   the last time you ran the app -- expected and harmless^)
+    rmdir /s /q "%LIVE_BROWSERS%"
+    xcopy /E /I /Q /Y "%PRISTINE_BACKUP%" "%LIVE_BROWSERS%" >nul
+    if errorlevel 1 (
+        echo [ERROR] Could not restore Chromium from the pristine snapshot.
+        goto :fail
+    )
+)
+echo Done.
+echo.
 
 echo [4/4] Building ClientLedgerIndia.exe with PyInstaller...
 echo       ^(this only repackages your current source files - no

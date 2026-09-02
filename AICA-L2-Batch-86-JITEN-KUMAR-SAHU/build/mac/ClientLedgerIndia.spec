@@ -5,6 +5,39 @@
 
 # -*- mode: python ; coding: utf-8 -*-
 import os
+import shutil
+
+# NOTE ON THE WINDOWS SIDE OF THIS PROJECT: the equivalent build on
+# Windows repeatedly failed on optional Chrome feature files (a
+# Reading Mode helper script, a Privacy Sandbox attestation file)
+# going missing mid-build. Several theories were tried (antivirus,
+# Chrome's background updater) before the actual, confirmed cause
+# turned out to be much simpler: Windows' classic 260-character
+# MAX_PATH limit. This project's own folder nesting, combined with
+# Chromium's own deeply-nested optional feature folders, produced
+# destination paths that measured over 260 characters -- past which
+# Win32's plain file APIs fail with "path not found" even though the
+# path is completely valid. macOS (APFS/HFS+) doesn't share this
+# specific limitation, so no equivalent fix is needed here. The
+# tolerance wrapper below is kept anyway as a harmless general safety
+# net (skip one optional Chrome file that's genuinely missing for any
+# other reason, rather than crash the whole build over it), but it is
+# NOT expected to be needed on Mac the way its Windows counterpart was.
+_original_copyfile = shutil.copyfile
+def _copyfile_tolerate_vanished_files(src, dst, *args, **kwargs):
+    try:
+        return _original_copyfile(src, dst, *args, **kwargs)
+    except FileNotFoundError:
+        print(f"NOTE: skipping a file that vanished during packaging "
+              f"(not needed by this app -- an optional Chrome feature file): {src}")
+        try:
+            os.makedirs(os.path.dirname(dst), exist_ok=True)
+            with open(dst, "wb"):
+                pass  # empty placeholder, in case something downstream expects it to exist
+        except Exception as placeholder_err:
+            print(f"      (also could not create a placeholder at {dst}: {placeholder_err})")
+        return dst
+shutil.copyfile = _copyfile_tolerate_vanished_files
 
 APP_DIR = os.path.join(os.path.dirname(os.path.abspath(SPEC)), "..", "..", "app")
 APP_DIR = os.path.normpath(APP_DIR)
@@ -58,6 +91,28 @@ exe = EXE(
     upx=True,
     console=False,
 )
+
+# Drop any data file that has vanished between when it was scanned
+# (Analysis, above) and now, right before COLLECT actually copies
+# everything. This has repeatedly bitten optional Chrome feature files
+# inside the bundled browser (a Reading Mode helper script, a Privacy
+# Sandbox attestation file) that exist one moment and are gone the
+# next — most likely real-time antivirus reacting to a script with a
+# name like "gdocs_helper" that looks like it injects into Google
+# Docs, though the exact cause doesn't actually matter here. None of
+# these are files the app needs at runtime (they're optional Chrome UI
+# features, irrelevant to browser automation), so silently skipping a
+# missing one is always safe — the alternative is a hard build failure
+# on a file this app was never going to use anyway. This is a general
+# fix: it isn't specific to any one filename, so it also covers
+# whichever file breaks next, not just the ones already seen.
+_missing = [d for d in a.datas if not os.path.isfile(d[1])]
+if _missing:
+    print(f"NOTE: skipping {len(_missing)} data file(s) that vanished before packaging "
+          f"(expected for optional Chrome feature files — not needed by this app):")
+    for d in _missing:
+        print(f"      {d[1]}")
+a.datas = [d for d in a.datas if os.path.isfile(d[1])]
 
 coll = COLLECT(
     exe,

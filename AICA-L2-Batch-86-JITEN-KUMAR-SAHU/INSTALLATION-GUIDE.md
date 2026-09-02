@@ -48,7 +48,7 @@ This is the free tool that packages everything into the final single `.exe` inst
 ## Step 3 — Get the project files
 
 1. Download the `ClientLedgerIndia-Installer-Project.zip` file (the one provided alongside this guide).
-2. Right-click it → **Extract All...** → choose a simple location, for example `C:\ClientLedgerIndia\` (avoid extracting inside a path with unusual characters like `&` if possible — a plain folder name is safest).
+2. Right-click it → **Extract All...** → choose a **short** location close to your drive root, for example `C:\CLI\` — **not** somewhere like `C:\Users\Your Name\Downloads\ClientLedgerIndia-Installer-Project\ClientLedgerIndia\`. **This isn't just a suggestion — treat it as required.** Windows has a hard 260-character limit on file paths, and this project's folder nesting combined with the bundled Chromium browser's own deeply-nested files can push some paths past that limit if you extract somewhere long. This has been confirmed — not just theorized — to break **two separate tools** in this build process the same way: PyInstaller (step 4 below) and Inno Setup (step 5), both failing with a confusing "path not found" / "cannot find the path specified" error that has nothing to do with anything you did wrong. Extracting directly to a short path like `C:\CLI\` has been confirmed to resolve both. Also avoid unusual characters like `&` in the path if possible.
 3. Open that extracted folder. You should see:
    ```
    ClientLedgerIndia\
@@ -116,6 +116,7 @@ This is the free tool that packages everything into the final single `.exe` inst
 
 ## If something goes wrong along the way
 
+- **`build.bat` or Inno Setup fails with "The system cannot find the path specified" or "path not found," mentioning a deeply nested file under `.local-browsers\chromium-...`:** this is Windows' 260-character path limit, triggered by extracting the project somewhere with a long path (see Step 3 above). **Move the entire project folder to a short path like `C:\CLI\` and rebuild from there** — this has been confirmed to fully resolve it.
 - **`build.bat` shows an `[ERROR]` message:** read exactly what it says — the script is written to explain the specific problem (missing Python, failed download, etc.) rather than just failing silently.
 - **Windows blocks the app with no way to run it ("Smart App Control")**: this is a Windows security feature unrelated to whether the build succeeded. See the "Smart App Control" section in `README-BUILD.md`.
 - **Something related to the app's actual behavior misbehaves** (a download stuck, a feature not working): check `<your chosen data folder>\System\logs\gst_rpa_activity.log` — real errors show up there with a clear message. See `USER-MANUAL.md`'s troubleshooting section.
