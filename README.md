@@ -1,10 +1,20 @@
-# Upload Your Project Folder to the AICA Level 2 Projects Repository
+# Ledger Reconciliation & Reporting Desktop App
 
-**Target repository:** [aiinicai/AICA-Level-2-Projects](https://github.com/aiinicai/AICA-Level-2-Projects)
+## Files
+- `reconciliation_app.py` - desktop application
+- `requirements.txt` - Python dependencies
+- `Install_and_Run.bat` - installs dependencies and opens the app
 
-This guide explains how to contribute your complete project folder to the **AICA-Level-2-Projects** repository using GitHub’s **Fork + Pull Request** workflow.
+## Usage
+1. Install Python 3.10+.
+2. Double-click `Install_and_Run.bat`.
+3. Select Company Books and Party Books.
+4. Enter the reconciliation/cut-off date.
+5. Select an output folder.
+6. Click Run Reconciliation & Generate Reports.
 
-Two methods are covered:
+## Supported input
+Excel, CSV, PDF and JPEG/PNG images.
 
 1. **Website-only method** — no software installation required.
 2. **Git command-line method** — recommended for complete project folders and projects containing many files.
@@ -13,6 +23,12 @@ Two methods are covered:
 ## Overview
 
 A browser-based, offline invoice QR scanner that finds QR codes in invoice PDFs and scanned images, decodes the QR content, parses common QR formats—including GST e-invoice signed QRs—and exports the extracted data to an Excel workbook.
+## Important OCR note
+For image OCR, install the Tesseract OCR Windows engine separately and ensure it is available in PATH. The application does not fabricate unreadable transactions. Complex scanned PDFs may require manual review.
+
+## Current matching logic
+The app normalizes dates, references, narrations, debit/credit values and balances, then attempts evidence-based transaction matching. Ambiguous matches are flagged as review items rather than silently accepted.
+---
 
 ## Fork + Pull Request Workflow
 
@@ -450,3 +466,4 @@ Successful scans are displayed in the table with:
 - Parsed fields
 
 The complete decoded QR payload is retained as `Raw QR Data` for Excel export.
+This is a practical starter version and should be validated against your accounting workflow before relying on it for statutory or final financial reporting.

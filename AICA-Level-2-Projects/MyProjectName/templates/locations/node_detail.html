@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% load humanize %}
+{% block title %}{{ node.name }}{% endblock %}
+{% block content %}
+<nav aria-label="breadcrumb"><p class="small text-muted mb-1">{{ node.breadcrumb }}</p></nav>
+<h4>{{ node.name }} <span class="badge bg-light text-dark">{{ node.get_node_type_display }}</span></h4>
+<p class="text-muted small">{{ node.breadcrumb }} &middot; code: {{ node.full_path_codes }}</p>
+
+{% if children %}
+<h6 class="mt-4">Sub-locations</h6>
+<div class="row g-2 mb-3">
+  {% for c in children %}
+  <div class="col-md-3">
+    <a href="{% url 'locations:node_detail' c.pk %}" class="card stat-card p-2 text-decoration-none text-dark d-block">
+      {{ c.name }} <span class="badge bg-light text-dark">{{ c.get_node_type_display }}</span>
+    </a>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+
+<h6 class="mt-3">Assets at this node and below ({{ assets|length }})</h6>
+<div class="card stat-card p-3">
+  <div class="table-responsive">
+  <table class="table table-sm table-hover">
+    <thead><tr><th>Asset ID</th><th>Description</th><th>Class</th><th>Custodian</th><th>Status</th><th>NBV</th></tr></thead>
+    <tbody>
+    {% for a in assets %}
+      <tr>
+        <td><a href="{{ a.get_absolute_url }}">{{ a.asset_id }}</a></td>
+        <td>{{ a.description }}</td>
+        <td>{{ a.asset_class }}</td>
+        <td>{{ a.custodian }}</td>
+        <td>{{ a.get_life_status_display }}</td>
+        <td>₹{{ a.net_book_value|floatformat:0|intcomma }}</td>
+      </tr>
+    {% empty %}
+      <tr><td colspan="6" class="text-muted">No assets here yet.</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  </div>
+</div>
+{% endblock %}
