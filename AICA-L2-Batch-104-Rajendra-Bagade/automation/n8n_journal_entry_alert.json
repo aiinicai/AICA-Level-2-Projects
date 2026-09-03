@@ -1,0 +1,216 @@
+{
+  "name": "AuditLens - journal entry alert",
+  "nodes": [
+    {
+      "parameters": {
+        "event": "fileCreated",
+        "triggerOn": "specificFolder",
+        "folderToWatch": {
+          "__rl": true,
+          "mode": "list",
+          "value": "AuditLens inbox"
+        },
+        "pollTimes": {
+          "item": [
+            {
+              "mode": "everyHour"
+            }
+          ]
+        }
+      },
+      "id": "new-ledger-on-drive",
+      "name": "New ledger on Drive",
+      "type": "n8n-nodes-base.googleDriveTrigger",
+      "typeVersion": 1,
+      "position": [
+        -620,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.AUDITLENS_BASE_URL }}/api/engagements",
+        "sendBody": true,
+        "contentType": "multipart-form-data",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "client_name",
+              "value": "={{ $json.name.split(' - ')[0] }}"
+            },
+            {
+              "name": "financial_year",
+              "value": "2024-25"
+            },
+            {
+              "name": "year_end",
+              "value": "2025-03-31"
+            },
+            {
+              "name": "use_samples",
+              "value": "true"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 120000
+        }
+      },
+      "id": "run-the-review",
+      "name": "Run the review",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -380,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// One item per journal entry selected under SA 240, so the alert can\n// be graded by severity rather than sent as an undifferentiated list.\nconst flags = $input.first().json.je?.flags ?? [];\nconst headlines = $input.first().json.headlines;\nreturn flags.map((f) => ({ json: { ...f, client: headlines.client,\n  financial_year: headlines.financial_year } }));"
+      },
+      "id": "split-the-selections",
+      "name": "Split the selections",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 1,
+      "position": [
+        -140,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "version": 2
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              },
+              "leftValue": "={{ $json.severity }}",
+              "rightValue": "elevated"
+            }
+          ]
+        }
+      },
+      "id": "elevated-only",
+      "name": "Elevated only",
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 2,
+      "position": [
+        100,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "aggregate": "aggregateAllItemData",
+        "options": {}
+      },
+      "id": "group-for-the-manager",
+      "name": "Group for the manager",
+      "type": "n8n-nodes-base.aggregate",
+      "typeVersion": 1,
+      "position": [
+        340,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $env.AUDITLENS_MANAGER_EMAIL }}",
+        "subject": "=Journal entries requiring examination - {{ $json.data[0].client }}",
+        "emailType": "text",
+        "message": "=The following journal entries have been selected for examination under SA 240 for {{ $json.data[0].client }}, financial year {{ $json.data[0].financial_year }}.\n\n{{ $json.data.map(f => `${f.entry_id}  ${f.posting_date}  Rs ${f.amount}  ${f.test} - ${f.reason} (posted by ${f.posted_by})`).join('\\n') }}\n\nSelection of an entry does not imply that anything is wrong with it.\n\nMachine-generated analytical output requiring the review and professional judgement of a Chartered Accountant.",
+        "options": {}
+      },
+      "id": "alert-the-audit-manager",
+      "name": "Alert the audit manager",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        580,
+        300
+      ]
+    }
+  ],
+  "connections": {
+    "New ledger on Drive": {
+      "main": [
+        [
+          {
+            "node": "Run the review",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Run the review": {
+      "main": [
+        [
+          {
+            "node": "Split the selections",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split the selections": {
+      "main": [
+        [
+          {
+            "node": "Elevated only",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Elevated only": {
+      "main": [
+        [
+          {
+            "node": "Group for the manager",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Group for the manager": {
+      "main": [
+        [
+          {
+            "node": "Alert the audit manager",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true
+  },
+  "tags": [
+    {
+      "name": "auditlens"
+    },
+    {
+      "name": "SA 240"
+    }
+  ],
+  "meta": {
+    "description": "Watches a Drive folder for a new general ledger, runs the SA 240 routines and emails the audit manager only the entries the engine graded as elevated."
+  }
+}

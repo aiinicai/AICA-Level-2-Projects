@@ -1,0 +1,336 @@
+{
+  "name": "AuditLens - quarterly analytical review",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 7 5 1,4,7,10 *"
+            }
+          ]
+        }
+      },
+      "id": "every-quarter",
+      "name": "Every quarter",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -620,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// One item per engagement due for analytical review this quarter.\n// In practice this list comes from the firm's engagement register;\n// it is held here so the workflow runs without another system.\nreturn [\n  {\n    json: {\n      client_name: 'Bharat Precision Components Private Limited',\n      financial_year: '2024-25',\n      year_end: '2025-03-31',\n      company_class: 'private',\n      partner_email: 'engagement.partner@example.com',\n      principal_repayments: 7500000,\n      credit_sales_ratio: 0.92,\n      credit_purchase_ratio: 0.95,\n      working_capital_limit: 60000000,\n    },\n  },\n];"
+      },
+      "id": "engagements-to-review",
+      "name": "Engagements to review",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 1,
+      "position": [
+        -400,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.AUDITLENS_BASE_URL }}/api/engagements",
+        "sendBody": true,
+        "contentType": "multipart-form-data",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "client_name",
+              "value": "={{ $json.client_name }}"
+            },
+            {
+              "name": "financial_year",
+              "value": "={{ $json.financial_year }}"
+            },
+            {
+              "name": "year_end",
+              "value": "={{ $json.year_end }}"
+            },
+            {
+              "name": "company_class",
+              "value": "={{ $json.company_class }}"
+            },
+            {
+              "name": "principal_repayments",
+              "value": "={{ $json.principal_repayments }}"
+            },
+            {
+              "name": "credit_sales_ratio",
+              "value": "={{ $json.credit_sales_ratio }}"
+            },
+            {
+              "name": "credit_purchase_ratio",
+              "value": "={{ $json.credit_purchase_ratio }}"
+            },
+            {
+              "name": "working_capital_limit",
+              "value": "={{ $json.working_capital_limit }}"
+            },
+            {
+              "name": "use_samples",
+              "value": "true"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 120000
+        }
+      },
+      "id": "run-the-review",
+      "name": "Run the review",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -180,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "version": 2
+          },
+          "combinator": "or",
+          "conditions": [
+            {
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              },
+              "leftValue": "={{ $json.headlines.ratios_requiring_explanation }}",
+              "rightValue": 0
+            },
+            {
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              },
+              "leftValue": "={{ $json.headlines.je_entries_flagged }}",
+              "rightValue": 0
+            },
+            {
+              "operator": {
+                "type": "boolean",
+                "operation": "false"
+              },
+              "leftValue": "={{ $json.headlines.balance_sheet_tallies }}",
+              "rightValue": ""
+            }
+          ]
+        }
+      },
+      "id": "anything-for-the-partner?",
+      "name": "Anything for the partner?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        40,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.AUDITLENS_BASE_URL }}/api/engagements/{{ $json.engagement_id }}/drafts",
+        "options": {
+          "timeout": 120000
+        }
+      },
+      "id": "draft-the-memorandum",
+      "name": "Draft the memorandum",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        280,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $env.AUDITLENS_BASE_URL }}/api/engagements/{{ $('Run the review').item.json.engagement_id }}/workbook",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file",
+              "outputPropertyName": "workpaper"
+            }
+          }
+        }
+      },
+      "id": "fetch-the-workpaper",
+      "name": "Fetch the workpaper",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        500,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "upload",
+        "inputDataFieldName": "workpaper",
+        "name": "={{ $('Run the review').item.json.headlines.client }} - analytical review - {{ $('Run the review').item.json.headlines.financial_year }}.xlsx",
+        "driveId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "My Drive"
+        },
+        "folderId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "AuditLens workpapers"
+        }
+      },
+      "id": "file-it-on-drive",
+      "name": "File it on Drive",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        720,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $('Engagements to review').item.json.partner_email }}",
+        "subject": "=Analytical review ready - {{ $('Run the review').item.json.headlines.client }} {{ $('Run the review').item.json.headlines.financial_year }}",
+        "emailType": "text",
+        "message": "={{ $('Draft the memorandum').item.json.memorandum.body }}\n\n----------------------------------------------------------\nRatios requiring explanation under Schedule III: {{ $('Run the review').item.json.headlines.ratios_requiring_explanation }}\nJournal entries selected under SA 240: {{ $('Run the review').item.json.headlines.je_entries_flagged }} of {{ $('Run the review').item.json.headlines.je_total_entries }}\nLedgers awaiting classification: {{ $('Run the review').item.json.headlines.ledgers_for_review }}\n\nThe workpaper has been filed on Drive.\n\nMachine-generated analytical output. Every figure, selection and draft requires the review and professional judgement of a Chartered Accountant before it is relied upon or issued.",
+        "options": {}
+      },
+      "id": "email-the-partner",
+      "name": "Email the partner",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        940,
+        200
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "log-a-clean-run",
+      "name": "Log a clean run",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        280,
+        420
+      ]
+    }
+  ],
+  "connections": {
+    "Every quarter": {
+      "main": [
+        [
+          {
+            "node": "Engagements to review",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Engagements to review": {
+      "main": [
+        [
+          {
+            "node": "Run the review",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Run the review": {
+      "main": [
+        [
+          {
+            "node": "Anything for the partner?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Anything for the partner?": {
+      "main": [
+        [
+          {
+            "node": "Draft the memorandum",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Log a clean run",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Draft the memorandum": {
+      "main": [
+        [
+          {
+            "node": "Fetch the workpaper",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch the workpaper": {
+      "main": [
+        [
+          {
+            "node": "File it on Drive",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "File it on Drive": {
+      "main": [
+        [
+          {
+            "node": "Email the partner",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true
+  },
+  "tags": [
+    {
+      "name": "auditlens"
+    },
+    {
+      "name": "statutory audit"
+    }
+  ],
+  "meta": {
+    "description": "Runs the analytical review for each engagement due this quarter, drafts the memorandum, files the workpaper on Drive and emails the engagement partner - but only when there is something the partner needs to see."
+  }
+}
