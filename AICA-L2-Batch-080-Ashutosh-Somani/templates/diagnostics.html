@@ -1,0 +1,150 @@
+{% extends "base.html" %}
+
+{% block title %}System Diagnostics - Bank Statement Converter{% endblock %}
+
+{% block content %}
+<div style="padding: 20px;">
+    <h2>System Diagnostics</h2>
+
+    <div style="display: flex; gap: 20px; flex-wrap: wrap; margin-top: 20px;">
+        <!-- Column 1 -->
+        <div style="flex: 1; min-width: 300px;">
+            <div style="border: 1px solid #ccc; border-radius: 4px; margin-bottom: 20px;">
+                <div style="background-color: #f5f5f5; padding: 10px; border-bottom: 1px solid #ccc;"><strong>System Information</strong></div>
+                <ul style="list-style: none; padding: 0; margin: 0;">
+                    <li style="padding: 10px; border-bottom: 1px solid #eee;"><strong>Version:</strong> {{ stats.version }}</li>
+                    <li style="padding: 10px; border-bottom: 1px solid #eee;"><strong>Python:</strong> {{ stats.python_version }}</li>
+                    <li style="padding: 10px; border-bottom: 1px solid #eee;"><strong>Platform:</strong> {{ stats.platform }}</li>
+                    <li style="padding: 10px; border-bottom: 1px solid #eee;"><strong>App Root:</strong> <small>{{ stats.app_root }}</small></li>
+                    <li style="padding: 10px;"><strong>Host:Port:</strong> {{ stats.host }}:{{ stats.port }}</li>
+                </ul>
+            </div>
+            
+            <div style="border: 1px solid #ccc; border-radius: 4px; margin-bottom: 20px;">
+                <div style="background-color: #f5f5f5; padding: 10px; border-bottom: 1px solid #ccc;"><strong>Feature Status</strong></div>
+                <ul style="list-style: none; padding: 0; margin: 0;">
+                    <li style="padding: 10px; border-bottom: 1px solid #eee;"><strong>Database:</strong> {{ stats.db_status }} ({{ stats.profile_count }} profiles)</li>
+                    <li style="padding: 10px; border-bottom: 1px solid #eee;"><strong>OCR Engine:</strong> {{ stats.ocr_status }}</li>
+                    <li style="padding: 10px; border-bottom: 1px solid #eee;"><strong>Excel Export:</strong> {{ stats.excel_status }}</li>
+                    <li style="padding: 10px; border-bottom: 1px solid #eee;"><strong>External AI:</strong> {{ 'Enabled' if stats.privacy_ai else 'Disabled' }}</li>
+                    <li style="padding: 10px;"><strong>Cloud OCR:</strong> {{ 'Enabled' if stats.privacy_cloud_ocr else 'Disabled' }}</li>
+                </ul>
+            </div>
+        </div>
+        
+        <!-- Column 2 -->
+        <div style="flex: 1; min-width: 300px;">
+            <div style="border: 1px solid #ccc; border-radius: 4px; margin-bottom: 20px;">
+                <div style="background-color: #f5f5f5; padding: 10px; border-bottom: 1px solid #ccc;"><strong>Self-Test & Backup</strong></div>
+                <div style="padding: 15px;">
+                    <p>Run a non-destructive self-test to verify configuration and directory permissions.</p>
+                    <button class="btn" style="padding:8px 12px; cursor:pointer;" onclick="runCheck()">Run System Check</button>
+                    <div id="check-results" style="display:none; margin-top:10px; border:1px solid #ddd; padding:10px; background:#fafafa;"></div>
+                    
+                    <hr style="margin: 20px 0;">
+                    
+                    <p>Create a backup of your configuration and profiles. Client PDFs and generated workbooks are not backed up for privacy.</p>
+                    <button class="btn" style="padding:8px 12px; cursor:pointer;" onclick="createBackup()">Create Backup</button>
+                    <div id="backup-results" style="margin-top: 10px;"></div>
+                    
+                    <hr style="margin: 20px 0;">
+                    
+                    <p>Restore a backup. This will overwrite your current configuration and profiles.</p>
+                    <input type="file" id="restoreFile" accept=".zip" style="margin-bottom: 10px; display:block;">
+                    <button class="btn" style="padding:8px 12px; cursor:pointer;" onclick="restoreBackup()">Restore Backup</button>
+                    <div id="restore-results" style="margin-top: 10px;"></div>
+                </div>
+            </div>
+            
+            <div style="border: 1px solid #ccc; border-radius: 4px; margin-bottom: 20px;">
+                <div style="background-color: #f5f5f5; padding: 10px; border-bottom: 1px solid #ccc;"><strong>Directories</strong></div>
+                <ul style="list-style: none; padding: 0; margin: 0;">
+                    {% for name, status in stats.folders.items() %}
+                    <li style="padding: 10px; border-bottom: 1px solid #eee; display:flex; justify-content:space-between;">
+                        <span>{{ name | title }}</span>
+                        {% if status == 'OK' %}
+                        <span style="background-color: #4caf50; color: white; padding: 2px 8px; border-radius: 12px; font-size: 0.85em;">OK</span>
+                        {% else %}
+                        <span style="background-color: #f44336; color: white; padding: 2px 8px; border-radius: 12px; font-size: 0.85em;">Missing</span>
+                        {% endif %}
+                    </li>
+                    {% endfor %}
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function runCheck() {
+    let div = document.getElementById('check-results');
+    div.innerHTML = 'Running...';
+    div.style.display = 'block';
+    
+    fetch('/diagnostics/run_check', { method: 'POST' })
+        .then(res => res.json())
+        .then(data => {
+            let html = '<ul style="list-style:none; padding:0; margin:0;">';
+            data.results.forEach(r => {
+                let color = r.status === 'PASS' ? '#4caf50' : '#f44336';
+                html += `<li style="margin-bottom:10px; padding-bottom:10px; border-bottom:1px solid #ccc;">
+                    <div style="display:flex; justify-content:space-between;">
+                        <strong>${r.name}</strong>
+                        <span style="background-color:${color}; color:white; padding:2px 8px; border-radius:12px; font-size:0.85em;">${r.status}</span>
+                    </div>
+                    <div style="font-size:0.9em; color:#666;">${r.message}</div>
+                </li>`;
+            });
+            html += '</ul>';
+            div.innerHTML = html;
+        })
+        .catch(e => {
+            div.innerHTML = `<div style="color:red;">Failed to run check: ${e}</div>`;
+        });
+}
+
+function createBackup() {
+    let div = document.getElementById('backup-results');
+    div.innerHTML = '<span style="color:#008CBA;">Creating backup...</span>';
+    fetch('/diagnostics/backup', { method: 'POST' })
+        .then(res => res.json())
+        .then(data => {
+            if (data.status === 'success') {
+                div.innerHTML = `<div style="color:#4caf50; margin-top:5px;">${data.message}</div>`;
+            } else {
+                div.innerHTML = `<div style="color:#f44336; margin-top:5px;">Error: ${data.message}</div>`;
+            }
+        });
+}
+
+function restoreBackup() {
+    let fileInput = document.getElementById('restoreFile');
+    if (!fileInput.files.length) {
+        alert("Please select a ZIP file first.");
+        return;
+    }
+    
+    let formData = new FormData();
+    formData.append("file", fileInput.files[0]);
+    
+    let div = document.getElementById('restore-results');
+    div.innerHTML = '<span style="color:#ff9800;">Restoring... please wait.</span>';
+    
+    fetch('/diagnostics/restore', {
+        method: 'POST',
+        body: formData
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.status === 'success') {
+            div.innerHTML = `<div style="color:#4caf50; margin-top:5px;">${data.message}</div>`;
+        } else {
+            div.innerHTML = `<div style="color:#f44336; margin-top:5px;">${data.message}</div>`;
+        }
+    })
+    .catch(e => {
+        div.innerHTML = `<div style="color:#f44336; margin-top:5px;">Upload failed: ${e}</div>`;
+    });
+}
+</script>
+{% endblock %}

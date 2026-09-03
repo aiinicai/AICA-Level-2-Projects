@@ -1,0 +1,122 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="card">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+        <h2>Exceptions for Review (Page {{ current_page }} / {{ total_pages }})</h2>
+        <div>
+            <button onclick="triggerExport('{{ job.id }}', 'EXCEPTIONS_FOUND', event)" class="btn" style="background-color: #28a745; color: white;">Export Excel</button>
+            <a href="{{ url_for('validation.summary', job_id=job.id) }}" class="btn">Back to Summary</a>
+            <a href="{{ url_for('review.review_page', job_id=job.id) }}" class="btn btn-primary" style="margin-left: 10px;">Advanced Review</a>
+        </div>
+    </div>
+
+    <div style="margin-bottom: 1rem; display: flex; gap: 0.5rem;">
+        {% if current_page > 1 %}
+            <a href="?page={{ current_page - 1 }}" class="btn">Previous</a>
+        {% endif %}
+        {% if current_page < total_pages %}
+            <a href="?page={{ current_page + 1 }}" class="btn">Next</a>
+        {% endif %}
+    </div>
+
+    <div style="overflow-x: auto;">
+        <table class="table" style="width: 100%; text-align: left; font-size: 14px;">
+            <thead>
+                <tr>
+                    <th>Severity</th>
+                    <th>Code</th>
+                    <th>Message</th>
+                    <th>Diff</th>
+                    <th>Confidence</th>
+                    <th>Pg/Row</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for exc in exceptions %}
+                <tr>
+                    <td>
+                        {% if exc.severity == 'CRITICAL' %}
+                            <span class="badge-error">CRITICAL</span>
+                        {% elif exc.severity == 'ERROR' %}
+                            <span class="badge-error">ERROR</span>
+                        {% elif exc.severity == 'WARNING' %}
+                            <span class="badge-warning">WARNING</span>
+                        {% else %}
+                            <span style="color: gray;">{{ exc.severity }}</span>
+                        {% endif %}
+                    </td>
+                    <td><strong>{{ exc.exception_code }}</strong><br/><small>{{ exc.context or '' }}</small></td>
+                    <td>{{ exc.message }}</td>
+                    <td style="color: red;">{{ exc.financial_difference or '' }}</td>
+                    <td>
+                        {% if exc.transaction_index is not none %}
+                            {% set txn = transactions[exc.transaction_index] %}
+                            <span style="font-weight: bold; color: {% if txn.review_score >= 80 %}green{% elif txn.review_score >= 50 %}orange{% else %}red{% endif %};">
+                                {{ txn.review_score }}
+                            </span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if exc.source_page is not none %}
+                            P{{ exc.source_page }} R{{ exc.source_row }}
+                        {% endif %}
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="6">No exceptions found.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+<script>
+function triggerExport(jobId, status, event) {
+    if (status !== 'PASS' && status !== 'VALID') {
+        if (!confirm("This statement contains unresolved exceptions. Are you sure you want to export?")) {
+            return;
+        }
+    }
+    // Disable button to prevent double clicks
+    let btn = event ? event.currentTarget : document.querySelector('button[onclick^="triggerExport"]');
+    if (btn) {
+        btn.disabled = true;
+        btn.innerText = "Exporting...";
+    }
+
+    fetch(`/api/export/${jobId}`, {method: 'POST'})
+        .then(res => {
+            const contentType = res.headers.get("content-type");
+            if (contentType && contentType.indexOf("application/json") !== -1) {
+                return res.json().then(data => ({status: res.status, data: data}));
+            } else {
+                throw new Error(`Export returned non-JSON response (HTTP ${res.status}). Please check Diagnostics.`);
+            }
+        })
+        .then(({status, data}) => {
+            if (data.status === 'processing' && data.progress_url) {
+                window.location.href = data.progress_url;
+            } else if (data.status === 'success' && data.download_url) {
+                window.location.href = data.download_url;
+            } else {
+                const message = data.error || data.message || `Export failed (HTTP ${status})`;
+                alert("Export failed: " + message);
+                if (btn) {
+                    btn.disabled = false;
+                    btn.innerText = "Export Excel";
+                }
+            }
+        })
+        .catch(err => {
+            console.error(err);
+            alert("Export error: " + err.message);
+            if (btn) {
+                btn.disabled = false;
+                btn.innerText = "Export Excel";
+            }
+        });
+}
+</script>
+{% endblock %}

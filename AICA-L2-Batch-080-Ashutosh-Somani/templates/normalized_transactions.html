@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="card">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+        <h2>Normalized Transactions (Page {{ current_page }} / {{ total_pages }})</h2>
+        <a href="{{ url_for('normalization.summary', job_id=job.id) }}" class="btn">Back to Summary</a>
+    </div>
+
+    <div style="margin-bottom: 1rem; display: flex; gap: 0.5rem;">
+        {% if current_page > 1 %}
+            <a href="?page={{ current_page - 1 }}" class="btn">Previous</a>
+        {% endif %}
+        {% if current_page < total_pages %}
+            <a href="?page={{ current_page + 1 }}" class="btn">Next</a>
+        {% endif %}
+    </div>
+
+    <div style="overflow-x: auto;">
+        <table class="table" style="width: 100%; text-align: left; font-family: monospace; font-size: 12px; white-space: nowrap;">
+            <thead>
+                <tr>
+                    <th>Txn Date</th>
+                    <th>Value Date</th>
+                    <th>Narration</th>
+                    <th>Reference</th>
+                    <th>Cheque No.</th>
+                    <th>Debit</th>
+                    <th>Credit</th>
+                    <th>Balance</th>
+                    <th>Source Page</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for txn in transactions %}
+                <tr>
+                    <td>{{ txn.transaction_date|default('', true)|e }}</td>
+                    <td>{{ txn.value_date|default('', true)|e }}</td>
+                    <td style="white-space: normal; min-width: 200px;">{{ txn.narration|default('', true)|e }}</td>
+                    <td>{{ txn.reference_number|default('', true)|e }}</td>
+                    <td>{{ txn.cheque_number|default('', true)|e }}</td>
+                    <td>{{ txn.debit|default('', true)|e }}</td>
+                    <td>{{ txn.credit|default('', true)|e }}</td>
+                    <td>{{ txn.balance|default('', true)|e }}</td>
+                    <td>{{ txn.source_page|default('', true) }}</td>
+                    <td>
+                        {% if txn.normalization_status == 'success' %}
+                            <span style="color: green;">Success</span>
+                        {% else %}
+                            <span style="color: red;" title="{{ txn.normalization_warnings|join(', ') }}">Warning</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="10">No transactions found.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

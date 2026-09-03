@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="preview-layout">
+    
+    <div class="preview-header">
+        <div>
+            <h2>{{ job.display_name }}</h2>
+            <p class="subtitle">Status: <span class="badge-{{ job.status }}">{{ job.status }}</span> | Pages: {{ job.page_count }} | Size: {{ (job.file_size / 1024 / 1024)|round(2) }} MB</p>
+        </div>
+        <div>
+            <form action="{{ url_for('upload.delete_job_route', job_id=job.id) }}" method="POST" style="display:inline;">
+                <button type="submit" class="btn" style="background-color: var(--error-color);" onclick="return confirm('Are you sure you want to cancel this job and remove the file?');">Remove Statement</button>
+            </form>
+        </div>
+    </div>
+
+    {% if job.status == 'password_required' %}
+        <div class="password-form">
+            <h3>Password Required</h3>
+            <p>This PDF is encrypted. Please enter the password to preview it.</p>
+            <form action="{{ url_for('upload.check_password', job_id=job.id) }}" method="POST">
+                <input type="password" name="password" required placeholder="Enter PDF password">
+                <br>
+                <button type="submit" class="btn">Unlock PDF</button>
+            </form>
+        </div>
+    {% elif job.status == 'invalid' or job.status == 'failed' %}
+        <div class="error-state">
+            <h3>Processing Failed</h3>
+            <p>Error Code: {{ job.error_code }}</p>
+        </div>
+    {% else %}
+        <div class="preview-toolbar" style="justify-content: space-between;">
+            <div>
+                <button id="prev-page" class="btn">Previous</button>
+                <span>Page: <span id="page-num"></span> / <span id="page-count"></span></span>
+                <button id="next-page" class="btn">Next</button>
+            </div>
+            <div>
+                <form action="{{ url_for('extraction.trigger_extraction', job_id=job.id) }}" method="POST" style="display:inline;" onsubmit="document.getElementById('analyze-btn').innerText='Analyzing...'; document.getElementById('analyze-btn').disabled=true;">
+                    <button type="submit" id="analyze-btn" class="btn" style="background-color: var(--primary-color);">Analyze Digital PDF</button>
+                </form>
+            </div>
+            <div>
+                <button id="zoom-out" class="btn">Zoom Out</button>
+                <span id="zoom-val">100%</span>
+                <button id="zoom-in" class="btn">Zoom In</button>
+            </div>
+        </div>
+        
+        <div class="pdf-viewer-container">
+            <canvas id="pdf-canvas"></canvas>
+        </div>
+
+        <!-- Hidden elements for JS to pick up -->
+        <input type="hidden" id="pdf-url" value="{{ url_for('upload.serve_pdf', job_id=job.id) }}">
+    {% endif %}
+
+</div>
+
+{% if job.status != 'password_required' and job.status != 'invalid' and job.status != 'failed' %}
+    <script src="{{ url_for('static', filename='vendor/pdfjs/build/pdf.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/pdf_preview.js') }}"></script>
+{% endif %}
+
+{% endblock %}

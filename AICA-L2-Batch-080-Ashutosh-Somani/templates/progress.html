@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div style="max-width: 600px; margin: 2rem auto; padding: 2rem; background: var(--bg-secondary); border-radius: 8px; text-align: center;">
+    <h2 style="margin-bottom: 1.5rem;">{{ title }}</h2>
+    
+    <div style="margin-bottom: 1rem;">
+        <h4 id="progress-message">Initializing...</h4>
+        <p id="progress-pages" style="color: #666; font-size: 0.9rem; margin-top: 0.5rem;"></p>
+    </div>
+    
+    <div style="width: 100%; background-color: #ddd; border-radius: 4px; overflow: hidden; height: 24px; margin-bottom: 1rem;">
+        <div id="progress-bar" style="width: 0%; height: 100%; background-color: var(--primary-color); transition: width 0.3s ease;"></div>
+    </div>
+    
+    <div style="font-weight: bold; font-size: 1.2rem;" id="progress-percent">0%</div>
+    
+    <div id="error-container" style="display: none; margin-top: 1.5rem; color: var(--error-color);">
+        <p id="error-message"></p>
+        <a href="{{ error_url }}" class="btn" style="background-color: var(--text-color); color: white; margin-top: 1rem;">Go Back</a>
+    </div>
+</div>
+
+<script>
+    const jobId = "{{ job_id }}";
+    const nextUrl = "{{ next_url|safe }}";
+    
+    async function checkProgress() {
+        try {
+            const res = await fetch(`/jobs/${jobId}/progress`);
+            const data = await res.json();
+            
+            if (data.message) {
+                document.getElementById('progress-message').innerText = data.message;
+            }
+            
+            if (data.total_pages > 1 && data.current_page > 0) {
+                document.getElementById('progress-pages').innerText = `Page ${data.current_page} of ${data.total_pages}`;
+            } else if (data.total_pages > 0) {
+                document.getElementById('progress-pages').innerText = `Total Pages: ${data.total_pages}`;
+            }
+            
+            document.getElementById('progress-bar').style.width = `${data.percent}%`;
+            document.getElementById('progress-percent').innerText = `${data.percent}%`;
+            
+            if (data.error) {
+                document.getElementById('progress-message').innerText = "Processing Failed";
+                document.getElementById('progress-bar').style.backgroundColor = "var(--error-color)";
+                document.getElementById('error-message').innerText = data.error;
+                document.getElementById('error-container').style.display = "block";
+                return; // stop polling
+            }
+            
+            if (data.completed) {
+                document.getElementById('progress-message').innerText = "Completed! Redirecting...";
+                setTimeout(() => {
+                    window.location.href = nextUrl;
+                }, 500);
+                return; // stop polling
+            }
+            
+            setTimeout(checkProgress, 800);
+            
+        } catch (e) {
+            console.error("Error fetching progress:", e);
+            setTimeout(checkProgress, 2000);
+        }
+    }
+    
+    // Start polling
+    setTimeout(checkProgress, 500);
+</script>
+{% endblock %}

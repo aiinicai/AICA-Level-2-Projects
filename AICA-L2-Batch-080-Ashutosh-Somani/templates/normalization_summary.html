@@ -1,0 +1,99 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="card">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+        <h2>Normalization Summary</h2>
+        <div>
+            <a href="{{ url_for('extraction.diagnostics', job_id=job.id) }}" class="btn">Back to Diagnostics</a>
+            <a href="{{ url_for('normalization.preview_transactions', job_id=job.id) }}" class="btn">View Transactions</a>
+            <form action="{{ url_for('validation.trigger_validation', job_id=job.id) }}" method="POST" style="display:inline;" onsubmit="this.querySelector('button').innerText='Validating...'; this.querySelector('button').disabled=true;">
+                <button type="submit" class="btn" style="background-color: var(--primary-color);">Validate Statement</button>
+            </form>
+        </div>
+    </div>
+
+    <div style="margin-bottom: 2rem; border: 1px solid var(--border-color); padding: 1rem; border-radius: 4px;">
+        <h3>Bank Detection</h3>
+        <p><strong>Detected Bank:</strong> {{ result.bank_detection.bank_name }}</p>
+        <p><strong>Detection Status:</strong> 
+            {% if result.bank_detection.status == 'detected' %}
+                <span class="badge-success">Detected</span>
+            {% elif result.bank_detection.status == 'ambiguous' %}
+                <span class="badge-warning">Ambiguous</span>
+            {% else %}
+                <span class="badge-error">Unknown</span>
+            {% endif %}
+        </p>
+        <p><strong>Matched Evidence:</strong> {{ result.bank_detection.signatures|join(', ') or 'None' }}</p>
+    </div>
+
+    <div style="margin-bottom: 2rem; border: 1px solid var(--border-color); padding: 1rem; border-radius: 4px;">
+        <h3>Statement Metadata</h3>
+        <p><strong>Account Holder:</strong> {{ result.metadata.account_holder or 'Not found' }}</p>
+        <p><strong>Account Number:</strong> 
+            {% if result.metadata.account_number %}
+                XXXXXX{{ result.metadata.account_number[-4:] if result.metadata.account_number|length >= 4 else result.metadata.account_number }}
+            {% else %}
+                Not found
+            {% endif %}
+        </p>
+        <p><strong>IFSC:</strong> {{ result.metadata.ifsc or 'Not found' }}</p>
+        <p><strong>Branch:</strong> {{ result.metadata.branch or 'Not found' }}</p>
+        <p><strong>Currency:</strong> {{ result.metadata.currency or 'Not found' }}</p>
+        <p><strong>Statement Period:</strong> 
+            {{ result.metadata.statement_start_date or '?' }} to {{ result.metadata.statement_end_date or '?' }}
+        </p>
+    </div>
+
+    <div style="margin-bottom: 2rem; border: 1px solid var(--border-color); padding: 1rem; border-radius: 4px;">
+        <h3>Normalization</h3>
+        <p><strong>Transaction Table:</strong> {% if result.transactions %}Detected{% else %}Unresolved{% endif %}</p>
+        <p><strong>Pages Processed:</strong> {{ result.pages_processed }} / {{ result.page_count }}</p>
+        <p><strong>Rows Normalized:</strong> {{ result.transactions|length }}</p>
+        <p><strong>Warnings:</strong> {{ result.warnings|length }} structural warnings</p>
+
+        {% if result.profile_application.status in ['AUTO_APPLIED', 'MANUAL'] %}
+            <p><strong>Profile Applied:</strong> {{ result.profile_application.profile_name }}</p>
+            <p><strong>Match Score:</strong> {{ result.profile_application.match_score }}</p>
+        {% endif %}
+
+        {% if result.profile_application.status == 'NO_PROFILES_AVAILABLE' and (not result.transactions or result.transactions|length == 0) %}
+        <div style="margin-top:15px; padding:15px; background-color:#fff3cd; border:1px solid #ffeeba; border-radius:4px; color:#856404;">
+            <strong>Cannot resolve transaction table.</strong>
+            If this is a valid bank statement, the generic normalizer couldn't parse the layout automatically.
+            <br><br>
+            <a href="{{ url_for('profiles.create_for_job', job_id=job.id) }}" class="btn" style="background-color:#0056b3; color:white;">Create Profile From Statement</a>
+        </div>
+        {% endif %}
+
+        {% if result.profile_application.status == 'SELECTION_REQUIRED' %}
+        <div style="margin-top:20px; border:1px solid var(--border-color); padding:1rem; border-radius:4px;">
+            <h3>Existing Bank Profiles</h3>
+            {% for candidate in result.profile_application.candidates %}
+                <div style="margin-bottom:10px; padding:10px; border:1px solid #ddd; border-radius:4px;">
+                    <p><strong>Profile Name:</strong> {{ candidate.profile_name }}</p>
+                    <p><strong>Bank Name:</strong> {{ candidate.bank_name }}</p>
+                    <p><strong>Revision:</strong> {{ candidate.revision }}</p>
+                    <p><strong>Match Score:</strong> {{ candidate.score }}</p>
+                    <form method="POST" action="{{ url_for('profiles.apply_profile', job_id=job.id, profile_id=candidate.profile_id) }}" style="display:inline;">
+                        <button type="submit" class="btn" style="margin-right:5px;">Use This Profile</button>
+                    </form>
+                </div>
+            {% endfor %}
+            <div style="margin-top: 15px;">
+                <a href="{{ url_for('profiles.create_for_job', job_id=job.id) }}" class="btn" style="background-color:#0056b3; color:white;">Create New Profile</a>
+            </div>
+        </div>
+        {% endif %}
+
+        {% if result.warnings %}
+            <ul style="color: #d32f2f;">
+                {% for w in result.warnings %}
+                    <li>{{ w }}</li>
+                {% endfor %}
+            </ul>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

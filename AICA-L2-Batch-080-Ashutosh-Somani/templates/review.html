@@ -1,0 +1,132 @@
+{% extends "base.html" %}
+
+{% block title %}Advanced Review - {{ job_id }}{% endblock %}
+
+{% block content %}
+<div class="review-header">
+    <h2>Advanced Review</h2>
+    <p>Job ID: {{ job_id }} | Revision: <span id="rev-badge">Loading...</span> | Status: <span id="val-badge">Loading...</span></p>
+    <div>
+        <button id="btn-export" class="btn" style="background-color: #28a745; color: white;" onclick="triggerExport(\'{{ job_id }}\', null, event)">Export Excel</button>
+        <a href="/validation/{{ job_id }}/summary" class="btn">Back to Validation Summary</a>
+    </div>
+</div>
+
+<div class="review-container" style="display: flex; gap: 20px; height: 75vh;">
+    <!-- LEFT: PDF Viewer -->
+    <div class="pdf-pane" style="flex: 1; border: 1px solid #ccc; position: relative; overflow: hidden; display: flex; flex-direction: column;">
+        <div class="pdf-toolbar" style="padding: 10px; background: #f4f4f4; border-bottom: 1px solid #ccc;">
+            <button id="prev-page" class="btn">Prev</button>
+            <span id="page-num">1</span> / <span id="page-count">?</span>
+            <button id="next-page" class="btn">Next</button>
+            
+            <span style="margin-left: 20px;">Zoom:</span>
+            <select id="zoom-select">
+                <option value="0.75">75%</option>
+                <option value="1.0" selected>100%</option>
+                <option value="1.5">150%</option>
+                <option value="2.0">200%</option>
+            </select>
+        </div>
+        <div id="pdf-container" style="flex: 1; overflow: auto; position: relative; background: #525659; text-align: center;">
+            <div style="display: inline-block; position: relative;" id="canvas-wrapper">
+                <canvas id="pdf-canvas" style="direction: ltr;"></canvas>
+                <canvas id="overlay-canvas" style="position: absolute; top: 0; left: 0; pointer-events: none;"></canvas>
+            </div>
+        </div>
+    </div>
+    
+    <!-- RIGHT: Data Grid -->
+    <div class="data-pane" style="flex: 1; border: 1px solid #ccc; display: flex; flex-direction: column; overflow: hidden;">
+        <div class="data-toolbar" style="padding: 10px; background: #f4f4f4; border-bottom: 1px solid #ccc;">
+            <button class="btn" onclick="filterTransactions('all')">All</button>
+            <button class="btn" onclick="filterTransactions('exceptions')">Exceptions Only</button>
+            <button class="btn" onclick="showAudit()">Audit Trail</button>
+            <div id="suggestions-banner" style="display: none; color: red; margin-top: 5px;">
+                Profile review suggested! <button class="btn" onclick="alert('Open Profile Editor')">Review</button>
+            </div>
+        </div>
+        <div id="transactions-list" style="flex: 1; overflow-y: auto;">
+            <!-- Rendered via JS -->
+        </div>
+        <div id="audit-list" style="flex: 1; overflow-y: auto; display: none;">
+            <!-- Rendered via JS -->
+        </div>
+    </div>
+</div>
+
+<!-- Modal for Field Edit -->
+<div id="edit-modal" style="display:none; position:fixed; top:20%; left:30%; width:40%; background:white; padding:20px; border:2px solid #333; z-index:1000; box-shadow: 0 4px 8px rgba(0,0,0,0.2);">
+    <h3>Edit Transaction</h3>
+    <input type="hidden" id="edit-tx-id">
+    <table class="table">
+        <tr><th>Field</th><th>Machine Value</th><th>New Value</th></tr>
+        <tr><td>Date</td><td id="m-date"></td><td><input type="text" id="e-date"></td></tr>
+        <tr><td>Narration</td><td id="m-narration"></td><td><input type="text" id="e-narration"></td></tr>
+        <tr><td>Debit</td><td id="m-debit"></td><td><input type="text" id="e-debit"></td></tr>
+        <tr><td>Credit</td><td id="m-credit"></td><td><input type="text" id="e-credit"></td></tr>
+        <tr><td>Balance</td><td id="m-balance"></td><td><input type="text" id="e-balance"></td></tr>
+        <tr><td>Reason</td><td>-</td><td><input type="text" id="e-reason" placeholder="Optional"></td></tr>
+    </table>
+    <div style="margin-top:15px; text-align:right;">
+        <button class="btn" onclick="document.getElementById('edit-modal').style.display='none'">Cancel</button>
+        <button class="btn btn-primary" onclick="submitEdit()">Save Correction</button>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
+<script>
+    const JOB_ID = "{{ job_id }}";
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
+    
+    function triggerExport(jobId, status, event) {
+        let status = document.getElementById('val-badge').innerText;
+        if (status !== 'PASS' && status !== 'VALID') {
+            if (!confirm("This statement contains unresolved exceptions. Are you sure you want to export?")) {
+                return;
+            }
+        }
+        // Disable button to prevent double clicks
+    let btn = event ? event.currentTarget : document.querySelector('button[onclick^="triggerExport"]');
+    if (btn) {
+        btn.disabled = true;
+        btn.innerText = "Exporting...";
+    }
+
+    fetch(`/api/export/${jobId}`, {method: 'POST'})
+        .then(res => {
+            const contentType = res.headers.get("content-type");
+            if (contentType && contentType.indexOf("application/json") !== -1) {
+                return res.json().then(data => ({status: res.status, data: data}));
+            } else {
+                throw new Error(`Export returned non-JSON response (HTTP ${res.status}). Please check Diagnostics.`);
+            }
+        })
+        .then(({status, data}) => {
+            if (data.status === 'processing' && data.progress_url) {
+                window.location.href = data.progress_url;
+            } else if (data.status === 'success' && data.download_url) {
+                window.location.href = data.download_url;
+            } else {
+                const message = data.error || data.message || `Export failed (HTTP ${status})`;
+                alert("Export failed: " + message);
+                if (btn) {
+                    btn.disabled = false;
+                    btn.innerText = "Export Excel";
+                }
+            }
+        })
+        .catch(err => {
+            console.error(err);
+            alert("Export error: " + err.message);
+            if (btn) {
+                btn.disabled = false;
+                btn.innerText = "Export Excel";
+            }
+        });
+    }
+</script>
+<script src="/static/js/review.js"></script>
+{% endblock %}

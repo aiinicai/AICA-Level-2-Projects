@@ -1,0 +1,135 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="card">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+        <h2>Digital Extraction Diagnostics</h2>
+        <div>
+            <a href="{{ url_for('upload.preview', job_id=job.id) }}" class="btn">Back to PDF Preview</a>
+            <form action="{{ url_for('normalization.trigger_normalization', job_id=job.id) }}" method="POST" style="display:inline;" onsubmit="this.querySelector('button').innerText='Detecting & Normalizing...'; this.querySelector('button').disabled=true;">
+                <button type="submit" class="btn" style="background-color: var(--primary-color);">Detect Bank & Normalize</button>
+            </form>
+        </div>
+    </div>
+    
+    {% if ocr_assessment %}
+    <div style="background-color: white; padding: 1.5rem; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); margin-bottom: 2rem; border-left: 4px solid {% if ocr_assessment.overall_status == 'OCR_REQUIRED' or ocr_assessment.overall_status == 'MIXED_PDF_OCR_REQUIRED' %}#e74c3c{% elif ocr_assessment.overall_status == 'OCR_DISABLED' %}#95a5a6{% else %}#2ecc71{% endif %};">
+        <h3 style="margin-top:0;">OCR Assessment: {{ ocr_assessment.overall_status }}</h3>
+        <p>{{ ocr_assessment.requires_ocr_count }} page(s) require OCR due to insufficient digital text.</p>
+        {% if ocr_assessment.overall_status in ['OCR_REQUIRED', 'MIXED_PDF_OCR_REQUIRED'] %}
+        <button id="run-ocr-btn" class="btn" style="background-color: #e74c3c;" onclick="triggerOcr('{{ job.id }}')">Run Local OCR</button>
+        <span id="ocr-status-text" style="margin-left: 1rem; font-weight: bold;"></span>
+        {% endif %}
+    </div>
+    
+    <script>
+    function triggerOcr(jobId) {
+        const btn = document.getElementById('run-ocr-btn');
+        const statusTxt = document.getElementById('ocr-status-text');
+        btn.disabled = true;
+        btn.innerText = 'Starting...';
+        
+        fetch(`/ocr/${jobId}/trigger`, { method: 'POST' })
+            .then(r => r.json())
+            .then(data => {
+                if(data.status === 'success') {
+                    const nextUrl = encodeURIComponent(`/jobs/${jobId}/diagnostics`);
+                    const errorUrl = encodeURIComponent(`/jobs/${jobId}/diagnostics`);
+                    window.location.href = `/jobs/${jobId}/progress_view?title=Running%20Local%20OCR&next_url=${nextUrl}&error_url=${errorUrl}`;
+                } else {
+                    statusTxt.innerText = 'Error: ' + data.message;
+                    btn.disabled = false;
+                    btn.innerText = 'Run Local OCR';
+                }
+            }).catch(e => {
+                statusTxt.innerText = 'Network error';
+                btn.disabled = false;
+                btn.innerText = 'Run Local OCR';
+            });
+    }
+    
+    function pollOcrStatus(jobId) {
+        const statusTxt = document.getElementById('ocr-status-text');
+        const interval = setInterval(() => {
+            fetch(`/ocr/${jobId}/status`)
+                .then(r => r.json())
+                .then(data => {
+                    statusTxt.innerText = 'Status: ' + data.ocr_status;
+                    if(data.ocr_status === 'OCR_COMPLETE') {
+                        clearInterval(interval);
+                        window.location.reload();
+                    } else if(data.ocr_status === 'OCR_FAILED') {
+                        clearInterval(interval);
+                        document.getElementById('run-ocr-btn').disabled = false;
+                        document.getElementById('run-ocr-btn').innerText = 'Retry Local OCR';
+                    }
+                });
+        }, 2000);
+    }
+    </script>
+    {% endif %}
+
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; margin-bottom: 2rem;">
+        <div>
+            <p><strong>Extractor:</strong> {{ result.extractor_used }} ({{ result.extractor_version }})</p>
+            <p><strong>Pages:</strong> {{ result.pages_processed }} / {{ result.page_count }}</p>
+            <p><strong>Total words:</strong> {{ result.total_words }}</p>
+            <p><strong>Total characters:</strong> {{ result.total_characters }}</p>
+        </div>
+        <div>
+            <p><strong>Text-layer status:</strong> 
+                {% if result.text_layer_status == 'usable' %}
+                    <span class="badge-success">Usable Digital Text</span>
+                {% elif result.text_layer_status == 'limited' %}
+                    <span class="badge-warning">Limited Digital Text</span>
+                {% else %}
+                    <span class="badge-error">No Usable Digital Text</span>
+                {% endif %}
+            </p>
+            <p><strong>Table candidates:</strong> {{ result.table_candidate_count }}</p>
+            <p><strong>Warnings:</strong> {{ result.warnings|length }}</p>
+        </div>
+    </div>
+
+    {% if result.warnings %}
+        <div class="error-state" style="margin-bottom: 2rem; text-align: left; padding: 1rem;">
+            <h4>Warnings:</h4>
+            <ul>
+                {% for w in result.warnings %}
+                    <li>{{ w }}</li>
+                {% endfor %}
+            </ul>
+        </div>
+    {% endif %}
+
+    <h3>Page Diagnostics</h3>
+    <table class="table" style="width: 100%; text-align: left; margin-bottom: 2rem;">
+        <thead>
+            <tr>
+                <th>Page</th>
+                <th>Words</th>
+                <th>Characters</th>
+                <th>Table Candidates</th>
+                <th>Status</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for page in result.pages %}
+            <tr>
+                <td>{{ page.page_number }}</td>
+                <td>{{ page.word_count }}</td>
+                <td>{{ page.character_count }}</td>
+                <td>{{ page.table_candidates|length }}</td>
+                <td>{{ page.extraction_status }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <div style="display: flex; gap: 1rem;">
+        <a href="{{ url_for('extraction.diagnostic_raw_text', job_id=job.id) }}" class="btn">View Raw Text</a>
+        <a href="{{ url_for('extraction.diagnostic_geometry', job_id=job.id) }}" class="btn">View Word Geometry</a>
+        <a href="{{ url_for('extraction.diagnostic_tables', job_id=job.id) }}" class="btn">View Table Candidates</a>
+    </div>
+</div>
+{% endblock %}
