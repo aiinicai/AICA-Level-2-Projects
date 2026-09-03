@@ -1,0 +1,127 @@
+{% extends "base.html" %}
+{% block title %}Calendar{% endblock %}
+{% block content %}
+<div class="flex items-center justify-between mb-4 flex-wrap gap-2">
+  <div class="flex items-center gap-2">
+    <a href="/calendar?year={{ prev_year }}&month={{ prev_month }}&view_user_id={{ target.id }}" class="text-sm bg-white border rounded px-2 py-1 hover:bg-slate-50">&larr; Prev</a>
+    <h1 class="text-2xl font-bold">{{ target.name }}'s Calendar &mdash; {{ month_name }} {{ year }}</h1>
+    <a href="/calendar?year={{ next_year }}&month={{ next_month }}&view_user_id={{ target.id }}" class="text-sm bg-white border rounded px-2 py-1 hover:bg-slate-50">Next &rarr;</a>
+    <a href="/calendar?view_user_id={{ target.id }}" class="text-xs text-slate-500 underline">Today</a>
+  </div>
+  <form method="get" class="flex items-center gap-2 text-sm">
+    <input type="hidden" name="year" value="{{ year }}">
+    <input type="hidden" name="month" value="{{ month }}">
+    <select name="view_user_id" onchange="this.form.submit()" class="border rounded px-2 py-1">
+      <option value="{{ user.id }}" {% if target.id == user.id %}selected{% endif %}>My Calendar</option>
+      {% for p in visible_people %}
+      <option value="{{ p.id }}" {% if target.id == p.id %}selected{% endif %}>{{ p.name }}</option>
+      {% endfor %}
+    </select>
+  </form>
+</div>
+
+{% if not can_see_detail %}
+<div class="card mb-4 text-sm text-slate-500">You can only see Free/Busy blocks for this person's calendar.</div>
+{% endif %}
+
+<div class="grid lg:grid-cols-4 gap-4">
+  <div class="lg:col-span-3">
+    <div class="card">
+      <div class="cal-grid mb-1">
+        {% for d in ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"] %}<div class="cal-head">{{ d }}</div>{% endfor %}
+      </div>
+      <div class="cal-grid">
+        {% for week in weeks %}
+          {% for day in week %}
+          <div class="cal-cell {% if not day.in_month %}out-month{% endif %} {% if day.is_weekend %}weekend{% endif %} {% if day.is_today %}today{% endif %}">
+            <div class="cal-daynum">{{ day.date.day }}</div>
+            {% if can_see_detail %}
+              {% if day.attendance %}
+              <span class="cal-att-dot badge-{{ day.attendance|lower|replace('_','') }}">{{ day.attendance }}</span>
+              {% elif day.on_leave %}
+              <span class="cal-att-dot badge-leave">LEAVE</span>
+              {% endif %}
+              {% for e in day.events[:2] %}
+              <div class="cal-chip chip-{{ e.event_type|lower }} {% if e.status == 'DONE' %}chip-done{% endif %}" title="{{ e.title }}">
+                {% if e.start_time %}{{ e.start_time }} {% endif %}{{ e.title }}
+              </div>
+              {% endfor %}
+              {% if day.events|length > 2 %}<div class="cal-more">+{{ day.events|length - 2 }} more</div>{% endif %}
+            {% else %}
+              {% if day.attendance or day.on_leave or day.events %}
+              <div class="cal-chip chip-meeting">Busy</div>
+              {% endif %}
+            {% endif %}
+          </div>
+          {% endfor %}
+        {% endfor %}
+      </div>
+    </div>
+
+    {% if can_see_detail and events %}
+    <div class="card mt-4">
+      <h2 class="font-semibold mb-3">All events this month ({{ events|length }})</h2>
+      <table class="w-full text-sm">
+        <thead><tr class="text-left text-slate-500 border-b"><th class="py-1">Date</th><th>Type</th><th>Title</th><th>Priority</th><th>Status</th>{% if target.id == user.id %}<th></th>{% endif %}</tr></thead>
+        <tbody>
+        {% for e in events %}
+        <tr class="border-b">
+          <td class="py-1">{{ e.start_date }} {{ e.start_time or "" }}</td>
+          <td>{{ e.event_type.replace('_',' ') }}</td>
+          <td>{{ e.title }}{% if e.assigned_by %}<span class="text-xs text-slate-400"> (assigned by {{ e.assigned_by.name }})</span>{% endif %}</td>
+          <td><span class="badge badge-{{ e.priority|lower }}">{{ e.priority }}</span></td>
+          <td><span class="badge badge-{{ e.status|lower }}">{{ e.status.replace('_',' ') }}</span></td>
+          {% if target.id == user.id %}
+          <td>
+            {% if e.status != "DONE" %}
+            <form method="post" action="/calendar/event/{{ e.id }}/status" class="inline">
+              <input type="hidden" name="status" value="DONE">
+              <button class="text-xs text-green-700 underline">Done</button>
+            </form>
+            {% endif %}
+          </td>
+          {% endif %}
+        </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% endif %}
+  </div>
+
+  <div class="space-y-4">
+    {% if target.id == user.id %}
+    <div class="card">
+      <h2 class="font-semibold mb-3">Add manually</h2>
+      <form method="post" action="/calendar/manual" class="space-y-2 text-sm">
+        <select name="event_type" class="w-full border rounded px-2 py-1">
+          <option value="TASK">Task</option>
+          <option value="MEETING">Meeting</option>
+          <option value="PENDING_ACTION">Pending Action</option>
+          <option value="REMINDER">Reminder</option>
+        </select>
+        <input name="title" placeholder="Title" required class="w-full border rounded px-2 py-1">
+        <input name="start_date" type="date" required class="w-full border rounded px-2 py-1">
+        <input name="start_time" type="time" class="w-full border rounded px-2 py-1">
+        <select name="priority" class="w-full border rounded px-2 py-1">
+          <option>LOW</option><option selected>MEDIUM</option><option>HIGH</option><option>URGENT</option>
+        </select>
+        <button class="w-full bg-slate-900 text-white py-1.5 rounded">Add</button>
+      </form>
+    </div>
+    {% endif %}
+
+    {% if can_see_detail and leaves %}
+    <div class="card">
+      <h2 class="font-semibold mb-3">Planned leave</h2>
+      {% for l in leaves %}
+      <div class="text-sm flex justify-between border-b py-1">
+        <span>{{ l.start_date }} - {{ l.end_date }}</span>
+        <span class="badge badge-{{ l.status|lower }}">{{ l.status }}</span>
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}
