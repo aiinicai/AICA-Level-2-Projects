@@ -18,8 +18,16 @@ Two methods are covered:
 3. **Commit:** Save the changes in your fork with a clear commit message.
 4. **Open a Pull Request:** Request the `aiinicai` account to merge your changes into the original repository.
 5. **Merge:** The repository owner reviews and accepts your Pull Request. After it is merged, your project folder will appear in the official repository.
+The application is designed so that scanning happens locally in the browser and files are not uploaded.
 
----
+## Supported Input
+
+- PDF
+- PNG
+- JPG
+- WEBP
+- Multiple files
+- Multi-page PDFs
 
 # Method 1: Website Only
 
@@ -148,8 +156,22 @@ The repository owner may:
 If changes are requested, update the files in your fork and commit them. Your existing Pull Request will update automatically.
 
 After the Pull Request is merged, your project folder will become part of the official repository.
+Users can either drag files into the drop area or click to browse.
 
----
+## Core Workflow
+
+1. Select or drop invoice files.
+2. For PDFs, render each page at multiple scales and scan for a QR code.
+3. For images, resize large images to a maximum side length of 4200 pixels and scan them.
+4. Prefer the browser's native `BarcodeDetector` when available.
+5. Fall back to `jsQR` when native detection is unavailable or unsuccessful.
+6. Try image enhancement using Otsu thresholding when needed.
+7. Scan cropped regions at reduced scales to improve QR detection.
+8. Parse the decoded QR text.
+9. Display one result row per scanned page/file.
+10. Export all found QR data to `qr-invoice-data.xlsx`.
+
+## QR Parsing
 
 # Method 2: Git Command Line
 
@@ -248,8 +270,15 @@ Your project folder will now appear in your fork on GitHub.
 
 4. Add a clear title and project description.
 5. Click **Create pull request**.
+The parser recognizes the following formats:
 
----
+### GST e-Invoice Signed QR
+
+A three-part token whose first part matches the expected base64url-safe pattern is treated as a signed e-invoice QR.
+
+The payload is base64url-decoded, parsed as JSON, and—when a `data` property contains a string—parsed again.
+
+Common fields are given friendly labels:
 
 ## Before Submitting
 
