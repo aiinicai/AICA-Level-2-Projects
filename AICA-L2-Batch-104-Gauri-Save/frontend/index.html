@@ -1,0 +1,445 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Intercompany Invoice Consistency Checker</title>
+<link rel="manifest" href="manifest.json" />
+<style>
+  :root {
+    --ink: #10182b;
+    --ink-soft: #384158;
+    --paper: #f6f5f2;
+    --panel: #ffffff;
+    --line: #d8d6cf;
+    --navy: #0b1f3a;
+    --navy-deep: #071527;
+    --brass: #9c7a2e;
+    --ok: #1e7a3a;
+    --flag: #a8710d;
+    --critical: #a3241f;
+    --mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+    --serif: "Source Serif 4", Georgia, "Times New Roman", serif;
+    --sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--paper); color: var(--ink); font-family: var(--sans); line-height: 1.5; }
+  .shell { max-width: 960px; margin: 0 auto; padding: 0 24px 80px; }
+
+  header.masthead { background: var(--navy); color: #eef1f6; padding: 28px 24px 22px; border-bottom: 3px solid var(--brass); }
+  header.masthead .inner { max-width: 960px; margin: 0 auto; display: flex; align-items: baseline; justify-content: space-between; flex-wrap: wrap; gap: 8px; }
+  .masthead h1 { font-family: var(--serif); font-weight: 600; font-size: 1.5rem; margin: 0; }
+  .masthead .tag { font-family: var(--mono); font-size: 0.72rem; color: #b9c2d4; letter-spacing: 0.04em; }
+  .masthead .sub { width: 100%; font-size: 0.8rem; color: #9fabc4; margin-top: 6px; }
+
+  main { padding-top: 32px; }
+  .section-title { font-family: var(--serif); font-size: 1.05rem; font-weight: 600; color: var(--navy); margin: 0 0 14px; padding-bottom: 8px; border-bottom: 1px solid var(--line); }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 3px; padding: 24px; margin-bottom: 22px; }
+
+  .upload-zone {
+    border: 2px dashed #c3c0b6;
+    border-radius: 4px;
+    padding: 24px;
+    text-align: center;
+    cursor: pointer;
+    background: #fbfaf7;
+    transition: border-color 0.15s;
+  }
+  .upload-zone:hover, .upload-zone.dragover { border-color: var(--brass); }
+  .upload-zone input { display: none; }
+  .upload-zone .icon { font-size: 1.8rem; margin-bottom: 6px; }
+  .upload-zone .label { font-weight: 600; font-size: 0.9rem; color: var(--ink); }
+  .upload-zone .hint { font-size: 0.78rem; color: #7b7767; margin-top: 4px; }
+
+  .file-list { margin-top: 12px; }
+  .file-chip {
+    display: inline-flex; align-items: center; gap: 6px;
+    background: #eef1f6; border: 1px solid var(--line);
+    padding: 5px 10px; border-radius: 3px; margin: 4px 6px 4px 0;
+    font-size: 0.82rem; font-family: var(--mono);
+  }
+  .file-chip button {
+    background: none; border: none; color: var(--critical); cursor: pointer;
+    font-size: 0.9rem; padding: 0; margin-left: 2px;
+  }
+
+  .actions { display: flex; justify-content: flex-end; gap: 12px; margin-top: 18px; }
+  button.run { background: var(--navy); color: #fff; border: none; font-family: var(--sans); font-weight: 600; font-size: 0.92rem; padding: 12px 22px; border-radius: 2px; cursor: pointer; }
+  button.run:hover { background: var(--navy-deep); }
+  button.run:disabled { background: #9aa1b2; cursor: wait; }
+  button.secondary { background: transparent; border: 1px solid var(--line); color: var(--ink-soft); font-family: var(--sans); font-size: 0.88rem; padding: 11px 18px; border-radius: 2px; cursor: pointer; }
+  button.secondary:hover { border-color: var(--brass); color: var(--navy); }
+
+  .status-line { font-family: var(--mono); font-size: 0.8rem; color: var(--ink-soft); margin-top: 10px; min-height: 18px; }
+  .error-box { background: #f6e0de; border-left: 4px solid var(--critical); color: var(--critical); padding: 12px 16px; font-size: 0.88rem; margin-top: 12px; border-radius: 2px; }
+
+  #results { display: none; }
+
+  .summary-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 22px; }
+  .stat-box { border: 1px solid var(--line); border-top: 4px solid var(--navy); padding: 14px 12px; background: var(--panel); text-align: center; }
+  .stat-box.CRITICAL { border-top-color: var(--critical); }
+  .stat-box.FLAG, .stat-box.REVIEW { border-top-color: var(--flag); }
+  .stat-box.OK { border-top-color: var(--ok); }
+  .stat-box .num { font-family: var(--serif); font-size: 1.6rem; font-weight: 700; }
+  .stat-box .lbl { font-size: 0.72rem; font-family: var(--mono); color: var(--ink-soft); text-transform: uppercase; }
+
+  .exec-summary { background: #fbfaf7; border-left: 4px solid var(--brass); padding: 16px 18px; font-size: 0.94rem; margin-bottom: 24px; }
+
+  .invoice-block { border: 1px solid var(--line); border-radius: 3px; margin-bottom: 16px; overflow: hidden; }
+  .invoice-header {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 12px 16px; cursor: pointer; background: #fbfaf7;
+  }
+  .invoice-header .fname { font-family: var(--mono); font-size: 0.85rem; }
+  .status-pill { font-family: var(--mono); font-size: 0.7rem; font-weight: 700; padding: 3px 10px; border-radius: 12px; }
+  .status-pill.OK { background: #e4f2e8; color: var(--ok); }
+  .status-pill.FLAG, .status-pill.REVIEW { background: #f6ecd8; color: var(--flag); }
+  .status-pill.CRITICAL { background: #f6e0de; color: var(--critical); }
+
+  .invoice-body { padding: 4px 16px 14px; display: none; }
+  .invoice-body.open { display: block; }
+  .finding-row { display: grid; grid-template-columns: 90px 1fr; gap: 12px; padding: 8px 0; border-bottom: 1px dashed var(--line); font-size: 0.85rem; }
+  .finding-row:last-child { border-bottom: none; }
+  .sev-tag { font-family: var(--mono); font-size: 0.65rem; font-weight: 700; padding: 3px 6px; border-radius: 2px; height: fit-content; text-align: center; }
+  .sev-tag.OK { background: #e4f2e8; color: var(--ok); }
+  .sev-tag.FLAG, .sev-tag.REVIEW { background: #f6ecd8; color: var(--flag); }
+  .sev-tag.CRITICAL { background: #f6e0de; color: var(--critical); }
+  .finding-row .check { font-weight: 600; color: var(--navy); }
+
+  ul.action-list { margin: 0; padding-left: 20px; }
+  ul.action-list li { font-size: 0.88rem; padding: 5px 0; }
+
+  .revenue-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+  .revenue-table th { background: var(--navy); color: #eef1f6; text-align: left; padding: 8px 10px; font-family: var(--mono); font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.03em; }
+  .revenue-table td { padding: 7px 10px; border-bottom: 1px solid var(--line); font-family: var(--mono); }
+  .revenue-table td.extraordinary.has-value { color: var(--flag); font-weight: 700; }
+  .no-revenue-note { font-size: 0.85rem; color: var(--ink-soft); font-style: italic; }
+
+  .download-row { display: flex; gap: 12px; margin-top: 24px; }
+  .download-row a.btn { background: var(--brass); color: #fff; text-decoration: none; padding: 12px 20px; border-radius: 2px; font-weight: 600; font-size: 0.9rem; }
+
+  footer { max-width: 960px; margin: 40px auto 0; padding: 20px 24px; font-size: 0.74rem; color: #8a8672; border-top: 1px solid var(--line); }
+
+  @media (max-width: 640px) { .summary-grid { grid-template-columns: repeat(2, 1fr); } }
+</style>
+</head>
+<body>
+
+<header class="masthead">
+  <div class="inner">
+    <h1>Intercompany Invoice Consistency Checker</h1>
+    <span class="tag">AICA LEVEL 2 &middot; CAPSTONE PROJECT BY GAURI SAVE</span>
+  </div>
+  <div class="sub">Cross-checks intercompany invoices against a master agreement — extraction via OCR/text parsing, deterministic reconciliation, AI-drafted summary.</div>
+</header>
+
+<div class="shell">
+  <main>
+
+    <section class="card" id="input-card">
+      <h2 class="section-title">1. Upload Master Agreement</h2>
+      <div class="upload-zone" id="agreement-zone">
+        <div class="icon">📄</div>
+        <div class="label">Click or drop the intercompany agreement here</div>
+        <div class="hint">PDF only — this is the source of truth invoices are checked against.</div>
+        <input type="file" id="agreement-input" accept=".pdf" />
+      </div>
+      <div class="file-list" id="agreement-file-list"></div>
+
+      <h2 class="section-title" style="margin-top:26px;">2. Upload Revenue Support Schedules</h2>
+      <div class="upload-zone" id="revenue-zone">
+        <div class="icon">📊</div>
+        <div class="label">Click or drop the monthly Revenue Support Schedules here</div>
+        <div class="hint">PDF only — one per month, certifying actual Operating Revenue and Extraordinary Income. Optional, but required to verify invoiced fee amounts.</div>
+        <input type="file" id="revenue-input" accept=".pdf" multiple />
+      </div>
+      <div class="file-list" id="revenue-file-list"></div>
+
+      <h2 class="section-title" style="margin-top:26px;">3. Upload Invoices</h2>
+      <div class="upload-zone" id="invoices-zone">
+        <div class="icon">🧾</div>
+        <div class="label">Click or drop one or more invoices here</div>
+        <div class="hint">PDF, PNG, or JPG — scanned/photographed invoices are supported.</div>
+        <input type="file" id="invoices-input" accept=".pdf,.png,.jpg,.jpeg" multiple />
+      </div>
+      <div class="file-list" id="invoices-file-list"></div>
+
+      <div class="actions">
+        <button class="secondary" id="load-sample">Use sample documents</button>
+        <button class="run" id="run-check">Run consistency check</button>
+      </div>
+      <div class="status-line" id="status-line"></div>
+    </section>
+
+    <section id="results">
+      <div class="summary-grid" id="summary-grid"></div>
+
+      <div class="card">
+        <h2 class="section-title">Revenue Support Schedules Referenced</h2>
+        <div id="revenue-schedules-content"></div>
+      </div>
+
+      <div class="card">
+        <h2 class="section-title">Executive Summary</h2>
+        <div class="exec-summary" id="exec-summary">—</div>
+      </div>
+
+      <div class="card">
+        <h2 class="section-title">Prioritized Items</h2>
+        <ul class="action-list" id="prioritized-list"></ul>
+      </div>
+
+      <div class="card">
+        <h2 class="section-title">Per-Invoice Findings</h2>
+        <div id="invoice-blocks"></div>
+      </div>
+
+      <div class="card">
+        <h2 class="section-title">Recommended Next Steps</h2>
+        <ul class="action-list" id="next-steps-list"></ul>
+      </div>
+
+      <div class="download-row">
+        <a class="btn" id="download-link" href="#" download>Download Word memo</a>
+        <button class="secondary" id="new-check">Run another batch</button>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<footer>
+  Internal capstone tool &middot; documentation-readiness aid only. OCR-sourced fields carry inherent
+  uncertainty and are flagged for manual verification. Does not substitute professional judgment.
+</footer>
+
+<script>
+  const API_BASE = window.INVOICE_CHECKER_API_BASE || "http://localhost:5002";
+  const el = (id) => document.getElementById(id);
+
+  let agreementFile = null;
+  let revenueFiles = [];
+  let invoiceFiles = [];
+
+  function setupDropzone(zoneId, inputId, onFiles) {
+    const zone = el(zoneId);
+    const input = el(inputId);
+    zone.addEventListener("click", () => input.click());
+    input.addEventListener("change", () => onFiles(Array.from(input.files)));
+    zone.addEventListener("dragover", (e) => { e.preventDefault(); zone.classList.add("dragover"); });
+    zone.addEventListener("dragleave", () => zone.classList.remove("dragover"));
+    zone.addEventListener("drop", (e) => {
+      e.preventDefault();
+      zone.classList.remove("dragover");
+      onFiles(Array.from(e.dataTransfer.files));
+    });
+  }
+
+  function renderAgreementChip() {
+    const list = el("agreement-file-list");
+    list.innerHTML = "";
+    if (agreementFile) {
+      const chip = document.createElement("span");
+      chip.className = "file-chip";
+      chip.innerHTML = `${agreementFile.name} <button data-action="remove-agreement">✕</button>`;
+      list.appendChild(chip);
+    }
+  }
+
+  function renderRevenueChips() {
+    const list = el("revenue-file-list");
+    list.innerHTML = "";
+    revenueFiles.forEach((f, i) => {
+      const chip = document.createElement("span");
+      chip.className = "file-chip";
+      chip.innerHTML = `${f.name} <button data-idx="${i}">✕</button>`;
+      list.appendChild(chip);
+    });
+  }
+
+  function renderInvoiceChips() {
+    const list = el("invoices-file-list");
+    list.innerHTML = "";
+    invoiceFiles.forEach((f, i) => {
+      const chip = document.createElement("span");
+      chip.className = "file-chip";
+      chip.innerHTML = `${f.name} <button data-idx="${i}">✕</button>`;
+      list.appendChild(chip);
+    });
+  }
+
+  setupDropzone("agreement-zone", "agreement-input", (files) => {
+    if (files.length) { agreementFile = files[0]; renderAgreementChip(); }
+  });
+
+  setupDropzone("revenue-zone", "revenue-input", (files) => {
+    revenueFiles = revenueFiles.concat(files);
+    renderRevenueChips();
+  });
+
+  setupDropzone("invoices-zone", "invoices-input", (files) => {
+    invoiceFiles = invoiceFiles.concat(files);
+    renderInvoiceChips();
+  });
+
+  el("agreement-file-list").addEventListener("click", (e) => {
+    if (e.target.dataset.action === "remove-agreement") {
+      agreementFile = null;
+      renderAgreementChip();
+    }
+  });
+
+  el("revenue-file-list").addEventListener("click", (e) => {
+    if (e.target.dataset.idx !== undefined) {
+      revenueFiles.splice(parseInt(e.target.dataset.idx), 1);
+      renderRevenueChips();
+    }
+  });
+
+  el("invoices-file-list").addEventListener("click", (e) => {
+    if (e.target.dataset.idx !== undefined) {
+      invoiceFiles.splice(parseInt(e.target.dataset.idx), 1);
+      renderInvoiceChips();
+    }
+  });
+
+  el("load-sample").addEventListener("click", () => {
+    el("status-line").textContent = "Sample documents are bundled with the project under /sample_docs — " +
+      "upload agreement_management_services.pdf, the revenue_schedule_*.pdf files, and the invoice_*.pdf/.png files from that folder to try the tool.";
+  });
+
+  el("new-check").addEventListener("click", () => {
+    el("results").style.display = "none";
+    el("input-card").style.display = "block";
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  });
+
+  el("run-check").addEventListener("click", async () => {
+    const statusLine = el("status-line");
+    if (!agreementFile) { statusLine.innerHTML = `<span style="color:#a3241f">Please upload the master agreement.</span>`; return; }
+    if (invoiceFiles.length === 0) { statusLine.innerHTML = `<span style="color:#a3241f">Please upload at least one invoice.</span>`; return; }
+
+    const formData = new FormData();
+    formData.append("agreement", agreementFile);
+    revenueFiles.forEach((f) => formData.append("revenue_schedules", f));
+    invoiceFiles.forEach((f) => formData.append("invoices", f));
+
+    const btn = el("run-check");
+    btn.disabled = true;
+    btn.textContent = "Running check…";
+    statusLine.textContent = "Extracting documents, reconciling, and drafting summary — this can take up to a minute for scanned documents.";
+
+    try {
+      const resp = await fetch(`${API_BASE}/api/reconcile`, { method: "POST", body: formData });
+      const data = await resp.json();
+      if (!data.ok) throw new Error(data.error || "Unknown error from reconciliation service.");
+      renderResults(data);
+      statusLine.textContent = "";
+    } catch (e) {
+      statusLine.innerHTML = `<div class="error-box">Check failed: ${e.message}. Confirm the backend server is running at ${API_BASE}.</div>`;
+    } finally {
+      btn.disabled = false;
+      btn.textContent = "Run consistency check";
+    }
+  });
+
+  function renderResults(data) {
+    el("input-card").style.display = "none";
+    el("results").style.display = "block";
+
+    const counts = {};
+    data.invoices.forEach((inv) => { counts[inv.status] = (counts[inv.status] || 0) + 1; });
+
+    const summaryGrid = el("summary-grid");
+    summaryGrid.innerHTML = "";
+    ["CRITICAL", "FLAG", "REVIEW", "OK"].forEach((status) => {
+      if (counts[status]) {
+        const box = document.createElement("div");
+        box.className = `stat-box ${status}`;
+        box.innerHTML = `<div class="num">${counts[status]}</div><div class="lbl">${status}</div>`;
+        summaryGrid.appendChild(box);
+      }
+    });
+
+    el("exec-summary").textContent = data.narrative.executive_summary || "Not available.";
+
+    const revenueContent = el("revenue-schedules-content");
+    const schedules = data.revenue_schedules || [];
+    if (schedules.length === 0) {
+      revenueContent.innerHTML = `<div class="no-revenue-note">No Revenue Support Schedules were supplied for this run — invoiced amounts could not be independently verified against actual Operating Revenue.</div>`;
+    } else {
+      const sorted = schedules.slice().sort((a, b) => {
+        const da = a.month ? new Date(`1 ${a.month}`) : new Date(8640000000000000);
+        const db = b.month ? new Date(`1 ${b.month}`) : new Date(8640000000000000);
+        return da - db;
+      });
+      const fmt = (n) => (n === null || n === undefined) ? "—" : Number(n).toLocaleString("en-IN");
+      revenueContent.innerHTML = `
+        <table class="revenue-table">
+          <thead><tr><th>Month</th><th>Operating Revenue</th><th>Extraordinary Income</th><th>Total Revenue</th></tr></thead>
+          <tbody>
+            ${sorted.map(s => `
+              <tr>
+                <td>${s.month || "—"}</td>
+                <td>${fmt(s.operating_revenue)}</td>
+                <td class="extraordinary${s.extraordinary_income ? ' has-value' : ''}">${fmt(s.extraordinary_income)}</td>
+                <td>${fmt(s.total_revenue)}</td>
+              </tr>
+            `).join("")}
+          </tbody>
+        </table>
+      `;
+    }
+
+    const prioritizedList = el("prioritized-list");
+    prioritizedList.innerHTML = "";
+    (data.narrative.prioritized_items || []).forEach((item) => {
+      const li = document.createElement("li");
+      li.textContent = item;
+      prioritizedList.appendChild(li);
+    });
+
+    const nextSteps = el("next-steps-list");
+    nextSteps.innerHTML = "";
+    (data.narrative.recommended_next_steps || []).forEach((s) => {
+      const li = document.createElement("li");
+      li.textContent = s;
+      nextSteps.appendChild(li);
+    });
+
+    const blocks = el("invoice-blocks");
+    blocks.innerHTML = "";
+    data.invoices.forEach((inv, idx) => {
+      const block = document.createElement("div");
+      block.className = "invoice-block";
+      block.innerHTML = `
+        <div class="invoice-header" data-idx="${idx}">
+          <span class="fname">${inv.filename} <span style="color:#8a8672;">(${inv.extraction_method})</span></span>
+          <span class="status-pill ${inv.status}">${inv.status}</span>
+        </div>
+        <div class="invoice-body" id="inv-body-${idx}">
+          ${inv.findings.map(f => `
+            <div class="finding-row">
+              <div class="sev-tag ${f.severity}">${f.severity}</div>
+              <div><span class="check">${f.check}:</span> ${f.detail}</div>
+            </div>
+          `).join("")}
+        </div>
+      `;
+      blocks.appendChild(block);
+    });
+
+    blocks.querySelectorAll(".invoice-header").forEach((h) => {
+      h.addEventListener("click", () => {
+        const body = el(`inv-body-${h.dataset.idx}`);
+        body.classList.toggle("open");
+      });
+    });
+
+    el("download-link").href = `${API_BASE}/api/download/${encodeURIComponent(data.memo_filename)}`;
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+</script>
+
+</body>
+</html>
