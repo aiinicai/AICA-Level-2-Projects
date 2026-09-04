@@ -1,5 +1,6 @@
 ECL Stage Migration Matrix & Commentary Narrator
 AICA Level 2 Capstone Project — Hitesh Bhadada, Financial Controller
+**Prebuilt Windows executable:** [Download ecl_gui.exe](https://drive.google.com/file/d/1tC18DdHfVCi3tpNmVScdrHC3KtjwgRpt/view?usp=drive_link)
 A desktop tool that takes loan-level data across period-ends and produces a Board/Audit-Committee-ready ECL stage migration analysis — with loan-level drill-down, an Ind AS 107 para 35H loss-allowance reconciliation, and an RBI IRACP vs Ind AS 109 comparison.
 Two files, used together:
 File	Role
