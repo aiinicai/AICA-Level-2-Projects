@@ -1,3 +1,11 @@
+# My Desktop Application
+
+## How to Install and Run
+1. Go to the **Releases** section on the right side of this page.
+2. Download the latest `.zip` file.
+3. Extract the contents of the folder to your computer.
+4. Double-click the `.exe` file to launch the application!
+
 # Upload Your Project Folder to the AICA Level 2 Projects Repository
 
 **Target repository:** [aiinicai/AICA-Level-2-Projects](https://github.com/aiinicai/AICA-Level-2-Projects)
