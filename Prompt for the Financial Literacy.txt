@@ -1,0 +1,678 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>EquiPulse | Corporate Financial Health & Intelligence Platform</title>
+  
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Chart.js CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#f0f7ff',
+              100: '#e0effe',
+              500: '#0284c7',
+              600: '#0369a1',
+              900: '#0c4a6e',
+            },
+            slate: {
+              850: '#151f32',
+              900: '#0f172a',
+              950: '#080d1a',
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+    body { font-family: 'Inter', sans-serif; }
+    .custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
+    .custom-scrollbar::-webkit-scrollbar-track { background: #0f172a; }
+    .custom-scrollbar::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
+    
+    /* Subtle bounce for doodle interactions */
+    .doodle-card:hover svg {
+      transform: scale(1.08) translateY(-2px);
+      transition: transform 0.2s ease-in-out;
+    }
+  </style>
+</head>
+
+<body class="bg-slate-950 text-slate-100 flex min-h-screen custom-scrollbar">
+
+  <!-- Sidebar Navigation -->
+  <aside class="w-64 bg-slate-900 border-r border-slate-800 flex flex-col justify-between hidden md:flex">
+    <div>
+      <!-- Brand Logo -->
+      <div class="h-16 flex items-center px-6 border-b border-slate-800 space-x-3">
+        <div class="p-2 bg-sky-500 rounded-lg text-white">
+          <i data-lucide="activity" class="w-5 h-5"></i>
+        </div>
+        <span class="text-xl font-bold tracking-wide text-white">Equi<span class="text-sky-400">Pulse</span></span>
+      </div>
+
+      <!-- Nav Links -->
+      <nav class="p-4 space-y-1 text-sm font-medium">
+        <a href="#overview" class="flex items-center space-x-3 px-3 py-2.5 rounded-lg bg-sky-500/10 text-sky-400 border border-sky-500/20">
+          <i data-lucide="layout-dashboard" class="w-4 h-4"></i>
+          <span>Executive Overview</span>
+        </a>
+        <a href="#screeners" class="flex items-center space-x-3 px-3 py-2.5 rounded-lg text-slate-400 hover:bg-slate-800 hover:text-slate-200 transition">
+          <i data-lucide="filter" class="w-4 h-4"></i>
+          <span>Strategic Screeners</span>
+        </a>
+        <a href="#ratios" class="flex items-center space-x-3 px-3 py-2.5 rounded-lg text-slate-400 hover:bg-slate-800 hover:text-slate-200 transition">
+          <i data-lucide="calculator" class="w-4 h-4"></i>
+          <span>Financial Ratio Matrix</span>
+        </a>
+        <a href="#feed" class="flex items-center space-x-3 px-3 py-2.5 rounded-lg text-slate-400 hover:bg-slate-800 hover:text-slate-200 transition">
+          <i data-lucide="radio" class="w-4 h-4"></i>
+          <span>NSE/BSE Real-Time Feed</span>
+        </a>
+      </nav>
+    </div>
+
+    <!-- Live Market Status + Stick Figure Buddy -->
+    <div class="p-4 border-t border-slate-800 text-xs">
+      <div class="flex items-center justify-between text-slate-400 mb-2">
+        <span class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span> Market Live</span>
+        <span id="timestamp">15:30:00 IST</span>
+      </div>
+      <div class="bg-slate-850 p-2.5 rounded-lg border border-slate-800 space-y-1">
+        <div class="flex justify-between font-medium"><span>NIFTY 50</span><span class="text-emerald-400">24,310.50 (+0.42%)</span></div>
+        <div class="flex justify-between font-medium"><span>BSE SENSEX</span><span class="text-emerald-400">79,845.20 (+0.38%)</span></div>
+      </div>
+      
+      <!-- Stick Figure Analyst Doodle -->
+      <div class="mt-4 flex items-center gap-2 p-2 bg-slate-900 rounded-lg border border-slate-800">
+        <svg class="w-8 h-8 text-sky-400 flex-shrink-0" viewBox="0 0 50 50" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+          <!-- Head -->
+          <circle cx="25" cy="12" r="6" />
+          <!-- Eyes & Smile -->
+          <circle cx="23" cy="11" r="0.8" fill="currentColor"/>
+          <circle cx="27" cy="11" r="0.8" fill="currentColor"/>
+          <path d="M23 14 Q25 16 27 14" stroke-width="1.5"/>
+          <!-- Body -->
+          <path d="M25 18 L25 34" />
+          <!-- Arm holding telescope -->
+          <path d="M25 22 L35 18 L42 16" />
+          <path d="M25 22 L16 28" />
+          <!-- Legs -->
+          <path d="M25 34 L18 46" />
+          <path d="M25 34 L32 46" />
+        </svg>
+        <span class="text-[11px] text-slate-400">Analyst Bot watching real-time ticks...</span>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Main Content Area -->
+  <main class="flex-1 flex flex-col min-w-0 overflow-y-auto max-h-screen custom-scrollbar">
+    
+    <!-- Top Header -->
+    <header class="h-16 bg-slate-900/60 backdrop-blur border-b border-slate-800 px-6 flex items-center justify-between sticky top-0 z-30">
+      <div class="flex items-center space-x-4">
+        <h1 class="text-lg font-semibold">Corporate Financial Health & Diagnostic Radar</h1>
+        <span class="bg-sky-500/10 text-sky-400 text-xs px-2.5 py-0.5 rounded-full border border-sky-500/20 font-medium">BSE/NSE Integrated</span>
+      </div>
+      <div class="flex items-center space-x-3">
+        <div class="relative">
+          <input type="text" placeholder="Search Company / Scrip Code..." class="bg-slate-800 text-xs rounded-lg pl-8 pr-4 py-2 border border-slate-700 text-slate-200 placeholder-slate-400 focus:outline-none focus:border-sky-500 w-64" />
+          <i data-lucide="search" class="w-3.5 h-3.5 absolute left-2.5 top-2.5 text-slate-400"></i>
+        </div>
+        <button class="p-2 bg-slate-800 border border-slate-700 rounded-lg text-slate-300 hover:text-white">
+          <i data-lucide="bell" class="w-4 h-4"></i>
+        </button>
+      </div>
+    </header>
+
+    <div class="p-6 space-y-6">
+
+      <!-- Strategic Filters / Key Signal Badges with Custom Stick Figures -->
+      <section id="screeners" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-3">
+        
+        <!-- 1. Low 10Y PE: Stick Figure with Magnifying Glass -->
+        <button onclick="filterByCriteria('low-pe')" class="doodle-card p-3 bg-slate-900 border border-slate-800 hover:border-sky-500/50 rounded-xl flex flex-col items-start gap-1 transition text-left group">
+          <div class="w-full flex justify-between items-center">
+            <span class="text-slate-400 text-[11px] group-hover:text-sky-400">10Y Avg PE</span>
+            <!-- Doodle: Inspecting bargain -->
+            <svg class="w-6 h-6 text-sky-400" viewBox="0 0 40 40" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+              <circle cx="16" cy="10" r="4"/>
+              <path d="M16 14 L16 26 M16 26 L10 36 M16 26 L22 36 M16 18 L25 18 M25 18 L32 12"/>
+              <circle cx="32" cy="12" r="3"/>
+            </svg>
+          </div>
+          <span class="text-sm font-bold text-slate-100">Low 10Y PE</span>
+          <span class="text-[10px] text-emerald-400 flex items-center gap-0.5"><i data-lucide="arrow-down-right" class="w-3 h-3"></i> Undervalued</span>
+        </button>
+
+        <!-- 2. Capacity Expansion: Stick Figure Building Blocks -->
+        <button onclick="filterByCriteria('capex')" class="doodle-card p-3 bg-slate-900 border border-slate-800 hover:border-sky-500/50 rounded-xl flex flex-col items-start gap-1 transition text-left group">
+          <div class="w-full flex justify-between items-center">
+            <span class="text-slate-400 text-[11px] group-hover:text-sky-400">Expansion</span>
+            <!-- Doodle: Stacking blocks -->
+            <svg class="w-6 h-6 text-sky-400" viewBox="0 0 40 40" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+              <circle cx="14" cy="10" r="4"/>
+              <path d="M14 14 L14 26 M14 26 L8 36 M14 26 L20 36 M14 18 L24 20"/>
+              <rect x="25" y="24" width="10" height="10" stroke-width="1.8"/>
+              <rect x="25" y="14" width="10" height="10" stroke-width="1.8"/>
+            </svg>
+          </div>
+          <span class="text-sm font-bold text-slate-100">Capex Surge</span>
+          <span class="text-[10px] text-sky-400 flex items-center gap-0.5"><i data-lucide="trending-up" class="w-3 h-3"></i> > 15% Asset Growth</span>
+        </button>
+
+        <!-- 3. Debt Reduction: Stick Figure Throwing Weight Away -->
+        <button onclick="filterByCriteria('debt-reduction')" class="doodle-card p-3 bg-slate-900 border border-slate-800 hover:border-sky-500/50 rounded-xl flex flex-col items-start gap-1 transition text-left group">
+          <div class="w-full flex justify-between items-center">
+            <span class="text-slate-400 text-[11px] group-hover:text-sky-400">Balance Sheet</span>
+            <!-- Doodle: Light and free figure -->
+            <svg class="w-6 h-6 text-emerald-400" viewBox="0 0 40 40" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+              <circle cx="16" cy="10" r="4"/>
+              <path d="M16 14 L16 26 M16 26 L10 36 M16 26 L22 36 M16 18 L26 14"/>
+              <circle cx="30" cy="28" r="4" stroke-dasharray="2 2"/>
+              <path d="M26 14 L30 24" stroke-width="1"/>
+            </svg>
+          </div>
+          <span class="text-sm font-bold text-slate-100">Debt Reduction</span>
+          <span class="text-[10px] text-emerald-400 flex items-center gap-0.5"><i data-lucide="shield-check" class="w-3 h-3"></i> Zero / Deleveraged</span>
+        </button>
+
+        <!-- 4. New High: Stick Figure Celebrating at Summit -->
+        <button onclick="filterByCriteria('new-high')" class="doodle-card p-3 bg-slate-900 border border-slate-800 hover:border-sky-500/50 rounded-xl flex flex-col items-start gap-1 transition text-left group">
+          <div class="w-full flex justify-between items-center">
+            <span class="text-slate-400 text-[11px] group-hover:text-sky-400">Momentum</span>
+            <!-- Doodle: Cheering on flag peak -->
+            <svg class="w-6 h-6 text-purple-400" viewBox="0 0 40 40" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+              <circle cx="18" cy="8" r="4"/>
+              <path d="M18 12 L18 24 M18 24 L12 34 M18 24 L24 34"/>
+              <path d="M18 16 L10 10 M18 16 L26 10"/>
+              <path d="M30 34 L30 14 L37 18 L30 22" stroke-width="1.8"/>
+            </svg>
+          </div>
+          <span class="text-sm font-bold text-slate-100">52W / ATH High</span>
+          <span class="text-[10px] text-purple-400 flex items-center gap-0.5"><i data-lucide="zap" class="w-3 h-3"></i> Breakout Radar</span>
+        </button>
+
+        <!-- 5. Growth No Dilution: Stick Figure Guarding Pie -->
+        <button onclick="filterByCriteria('no-dilution')" class="doodle-card p-3 bg-slate-900 border border-slate-800 hover:border-sky-500/50 rounded-xl flex flex-col items-start gap-1 transition text-left group">
+          <div class="w-full flex justify-between items-center">
+            <span class="text-slate-400 text-[11px] group-hover:text-sky-400">Equity Health</span>
+            <!-- Doodle: Preserved pie -->
+            <svg class="w-6 h-6 text-amber-400" viewBox="0 0 40 40" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+              <circle cx="14" cy="10" r="4"/>
+              <path d="M14 14 L14 26 M14 26 L8 36 M14 26 L20 36 M14 18 L24 16"/>
+              <circle cx="28" cy="20" r="7"/>
+              <path d="M28 13 L28 20 L34 22"/>
+            </svg>
+          </div>
+          <span class="text-sm font-bold text-slate-100">No Dilution</span>
+          <span class="text-[10px] text-amber-400 flex items-center gap-0.5"><i data-lucide="check-circle-2" class="w-3 h-3"></i> Intact Capital</span>
+        </button>
+
+        <!-- 6. FII Buying: Stick Figures Handshaking/Catching Bags -->
+        <button onclick="filterByCriteria('fii-buying')" class="doodle-card p-3 bg-slate-900 border border-slate-800 hover:border-sky-500/50 rounded-xl flex flex-col items-start gap-1 transition text-left group">
+          <div class="w-full flex justify-between items-center">
+            <span class="text-slate-400 text-[11px] group-hover:text-sky-400">Institutional</span>
+            <!-- Doodle: Inflow of funds -->
+            <svg class="w-6 h-6 text-emerald-400" viewBox="0 0 40 40" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+              <circle cx="10" cy="10" r="3.5"/>
+              <circle cx="26" cy="10" r="3.5"/>
+              <path d="M10 14 L10 26 M10 26 L6 34 M10 26 L14 34"/>
+              <path d="M26 14 L26 26 M26 26 L22 34 M26 26 L30 34"/>
+              <path d="M10 18 L18 20 L26 18"/>
+            </svg>
+          </div>
+          <span class="text-sm font-bold text-slate-100">FII Buying</span>
+          <span class="text-[10px] text-emerald-400 flex items-center gap-0.5"><i data-lucide="user-plus" class="w-3 h-3"></i> Stake +2% QoQ</span>
+        </button>
+
+        <!-- 7. Dividend Yield: Stick Figure Collecting Coins Under Tree -->
+        <button onclick="filterByCriteria('div-yield')" class="doodle-card p-3 bg-slate-900 border border-slate-800 hover:border-sky-500/50 rounded-xl flex flex-col items-start gap-1 transition text-left group">
+          <div class="w-full flex justify-between items-center">
+            <span class="text-slate-400 text-[11px] group-hover:text-sky-400">Cash Flow</span>
+            <!-- Doodle: Gathering rewards -->
+            <svg class="w-6 h-6 text-cyan-400" viewBox="0 0 40 40" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+              <circle cx="22" cy="10" r="4"/>
+              <path d="M22 14 L22 26 M22 26 L16 36 M22 26 L28 36"/>
+              <path d="M22 18 L14 22 L14 26"/>
+              <circle cx="14" cy="30" r="2.5"/>
+              <circle cx="14" cy="34" r="2.5"/>
+            </svg>
+          </div>
+          <span class="text-sm font-bold text-slate-100">High Dividend</span>
+          <span class="text-[10px] text-cyan-400 flex items-center gap-0.5"><i data-lucide="percent" class="w-3 h-3"></i> Yield > 3.5%</span>
+        </button>
+      </section>
+
+      <!-- Comparative Trends & Ratio Analytics -->
+      <section class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <!-- Revenue vs Operating Profitability Chart -->
+        <div class="lg:col-span-2 bg-slate-900 border border-slate-800 p-5 rounded-xl flex flex-col justify-between">
+          <div class="flex items-center justify-between mb-4">
+            <div>
+              <h2 class="text-sm font-semibold text-slate-100">Financial Performance & Earnings Consistency (10-Year View)</h2>
+              <p class="text-xs text-slate-400">Tracking Standalone & Consolidated Revenue vs Operating EBITDA</p>
+            </div>
+            <span class="text-xs bg-slate-800 px-2.5 py-1 rounded border border-slate-700 text-slate-300">Ambuja Cements Ltd (BSE: 500425)</span>
+          </div>
+          <div class="h-64 w-full">
+            <canvas id="performanceChart"></canvas>
+          </div>
+        </div>
+
+        <!-- Financial Health Scorecard with Mascot -->
+        <div class="bg-slate-900 border border-slate-800 p-5 rounded-xl flex flex-col justify-between">
+          <div>
+            <div class="flex items-center justify-between mb-4">
+              <h2 class="text-sm font-semibold text-slate-100">Solvency & Health Check</h2>
+              <span class="text-xs px-2 py-0.5 bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 rounded">Piotroski Score: 8/9</span>
+            </div>
+            
+            <div class="space-y-3 text-xs">
+              <div>
+                <div class="flex justify-between mb-1">
+                  <span class="text-slate-400">Debt-to-Equity Exposure</span>
+                  <span class="text-slate-200 font-semibold">0.00x (Debt-Free)</span>
+                </div>
+                <div class="w-full bg-slate-800 h-1.5 rounded-full overflow-hidden">
+                  <div class="bg-emerald-500 h-1.5 rounded-full" style="width: 5%"></div>
+                </div>
+              </div>
+
+              <div>
+                <div class="flex justify-between mb-1">
+                  <span class="text-slate-400">Interest Coverage Ratio</span>
+                  <span class="text-slate-200 font-semibold">28.4x (Superior)</span>
+                </div>
+                <div class="w-full bg-slate-800 h-1.5 rounded-full overflow-hidden">
+                  <div class="bg-sky-500 h-1.5 rounded-full" style="width: 95%"></div>
+                </div>
+              </div>
+
+              <div>
+                <div class="flex justify-between mb-1">
+                  <span class="text-slate-400">10Y Avg Return on Capital (ROCE)</span>
+                  <span class="text-slate-200 font-semibold">14.8%</span>
+                </div>
+                <div class="w-full bg-slate-800 h-1.5 rounded-full overflow-hidden">
+                  <div class="bg-cyan-500 h-1.5 rounded-full" style="width: 74%"></div>
+                </div>
+              </div>
+
+              <div>
+                <div class="flex justify-between mb-1">
+                  <span class="text-slate-400">FII / DII Institutional Backing</span>
+                  <span class="text-slate-200 font-semibold">32.4% Stake</span>
+                </div>
+                <div class="w-full bg-slate-800 h-1.5 rounded-full overflow-hidden">
+                  <div class="bg-purple-500 h-1.5 rounded-full" style="width: 65%"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Motivational Stick Figure Box -->
+          <div class="mt-4 p-3 bg-slate-850 rounded-lg border border-slate-800 flex items-center gap-3">
+            <svg class="w-10 h-10 text-emerald-400 flex-shrink-0" viewBox="0 0 50 50" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round">
+              <!-- Strongman stick figure with cash dumbbells -->
+              <circle cx="25" cy="10" r="5"/>
+              <path d="M25 15 L25 32"/>
+              <path d="M25 32 L17 45 M25 32 L33 45"/>
+              <!-- Raised strong arms -->
+              <path d="M25 20 L15 15 L10 10 M25 20 L35 15 L40 10"/>
+              <!-- Weights / Shield on arms -->
+              <circle cx="10" cy="10" r="3" fill="#10b981"/>
+              <circle cx="40" cy="10" r="3" fill="#10b981"/>
+            </svg>
+            <div class="text-[11px] text-slate-400">
+              <span class="font-semibold text-emerald-400">Fortress Balance Sheet:</span> Net cash exceeds liabilities, shielding against debt inflation cycles.
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Comprehensive Financial Ratio Diagnostics Table -->
+      <section id="ratios" class="bg-slate-900 border border-slate-800 rounded-xl p-5">
+        <div class="flex flex-col sm:flex-row justify-between sm:items-center gap-3 mb-4">
+          <div>
+            <h2 class="text-sm font-semibold text-slate-100">Key Analytical Financial Ratios</h2>
+            <p class="text-xs text-slate-400">Standardized classification covering Solvency, Valuation, Profitability, and Capital Turnover</p>
+          </div>
+          <div class="flex items-center gap-2">
+            <span class="text-xs text-slate-400">Source: Corporate Filings (BSE/NSE)</span>
+          </div>
+        </div>
+
+        <div class="overflow-x-auto">
+          <table class="w-full text-left text-xs border-collapse">
+            <thead>
+              <tr class="border-b border-slate-800 text-slate-400 bg-slate-850/50">
+                <th class="py-3 px-4">Ratio Category</th>
+                <th class="py-3 px-4">Metric Indicator</th>
+                <th class="py-3 px-4">Benchmark Formula</th>
+                <th class="py-3 px-4">Ambuja Cement (FY26)</th>
+                <th class="py-3 px-4">10Y Historical Avg</th>
+                <th class="py-3 px-4">Diagnostic Signal</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-800 text-slate-300">
+              <tr>
+                <td class="py-3 px-4 font-medium text-sky-400">Valuation</td>
+                <td class="py-3 px-4 font-semibold text-slate-100">Price to Earnings (P/E)</td>
+                <td class="py-3 px-4 text-slate-400">Market Price / EPS</td>
+                <td class="py-3 px-4">17.5x</td>
+                <td class="py-3 px-4">26.4x</td>
+                <td class="py-3 px-4"><span class="px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">Low on 10Y Avg</span></td>
+              </tr>
+              <tr>
+                <td class="py-3 px-4 font-medium text-sky-400">Valuation</td>
+                <td class="py-3 px-4 font-semibold text-slate-100">EV / EBITDA</td>
+                <td class="py-3 px-4 text-slate-400">Enterprise Value / EBITDA</td>
+                <td class="py-3 px-4">12.8x</td>
+                <td class="py-3 px-4">15.1x</td>
+                <td class="py-3 px-4"><span class="px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">Attractive Value</span></td>
+              </tr>
+              <tr>
+                <td class="py-3 px-4 font-medium text-emerald-400">Profitability</td>
+                <td class="py-3 px-4 font-semibold text-slate-100">Return on Equity (RoE)</td>
+                <td class="py-3 px-4 text-slate-400">Net Profit / Shareholder Equity</td>
+                <td class="py-3 px-4">8.30%</td>
+                <td class="py-3 px-4">11.2%</td>
+                <td class="py-3 px-4"><span class="px-2 py-0.5 rounded bg-slate-800 text-slate-300">Stable Baseline</span></td>
+              </tr>
+              <tr>
+                <td class="py-3 px-4 font-medium text-emerald-400">Profitability</td>
+                <td class="py-3 px-4 font-semibold text-slate-100">Return on Capital (ROCE)</td>
+                <td class="py-3 px-4 text-slate-400">EBIT / Capital Employed</td>
+                <td class="py-3 px-4">7.31%</td>
+                <td class="py-3 px-4">13.5%</td>
+                <td class="py-3 px-4"><span class="px-2 py-0.5 rounded bg-slate-800 text-slate-300">Expansion Dilution</span></td>
+              </tr>
+              <tr>
+                <td class="py-3 px-4 font-medium text-indigo-400">Solvency</td>
+                <td class="py-3 px-4 font-semibold text-slate-100">Debt to Equity (D/E)</td>
+                <td class="py-3 px-4 text-slate-400">Total Debt / Total Equity</td>
+                <td class="py-3 px-4">0.00</td>
+                <td class="py-3 px-4">0.05</td>
+                <td class="py-3 px-4"><span class="px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">Debt Free</span></td>
+              </tr>
+              <tr>
+                <td class="py-3 px-4 font-medium text-cyan-400">Dividend Yield</td>
+                <td class="py-3 px-4 font-semibold text-slate-100">Dividend Yield</td>
+                <td class="py-3 px-4 text-slate-400">DPS / Market Price</td>
+                <td class="py-3 px-4">1.25%</td>
+                <td class="py-3 px-4">1.10%</td>
+                <td class="py-3 px-4"><span class="px-2 py-0.5 rounded bg-slate-800 text-slate-300">Moderate Payout</span></td>
+              </tr>
+              <tr>
+                <td class="py-3 px-4 font-medium text-amber-400">Working Capital</td>
+                <td class="py-3 px-4 font-semibold text-slate-100">Cash Conversion Cycle</td>
+                <td class="py-3 px-4 text-slate-400">DIO + DSO - DPO</td>
+                <td class="py-3 px-4">20 Days</td>
+                <td class="py-3 px-4">28 Days</td>
+                <td class="py-3 px-4"><span class="px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">Lean Working Capital</span></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- Real-Time Company Screener Table with Live Signals -->
+      <section id="feed" class="bg-slate-900 border border-slate-800 rounded-xl p-5">
+        <div class="flex flex-col sm:flex-row justify-between sm:items-center gap-3 mb-4">
+          <div>
+            <h2 class="text-sm font-semibold text-slate-100">BSE/NSE Peer Diagnostics & Live Screening Matrix</h2>
+            <p class="text-xs text-slate-400">Select any filter above or reset to view all real-time entries</p>
+          </div>
+          <div class="flex items-center gap-2">
+            <button onclick="refreshData()" class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs flex items-center gap-1.5 transition">
+              <i data-lucide="refresh-cw" class="w-3 h-3"></i> Sync Market Feed
+            </button>
+          </div>
+        </div>
+
+        <div class="overflow-x-auto">
+          <table class="w-full text-left text-xs border-collapse">
+            <thead>
+              <tr class="border-b border-slate-800 text-slate-400 bg-slate-850/50">
+                <th class="py-3 px-4">Company / Ticker</th>
+                <th class="py-3 px-4">CMP (₹)</th>
+                <th class="py-3 px-4">10Y P/E vs Cur</th>
+                <th class="py-3 px-4">Capacity Expansion</th>
+                <th class="py-3 px-4">Debt Status</th>
+                <th class="py-3 px-4">52W Status</th>
+                <th class="py-3 px-4">Growth / Dilution</th>
+                <th class="py-3 px-4">FII Action</th>
+                <th class="py-3 px-4">Div Yield</th>
+              </tr>
+            </thead>
+            <tbody id="screenerTableBody" class="divide-y divide-slate-800 text-slate-300">
+              <!-- Rendered via JS -->
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Stick Figure Empty State (Hidden when data exists) -->
+        <div id="noDataDoodle" class="hidden flex flex-col items-center justify-center p-8 text-center space-y-2">
+          <svg class="w-16 h-16 text-slate-500" viewBox="0 0 60 60" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+            <!-- Puzzled stick figure shrugging -->
+            <circle cx="30" cy="16" r="6"/>
+            <path d="M30 22 L30 38"/>
+            <path d="M30 38 L22 52 M30 38 L38 52"/>
+            <!-- Shrug arms -->
+            <path d="M30 26 L18 22 L14 16 M30 26 L42 22 L46 16"/>
+            <!-- Question marks around head -->
+            <path d="M20 8 Q22 4 24 6 Q24 9 22 10" stroke-width="1.5"/>
+            <path d="M38 8 Q40 4 42 6 Q42 9 40 10" stroke-width="1.5"/>
+          </svg>
+          <span class="text-sm font-semibold text-slate-400">No matching stocks found for this criterion</span>
+          <p class="text-xs text-slate-500">Try adjusting your screener filters or reset the view.</p>
+        </div>
+      </section>
+
+    </div>
+  </main>
+
+  <!-- Script for Interactivity, Chart.js, and Screeners -->
+  <script>
+    lucide.createIcons();
+
+    const companiesData = [
+      {
+        ticker: "AMBUJACEM",
+        name: "Ambuja Cements Ltd.",
+        price: "₹634.50",
+        change: "+1.2%",
+        pe10y: "17.5x (Avg 26.4x)",
+        peLow: true,
+        capacity: "+10.7 MTPA (to 119 MTPA)",
+        debt: "Zero Debt (Net Cash)",
+        debtReduced: true,
+        high52w: "Near 52W High",
+        isNewHigh: true,
+        growthNoDilution: "Yes (PAT +13.9% YoY)",
+        fiiBuying: "+1.85% Stake Added",
+        isFiiBuying: true,
+        divYield: "1.25%",
+        isHighDiv: false
+      },
+      {
+        ticker: "TCS",
+        name: "Tata Consultancy Services",
+        price: "₹4,120.00",
+        change: "+0.5%",
+        pe10y: "28.1x (Avg 27.8x)",
+        peLow: false,
+        capacity: "+15,000 Seats / AI Hub",
+        debt: "Zero Debt",
+        debtReduced: true,
+        high52w: "All-Time High",
+        isNewHigh: true,
+        growthNoDilution: "Yes (Buyback History)",
+        fiiBuying: "+0.45% Added",
+        isFiiBuying: false,
+        divYield: "2.10%",
+        isHighDiv: false
+      },
+      {
+        ticker: "VEDL",
+        name: "Vedanta Ltd.",
+        price: "₹452.10",
+        change: "-0.8%",
+        pe10y: "8.2x (Avg 9.1x)",
+        peLow: true,
+        capacity: "Aluminium Smelter Exp.",
+        debt: "Deleveraging (-₹12,000 Cr)",
+        debtReduced: true,
+        high52w: "52W High Test",
+        isNewHigh: true,
+        growthNoDilution: "Moderate Dilution",
+        fiiBuying: "+2.10% Stake Added",
+        isFiiBuying: true,
+        divYield: "6.80%",
+        isHighDiv: true
+      },
+      {
+        ticker: "COALINDIA",
+        name: "Coal India Limited",
+        price: "₹498.40",
+        change: "+0.3%",
+        pe10y: "7.9x (Avg 10.4x)",
+        peLow: true,
+        capacity: "EV Rail Logistics Infra",
+        debt: "Net Cash Positive",
+        debtReduced: true,
+        high52w: "Near 52W High",
+        isNewHigh: true,
+        growthNoDilution: "Yes (Govt Backed)",
+        fiiBuying: "+0.90% Added",
+        isFiiBuying: false,
+        divYield: "5.45%",
+        isHighDiv: true
+      },
+      {
+        ticker: "TATAMOTORS",
+        name: "Tata Motors Ltd.",
+        price: "₹985.20",
+        change: "+2.1%",
+        pe10y: "14.2x (Avg 18.0x)",
+        peLow: true,
+        capacity: "Sanand EV Plant Expansion",
+        debt: "Automotive Net Debt Zero",
+        debtReduced: true,
+        high52w: "All-Time High",
+        isNewHigh: true,
+        growthNoDilution: "Yes (Organic FCF)",
+        fiiBuying: "+3.20% Stake Added",
+        isFiiBuying: true,
+        divYield: "0.80%",
+        isHighDiv: false
+      }
+    ];
+
+    function renderTable(data) {
+      const tbody = document.getElementById("screenerTableBody");
+      const emptyDoodle = document.getElementById("noDataDoodle");
+      tbody.innerHTML = "";
+
+      if (data.length === 0) {
+        emptyDoodle.classList.remove("hidden");
+        return;
+      } else {
+        emptyDoodle.classList.add("hidden");
+      }
+
+      data.forEach(item => {
+        const row = `
+          <tr class="hover:bg-slate-850/50 transition">
+            <td class="py-3 px-4">
+              <div class="font-bold text-slate-100">${item.ticker}</div>
+              <div class="text-[11px] text-slate-400">${item.name}</div>
+            </td>
+            <td class="py-3 px-4 font-semibold text-slate-200">${item.price} <span class="text-[10px] ${item.change.startsWith('+') ? 'text-emerald-400' : 'text-rose-400'}">(${item.change})</span></td>
+            <td class="py-3 px-4 ${item.peLow ? 'text-emerald-400 font-medium' : 'text-slate-300'}">${item.pe10y}</td>
+            <td class="py-3 px-4 text-slate-300">${item.capacity}</td>
+            <td class="py-3 px-4 text-emerald-400 font-medium">${item.debt}</td>
+            <td class="py-3 px-4"><span class="px-2 py-0.5 rounded bg-purple-500/10 text-purple-400 border border-purple-500/20">${item.high52w}</span></td>
+            <td class="py-3 px-4 text-slate-300">${item.growthNoDilution}</td>
+            <td class="py-3 px-4 ${item.isFiiBuying ? 'text-emerald-400 font-semibold' : 'text-slate-400'}">${item.fiiBuying}</td>
+            <td class="py-3 px-4 ${item.isHighDiv ? 'text-cyan-400 font-bold' : 'text-slate-300'}">${item.divYield}</td>
+          </tr>
+        `;
+        tbody.innerHTML += row;
+      });
+    }
+
+    function filterByCriteria(criteria) {
+      let filtered = [...companiesData];
+      if (criteria === 'low-pe') filtered = companiesData.filter(c => c.peLow);
+      if (criteria === 'capex') filtered = companiesData.filter(c => c.capacity.includes('+') || c.capacity.includes('Exp'));
+      if (criteria === 'debt-reduction') filtered = companiesData.filter(c => c.debtReduced);
+      if (criteria === 'new-high') filtered = companiesData.filter(c => c.isNewHigh);
+      if (criteria === 'no-dilution') filtered = companiesData.filter(c => c.growthNoDilution.startsWith('Yes'));
+      if (criteria === 'fii-buying') filtered = companiesData.filter(c => c.isFiiBuying);
+      if (criteria === 'div-yield') filtered = companiesData.filter(c => c.isHighDiv);
+      renderTable(filtered);
+    }
+
+    function refreshData() {
+      renderTable(companiesData);
+      document.getElementById('timestamp').innerText = new Date().toLocaleTimeString() + " IST";
+    }
+
+    // Performance Chart (Revenue vs EBITDA)
+    const ctx = document.getElementById('performanceChart').getContext('2d');
+    new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels: ['FY17', 'FY18', 'FY19', 'FY20', 'FY21', 'FY22', 'FY23', 'FY24', 'FY25', 'FY26'],
+        datasets: [
+          {
+            label: 'Consolidated Revenue (₹ Cr)',
+            data: [20400, 22100, 24500, 25200, 28965, 38937, 33160, 35336, 38200, 40656],
+            backgroundColor: 'rgba(2, 132, 199, 0.65)',
+            borderColor: '#0284c7',
+            borderWidth: 1,
+            borderRadius: 4
+          },
+          {
+            label: 'Operating EBITDA (₹ Cr)',
+            data: [3600, 4100, 4600, 4900, 6563, 5860, 6400, 7566, 8100, 8625],
+            backgroundColor: 'rgba(16, 185, 129, 0.8)',
+            borderColor: '#10b981',
+            borderWidth: 1,
+            borderRadius: 4
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { labels: { color: '#94a3b8', font: { size: 11 } } },
+          tooltip: { backgroundColor: '#0f172a', borderColor: '#334155', borderWidth: 1 }
+        },
+        scales: {
+          x: { grid: { color: 'rgba(51, 65, 85, 0.2)' }, ticks: { color: '#94a3b8' } },
+          y: { grid: { color: 'rgba(51, 65, 85, 0.2)' }, ticks: { color: '#94a3b8' } }
+        }
+      }
+    });
+
+    // Initial render
+    renderTable(companiesData);
+  </script>
+</body>
+</html>

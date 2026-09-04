@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% load humanize %}
+{% block title %}CARO 3(i) evidence pack{% endblock %}
+{% block content %}
+<h4>CARO 3(i) evidence pack — {{ entity }}</h4>
+
+<div class="row g-3 mb-3">
+  <div class="col-md-3"><div class="card stat-card p-3"><div class="small text-muted">(a) Records completeness</div><div class="fs-4">{{ data.records_completeness_pct }}%</div></div></div>
+  <div class="col-md-3"><div class="card stat-card p-3"><div class="small text-muted">(b) Verification coverage</div><div class="fs-4">{{ data.verification_coverage_pct }}%</div></div></div>
+  <div class="col-md-3"><div class="card stat-card p-3"><div class="small text-muted">Immovable property assets</div><div class="fs-4">{{ data.immovable_count }}</div></div></div>
+  <div class="col-md-3"><div class="card stat-card p-3"><div class="small text-muted">(c) Title-deed issues</div><div class="fs-4 {% if data.title_deed_issues %}text-danger{% endif %}">{{ data.title_deed_issues|length }}</div></div></div>
+</div>
+
+<h6>(c) Title deeds not confirmed in the company's own name</h6>
+<div class="card stat-card p-3 mb-3">
+<table class="table table-sm">
+  <thead><tr><th>Asset</th><th>Location</th><th>Title deed reference</th></tr></thead>
+  <tbody>{% for a in data.title_deed_issues %}<tr><td><a href="{{ a.get_absolute_url }}">{{ a.asset_id }}</a></td><td>{{ a.location.breadcrumb }}</td><td>{{ a.title_deed_reference|default:"—" }}</td></tr>{% empty %}<tr><td colspan="3" class="text-muted">No issues — all immovable property title deeds are confirmed in the company's name.</td></tr>{% endfor %}</tbody>
+</table>
+</div>
+
+<h6>(d) Revaluation register (approved revaluations)</h6>
+<div class="card stat-card p-3 mb-3">
+<table class="table table-sm">
+  <thead><tr><th>Asset</th><th>Valuer</th><th>Date</th><th class="text-end">Surplus/deficit</th><th>&gt;10% threshold?</th></tr></thead>
+  <tbody>{% for r in data.revaluations %}<tr><td><a href="{{ r.asset.get_absolute_url }}">{{ r.asset.asset_id }}</a></td><td>{{ r.valuer_name }} ({{ r.valuer_registration_number }})</td><td>{{ r.valuation_date }}</td><td class="text-end">₹{{ r.surplus_or_deficit|intcomma }}</td><td>{% if r.exceeds_10pct_threshold %}Yes — disclose{% else %}No{% endif %}</td></tr>{% empty %}<tr><td colspan="5" class="text-muted">No revaluations recorded.</td></tr>{% endfor %}</tbody>
+</table>
+</div>
+
+<h6>(b) Verification cycles</h6>
+<div class="card stat-card p-3 mb-3">
+<table class="table table-sm">
+  <thead><tr><th>Cycle</th><th>Scope</th><th>Status</th><th>Coverage</th></tr></thead>
+  <tbody>{% for c in data.cycles %}<tr><td>{{ c.name }}</td><td>{{ c.scope_location.breadcrumb|default:"Whole entity" }}</td><td>{{ c.get_status_display }}</td><td>{{ c.coverage_pct }}%</td></tr>{% empty %}<tr><td colspan="4" class="text-muted">No verification cycles planned yet.</td></tr>{% endfor %}</tbody>
+</table>
+</div>
+
+<h6>(e) Benami Transactions (Prohibition) Act declaration</h6>
+<div class="card stat-card p-3">
+  {% if benami %}
+    <p>Proceedings exist: <strong>{% if benami.proceedings_exist %}Yes{% else %}No{% endif %}</strong> — declared by {{ benami.declared_by }} on {{ benami.declared_at|date:"d M Y" }}.</p>
+    {% if benami.details %}<p class="small text-muted">{{ benami.details }}</p>{% endif %}
+  {% else %}
+    <p class="text-muted">No declaration recorded for this financial year yet.</p>
+  {% endif %}
+  {% if fy %}
+  <form method="post" action="{% url 'compliance:benami_declare' %}?entity={{ entity.pk }}&fy={{ fy.pk }}" class="row g-2">
+    {% csrf_token %}
+    <div class="col-auto form-check mt-2"><input type="checkbox" name="proceedings_exist" class="form-check-input" id="pe" {% if benami.proceedings_exist %}checked{% endif %}><label class="form-check-label" for="pe">Proceedings exist</label></div>
+    <div class="col-auto"><input type="text" name="details" class="form-control form-control-sm" placeholder="Details (if any)" value="{{ benami.details }}"></div>
+    <div class="col-auto"><button class="btn btn-sm btn-outline-primary">Save declaration</button></div>
+  </form>
+  {% endif %}
+</div>
+{% endblock %}

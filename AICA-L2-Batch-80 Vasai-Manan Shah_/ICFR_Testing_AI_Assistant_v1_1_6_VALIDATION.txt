@@ -1,0 +1,105 @@
+ICFR Testing AI Assistant v1.1.6 — Validation Report
+====================================================
+
+SOURCE
+------
+File: ICFR_Testing_AI_Assistant_v1_1_6.py
+SHA-256: b9f7e4cffaa34ecaf28b7d010cec04f1aff1edd98f69507fc37a02375b188d57
+Python compilation: PASS
+
+1. SAVE AUDITOR EVALUATION
+--------------------------
+PASS
+- Save uses a dedicated persistence method.
+- Database read-back is verified before success confirmation.
+- Successful save shows a confirmation dialog.
+- Failed verification raises a visible error.
+- An unchanged previously-approved evaluation preserves its approval.
+- A materially changed approved evaluation resets the stale approval and returns the control to AUDITOR_REVIEW.
+
+Functional regression executed:
+- Save Requires Auditor Review -> Pass: PASS
+- Read-back observation/result verification: PASS
+- Save unchanged approved result: approval retained: PASS
+- Save materially changed approved result: approval reset: PASS
+
+2. TEST RESULT APPROVAL
+-----------------------
+PASS
+- Approval writes auditor_approved=1.
+- Approval writes auditor_approved_by.
+- Approval writes auditor_approved_at.
+- Database read-back is verified.
+- Approval confirmation shows number saved and control-level approval progress.
+- When all ACTIVE test steps are approved, control status moves to TESTING_COMPLETE unless an exception lifecycle status must be preserved.
+
+3. RUN TESTS / APPROVAL PRESERVATION
+------------------------------------
+PASS
+- Re-running Testing no longer clears approval merely because Run Tests was clicked.
+- Unchanged evidence-driven facts preserve the existing auditor result/approval.
+- Materially changed evidence-driven facts invalidate the stale approval and are audit logged.
+- Material changes also invalidate stale final control approval/conclusion and return the control to auditor review.
+
+4. WORKING PAPERS SYNC
+----------------------
+PASS
+- Working Paper generation is locked until every ACTIVE test result is auditor-approved.
+- Draft WP remains available after all test results are approved but before final conclusion approval.
+- Final WP remains tied to the finally approved COMPLETE control.
+- Working Paper test table includes Approved, Approved By and Approved At.
+- Working Paper OOXML generation with the new approval columns: PASS.
+
+5. FINAL CONCLUSION SYNC
+------------------------
+PASS (code-path validation)
+- Final conclusion cannot be approved until all ACTIVE test steps are auditor-approved.
+
+6. REPORTS REMOVAL
+------------------
+PASS
+- Reports removed from sidebar navigation.
+- show_reports and Excel report-export feature methods removed from the revised source.
+- Working Papers retained.
+
+7. SAVE CONFIRMATIONS
+---------------------
+PASS / strengthened
+- Auditor Evaluation: verified + confirmation.
+- Control Save: confirmation added.
+- Manual Response Save: read-back + confirmation added.
+- Exception Save: read-back + confirmation added.
+- Existing confirmations retained for Inquiry, Standard Steps, Custom Test Steps and Settings.
+
+8. DATA PRESERVATION / MIGRATION
+--------------------------------
+PASS
+A v1.1.5-format database was populated with Inquiry, Response, Evidence, Testing and Exception records and opened through v1.1.6.
+Record counts before/after migration were identical for all five modules.
+Data values were unchanged.
+The migration only adds nullable approval metadata columns to test_steps:
+- auditor_approved_by
+- auditor_approved_at
+
+APP_SLUG remains DigiLens_IFCR_Testing, therefore the revised EXE continues to use:
+%LOCALAPPDATA%\DigiLens_IFCR_Testing
+
+9. GUEST DEMONSTRATION MODE
+---------------------------
+PASS (existing behaviour retained)
+- Local demonstration mode remains enabled.
+- Guest sessions retain Auditor permissions.
+- When run under the same Windows user workspace, guest demonstration mode uses the same existing local audit database; data is not copied/reset/removed.
+
+10. LEAN EXE OPTIMISATION
+-------------------------
+PASS (build profile prepared)
+- Matplotlib removed from application/runtime requirements.
+- Numpy no longer required.
+- ReportLab removed; Working Papers continue through the existing custom OOXML generator.
+- Dashboard chart replaced with Tkinter Canvas.
+- PyInstaller excludes unused scientific/notebook packages.
+- Bundled Tesseract includes only eng.traineddata rather than all installed language files.
+- Bundled Tesseract discovery test: PASS.
+
+The prior reported EXE was ~124 MB. These changes are specifically designed to remove the largest unused Python package contributors. The Windows builder reports exact final size after compilation. Sub-100 MB is the target but cannot be guaranteed until built on the target Windows/Python/Tesseract environment.

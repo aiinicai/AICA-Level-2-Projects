@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8"/>
+<title>{{ company.name }} — Valuation Report</title>
+<style>
+  @page { size: A4; margin: 2cm 1.8cm 2.4cm 1.8cm;
+    @frame footer_frame { -pdf-frame-content: footer_content; left: 50pt; width: 495pt; top: 780pt; height: 30pt; } }
+  body { font-family: Helvetica, Arial, sans-serif; color: #16223b; font-size: 10.5pt; line-height: 1.55; }
+  h1 { font-size: 22pt; color: #0f1f3d; margin: 0 0 4pt 0; }
+  h2 { font-size: 14pt; color: #1d4ed8; border-bottom: 1.5pt solid #dbe4f0; padding-bottom: 4pt; margin-top: 22pt; }
+  h3 { font-size: 11.5pt; color: #0f1f3d; margin-bottom: 4pt; }
+  p { margin: 6pt 0; }
+  .muted { color: #5b6b84; }
+  .cover { text-align: center; padding-top: 140pt; }
+  .cover .brand { color: #2563eb; font-size: 13pt; font-weight: bold; letter-spacing: 1pt; }
+  .cover .subtitle { font-size: 13pt; color: #5b6b84; margin-top: 6pt; }
+  .cover .box { margin: 30pt auto 0 auto; width: 70%; border: 1pt solid #dbe4f0; padding: 14pt; background-color: #f6f8fb; }
+  .pagebreak { page-break-before: always; }
+  table { width: 100%; border-collapse: collapse; margin: 8pt 0; }
+  th { background-color: #eef3fa; color: #0f1f3d; text-align: left; font-size: 9.5pt; padding: 5pt 6pt; border: 0.7pt solid #d7e0ee; }
+  td { padding: 5pt 6pt; border: 0.7pt solid #e3e9f3; font-size: 9.5pt; }
+  td.num, th.num { text-align: right; }
+  .kpi { background-color: #f6f8fb; border: 1pt solid #dbe4f0; padding: 8pt 10pt; margin: 4pt 0; }
+  .pos { color: #0b8f6b; } .neg { color: #d14343; } .warn { color: #b45309; }
+  .disclaimer { font-size: 8.5pt; color: #5b6b84; border: 0.7pt solid #e3e9f3; padding: 8pt; background-color: #fafbfd; }
+  .footer { font-size: 8pt; color: #8a97ab; text-align: center; }
+  ul { margin: 4pt 0 4pt 14pt; padding: 0; }
+  li { margin: 3pt 0; }
+  .bar-row td { border: none; padding: 2pt 4pt; }
+  .bar { background-color: #2563eb; height: 9pt; }
+  .bar.alt { background-color: #14b8a6; }
+  .bar.nav { background-color: #8b5cf6; }
+</style>
+</head>
+<body>
+
+<div id="footer_content" class="footer">
+  Confidential &amp; Proprietary — {{ company.name }} · Valuation Date: {{ case.valuation_date }} ·
+  Powered by CompanyVal AI · Page <pdf:pagenumber/> of <pdf:pagecount/>
+</div>
+
+<!-- 1. Cover -->
+<div class="cover">
+  <div class="brand">COMPANYVAL AI</div>
+  <div class="muted">AI-Assisted Business Valuation</div>
+  <h1 style="margin-top: 40pt">{{ company.name }}</h1>
+  <div class="subtitle">Comprehensive Valuation Analysis</div>
+  <div class="box">
+    <p><b>Valuation Date:</b> {{ case.valuation_date }}</p>
+    <p><b>Purpose:</b> {{ case.purpose }}</p>
+    <p><b>Indicative Enterprise Value Range:</b> {{ fmt(run.range_low) }} – {{ fmt(run.range_high) }}</p>
+    <p><b>Central Estimate:</b> {{ fmt(run.central_estimate) }}</p>
+    <p class="muted">{{ run.confidence_label }} · Valuation Readiness {{ run.readiness_score|int }}%</p>
+  </div>
+</div>
+
+<!-- 2. Executive Summary -->
+<div class="pagebreak"></div>
+<h2>1. Executive Summary</h2>
+{{ narrative.executive_summary|safe }}
+<div class="kpi">
+  <p><b>Fair enterprise value estimated between {{ fmt(run.range_low) }} and {{ fmt(run.range_high) }}</b>,
+  with a weighted central estimate of <b>{{ fmt(run.central_estimate) }}</b>.
+  Equity value: <b>{{ fmt(run.equity_value) }}</b>{% if run.per_share_value %},
+  implying <b>₹ {{ '%.2f'|format(run.per_share_value) }}</b> per share{% endif %}.</p>
+</div>
+
+<!-- 3. Company Profile -->
+<h2>2. Company Profile</h2>
+<table>
+  <tr><th>Company</th><td>{{ company.name }}</td><th>Industry</th><td>{{ company.industry }}</td></tr>
+  <tr><th>Entity Type</th><td>{{ company.entity_type }}</td><th>Country</th><td>{{ company.country }}</td></tr>
+  <tr><th>Valuation Purpose</th><td>{{ case.purpose }}</td><th>Currency / Units</th><td>{{ case.currency }} ({{ case.units|title }})</td></tr>
+  <tr><th>Promoter Holding</th><td>{{ '%.2f'|format(case.promoter_holding_pct) }}%</td>
+      <th>Total Shares (Diluted)</th><td>{{ '{:,.0f}'.format(case.total_shares) }}</td></tr>
+</table>
+{{ narrative.company_profile|safe }}
+
+<!-- 4. Documents analysed -->
+<h2>3. Documents Analysed</h2>
+{% if documents %}
+<table>
+  <tr><th>Document</th><th>Year</th><th>Pages</th><th>Status</th><th>SHA-256 (first 16)</th></tr>
+  {% for d in documents %}
+  <tr><td>{{ d.original_filename }}</td><td>{{ d.fiscal_year_label }}</td>
+      <td class="num">{{ d.page_count }}</td><td>{{ d.status }}</td><td>{{ d.sha256[:16] }}…</td></tr>
+  {% endfor %}
+</table>
+{% else %}<p class="muted">Financial data was seeded/entered directly for this engagement.</p>{% endif %}
+
+<!-- 5. Historical financials -->
+<h2>4. Historical Financial Performance</h2>
+<table>
+  <tr><th>Line Item ({{ case.currency }} Cr)</th>{% for p in periods %}<th class="num">{{ p }}</th>{% endfor %}</tr>
+  {% for row in financial_rows %}
+  <tr><td>{{ row.label }}</td>
+    {% for v in row.vals %}<td class="num">{{ v }}</td>{% endfor %}</tr>
+  {% endfor %}
+</table>
+{{ narrative.financial_performance|safe }}
+
+<!-- 6. Ratios -->
+<h2>5. Financial Ratio Analysis</h2>
+<table>
+  <tr><th>Ratio</th>{% for p in periods %}<th class="num">{{ p }}</th>{% endfor %}</tr>
+  {% for row in ratio_rows %}
+  <tr><td>{{ row.label }}</td>{% for v in row.vals %}<td class="num">{{ v }}</td>{% endfor %}</tr>
+  {% endfor %}
+</table>
+
+<!-- 7. Earnings quality -->
+<h2>6. Earnings Quality</h2>
+{{ narrative.earnings_quality|safe }}
+
+<!-- 8. Normalisations -->
+<h2>7. Normalisation Adjustments</h2>
+{% if normalisations %}
+<table>
+  <tr><th>Period</th><th>Metric</th><th>Kind</th><th class="num">Reported</th><th class="num">Adjustment</th><th class="num">Normalised</th><th>Status</th></tr>
+  {% for n in normalisations %}
+  <tr><td>{{ n.period_label }}</td><td>{{ n.metric }}</td><td>{{ n.kind|replace('_',' ')|title }}</td>
+      <td class="num">{{ fmt(n.reported_value) }}</td><td class="num">{{ fmt(n.adjustment) }}</td>
+      <td class="num">{{ fmt(n.reported_value + n.adjustment) }}</td><td>{{ n.status|title }}</td></tr>
+  {% endfor %}
+</table>
+<p class="muted">Reason(s): {% for n in normalisations %}{{ n.reason }} {% endfor %}</p>
+{% else %}<p class="muted">No normalisation adjustments were required.</p>{% endif %}
+
+<!-- 9/10. Business assessment + interview -->
+<h2>8. Business Assessment &amp; AI Interview Findings</h2>
+{{ narrative.business_assessment|safe }}
+{% if interview_findings %}
+<table>
+  <tr><th>Question</th><th>Management Response</th><th>Signal</th></tr>
+  {% for f in interview_findings %}
+  <tr><td>{{ f.question }}</td><td>{{ f.answer }}</td>
+      <td class="{{ 'pos' if f.signal == 'positive' else ('neg' if f.signal == 'negative' else '') }}">{{ f.signal|title }}</td></tr>
+  {% endfor %}
+</table>
+{% endif %}
+
+<!-- 11. Risks -->
+<h2>9. Key Risks</h2>
+{% if risks %}
+<ul>
+  {% for r in risks %}
+  <li><b>{{ r.title }}</b> <span class="{{ 'neg' if r.severity == 'high' else 'warn' }}">[{{ r.severity|title }}]</span> — {{ r.body }}</li>
+  {% endfor %}
+</ul>
+{% else %}<p class="muted">No rule-based risk flags are currently open.</p>{% endif %}
+
+<!-- 12. Assumptions -->
+<div class="pagebreak"></div>
+<h2>10. Valuation Assumptions</h2>
+<table>
+  <tr><th>Assumption</th><th class="num">Value</th><th>Source</th></tr>
+  {% for a in assumptions %}
+  <tr><td>{{ a.label }}</td><td class="num">{{ a.display }}</td><td>{{ a.source }}</td></tr>
+  {% endfor %}
+</table>
+
+<!-- 13. DCF -->
+<h2>11. Discounted Cash Flow (FCFF) Valuation</h2>
+{% if dcf %}
+<table>
+  <tr><th>Year</th><th class="num">Revenue</th><th class="num">EBITDA</th><th class="num">EBIT</th>
+      <th class="num">NOPAT</th><th class="num">Capex</th><th class="num">ΔNWC</th>
+      <th class="num">FCFF</th><th class="num">PV(FCFF)</th></tr>
+  {% for y in dcf.years %}
+  <tr><td>Year {{ y.year }}</td><td class="num">{{ fmt(y.revenue) }}</td><td class="num">{{ fmt(y.ebitda) }}</td>
+      <td class="num">{{ fmt(y.ebit) }}</td><td class="num">{{ fmt(y.nopat) }}</td>
+      <td class="num">{{ fmt(y.capex) }}</td><td class="num">{{ fmt(y.delta_nwc) }}</td>
+      <td class="num">{{ fmt(y.fcff) }}</td><td class="num">{{ fmt(y.pv_fcff) }}</td></tr>
+  {% endfor %}
+  <tr><th colspan="8">PV of explicit FCFF</th><th class="num">{{ fmt(dcf.pv_explicit) }}</th></tr>
+  <tr><th colspan="8">PV of Terminal Value (TV {{ fmt(dcf.terminal_value) }})</th><th class="num">{{ fmt(dcf.pv_terminal) }}</th></tr>
+  <tr><th colspan="8">Enterprise Value (DCF)</th><th class="num">{{ fmt(dcf.enterprise_value) }}</th></tr>
+  <tr><th colspan="8">Less: Debt {{ fmt(bridge.total_debt) }} · Add: Cash {{ fmt(bridge.cash) }} → Equity Value</th>
+      <th class="num">{{ fmt(dcf.equity_value) }}</th></tr>
+</table>
+{{ narrative.dcf_commentary|safe }}
+{% endif %}
+
+<!-- 14. Market multiple -->
+<h2>12. Market Multiple Valuation</h2>
+{% if mm %}
+<p>Applied basis: <b>{{ mm.multiple_used }}</b> on normalised EBITDA →
+Enterprise Value <b>{{ fmt(mm.enterprise_value) }}</b>, Equity Value <b>{{ fmt(mm.equity_value) }}</b>.</p>
+{% else %}<p class="muted">Market multiple method was not selected/available.</p>{% endif %}
+
+<!-- 15. NAV -->
+<h2>13. Adjusted Net Asset Value</h2>
+{% if nav %}
+<p>Book net worth {{ fmt(nav.book_net_worth) }} adjusted by {{ fmt(nav.total_adjustment) }} →
+Adjusted NAV (equity) <b>{{ fmt(nav.equity_value) }}</b> ({{ nav.nav_type }}).</p>
+{% if nav.schedule %}
+<table><tr><th>Item</th><th class="num">Book</th><th class="num">Adjusted</th><th class="num">Δ</th><th>Note</th></tr>
+{% for s in nav.schedule %}<tr><td>{{ s.item }}</td><td class="num">{{ fmt(s.book_value) }}</td>
+<td class="num">{{ fmt(s.adjusted_value) }}</td><td class="num">{{ fmt(s.delta) }}</td><td>{{ s.note }}</td></tr>{% endfor %}
+</table>{% endif %}
+{% else %}<p class="muted">Adjusted NAV method was not selected/available.</p>{% endif %}
+
+<!-- 16. Method comparison -->
+<h2>14. Method Comparison &amp; Weighted Central Estimate</h2>
+<table>
+  <tr><th>Method</th><th class="num">Enterprise Value</th><th class="num">Equity Value</th><th class="num">Weight</th><th class="num">Contribution</th></tr>
+  {% for m in method_rows %}
+  <tr><td>{{ m.label }}</td><td class="num">{{ fmt(m.ev) }}</td><td class="num">{{ fmt(m.eq) }}</td>
+      <td class="num">{{ '%.0f'|format(m.weight * 100) }}%</td><td class="num">{{ fmt(m.contribution) }}</td></tr>
+  {% endfor %}
+  <tr><th colspan="4">Weighted Central Estimate (EV)</th><th class="num">{{ fmt(run.central_estimate) }}</th></tr>
+</table>
+<table>
+  {% for m in method_rows %}
+  <tr class="bar-row"><td style="width:30%">{{ m.label }}</td>
+      <td><table style="margin:0"><tr><td style="border:none;padding:0;width:{{ m.bar_pct }}%"><div class="bar {{ m.bar_class }}">&nbsp;</div></td><td style="border:none;padding:0 4pt;font-size:8.5pt">{{ fmt(m.ev) }}</td></tr></table></td></tr>
+  {% endfor %}
+</table>
+
+<!-- 17. Sensitivity -->
+<h2>15. Sensitivity Analysis</h2>
+{% if heatmap %}
+<p class="muted">Equity value across WACC (columns) and terminal growth (rows):</p>
+<table>
+  <tr><th>g \ WACC</th>{% for w in heatmap.wacc_values %}<th class="num">{{ '%.1f'|format(w * 100) }}%</th>{% endfor %}</tr>
+  {% for row in heatmap.grid %}
+  <tr><th>{{ '%.1f'|format(heatmap.growth_values[loop.index0] * 100) }}%</th>
+    {% for v in row %}<td class="num">{{ fmt(v) if v is not none else '—' }}</td>{% endfor %}</tr>
+  {% endfor %}
+</table>
+{% endif %}
+{% if impacts %}
+<table>
+  <tr><th>Assumption</th><th>Change</th><th class="num">EV Impact</th><th class="num">% Impact</th></tr>
+  {% for i in impacts %}
+  <tr><td>{{ i.label }}</td><td>{{ i.change }}</td><td class="num">{{ fmt(i.impact) }}</td>
+      <td class="num">{{ '%+.1f'|format(i.impact_pct * 100) }}%</td></tr>
+  {% endfor %}
+</table>
+{% endif %}
+
+<!-- 18. Scenarios -->
+<h2>16. Scenario Analysis</h2>
+{% if scenarios %}
+<table>
+  <tr><th>Scenario</th><th class="num">Rev. Growth</th><th class="num">EBITDA Margin</th>
+      <th class="num">WACC</th><th class="num">Enterprise Value</th><th class="num">vs Base</th></tr>
+  {% for name, s in scenarios.items() %}
+  <tr><td>{{ name|title }} Case</td>
+      <td class="num">{{ '%.0f'|format(s.assumptions.revenue_growth * 100) }}%</td>
+      <td class="num">{{ '%.0f'|format(s.assumptions.ebitda_margin * 100) }}%</td>
+      <td class="num">{{ '%.0f'|format(s.assumptions.wacc * 100) }}%</td>
+      <td class="num">{{ fmt(s.enterprise_value) }}</td>
+      <td class="num {{ 'pos' if (s.vs_base_pct or 0) > 0 else ('neg' if (s.vs_base_pct or 0) < 0 else '') }}">
+        {{ '%+.1f'|format((s.vs_base_pct or 0) * 100) }}%</td></tr>
+  {% endfor %}
+</table>
+{% endif %}
+
+<!-- 19. Explainability -->
+<h2>17. Explainability — Key Value Drivers</h2>
+{{ narrative.value_drivers|safe }}
+
+<!-- 20. Range + 21. Conclusion -->
+<h2>18. Indicative Valuation Range &amp; Conclusion</h2>
+<div class="kpi">
+  <p>The indicative enterprise-value range of <b>{{ fmt(run.range_low) }} – {{ fmt(run.range_high) }}</b>
+  spans the lowest and highest selected methodology values. The weighted central estimate is
+  <b>{{ fmt(run.central_estimate) }}</b> ({{ run.confidence_label }}).</p>
+</div>
+{{ narrative.conclusion|safe }}
+
+<!-- 22. Assumption statement -->
+<h2>19. Statement of Assumptions</h2>
+<p class="muted">This valuation relies on the locked, human-approved historical financial
+data, the explicitly accepted forecast assumptions listed in Section 10, and management
+representations captured during the AI interview. Method weights: {% for m in method_rows %}{{ m.label }} {{ '%.0f'|format(m.weight * 100) }}%{{ ", " if not loop.last }}{% endfor %}.</p>
+
+<!-- 23. Disclaimer -->
+<h2>20. Disclaimer</h2>
+<div class="disclaimer">
+  <p>This document is an <b>AI-assisted indicative valuation simulation</b> produced by
+  CompanyVal AI based on financial information supplied by the user and assumptions
+  explicitly accepted by the user. It is <b>not</b> a statutory valuation, a registered
+  valuer's certificate under the Companies (Registered Valuers and Valuation) Rules, a
+  fairness opinion, or an audit opinion. Professional judgement and applicable regulatory
+  requirements may be necessary for formal purposes. All deterministic calculations were
+  performed by CompanyVal AI's Python financial engine; AI narrative explains — and does
+  not alter — those results.</p>
+</div>
+
+<!-- 24. Appendix -->
+<h2>21. Appendix — Data Sources &amp; Audit Trail</h2>
+<p class="muted">Financial line items are traceable to source documents/pages and retain
+Python-extracted, AI-verified and human-approved values. Generated by CompanyVal AI on
+{{ generated_on }} for {{ analyst }}.</p>
+
+</body>
+</html>
