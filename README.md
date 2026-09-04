@@ -1,268 +1,181 @@
-# Upload Your Project Folder to the AICA Level 2 Projects Repository
+# Bank Reconciliation App
 
-**Target repository:** [aiinicai/AICA-Level-2-Projects](https://github.com/aiinicai/AICA-Level-2-Projects)
+A simple Streamlit-based bank reconciliation application for CA and finance professionals. Upload bank statements and GL registers, automatically reconcile transactions, and generate reports.
 
-This guide explains how to contribute your complete project folder to the **AICA-Level-2-Projects** repository using GitHub’s **Fork + Pull Request** workflow.
+## Features
 
-Two methods are covered:
+- **Automatic Reconciliation**: Match transactions using date (±3 days tolerance), amount, and reference
+- **Dashboard**: View matched/unmatched transactions and match percentage
+- **Detailed Reports**: 
+  - Matched transactions
+  - Bank-only transactions
+  - GL-only transactions
+  - Amount/date mismatches
+  - Duplicate detection
+  - Bank Reconciliation Statement (BRS) summary
+- **Excel Export**: Download reconciliation results as Excel workbook
+- **Unit Tests**: Pytest tests for matching, unmatched, mismatch, and duplicate scenarios
 
-1. **Website-only method** — no software installation required.
-2. **Git command-line method** — recommended for complete project folders and projects containing many files.
+## Project Structure
 
----
-
-## Fork + Pull Request Workflow
-
-1. **Fork:** Create a personal copy of `aiinicai/AICA-Level-2-Projects` under your GitHub account.
-2. **Add your folder:** Upload or copy your project folder into your fork.
-3. **Commit:** Save the changes in your fork with a clear commit message.
-4. **Open a Pull Request:** Request the `aiinicai` account to merge your changes into the original repository.
-5. **Merge:** The repository owner reviews and accepts your Pull Request. After it is merged, your project folder will appear in the official repository.
-
----
-
-# Method 1: Website Only
-
-Use this method if:
-
-- You do not want to install Git.
-- Your project contains relatively few files.
-- You do not need to preserve the project’s earlier commit history.
-
-> [!NOTE]
-> GitHub’s web uploader generally allows up to 100 files in a single upload. If your project contains more files, upload them in batches or use the Git command-line method.
-
-## Step 1: Fork the Repository
-
-1. Log in to your GitHub account.
-2. Open the [AICA-Level-2-Projects repository](https://github.com/aiinicai/AICA-Level-2-Projects).
-3. Click **Fork** in the upper-right corner of the page.
-4. On the **Create a new fork** page, keep the default settings.
-5. Click **Create fork**.
-
-You will be redirected to your personal copy of the repository:
-
-```text
-https://github.com/YOUR-USERNAME/AICA-Level-2-Projects
+```
+bank-reconciliation-app/
+├── app.py                          # Main Streamlit app
+├── utils.py                        # Reconciliation logic
+├── requirements.txt                # Python dependencies
+├── README.md                       # This file
+├── sample_data/
+│   ├── sample_bank_statement.csv   # Sample bank data (50 transactions)
+│   └── sample_gl_register.csv      # Sample GL data (50+ transactions)
+└── tests/
+    ├── __init__.py
+    └── test_reconciliation.py      # Unit tests
 ```
 
-Replace `YOUR-USERNAME` with your GitHub username.
+## Installation
 
-## Step 2: Upload Your Project Folder
+1. Clone or download the project:
+```bash
+cd bank-reconciliation-app
+```
 
-GitHub provides two ways to add a folder through the website.
+2. Install dependencies:
+```bash
+pip install -r requirements.txt
+```
 
-### Option A: Drag and Drop the Complete Folder
+## Usage
 
-1. Open your fork of the repository.
-2. Click **Add file** → **Upload files**.
-3. Open the parent location of your project folder in File Explorer.
-4. Drag the **complete project folder**—not only the files inside it—into GitHub’s upload area.
-5. Wait until all the files appear in the upload list.
-
-Modern browsers such as Google Chrome and Microsoft Edge generally preserve the folder structure during upload.
-
-### Option B: Create the Folder Using a File Path
-
-1. Open your fork of the repository.
-2. Click **Add file** → **Create new file**.
-3. In the filename box, enter:
-
-   ```text
-   MyProjectName/README.md
-   ```
-
-   Typing `/` in the filename automatically creates the folder.
-
-4. Add a short description of your project to the new `README.md` file.
-5. Click **Commit changes**.
-6. Open the newly created folder.
-7. Click **Add file** → **Upload files** and upload the remaining project files.
-
-Replace `MyProjectName` with the name of your project.
-
-## Step 3: Commit the Upload
-
-1. Scroll down to the **Commit changes** section.
-2. Enter a clear commit message, for example:
-
-   ```text
-   Add <Your Name> - <Project Name> project folder
-   ```
-
-3. Keep **Commit directly to the main branch** selected.
-4. Click **Commit changes**.
-
-Because this is your personal fork, committing directly to its `main` branch is acceptable for this submission workflow.
-
-## Step 4: Open a Pull Request
-
-1. Return to the main page of your fork.
-2. GitHub may display a banner stating:
-
-   ```text
-   This branch is X commits ahead of aiinicai:main
-   ```
-
-3. Click **Contribute** → **Open pull request**.
-
-Alternatively:
-
-1. Open the **Pull requests** tab.
-2. Click **New pull request**.
-
-Before creating the Pull Request, confirm the following direction:
-
-| Setting | Selection |
-| --- | --- |
-| Base repository | `aiinicai/AICA-Level-2-Projects` |
-| Base branch | `main` |
-| Head repository | `YOUR-USERNAME/AICA-Level-2-Projects` |
-| Compare branch | `main` |
-
-Then:
-
-1. Enter a clear Pull Request title, for example:
-
-   ```text
-   Add AICA Level 2 Project - <Your Name>
-   ```
-
-2. In the description, briefly explain:
-   - The purpose of your project.
-   - Its main features.
-   - Any setup or usage instructions.
-3. Click **Create pull request**.
-
-## Step 5: Wait for Review and Merge
-
-The owner of the `aiinicai/AICA-Level-2-Projects` repository will receive your Pull Request.
-
-The repository owner may:
-
-- Review your project.
-- Ask questions.
-- Suggest changes.
-- Approve and merge the Pull Request.
-
-If changes are requested, update the files in your fork and commit them. Your existing Pull Request will update automatically.
-
-After the Pull Request is merged, your project folder will become part of the official repository.
-
----
-
-# Method 2: Git Command Line
-
-This method is recommended when:
-
-- Your project contains many files.
-- You want to upload the complete folder structure reliably.
-- You are comfortable using Git commands.
-
-## Prerequisites
-
-Before beginning:
-
-- Install [Git](https://git-scm.com/downloads).
-- Create or log in to your GitHub account.
-- Fork the [AICA-Level-2-Projects repository](https://github.com/aiinicai/AICA-Level-2-Projects) as explained in Method 1.
-
-## Step 1: Clone Your Fork
-
-Open Terminal, Command Prompt, PowerShell, or Git Bash and run:
+### Run the App
 
 ```bash
-git clone https://github.com/YOUR-USERNAME/AICA-Level-2-Projects.git
+streamlit run app.py
 ```
 
-Then open the cloned repository:
+The app will open at `http://localhost:8501`
+
+### Using Sample Data
+
+1. Click "Upload Bank Statement" → select `sample_data/sample_bank_statement.csv`
+2. Click "Upload GL Register" → select `sample_data/sample_gl_register.csv`
+3. View reconciliation results in tabs:
+   - **Matched**: Successfully reconciled transactions
+   - **Bank Only**: Transactions in bank statement but not in GL
+   - **GL Only**: Transactions in GL but not in bank statement
+   - **Mismatch**: Same reference but different amounts/dates
+   - **Duplicates**: Duplicate entries detected
+   - **BRS Summary**: Bank Reconciliation Statement
+
+4. Download results as Excel workbook
+
+### Input File Format
+
+**Bank Statement CSV** (with headers):
+```
+Date,Reference,Amount,Balance
+01-09-2024,CHQ001,5000,10000
+02-09-2024,DEP001,15000,25000
+```
+
+**GL Register CSV** (with headers):
+```
+Date,Reference,Amount,Description
+01-09-2024,CHQ001,5000,Rent Payment
+02-09-2024,DEP001,15000,Sales Revenue
+```
+
+Dates must be in DD-MM-YYYY format.
+
+## Run Tests
 
 ```bash
-cd AICA-Level-2-Projects
+pytest tests/ -v
 ```
 
-Replace `YOUR-USERNAME` with your GitHub username.
+### Test Coverage
 
-## Step 2: Copy Your Project Folder
+- `test_basic_matching`: Verify transaction matching logic
+- `test_unmatched_bank_only`: Identify bank-only transactions
+- `test_unmatched_gl_only`: Identify GL-only transactions
+- `test_date_tolerance`: Test date tolerance matching (±3 days)
+- `test_amount_mismatch_detection`: Detect amount mismatches
+- `test_duplicate_detection`: Identify duplicate transactions
+- `test_brs_generation`: Verify BRS summary generation
+- `test_empty_dataframes`: Handle empty input
+- `test_perfect_match`: Test perfect matching scenario
 
-Copy your complete project folder into the cloned `AICA-Level-2-Projects` directory.
+## Reconciliation Logic
 
-Recommended folder naming format:
+### Matching Rules
 
-```text
-YourName-ProjectName/
-```
+Transactions are matched if:
+1. **Amount** matches exactly
+2. **Date** is within ±3 days
+3. **Reference** matches (or weighted match if missing)
 
-Example:
+### Match Scoring
 
-```text
-Rahul-Sharma-AI-Invoice-Analyzer/
-```
+- Exact date match: +2 points
+- Reference match: +1 point
+- Minimum score to match: 0 (amount + date tolerance sufficient)
 
-## Step 3: Review the Changes
+### Categories
 
-Run:
+| Category | Meaning |
+|----------|---------|
+| **Matched** | Found in both bank & GL with matching date/amount/reference |
+| **Bank Only** | In bank statement but not in GL (e.g., cheques in transit) |
+| **GL Only** | In GL but not in bank statement (e.g., accruals) |
+| **Mismatch** | Same reference but different amounts or dates |
+| **Duplicates** | Repeated entries within same dataset |
 
+## Sample Data
+
+The `sample_data/` folder contains realistic reconciliation scenarios:
+
+- ✓ 40+ matched transactions
+- 🏦 5 bank-only transactions (timing/in-transit items)
+- 📘 10 GL-only transactions (accruals, reversals)
+- ⚠️ 1 amount mismatch
+- 🔁 1 duplicate
+- ⏱️ 2 timing differences (±1-2 days)
+
+## Key Dependencies
+
+| Package | Version | Purpose |
+|---------|---------|---------|
+| streamlit | 1.28.1 | Web app framework |
+| pandas | 2.0.3 | Data processing |
+| openpyxl | 3.1.2 | Excel export |
+| pytest | 7.4.2 | Unit testing |
+
+## Troubleshooting
+
+**"Date parsing error"**: Ensure dates are in DD-MM-YYYY format
+
+**"No transactions matched"**: 
+- Check that Amount column contains numbers (no ₹ or other symbols)
+- Verify date format matches DD-MM-YYYY
+- Increase date tolerance if needed (edit `date_tolerance=3` in app.py)
+
+**"Import error"**: Make sure all requirements are installed:
 ```bash
-git status
+pip install --upgrade -r requirements.txt
 ```
 
-Confirm that Git lists only the files and folders you intend to submit.
+## Future Enhancements
 
-## Step 4: Stage and Commit the Project
+- Multi-tolerance settings (configurable date/amount tolerance)
+- Batch file processing
+- Integration with accounting software (Tally, SAP)
+- Machine learning-based fuzzy matching
+- Email report delivery
+- API for external integration
 
-Stage your project folder:
+## License
 
-```bash
-git add YourName-ProjectName/
-```
+Open source - free to use and modify for your organization.
 
-Commit the changes:
+## Support
 
-```bash
-git commit -m "Add <Your Name> - <Project Name> project folder"
-```
-
-## Step 5: Push the Changes to Your Fork
-
-Run:
-
-```bash
-git push origin main
-```
-
-Your project folder will now appear in your fork on GitHub.
-
-## Step 6: Open a Pull Request
-
-1. Open your fork on GitHub.
-2. Click **Contribute** → **Open pull request**.
-3. Confirm the base and compare repositories:
-
-| Setting | Selection |
-| --- | --- |
-| Base repository | `aiinicai/AICA-Level-2-Projects` |
-| Base branch | `main` |
-| Head repository | `YOUR-USERNAME/AICA-Level-2-Projects` |
-| Compare branch | `main` |
-
-4. Add a clear title and project description.
-5. Click **Create pull request**.
-
----
-
-## Before Submitting
-
-Please verify the following:
-
-- Your complete project is inside one clearly named folder.
-- Your folder includes a `README.md` explaining the project.
-- The project does not contain passwords, API keys, access tokens, or other confidential information.
-- Unnecessary generated files and dependency folders are excluded where applicable.
-- The project opens or runs using the instructions included in its `README.md`.
-- Your Pull Request targets `aiinicai/AICA-Level-2-Projects` on the `main` branch.
-
-## Need to Update Your Submission?
-
-If your Pull Request is still open, make the required changes in the same fork and branch, then commit and push them. GitHub will automatically add the new commits to the existing Pull Request.
-
+For issues or feature requests, check the test suite for expected behavior or review the reconciliation logic in `utils.py`.
