@@ -1,24 +1,24 @@
-FD Treasury Management System
-ICAI Level 3 Capstone Prototype
+EXECUTABLE FILES
+==================
 
-RUN:
-1. Extract the ZIP.
-2. Double-click index.html.
-3. It runs entirely in the browser; no server or installation is required.
+InsightFlow-Windows.zip
+  Unzip, then double-click InsightFlow.exe (or "Launch InsightFlow.bat").
+  No Node.js or internet connection required.
+  Windows SmartScreen may show a warning on first launch because the app is
+  not code-signed with a paid certificate — click "More info" -> "Run
+  anyway". This is expected for an unsigned indie build, not a defect.
 
-FEATURES:
-- Dashboard KPIs and charts
-- FD register with create/edit/delete
-- Interest accrual calculation
-- Bank master and exposure limits
-- FD placement comparison tool
-- Maturity management
-- Suggested accounting entries
-- Print-ready reports
-- JSON backup/export and import
-- LocalStorage persistence
+InsightFlow-macOS-AppleSilicon.zip
+  For M1/M2/M3/M4 Macs. Unzip, then double-click InsightFlow.app.
+  macOS Gatekeeper will likely block the first launch ("cannot be opened" or
+  "is damaged"). To fix:
+    1. Open Terminal, cd into the unzipped folder
+    2. Run: xattr -cr InsightFlow.app
+    3. Double-click InsightFlow.app again — it will now open normally.
+  This is standard behavior for any unsigned macOS app downloaded from the
+  internet, not a sign the file is actually corrupted.
 
-IMPORTANT:
-This is an educational capstone prototype. Tax rates, accounting treatment, TDS rules,
-bank exposure policies and journal mappings should be configured/reviewed for the actual
-organisation and current applicable law before production use.
+Both builds are Electron desktop wrappers around the same React/Vite web
+application found in 05_Supporting_Documents — they embed the built
+dashboard directly, so no build step or dependency install is needed to run
+them.
