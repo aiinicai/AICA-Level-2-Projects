@@ -1,0 +1,1812 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TaxCompute Pro | Direct Tax Computation & Advisory Suite (FY 2025-26 & 2026-27)</title>
+  <meta name="description" content="Direct Tax Computation Suite for Indian Chartered Accountants, Tax Practitioners, and Corporate Advisors calibrated for FY 2025-26 & FY 2026-27.">
+  <link rel="stylesheet" href="css/main.css">
+  <link rel="stylesheet" href="css/print.css" media="print">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>⚖️</text></svg>">
+</head>
+<body>
+
+  <!-- Top Application Header -->
+  <header class="app-header">
+    <div class="header-container">
+      <div class="brand-section">
+        <div class="brand-icon">₹</div>
+        <div>
+          <div style="display: flex; align-items: center; gap: 0.5rem;">
+            <span class="brand-title">TaxCompute Pro</span>
+            <span class="brand-badge">AY 2026-27 & AY 2027-28</span>
+          </div>
+          <p style="font-size: 0.72rem; color: var(--text-muted);">Direct Tax Computation, Regime Optimization & CA Advisory Suite</p>
+        </div>
+      </div>
+
+      <div class="header-controls">
+        <div class="profile-select-wrapper">
+          <label class="control-label" for="presetProfileSelect">Sample Case / Preset:</label>
+          <select id="presetProfileSelect" class="select-control">
+            <option value="SALARIED_TECH_LEAD">Salaried Professional (HRA + 80C + 80CCD(2) + ESOPs)</option>
+            <option value="DOCTOR_CONSULTANT_44ADA">Doctor / Consultant (Sec 44ADA Presumptive)</option>
+            <option value="HNI_INVESTOR">HNI Investor (Business + Multi-Letout + Capital Gains)</option>
+            <option value="DOMESTIC_COMPANY_115BAA">Domestic Co (Sec 115BAA @ 22% + Sec 32 Depr.)</option>
+          </select>
+        </div>
+
+        <div class="profile-select-wrapper">
+          <label class="control-label" for="assesseeTypeSelect">Assessee Category:</label>
+          <select id="assesseeTypeSelect" class="select-control">
+            <option value="individual_general">Individual (Below 60 Yrs)</option>
+            <option value="individual_senior">Individual Senior (60-80 Yrs)</option>
+            <option value="individual_super_senior">Individual Super Senior (80+ Yrs)</option>
+            <option value="huf">HUF (Hindu Undivided Family)</option>
+            <option value="firm_llp">Partnership Firm / LLP (30%)</option>
+            <option value="company_115baa">Domestic Co u/s 115BAA (22%)</option>
+            <option value="company_115bab">Domestic Co u/s 115BAB (15%)</option>
+            <option value="company_reg_25">Domestic Co Regular (25%)</option>
+            <option value="company_reg_30">Domestic Co Regular (30%)</option>
+            <option value="company_foreign">Foreign Company (35%)</option>
+            <option value="cooperative_115bad">Cooperative Society (115BAD)</option>
+            <option value="cooperative_regular">Cooperative Society (Regular)</option>
+          </select>
+        </div>
+
+        <button id="btnClearAllFigures" class="btn btn-secondary" title="Clear all figures to 0 for a fresh computation">
+          <span>🧹</span> Clear / New Sheet
+        </button>
+
+        <button id="btnPrintStatement" class="btn btn-primary" title="Print ICAI Certified Statement">
+          <span>🖨️</span> Print / Save PDF
+        </button>
+
+        <button id="btnThemeToggle" class="btn btn-secondary btn-icon-only" title="Toggle Dark/Light Mode">
+          <span id="themeIcon">☀️</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- KPI Summary Ribbon -->
+  <section class="kpi-ribbon">
+    <div class="kpi-grid">
+      <div class="kpi-card kpi-gti">
+        <div class="kpi-header">
+          <span class="kpi-title">Gross Total Income (GTI)</span>
+          <span class="badge-tag">Total</span>
+        </div>
+        <div class="kpi-value" id="kpiGti">₹0</div>
+        <div class="kpi-subtext">Sum of all 5 Heads of Income</div>
+      </div>
+
+      <div class="kpi-card kpi-deductions">
+        <div class="kpi-header">
+          <span class="kpi-title">Chapter VI-A Deductions</span>
+          <span class="badge-tag">Old / New</span>
+        </div>
+        <div class="kpi-value" id="kpiDeductions">₹0</div>
+        <div class="kpi-subtext" id="kpiDeductionsSubtext">80C, 80D, 80CCD(2), etc.</div>
+      </div>
+
+      <div class="kpi-card kpi-new-regime">
+        <div class="kpi-header">
+          <span class="kpi-title">New Regime Tax (115BAC)</span>
+          <span class="badge-tag badge-new">Default</span>
+        </div>
+        <div class="kpi-value" id="kpiNewRegimeTax">₹0</div>
+        <div class="kpi-subtext">Standard Ded: ₹75,000 | Slabs 5-30%</div>
+      </div>
+
+      <div class="kpi-card kpi-old-regime">
+        <div class="kpi-header">
+          <span class="kpi-title">Old Regime Tax</span>
+          <span class="badge-tag badge-old">Optional</span>
+        </div>
+        <div class="kpi-value" id="kpiOldRegimeTax">₹0</div>
+        <div class="kpi-subtext">With all Chapter VI-A & HRA</div>
+      </div>
+
+      <div class="kpi-card kpi-recommended">
+        <div class="kpi-header">
+          <span class="kpi-title">Optimal Regime</span>
+          <span class="badge-tag" id="kpiRecommendationBadge">Analyzing</span>
+        </div>
+        <div class="kpi-value" id="kpiSavings">₹0</div>
+        <div class="kpi-subtext" id="kpiSavingsSubtext">Net Tax Savings</div>
+      </div>
+
+      <div class="kpi-card kpi-payable">
+        <div class="kpi-header">
+          <span class="kpi-title">Net Tax (Payable / Refund)</span>
+          <span class="badge-tag">Balance</span>
+        </div>
+        <div class="kpi-value" id="kpiNetPayable">₹0</div>
+        <div class="kpi-subtext" id="kpiPrepaidSubtext">After TDS & Advance Tax</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Main Workspace Tabs -->
+  <main class="main-wrapper">
+    <nav class="tab-nav">
+      <button class="tab-btn active" data-tab="tab-direct-sheet">
+        <span>📝</span> Single-Sheet Direct Entry Worksheet
+      </button>
+      <button class="tab-btn" data-tab="tab-heads">
+        <span>💼</span> 5 Heads Detailed Schedules
+      </button>
+      <button class="tab-btn" data-tab="tab-deductions">
+        <span>📑</span> Chapter VI-A Deductions
+      </button>
+      <button class="tab-btn" data-tab="tab-comparison">
+        <span>⚖️</span> Regime Comparison & Breakeven
+      </button>
+      <button class="tab-btn" data-tab="tab-advance-tax">
+        <span>⏱️</span> Advance Tax & Sec 234
+      </button>
+      <button class="tab-btn" data-tab="tab-master-rates">
+        <span>📚</span> Statutory Master Rates
+      </button>
+      <button class="tab-btn" data-tab="tab-certified-statement">
+        <span>📜</span> Certified Computation & AI Memo
+      </button>
+      <button class="tab-btn" data-tab="tab-assessee">
+        <span>👤</span> Assessee / CA Details
+      </button>
+    </nav>
+
+    <!-- TAB: DIRECT SINGLE-SHEET ENTRY WORKSHEET -->
+    <div id="tab-direct-sheet" class="tab-content active">
+      <div class="card" style="border: 2px solid var(--accent-primary); background: var(--bg-card);">
+        <div class="card-header">
+          <div>
+            <h2 class="card-title" style="color: var(--accent-primary);"><span>📝</span> Direct Income & Deductions Entry Worksheet</h2>
+            <p class="card-subtitle">Key in figures directly in the spaces provided below. The whole tax statement, Old vs New regime, and net tax payable calculate in real-time.</p>
+          </div>
+          <span class="badge-tag badge-new">Interactive Worksheet</span>
+        </div>
+
+        <!-- Section 1: 5 Heads of Income Direct Input Table -->
+        <div class="matrix-table-wrapper" style="margin-bottom: 1.5rem;">
+          <table class="matrix-table">
+            <thead>
+              <tr style="background: var(--bg-secondary);">
+                <th style="width: 25%;">Head of Income / Source</th>
+                <th style="width: 40%;">Figure Description & Statutory Rule</th>
+                <th style="width: 35%; text-align: right;">Put Figure Here (₹)</th>
+              </tr>
+            </thead>
+            <tbody>
+              <!-- 1. SALARIES -->
+              <tr style="background: var(--bg-accent);">
+                <td colspan="3"><strong style="color: var(--accent-primary);">1. SCHEDULE S: INCOME FROM SALARIES (Sec 15-17)</strong></td>
+              </tr>
+              <tr>
+                <td>Basic Salary + DA</td>
+                <td>Annual Basic Pay + Dearness Allowance (DA)</td>
+                <td>
+                  <div class="input-with-currency">
+                    <span class="currency-prefix">₹</span>
+                    <input type="number" id="ds_salaryBasicDa" class="input-control" value="2160000" placeholder="0">
+                  </div>
+                </td>
+              </tr>
+              <tr>
+                <td>HRA Received</td>
+                <td>House Rent Allowance received from employer</td>
+                <td>
+                  <div class="input-with-currency">
+                    <span class="currency-prefix">₹</span>
+                    <input type="number" id="ds_salaryHra" class="input-control" value="600000" placeholder="0">
+                  </div>
+                </td>
+              </tr>
+              <tr>
+                <td>Annual Rent Paid</td>
+                <td>
+                  Rent paid for residential accommodation
+                  <label class="checkbox-label" style="margin-top: 4px;">
+                    <input type="checkbox" id="ds_salaryIsMetro" checked>
+                    <span>Metro City (Delhi / Mumbai / Kolkata / Chennai - 50%)</span>
+                  </label>
+                </td>
+                <td>
+                  <div class="input-with-currency">
+                    <span class="currency-prefix">₹</span>
+                    <input type="number" id="ds_salaryRentPaid" class="input-control" value="480000" placeholder="0">
+                  </div>
+                </td>
+              </tr>
+              <tr>
+                <td>Other Allowances, Bonus & Perks</td>
+                <td>Special allowance, Bonus, Commission, LTA, Perquisites</td>
+                <td>
+                  <div class="input-with-currency">
+                    <span class="currency-prefix">₹</span>
+                    <input type="number" id="ds_salaryOtherAllowances" class="input-control" value="990000" placeholder="0">
+                  </div>
+                </td>
+              </tr>
+              <tr style="background: var(--bg-secondary); font-weight: 600;">
+                <td><strong>Net Taxable Salary</strong></td>
+                <td>After Std Ded (₹75k New / ₹50k Old) & HRA Exemption u/s 10(13A)</td>
+                <td class="amount-cell" id="ds_netSalaryOutput" style="color: var(--accent-primary); font-size: 1.05rem;">₹0</td>
+              </tr>
+
+              <!-- 2. HOUSE PROPERTY -->
+              <tr style="background: var(--bg-accent);">
+                <td colspan="3"><strong style="color: var(--accent-emerald);">2. SCHEDULE HP: INCOME / LOSS FROM HOUSE PROPERTY (Sec 22-27)</strong></td>
+              </tr>
+              <tr>
+                <td>Self-Occupied Home Loan Interest</td>
+                <td>Interest paid on housing loan u/s 24(b) (Cap ₹2,00,000 in Old Regime; Nil in New)</td>
+                <td>
+                  <div class="input-with-currency">
+                    <span class="currency-prefix">₹</span>
+                    <input type="number" id="ds_hpSelfInterest" class="input-control" value="240000" placeholder="0">
+                  </div>
+                </td>
+              </tr>
+              <tr>
+                <td>Let-Out Property Gross Rent</td>
+                <td>Annual rent received from let-out / commercial property</td>
+                <td>
+                  <div class="input-with-currency">
+                    <span class="currency-prefix">₹</span>
+                    <input type="number" id="ds_hpLetoutRent" class="input-control" value="0" placeholder="0">
+                  </div>
+                </td>
+              </tr>
+              <tr>
+                <td>Municipal Taxes & Let-out Interest</td>
+                <td>Municipal tax paid by owner + Home loan interest on let-out property</td>
+                <td>
+                  <div class="input-with-currency">
+                    <span class="currency-prefix">₹</span>
+                    <input type="number" id="ds_hpLetoutExpenses" class="input-control" value="0" placeholder="0">
+                  </div>
+                </td>
+              </tr>
+              <tr style="background: var(--bg-secondary); font-weight: 600;">
+                <td><strong>Net House Property Income / (Loss)</strong></td>
+                <td>After statutory 30% repair deduction u/s 24(a) & loan interest</td>
+                <td class="amount-cell" id="ds_netHpOutput" style="color: var(--accent-emerald); font-size: 1.05rem;">₹0</td>
+              </tr>
+
+              <!-- 3. BUSINESS / PROFESSION (PGBP) -->
+              <tr style="background: var(--bg-accent);">
+                <td colspan="3"><strong style="color: var(--accent-gold);">3. SCHEDULE PGBP: PROFITS & GAINS OF BUSINESS OR PROFESSION (Sec 28-44)</strong></td>
+              </tr>
+              <tr>
+                <td>PGBP Scheme Mode</td>
+                <td colspan="2">
+                  <select id="ds_pgbpModeSelect" class="select-control" style="width: 100%;">
+                    <option value="presumptive_44ad">Presumptive Business u/s 44AD (6% Digital / 8% Cash up to ₹3 Cr)</option>
+                    <option value="presumptive_44ada">Presumptive Professionals u/s 44ADA (50% Deemed Profit up to ₹75 Lakhs)</option>
+                    <option value="regular_books">Regular Books of Accounts (Net Profit as per P&L)</option>
+                  </select>
+                </td>
+              </tr>
+              <tr>
+                <td>Turnover / Gross Receipts / Net Profit</td>
+                <td>Gross turnover / professional receipts / net book profit</td>
+                <td>
+                  <div class="input-with-currency">
+                    <span class="currency-prefix">₹</span>
+                    <input type="number" id="ds_pgbpGrossInput" class="input-control" value="0" placeholder="0">
+                  </div>
+                </td>
+              </tr>
+              <tr style="background: var(--bg-secondary); font-weight: 600;">
+                <td><strong>Net Taxable PGBP Income</strong></td>
+                <td>Calculated deemed profit or net taxable business profit</td>
+                <td class="amount-cell" id="ds_netPgbpOutput" style="color: var(--accent-gold); font-size: 1.05rem;">₹0</td>
+              </tr>
+
+              <!-- 4. CAPITAL GAINS -->
+              <tr style="background: var(--bg-accent);">
+                <td colspan="3"><strong style="color: var(--accent-purple);">4. SCHEDULE CG: CAPITAL GAINS (Sec 45-55A - Budget 2024 Rates)</strong></td>
+              </tr>
+              <tr>
+                <td>STCG u/s 111A (Equity @ 20%)</td>
+                <td>Listed shares & equity mutual funds sold within 12 months (STT paid)</td>
+                <td>
+                  <div class="input-with-currency">
+                    <span class="currency-prefix">₹</span>
+                    <input type="number" id="ds_cgStcg111a" class="input-control" value="120000" placeholder="0">
+                  </div>
+                </td>
+              </tr>
+              <tr>
+                <td>LTCG u/s 112A (Equity @ 12.5%)</td>
+                <td>Listed shares & equity MFs (> 12 months). Enhanced ₹1,25,000 exemption applied automatically.</td>
+                <td>
+                  <div class="input-with-currency">
+                    <span class="currency-prefix">₹</span>
+                    <input type="number" id="ds_cgLtcg112a" class="input-control" value="250000" placeholder="0">
+                  </div>
+                </td>
+              </tr>
+              <tr>
+                <td>LTCG u/s 112 (Property / Gold / Unlisted)</td>
+                <td>Immovable property, unlisted shares, gold (@ 12.5% without indexation)</td>
+                <td>
+                  <div class="input-with-currency">
+                    <span class="currency-prefix">₹</span>
+                    <input type="number" id="ds_cgLtcg112" class="input-control" value="0" placeholder="0">
+                  </div>
+                </td>
+              </tr>
+              <tr>
+                <td>STCG Other / Debt Funds (Slab Rates)</td>
+                <td>Short-term debt funds, unlisted equity, short-term assets</td>
+                <td>
+                  <div class="input-with-currency">
+                    <span class="currency-prefix">₹</span>
+                    <input type="number" id="ds_cgStcgNormal" class="input-control" value="0" placeholder="0">
+                  </div>
+                </td>
+              </tr>
+              <tr style="background: var(--bg-secondary); font-weight: 600;">
+                <td><strong>Total Taxable Capital Gains</strong></td>
+                <td>Sum of taxable short-term and long-term capital gains</td>
+                <td class="amount-cell" id="ds_netCgOutput" style="color: var(--accent-purple); font-size: 1.05rem;">₹0</td>
+              </tr>
+
+              <!-- 5. OTHER SOURCES -->
+              <tr style="background: var(--bg-accent);">
+                <td colspan="3"><strong style="color: #06b6d4;">5. SCHEDULE OS: INCOME FROM OTHER SOURCES (Sec 56-59)</strong></td>
+              </tr>
+              <tr>
+                <td>Bank Savings & FD Interest</td>
+                <td>Savings bank interest + Term deposit / Recurring deposit interest</td>
+                <td>
+                  <div class="input-with-currency">
+                    <span class="currency-prefix">₹</span>
+                    <input type="number" id="ds_osInterest" class="input-control" value="110000" placeholder="0">
+                  </div>
+                </td>
+              </tr>
+              <tr>
+                <td>Dividends & Other Regular Income</td>
+                <td>Dividend income from shares/mutual funds + Family pension</td>
+                <td>
+                  <div class="input-with-currency">
+                    <span class="currency-prefix">₹</span>
+                    <input type="number" id="ds_osDividend" class="input-control" value="42000" placeholder="0">
+                  </div>
+                </td>
+              </tr>
+              <tr>
+                <td>Special Incomes (Crypto / Lotteries @ 30%)</td>
+                <td>Virtual Digital Assets/Crypto (115BBH), Online gaming (115BBJ), Lotteries (115BB)</td>
+                <td>
+                  <div class="input-with-currency">
+                    <span class="currency-prefix">₹</span>
+                    <input type="number" id="ds_osSpecial" class="input-control" value="0" placeholder="0">
+                  </div>
+                </td>
+              </tr>
+              <tr style="background: var(--bg-secondary); font-weight: 600;">
+                <td><strong>Total Other Sources Income</strong></td>
+                <td>Normal OS income + Special flat 30% incomes</td>
+                <td class="amount-cell" id="ds_netOsOutput" style="color: #06b6d4; font-size: 1.05rem;">₹0</td>
+              </tr>
+
+              <!-- GROSS TOTAL INCOME ROW -->
+              <tr class="total-row" style="background: var(--bg-card-hover); border-top: 3px solid var(--accent-primary);">
+                <td><strong>GROSS TOTAL INCOME (GTI)</strong></td>
+                <td><strong>Aggregate of all 5 Heads of Income</strong></td>
+                <td class="amount-cell" id="ds_gtiOutput" style="font-size: 1.25rem; color: var(--accent-primary);">₹0</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Section 2: Chapter VI-A Deductions Direct Input Table -->
+        <h3 style="font-size: 1.05rem; color: var(--text-primary); margin: 1.5rem 0 0.75rem 0; font-weight: 700;">📑 Chapter VI-A Deductions & Taxes Paid Spaces</h3>
+        <div class="matrix-table-wrapper" style="margin-bottom: 1.5rem;">
+          <table class="matrix-table">
+            <thead>
+              <tr style="background: var(--bg-secondary);">
+                <th style="width: 25%;">Section</th>
+                <th style="width: 40%;">Deduction Category</th>
+                <th style="width: 35%; text-align: right;">Claim Amount (₹)</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><span class="section-code">Section 80C</span></td>
+                <td>PPF, EPF, ELSS, LIC, Home Loan Principal, Tuition Fees (Capped at ₹1,50,000 in Old Regime)</td>
+                <td>
+                  <div class="input-with-currency">
+                    <span class="currency-prefix">₹</span>
+                    <input type="number" id="ds_ded80C" class="input-control" value="150000" placeholder="0">
+                  </div>
+                </td>
+              </tr>
+              <tr>
+                <td><span class="section-code">Section 80CCD(1B)</span></td>
+                <td>Additional NPS Self-Contribution (Capped at ₹50,000 in Old Regime)</td>
+                <td>
+                  <div class="input-with-currency">
+                    <span class="currency-prefix">₹</span>
+                    <input type="number" id="ds_ded80CCD1B" class="input-control" value="50000" placeholder="0">
+                  </div>
+                </td>
+              </tr>
+              <tr>
+                <td><span class="section-code">Section 80CCD(2)</span></td>
+                <td>Employer NPS Contribution (Up to 14% of Basic+DA - <strong>Allowed in BOTH Regimes!</strong>)</td>
+                <td>
+                  <div class="input-with-currency">
+                    <span class="currency-prefix">₹</span>
+                    <input type="number" id="ds_ded80CCD2" class="input-control" value="250000" placeholder="0">
+                  </div>
+                </td>
+              </tr>
+              <tr>
+                <td><span class="section-code">Section 80D</span></td>
+                <td>Mediclaim Health Insurance (Self/Family up to ₹25k/₹50k + Parents up to ₹25k/₹50k)</td>
+                <td>
+                  <div class="input-with-currency">
+                    <span class="currency-prefix">₹</span>
+                    <input type="number" id="ds_ded80D" class="input-control" value="75000" placeholder="0">
+                  </div>
+                </td>
+              </tr>
+              <tr>
+                <td><span class="section-code">Other VI-A (80E, 80G, etc.)</span></td>
+                <td>Higher education loan interest (80E), Donations (80G), Savings Interest (80TTA/TTB)</td>
+                <td>
+                  <div class="input-with-currency">
+                    <span class="currency-prefix">₹</span>
+                    <input type="number" id="ds_dedOther" class="input-control" value="10000" placeholder="0">
+                  </div>
+                </td>
+              </tr>
+              <tr style="background: var(--bg-accent);">
+                <td colspan="3"><strong style="color: var(--accent-crimson);">💳 PREPAID TAXES & CREDITS (TDS / TCS / ADVANCE TAX)</strong></td>
+              </tr>
+              <tr>
+                <td>TDS & TCS Deducted</td>
+                <td>Tax Deducted at Source (Form 16/16A/26AS) + TCS collected</td>
+                <td>
+                  <div class="input-with-currency">
+                    <span class="currency-prefix">₹</span>
+                    <input type="number" id="ds_preTdsTcs" class="input-control" value="465000" placeholder="0">
+                  </div>
+                </td>
+              </tr>
+              <tr>
+                <td>Advance Tax Paid</td>
+                <td>Quarterly Advance Tax paid via Challan 280 / e-Pay Tax</td>
+                <td>
+                  <div class="input-with-currency">
+                    <span class="currency-prefix">₹</span>
+                    <input type="number" id="ds_preAdvanceTax" class="input-control" value="60000" placeholder="0">
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Section 3: Summary Comparison Box right on worksheet -->
+        <div class="grid-2" style="margin-top: 1rem;">
+          <div class="card" style="background: var(--bg-secondary); border-left: 4px solid var(--accent-emerald);">
+            <div style="font-size: 0.85rem; font-weight: 700; color: var(--accent-emerald); text-transform: uppercase;">New Tax Regime (115BAC) Summary</div>
+            <div style="display: flex; justify-content: space-between; margin-top: 0.5rem;">
+              <span style="color: var(--text-secondary);">Taxable Income:</span>
+              <strong id="ds_newTaxableIncome">₹0</strong>
+            </div>
+            <div style="display: flex; justify-content: space-between; margin-top: 0.25rem;">
+              <span style="color: var(--text-secondary);">Total Tax Liability:</span>
+              <strong style="color: var(--accent-emerald);" id="ds_newTaxLiability">₹0</strong>
+            </div>
+            <div style="display: flex; justify-content: space-between; margin-top: 0.25rem;">
+              <span style="color: var(--text-secondary);">Net Payable / (Refund):</span>
+              <strong id="ds_newNetPayable">₹0</strong>
+            </div>
+          </div>
+
+          <div class="card" style="background: var(--bg-secondary); border-left: 4px solid var(--accent-gold);">
+            <div style="font-size: 0.85rem; font-weight: 700; color: var(--accent-gold); text-transform: uppercase;">Old Tax Regime Summary</div>
+            <div style="display: flex; justify-content: space-between; margin-top: 0.5rem;">
+              <span style="color: var(--text-secondary);">Taxable Income:</span>
+              <strong id="ds_oldTaxableIncome">₹0</strong>
+            </div>
+            <div style="display: flex; justify-content: space-between; margin-top: 0.25rem;">
+              <span style="color: var(--text-secondary);">Total Tax Liability:</span>
+              <strong style="color: var(--accent-gold);" id="ds_oldTaxLiability">₹0</strong>
+            </div>
+            <div style="display: flex; justify-content: space-between; margin-top: 0.25rem;">
+              <span style="color: var(--text-secondary);">Net Payable / (Refund):</span>
+              <strong id="ds_oldNetPayable">₹0</strong>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB: ASSESSEE MASTER & STATUS -->
+    <div id="tab-assessee" class="tab-content">
+      <div class="card">
+        <div class="card-header">
+          <div>
+            <h2 class="card-title"><span>📋</span> Assessee Identification & Statutory Parameters</h2>
+            <p class="card-subtitle">General details for Tax Audit and ITR preparation for Assessment Year 2026-27 (FY 2025-26)</p>
+          </div>
+          <span class="brand-badge">Section 139 Compliant</span>
+        </div>
+
+        <div class="grid-3">
+          <div class="form-group">
+            <label class="form-label" for="assesseeName">Assessee Full Name / Entity Name</label>
+            <input type="text" id="assesseeName" class="input-control" value="Aditya Vikram Sharma">
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="assesseePan">Permanent Account Number (PAN)</label>
+            <input type="text" id="assesseePan" class="input-control" value="ABCPS1234F" style="text-transform: uppercase;">
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="assesseeDob">Date of Birth / Incorporation</label>
+            <input type="date" id="assesseeDob" class="input-control" value="1988-06-15">
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="residentialStatus">Residential Status</label>
+            <select id="residentialStatus" class="select-control">
+              <option value="Resident">Resident & Ordinarily Resident (ROR)</option>
+              <option value="RNOR">Resident but Not Ordinarily Resident (RNOR)</option>
+              <option value="Non-Resident">Non-Resident (NR)</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="assessmentYear">Assessment Year</label>
+            <select id="assessmentYear" class="select-control">
+              <option value="2026-27" selected>AY 2026-27 (FY 2025-26)</option>
+              <option value="2027-28">AY 2027-28 (FY 2026-27)</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="regimePreference">Default Tax Regime Selection</label>
+            <select id="regimePreference" class="select-control">
+              <option value="new" selected>New Tax Regime u/s 115BAC(1A) [Default]</option>
+              <option value="old">Old Tax Regime (Opting out via Form 10-IEA/10-IC)</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <h2 class="card-title"><span>🏛️</span> Chartered Accountant / Tax Practitioner Certification Details</h2>
+          <span class="badge-tag">Verification Block</span>
+        </div>
+
+        <div class="grid-4">
+          <div class="form-group">
+            <label class="form-label" for="caName">CA / Practitioner Name</label>
+            <input type="text" id="caName" class="input-control" value="R. K. Agrawal & Co.">
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="caMembership">CA Membership No.</label>
+            <input type="text" id="caMembership" class="input-control" value="054321">
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="firmRegNo">Firm Registration No. (FRN)</label>
+            <input type="text" id="firmRegNo" class="input-control" value="001234N">
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="udin">UDIN (Unique Document ID)</label>
+            <input type="text" id="udin" class="input-control" value="26054321AAAAAA1122">
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <h2 class="card-title"><span>💳</span> Prepaid Taxes & Reliefs Claimed (TDS / TCS / Relief 89)</h2>
+        </div>
+
+        <div class="grid-4">
+          <div class="form-group">
+            <label class="form-label" for="tdsClaimed">TDS Claimed (26AS / AIS)</label>
+            <div class="input-with-currency">
+              <span class="currency-prefix">₹</span>
+              <input type="number" id="tdsClaimed" class="input-control" value="450000">
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="tcsClaimed">TCS Claimed (26AS / AIS)</label>
+            <div class="input-with-currency">
+              <span class="currency-prefix">₹</span>
+              <input type="number" id="tcsClaimed" class="input-control" value="15000">
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="advanceTaxPaidTotal">Advance Tax Already Paid</label>
+            <div class="input-with-currency">
+              <span class="currency-prefix">₹</span>
+              <input type="number" id="advanceTaxPaidTotal" class="input-control" value="60000">
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="reliefSec89">Relief u/s 89 / 90 / 91</label>
+            <div class="input-with-currency">
+              <span class="currency-prefix">₹</span>
+              <input type="number" id="reliefSec89" class="input-control" value="0">
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB 2: FIVE HEADS OF INCOME -->
+    <div id="tab-heads" class="tab-content">
+      <div class="subtab-nav">
+        <button class="subtab-btn active" data-subtab="subtab-salary">
+          <span>💼</span> 1. Salaries (Sec 15-17)
+        </button>
+        <button class="subtab-btn" data-subtab="subtab-hp">
+          <span>🏠</span> 2. House Property (Sec 22-27)
+        </button>
+        <button class="subtab-btn" data-subtab="subtab-pgbp">
+          <span>🏭</span> 3. Business / Profession (Sec 28-44)
+        </button>
+        <button class="subtab-btn" data-subtab="subtab-cg">
+          <span>📈</span> 4. Capital Gains (Sec 45-55A)
+        </button>
+        <button class="subtab-btn" data-subtab="subtab-os">
+          <span>🪙</span> 5. Other Sources (Sec 56-59)
+        </button>
+      </div>
+
+      <!-- SUBTAB 2.1: SALARIES -->
+      <div id="subtab-salary" class="subtab-pane active">
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <h3 class="card-title"><span>💼</span> Schedule S: Income from Salaries</h3>
+              <p class="card-subtitle">With automated Metro / Non-Metro HRA formula u/s 10(13A), LTA u/s 10(5), and Standard Deduction (₹75,000 New / ₹50,000 Old)</p>
+            </div>
+            <span class="badge-tag badge-new">Enhanced ₹75k Std. Ded.</span>
+          </div>
+
+          <div class="grid-3">
+            <div class="form-group">
+              <label class="form-label" for="salaryBasic">Basic Salary (Annual)</label>
+              <div class="input-with-currency">
+                <span class="currency-prefix">₹</span>
+                <input type="number" id="salaryBasic" class="input-control" value="1800000">
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label" for="salaryDa">Dearness Allowance (DA)</label>
+              <div class="input-with-currency">
+                <span class="currency-prefix">₹</span>
+                <input type="number" id="salaryDa" class="input-control" value="360000">
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label" for="salaryHra">House Rent Allowance (HRA) Received</label>
+              <div class="input-with-currency">
+                <span class="currency-prefix">₹</span>
+                <input type="number" id="salaryHra" class="input-control" value="600000">
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label" for="salaryRentPaid">Total Rent Paid (Annual)</label>
+              <div class="input-with-currency">
+                <span class="currency-prefix">₹</span>
+                <input type="number" id="salaryRentPaid" class="input-control" value="480000">
+              </div>
+            </div>
+
+            <div class="form-group" style="justify-content: center;">
+              <label class="checkbox-label">
+                <input type="checkbox" id="salaryIsMetro" checked>
+                <span>Accommodation is in Metro City (Delhi, Mumbai, Kolkata, Chennai - 50%)</span>
+              </label>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label" for="salaryLta">Leave Travel Allowance (LTA) Received</label>
+              <div class="input-with-currency">
+                <span class="currency-prefix">₹</span>
+                <input type="number" id="salaryLta" class="input-control" value="100000">
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label" for="salaryLtaExempt">LTA Exemption Claimed u/s 10(5)</label>
+              <div class="input-with-currency">
+                <span class="currency-prefix">₹</span>
+                <input type="number" id="salaryLtaExempt" class="input-control" value="80000">
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label" for="salarySpecialAllowance">Special Allowance & Other Allowances</label>
+              <div class="input-with-currency">
+                <span class="currency-prefix">₹</span>
+                <input type="number" id="salarySpecialAllowance" class="input-control" value="540000">
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label" for="salaryBonus">Bonus & Commission</label>
+              <div class="input-with-currency">
+                <span class="currency-prefix">₹</span>
+                <input type="number" id="salaryBonus" class="input-control" value="300000">
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label" for="salaryPerquisites">Perquisites Value u/s 17(2)</label>
+              <div class="input-with-currency">
+                <span class="currency-prefix">₹</span>
+                <input type="number" id="salaryPerquisites" class="input-control" value="50000">
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label" for="salaryProfTax">Professional Tax Paid u/s 16(iii)</label>
+              <div class="input-with-currency">
+                <span class="currency-prefix">₹</span>
+                <input type="number" id="salaryProfTax" class="input-control" value="2500">
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label" for="salaryEntertainment">Entertainment Allowance (Govt only)</label>
+              <div class="input-with-currency">
+                <span class="currency-prefix">₹</span>
+                <input type="number" id="salaryEntertainment" class="input-control" value="0">
+              </div>
+            </div>
+          </div>
+
+          <!-- Salary Live Summary Table -->
+          <div style="margin-top: 1.5rem;" class="matrix-table-wrapper">
+            <table class="matrix-table">
+              <thead>
+                <tr>
+                  <th>Component</th>
+                  <th>Old Tax Regime</th>
+                  <th>New Tax Regime u/s 115BAC</th>
+                  <th>Statutory Notes</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>Gross Salary u/s 17(1)</td>
+                  <td class="amount-cell" id="salSummaryGrossOld">₹0</td>
+                  <td class="amount-cell" id="salSummaryGrossNew">₹0</td>
+                  <td>Basic + DA + HRA + Allowances + Bonus + Perquisites</td>
+                </tr>
+                <tr>
+                  <td>Exemptions u/s 10 (HRA + LTA)</td>
+                  <td class="amount-cell" style="color: var(--accent-emerald);" id="salSummaryExemptionsOld">- ₹0</td>
+                  <td class="amount-cell" style="color: var(--text-muted);">- ₹0</td>
+                  <td>HRA min(Actual, 50% salary, Rent - 10% salary). Not allowed in New Regime.</td>
+                </tr>
+                <tr>
+                  <td>Standard Deduction u/s 16(ia)</td>
+                  <td class="amount-cell" style="color: var(--accent-emerald);">- ₹50,000</td>
+                  <td class="amount-cell" style="color: var(--accent-emerald);">- ₹75,000</td>
+                  <td>Budget 2024 enhanced New Regime deduction to ₹75,000</td>
+                </tr>
+                <tr>
+                  <td>Professional Tax u/s 16(iii)</td>
+                  <td class="amount-cell" style="color: var(--accent-emerald);" id="salSummaryProfTaxOld">- ₹0</td>
+                  <td class="amount-cell" style="color: var(--text-muted);">- ₹0</td>
+                  <td>Allowed up to ₹2,500 in Old Regime only</td>
+                </tr>
+                <tr class="total-row">
+                  <td>Net Taxable Income from Salaries</td>
+                  <td class="amount-cell" id="salSummaryNetOld">₹0</td>
+                  <td class="amount-cell" id="salSummaryNetNew">₹0</td>
+                  <td>Transferred to Schedule GTI</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- SUBTAB 2.2: HOUSE PROPERTY -->
+      <div id="subtab-hp" class="subtab-pane">
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <h3 class="card-title"><span>🏠</span> Schedule HP: Income / Loss from House Property</h3>
+              <p class="card-subtitle">Multi-property calculator with 30% statutory repair deduction u/s 24(a), ₹2,00,000 self-occupied interest cap u/s 24(b), and ₹2,00,000 inter-head set-off limit u/s 71(3A).</p>
+            </div>
+            <button id="btnAddHpProperty" class="btn btn-emerald">
+              <span>➕</span> Add Property
+            </button>
+          </div>
+
+          <div id="hpPropertiesContainer" style="display: flex; flex-direction: column; gap: 1rem;">
+            <!-- Dynamically injected properties -->
+          </div>
+
+          <!-- HP Live Summary Table -->
+          <div style="margin-top: 1.5rem;" class="matrix-table-wrapper">
+            <table class="matrix-table">
+              <thead>
+                <tr>
+                  <th>Regime</th>
+                  <th>Total House Property Net Income / (Loss)</th>
+                  <th>Allowable Set-off Against Other Heads</th>
+                  <th>Loss Carried Forward u/s 71B</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><strong>Old Tax Regime</strong></td>
+                  <td class="amount-cell" id="hpSummaryGrossOld">₹0</td>
+                  <td class="amount-cell" style="color: var(--accent-emerald);" id="hpSummaryAllowedOld">₹0</td>
+                  <td class="amount-cell" style="color: var(--accent-gold);" id="hpSummaryCfOld">₹0</td>
+                </tr>
+                <tr>
+                  <td><strong>New Tax Regime u/s 115BAC</strong></td>
+                  <td class="amount-cell" id="hpSummaryGrossNew">₹0</td>
+                  <td class="amount-cell" style="color: var(--accent-emerald);" id="hpSummaryAllowedNew">₹0</td>
+                  <td class="amount-cell" style="color: var(--accent-gold);" id="hpSummaryCfNew">₹0</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- SUBTAB 2.3: PGBP (BUSINESS / PROFESSION) -->
+      <div id="subtab-pgbp" class="subtab-pane">
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <h3 class="card-title"><span>🏭</span> Schedule PGBP: Profits and Gains of Business or Profession</h3>
+              <p class="card-subtitle">Presumptive taxation under Section 44AD / 44ADA / 44AE or Regular Books with Sec 40(a)/43B adjustments & Sec 32 Depreciation.</p>
+            </div>
+            <div style="display: flex; gap: 0.5rem;">
+              <button id="btnPgbpPresumptive" class="btn btn-primary">Presumptive Mode</button>
+              <button id="btnPgbpBooks" class="btn btn-secondary">Regular Books Mode</button>
+            </div>
+          </div>
+
+          <!-- Presumptive Form -->
+          <div id="pgbpPresumptiveSection" style="display: flex; flex-direction: column; gap: 1.25rem;">
+            <div class="form-group" style="max-width: 320px;">
+              <label class="form-label" for="pgbpSchemeSelect">Presumptive Scheme</label>
+              <select id="pgbpSchemeSelect" class="select-control">
+                <option value="44AD">Section 44AD (Eligible Small Business - 6% Digital / 8% Cash)</option>
+                <option value="44ADA">Section 44ADA (Specified Professionals - 50% Deemed Profit)</option>
+                <option value="44AE">Section 44AE (Goods Carriages Transport Operators)</option>
+              </select>
+            </div>
+
+            <!-- 44AD Inputs -->
+            <div id="sec44adInputs" class="grid-4">
+              <div class="form-group">
+                <label class="form-label" for="sec44ad_digitalTurnover">Digital / Banking Turnover (6%)</label>
+                <div class="input-with-currency">
+                  <span class="currency-prefix">₹</span>
+                  <input type="number" id="sec44ad_digitalTurnover" class="input-control" value="0">
+                </div>
+                <span class="form-hint">RTGS / NEFT / UPI / Cheque</span>
+              </div>
+
+              <div class="form-group">
+                <label class="form-label" for="sec44ad_cashTurnover">Cash Turnover (8%)</label>
+                <div class="input-with-currency">
+                  <span class="currency-prefix">₹</span>
+                  <input type="number" id="sec44ad_cashTurnover" class="input-control" value="0">
+                </div>
+                <span class="form-hint">Physical cash sales</span>
+              </div>
+
+              <div class="form-group">
+                <label class="form-label" for="sec44ad_declaredDigitalProfit">Declared Profit on Digital (Min 6%)</label>
+                <div class="input-with-currency">
+                  <span class="currency-prefix">₹</span>
+                  <input type="number" id="sec44ad_declaredDigitalProfit" class="input-control" value="0">
+                </div>
+              </div>
+
+              <div class="form-group">
+                <label class="form-label" for="sec44ad_declaredCashProfit">Declared Profit on Cash (Min 8%)</label>
+                <div class="input-with-currency">
+                  <span class="currency-prefix">₹</span>
+                  <input type="number" id="sec44ad_declaredCashProfit" class="input-control" value="0">
+                </div>
+              </div>
+            </div>
+
+            <!-- 44ADA Inputs -->
+            <div id="sec44adaInputs" class="grid-3" style="display: none;">
+              <div class="form-group">
+                <label class="form-label" for="sec44ada_grossReceipts">Gross Professional Receipts (Total)</label>
+                <div class="input-with-currency">
+                  <span class="currency-prefix">₹</span>
+                  <input type="number" id="sec44ada_grossReceipts" class="input-control" value="0">
+                </div>
+                <span class="form-hint">Cap: ₹75 Lakhs if cash <= 5% (else ₹50 Lakhs)</span>
+              </div>
+
+              <div class="form-group">
+                <label class="form-label" for="sec44ada_cashReceipts">Cash Receipts Component</label>
+                <div class="input-with-currency">
+                  <span class="currency-prefix">₹</span>
+                  <input type="number" id="sec44ada_cashReceipts" class="input-control" value="0">
+                </div>
+              </div>
+
+              <div class="form-group">
+                <label class="form-label" for="sec44ada_declaredProfit">Declared Professional Profit (Min 50%)</label>
+                <div class="input-with-currency">
+                  <span class="currency-prefix">₹</span>
+                  <input type="number" id="sec44ada_declaredProfit" class="input-control" value="0">
+                </div>
+              </div>
+            </div>
+
+            <!-- 44AE Inputs -->
+            <div id="sec44aeInputs" class="grid-4" style="display: none;">
+              <div class="form-group">
+                <label class="form-label" for="sec44ae_heavyVehicleTons">Heavy Vehicle Aggregate Tons</label>
+                <input type="number" id="sec44ae_heavyVehicleTons" class="input-control" value="0">
+              </div>
+
+              <div class="form-group">
+                <label class="form-label" for="sec44ae_heavyVehicleMonths">Operating Months (Heavy)</label>
+                <input type="number" id="sec44ae_heavyVehicleMonths" class="input-control" value="12">
+              </div>
+
+              <div class="form-group">
+                <label class="form-label" for="sec44ae_otherVehiclesCount">Other Vehicles Count (Max 10)</label>
+                <input type="number" id="sec44ae_otherVehiclesCount" class="input-control" value="0">
+              </div>
+
+              <div class="form-group">
+                <label class="form-label" for="sec44ae_otherVehicleMonths">Operating Months (Other)</label>
+                <input type="number" id="sec44ae_otherVehicleMonths" class="input-control" value="12">
+              </div>
+            </div>
+          </div>
+
+          <!-- Regular Books Form -->
+          <div id="pgbpBooksSection" style="display: none; flex-direction: column; gap: 1.25rem;">
+            <div class="grid-3">
+              <div class="form-group">
+                <label class="form-label" for="netProfitAsPerPL">Net Profit as per Profit & Loss A/c</label>
+                <div class="input-with-currency">
+                  <span class="currency-prefix">₹</span>
+                  <input type="number" id="netProfitAsPerPL" class="input-control" value="0">
+                </div>
+              </div>
+
+              <div class="form-group">
+                <label class="form-label" for="disallowanceSec40a">TDS Disallowances u/s 40(a)(ia) / 40(a)(i)</label>
+                <div class="input-with-currency">
+                  <span class="currency-prefix">₹</span>
+                  <input type="number" id="disallowanceSec40a" class="input-control" value="0">
+                </div>
+                <span class="form-hint">30% non-deduction on resident payments</span>
+              </div>
+
+              <div class="form-group">
+                <label class="form-label" for="disallowanceSec43B">Unpaid Statutory Dues / MSME u/s 43B/43B(h)</label>
+                <div class="input-with-currency">
+                  <span class="currency-prefix">₹</span>
+                  <input type="number" id="disallowanceSec43B" class="input-control" value="0">
+                </div>
+              </div>
+
+              <div class="form-group">
+                <label class="form-label" for="disallowanceSec40A3">Cash Payment Disallowance u/s 40A(3)</label>
+                <div class="input-with-currency">
+                  <span class="currency-prefix">₹</span>
+                  <input type="number" id="disallowanceSec40A3" class="input-control" value="0">
+                </div>
+                <span class="form-hint">Payments > ₹10,000 per day in cash</span>
+              </div>
+
+              <div class="form-group">
+                <label class="form-label" for="otherInadmissibleExpenses">Other Inadmissible Expenses</label>
+                <div class="input-with-currency">
+                  <span class="currency-prefix">₹</span>
+                  <input type="number" id="otherInadmissibleExpenses" class="input-control" value="0">
+                </div>
+              </div>
+
+              <div class="form-group">
+                <label class="form-label" for="bookDepreciation">Book Depreciation Debited in P&L</label>
+                <div class="input-with-currency">
+                  <span class="currency-prefix">₹</span>
+                  <input type="number" id="bookDepreciation" class="input-control" value="0">
+                </div>
+                <span class="form-hint">Added back to profit</span>
+              </div>
+
+              <div class="form-group">
+                <label class="form-label" for="itDepreciationSec32">Income Tax Depreciation u/s Section 32</label>
+                <div class="input-with-currency">
+                  <span class="currency-prefix">₹</span>
+                  <input type="number" id="itDepreciationSec32" class="input-control" value="0">
+                </div>
+                <span class="form-hint">Deducted from profit</span>
+              </div>
+
+              <div class="form-group">
+                <label class="form-label" for="incomeCreditedNotTaxableInPgbp">Income Credited in P&L Taxable Elsewhere</label>
+                <div class="input-with-currency">
+                  <span class="currency-prefix">₹</span>
+                  <input type="number" id="incomeCreditedNotTaxableInPgbp" class="input-control" value="0">
+                </div>
+                <span class="form-hint">Dividends, Interest, Capital Gains in P&L</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- PGBP Computed Net Bar -->
+          <div style="margin-top: 1.5rem; padding: 1rem; background: var(--bg-secondary); border-radius: var(--radius-md); display: flex; align-items: center; justify-content: space-between;">
+            <div>
+              <span style="font-size: 0.8rem; color: var(--text-muted); text-transform: uppercase;">Net Taxable PGBP Income</span>
+              <div style="font-size: 1.35rem; font-weight: 800; font-family: var(--font-mono); color: var(--accent-primary);" id="pgbpComputedNet">₹0</div>
+            </div>
+            <div id="pgbpAuditBadge"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- SUBTAB 2.4: CAPITAL GAINS -->
+      <div id="subtab-cg" class="subtab-pane">
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <h3 class="card-title"><span>📈</span> Schedule CG: Capital Gains</h3>
+              <p class="card-subtitle">Budget 2024 rationalized rates: STCG 111A @ 20%, LTCG 112A @ 12.5% (with ₹1,25,000 exemption), LTCG 112 @ 12.5%, and Rollover Exemptions.</p>
+            </div>
+            <span class="badge-tag badge-new">Budget 2024 Rates Calibrated</span>
+          </div>
+
+          <div class="grid-2">
+            <!-- STCG Card -->
+            <div style="border: 1px solid var(--border-subtle); padding: 1rem; border-radius: var(--radius-md);">
+              <h4 style="font-size: 0.95rem; margin-bottom: 1rem; color: var(--accent-primary);">Short-Term Capital Gains (STCG)</h4>
+              
+              <div class="form-group" style="margin-bottom: 1rem;">
+                <label class="form-label" for="stcg111a_gross">STCG u/s 111A (Listed Equities / Equity MFs @ 20%)</label>
+                <div class="input-with-currency">
+                  <span class="currency-prefix">₹</span>
+                  <input type="number" id="stcg111a_gross" class="input-control" value="0">
+                </div>
+                <span class="form-hint">Subject to STT | Revised rate 20%</span>
+              </div>
+
+              <div class="form-group">
+                <label class="form-label" for="stcgNormal_gross">STCG Other / Debt Funds / Short-Term Assets (Slab Rates)</label>
+                <div class="input-with-currency">
+                  <span class="currency-prefix">₹</span>
+                  <input type="number" id="stcgNormal_gross" class="input-control" value="0">
+                </div>
+                <span class="form-hint">Taxed at normal progressive slab rates</span>
+              </div>
+            </div>
+
+            <!-- LTCG Card -->
+            <div style="border: 1px solid var(--border-subtle); padding: 1rem; border-radius: var(--radius-md);">
+              <h4 style="font-size: 0.95rem; margin-bottom: 1rem; color: var(--accent-emerald);">Long-Term Capital Gains (LTCG)</h4>
+
+              <div class="form-group" style="margin-bottom: 1rem;">
+                <label class="form-label" for="ltcg112a_gross">LTCG u/s 112A (Listed Equities / Equity MFs @ 12.5%)</label>
+                <div class="input-with-currency">
+                  <span class="currency-prefix">₹</span>
+                  <input type="number" id="ltcg112a_gross" class="input-control" value="0">
+                </div>
+                <span class="form-hint">Enhanced ₹1,25,000 threshold exemption applied automatically</span>
+              </div>
+
+              <div class="form-group" style="margin-bottom: 1rem;">
+                <label class="form-label" for="ltcg112_gross">LTCG u/s 112 (Immovable Property, Unlisted Shares, Gold @ 12.5%)</label>
+                <div class="input-with-currency">
+                  <span class="currency-prefix">₹</span>
+                  <input type="number" id="ltcg112_gross" class="input-control" value="0">
+                </div>
+              </div>
+
+              <div class="form-group">
+                <label class="form-label" for="rollover54">Rollover Exemptions Claimed (Sec 54 / 54EC / 54F / 54B)</label>
+                <div class="input-with-currency">
+                  <span class="currency-prefix">₹</span>
+                  <input type="number" id="rollover54" class="input-control" value="0">
+                </div>
+                <span class="form-hint">54EC Bonds (Max ₹50L), 54 House Property reinvestment</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- CG Breakdown Table -->
+          <div style="margin-top: 1.5rem;" class="matrix-table-wrapper">
+            <table class="matrix-table">
+              <thead>
+                <tr>
+                  <th>Category</th>
+                  <th>Gross Gains</th>
+                  <th>Statutory Exemption / Rollover</th>
+                  <th>Taxable Gain</th>
+                  <th>Applicable Statutory Rate</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>STCG u/s 111A</td>
+                  <td class="amount-cell" id="cgBreakdownStcg111aGross">₹0</td>
+                  <td class="amount-cell">₹0</td>
+                  <td class="amount-cell" id="cgBreakdownStcg111aNet">₹0</td>
+                  <td><strong>20% Flat</strong></td>
+                </tr>
+                <tr>
+                  <td>STCG Normal (Other)</td>
+                  <td class="amount-cell" id="cgBreakdownStcgNormalGross">₹0</td>
+                  <td class="amount-cell">₹0</td>
+                  <td class="amount-cell" id="cgBreakdownStcgNormalNet">₹0</td>
+                  <td><strong>Progressive Slabs</strong></td>
+                </tr>
+                <tr>
+                  <td>LTCG u/s 112A</td>
+                  <td class="amount-cell" id="cgBreakdownLtcg112aGross">₹0</td>
+                  <td class="amount-cell" style="color: var(--accent-emerald);" id="cgBreakdownLtcg112aExempt">- ₹0</td>
+                  <td class="amount-cell" id="cgBreakdownLtcg112aNet">₹0</td>
+                  <td><strong>12.5% Flat</strong> (Excess of ₹1.25L)</td>
+                </tr>
+                <tr>
+                  <td>LTCG u/s 112 (Property / Gold)</td>
+                  <td class="amount-cell" id="cgBreakdownLtcg112Gross">₹0</td>
+                  <td class="amount-cell" style="color: var(--accent-emerald);" id="cgBreakdownLtcg112Rollover">- ₹0</td>
+                  <td class="amount-cell" id="cgBreakdownLtcg112Net">₹0</td>
+                  <td><strong>12.5% Flat</strong></td>
+                </tr>
+                <tr class="total-row">
+                  <td>Total Taxable Capital Gains</td>
+                  <td class="amount-cell" colspan="2"></td>
+                  <td class="amount-cell" id="cgBreakdownTotal">₹0</td>
+                  <td></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- SUBTAB 2.5: OTHER SOURCES -->
+      <div id="subtab-os" class="subtab-pane">
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <h3 class="card-title"><span>🪙</span> Schedule OS: Income from Other Sources</h3>
+              <p class="card-subtitle">Savings / FD interest, Dividends, Family Pension deduction (₹25,000 New / ₹15,000 Old), and Flat 30% Special Taxation on Lotteries, Gaming, and Crypto / VDAs.</p>
+            </div>
+            <span class="badge-tag">Section 56 to 59</span>
+          </div>
+
+          <div class="grid-3">
+            <div class="form-group">
+              <label class="form-label" for="savingsInterest">Savings Bank Interest</label>
+              <div class="input-with-currency">
+                <span class="currency-prefix">₹</span>
+                <input type="number" id="savingsInterest" class="input-control" value="35000">
+              </div>
+              <span class="form-hint">Eligible for 80TTA (₹10k) / 80TTB (₹50k)</span>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label" for="termDepositInterest">Fixed Deposit (FD) / Recurring Interest</label>
+              <div class="input-with-currency">
+                <span class="currency-prefix">₹</span>
+                <input type="number" id="termDepositInterest" class="input-control" value="75000">
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label" for="dividendIncome">Dividend Income from Equities / MFs</label>
+              <div class="input-with-currency">
+                <span class="currency-prefix">₹</span>
+                <input type="number" id="dividendIncome" class="input-control" value="42000">
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label" for="familyPension">Family Pension Received u/s 57(iia)</label>
+              <div class="input-with-currency">
+                <span class="currency-prefix">₹</span>
+                <input type="number" id="familyPension" class="input-control" value="0">
+              </div>
+              <span class="form-hint">Deduction: 1/3rd or ₹25k New / ₹15k Old</span>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label" for="otherRegularIncome">Any Other Normal Interest / Commission</label>
+              <div class="input-with-currency">
+                <span class="currency-prefix">₹</span>
+                <input type="number" id="otherRegularIncome" class="input-control" value="0">
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label" for="allowableExpensesSec57">Allowable Expenses u/s 57 (Interest only)</label>
+              <div class="input-with-currency">
+                <span class="currency-prefix">₹</span>
+                <input type="number" id="allowableExpensesSec57" class="input-control" value="0">
+              </div>
+            </div>
+          </div>
+
+          <!-- Special Flat 30% Incomes -->
+          <div style="margin-top: 1.5rem; border: 1px solid var(--accent-crimson); border-radius: var(--radius-md); padding: 1.25rem; background: rgba(244, 63, 94, 0.04);">
+            <h4 style="font-size: 0.95rem; color: var(--accent-crimson); margin-bottom: 1rem;">Special Rate Incomes (Flat 30% Tax u/s 115BB, 115BBJ, 115BBH)</h4>
+            <div class="grid-3">
+              <div class="form-group">
+                <label class="form-label" for="lotteryIncome115BB">Lotteries, Crossword & Horse Races u/s 115BB</label>
+                <div class="input-with-currency">
+                  <span class="currency-prefix">₹</span>
+                  <input type="number" id="lotteryIncome115BB" class="input-control" value="0">
+                </div>
+                <span class="form-hint">No deduction / expenditure allowed</span>
+              </div>
+
+              <div class="form-group">
+                <label class="form-label" for="onlineGaming115BBJ">Net Winnings from Online Gaming u/s 115BBJ</label>
+                <div class="input-with-currency">
+                  <span class="currency-prefix">₹</span>
+                  <input type="number" id="onlineGaming115BBJ" class="input-control" value="0">
+                </div>
+                <span class="form-hint">Flat 30% tax</span>
+              </div>
+
+              <div class="form-group">
+                <label class="form-label" for="cryptoVdaIncome115BBH">Virtual Digital Assets (Crypto / NFT) u/s 115BBH</label>
+                <div class="input-with-currency">
+                  <span class="currency-prefix">₹</span>
+                  <input type="number" id="cryptoVdaIncome115BBH" class="input-control" value="0">
+                </div>
+                <span class="form-hint">Flat 30% (No loss set-off against any head)</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB 3: CHAPTER VI-A DEDUCTIONS -->
+    <div id="tab-deductions" class="tab-content">
+      <div class="card">
+        <div class="card-header">
+          <div>
+            <h2 class="card-title"><span>📑</span> Schedule VIA: Deductions from Total Income</h2>
+            <p class="card-subtitle">Comprehensive deductions engine with Section 80C, 80CCD(1B), 80CCD(2) Employer NPS (allowed up to 14% in both regimes), 80D Mediclaim, 80E, 80G, and 80TTA/TTB.</p>
+          </div>
+          <span class="brand-badge">Sec 80C to 80U</span>
+        </div>
+
+        <div class="grid-2">
+          <!-- 80C Group -->
+          <div style="border: 1px solid var(--border-subtle); padding: 1.25rem; border-radius: var(--radius-md);">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+              <h3 style="font-size: 1rem; color: var(--accent-primary);">1. Section 80C / 80CCC / 80CCD(1)</h3>
+              <span class="badge-tag" style="background: rgba(56, 189, 248, 0.15); color: var(--accent-primary);">Max Cap: ₹1,50,000</span>
+            </div>
+
+            <div class="grid-2">
+              <div class="form-group">
+                <label class="form-label" for="sec80C_ppf">Public Provident Fund (PPF)</label>
+                <div class="input-with-currency">
+                  <span class="currency-prefix">₹</span>
+                  <input type="number" id="sec80C_ppf" class="input-control" value="100000">
+                </div>
+              </div>
+
+              <div class="form-group">
+                <label class="form-label" for="sec80C_epf">Employee PF (EPF / VPF)</label>
+                <div class="input-with-currency">
+                  <span class="currency-prefix">₹</span>
+                  <input type="number" id="sec80C_epf" class="input-control" value="150000">
+                </div>
+              </div>
+
+              <div class="form-group">
+                <label class="form-label" for="sec80C_elss">ELSS Mutual Funds (Tax Saver)</label>
+                <div class="input-with-currency">
+                  <span class="currency-prefix">₹</span>
+                  <input type="number" id="sec80C_elss" class="input-control" value="50000">
+                </div>
+              </div>
+
+              <div class="form-group">
+                <label class="form-label" for="sec80C_lic">Life Insurance Premium (LIC)</label>
+                <div class="input-with-currency">
+                  <span class="currency-prefix">₹</span>
+                  <input type="number" id="sec80C_lic" class="input-control" value="25000">
+                </div>
+              </div>
+
+              <div class="form-group">
+                <label class="form-label" for="sec80C_homeLoanPrincipal">Home Loan Principal Repayment</label>
+                <div class="input-with-currency">
+                  <span class="currency-prefix">₹</span>
+                  <input type="number" id="sec80C_homeLoanPrincipal" class="input-control" value="85000">
+                </div>
+              </div>
+
+              <div class="form-group">
+                <label class="form-label" for="sec80C_tuitionFees">Children Tuition Fees (Max 2 children)</label>
+                <div class="input-with-currency">
+                  <span class="currency-prefix">₹</span>
+                  <input type="number" id="sec80C_tuitionFees" class="input-control" value="40000">
+                </div>
+              </div>
+            </div>
+
+            <div style="margin-top: 1rem; padding: 0.75rem; background: var(--bg-secondary); border-radius: var(--radius-sm); display: flex; justify-content: space-between; font-size: 0.85rem;">
+              <span>Total 80C Claimed: <strong id="sec80CTotalClaimed">₹0</strong></span>
+              <span>Allowed in Old Regime: <strong style="color: var(--accent-emerald);" id="sec80CTotalAllowed">₹0</strong></span>
+            </div>
+          </div>
+
+          <!-- NPS & Pensions -->
+          <div style="border: 1px solid var(--border-subtle); padding: 1.25rem; border-radius: var(--radius-md);">
+            <h3 style="font-size: 1rem; color: var(--accent-emerald); margin-bottom: 1rem;">2. National Pension System (NPS) Deductions</h3>
+
+            <div class="form-group" style="margin-bottom: 1rem;">
+              <div style="display: flex; justify-content: space-between;">
+                <label class="form-label" for="sec80CCD1B">Section 80CCD(1B): Self Contribution to NPS</label>
+                <span class="form-hint" style="color: var(--accent-gold);">Capped at ₹50,000 (Old Regime)</span>
+              </div>
+              <div class="input-with-currency">
+                <span class="currency-prefix">₹</span>
+                <input type="number" id="sec80CCD1B" class="input-control" value="50000">
+              </div>
+            </div>
+
+            <div class="form-group" style="margin-bottom: 1rem;">
+              <div style="display: flex; justify-content: space-between;">
+                <label class="form-label" for="sec80CCD2_employerNps">Section 80CCD(2): Employer Contribution to NPS</label>
+                <span class="badge-tag badge-new">Allowed in BOTH Regimes!</span>
+              </div>
+              <div class="input-with-currency">
+                <span class="currency-prefix">₹</span>
+                <input type="number" id="sec80CCD2_employerNps" class="input-control" value="250000">
+              </div>
+              <span class="form-hint">Statutory limit: Up to 14% of (Basic + DA). Allowed in New Regime u/s 115BAC!</span>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label" for="sec80JJAA">Section 80JJAA: New Employment Deduction (Business)</label>
+              <div class="input-with-currency">
+                <span class="currency-prefix">₹</span>
+                <input type="number" id="sec80JJAA" class="input-control" value="0">
+              </div>
+              <span class="form-hint">Allowed in both Old & New Regimes for corporate / business assessees</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Row 2: 80D Mediclaim & Other Sections -->
+        <div class="grid-2" style="margin-top: 1.25rem;">
+          <!-- 80D Mediclaim -->
+          <div style="border: 1px solid var(--border-subtle); padding: 1.25rem; border-radius: var(--radius-md);">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+              <h3 style="font-size: 1rem; color: var(--accent-purple);">3. Section 80D: Health Insurance (Mediclaim)</h3>
+              <span class="badge-tag" style="background: rgba(168, 85, 247, 0.15); color: var(--accent-purple);">Self & Parents</span>
+            </div>
+
+            <div class="grid-2" style="margin-bottom: 1rem;">
+              <div class="form-group">
+                <label class="form-label" for="sec80D_selfInsurance">Self / Spouse / Children Premium</label>
+                <div class="input-with-currency">
+                  <span class="currency-prefix">₹</span>
+                  <input type="number" id="sec80D_selfInsurance" class="input-control" value="25000">
+                </div>
+              </div>
+
+              <div class="form-group">
+                <label class="form-label" for="sec80D_preventiveCheckup">Preventive Health Checkup (Self)</label>
+                <div class="input-with-currency">
+                  <span class="currency-prefix">₹</span>
+                  <input type="number" id="sec80D_preventiveCheckup" class="input-control" value="5000">
+                </div>
+                <span class="form-hint">Max ₹5,000 sublimit</span>
+              </div>
+            </div>
+
+            <div class="grid-2">
+              <div class="form-group">
+                <label class="form-label" for="sec80D_parentsInsurance">Parents Health Insurance Premium</label>
+                <div class="input-with-currency">
+                  <span class="currency-prefix">₹</span>
+                  <input type="number" id="sec80D_parentsInsurance" class="input-control" value="45000">
+                </div>
+              </div>
+
+              <div class="form-group" style="justify-content: center;">
+                <label class="checkbox-label">
+                  <input type="checkbox" id="isParentsSenior" checked>
+                  <span>Parents are Senior Citizens (Age 60+ cap ₹50,000)</span>
+                </label>
+              </div>
+            </div>
+          </div>
+
+          <!-- Other VI-A Deductions -->
+          <div style="border: 1px solid var(--border-subtle); padding: 1.25rem; border-radius: var(--radius-md);">
+            <h3 style="font-size: 1rem; color: var(--accent-gold); margin-bottom: 1rem;">4. Education, Housing & Donations (80E, 80EEA, 80G, 80TTA/TTB)</h3>
+
+            <div class="grid-2">
+              <div class="form-group">
+                <label class="form-label" for="sec80E_educationInterest">80E: Higher Education Loan Interest</label>
+                <div class="input-with-currency">
+                  <span class="currency-prefix">₹</span>
+                  <input type="number" id="sec80E_educationInterest" class="input-control" value="0">
+                </div>
+                <span class="form-hint">No upper limit (for 8 years)</span>
+              </div>
+
+              <div class="form-group">
+                <label class="form-label" for="sec80EEA_housingInterest">80EEA: Affordable Housing Interest</label>
+                <div class="input-with-currency">
+                  <span class="currency-prefix">₹</span>
+                  <input type="number" id="sec80EEA_housingInterest" class="input-control" value="0">
+                </div>
+                <span class="form-hint">Up to ₹1,50,000</span>
+              </div>
+
+              <div class="form-group">
+                <label class="form-label" for="sec80G_donations">80G: Eligible Charitable Donations</label>
+                <div class="input-with-currency">
+                  <span class="currency-prefix">₹</span>
+                  <input type="number" id="sec80G_donations" class="input-control" value="10000">
+                </div>
+              </div>
+
+              <div class="form-group">
+                <label class="form-label" for="otherDeductions">Other Deductions (80U / 80DDB / 80GGC)</label>
+                <div class="input-with-currency">
+                  <span class="currency-prefix">₹</span>
+                  <input type="number" id="otherDeductions" class="input-control" value="0">
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB 4: REGIME COMPARISON & BREAKEVEN MATRIX -->
+    <div id="tab-comparison" class="tab-content">
+      <div class="card">
+        <div class="card-header">
+          <div>
+            <h2 class="card-title"><span>⚖️</span> Side-by-Side Regime Comparison Matrix u/s 115BAC</h2>
+            <p class="card-subtitle">Comprehensive side-by-side computation of New Tax Regime vs Old Tax Regime with Breakeven Deductions Indicator.</p>
+          </div>
+          <div id="comparisonRecommendationBadge"></div>
+        </div>
+
+        <!-- Breakeven Indicator Banner -->
+        <div id="breakevenBanner" style="padding: 1.25rem; background: var(--bg-secondary); border-radius: var(--radius-md); border-left: 4px solid var(--accent-primary); margin-bottom: 1.5rem;">
+          <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 1rem;">
+            <div>
+              <h3 style="font-size: 1.05rem; font-weight: 700; color: var(--text-primary);" id="breakevenTitle">Breakeven Deductions Analysis</h3>
+              <p style="font-size: 0.85rem; color: var(--text-secondary); margin-top: 0.25rem;" id="breakevenInsight">Calculating breakeven threshold...</p>
+            </div>
+            <div style="text-align: right;">
+              <span style="font-size: 0.72rem; color: var(--text-muted); text-transform: uppercase;">Breakeven Target Deductions</span>
+              <div style="font-size: 1.35rem; font-weight: 800; font-family: var(--font-mono); color: var(--accent-emerald);" id="breakevenTarget">₹0</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Full Matrix Table -->
+        <div class="matrix-table-wrapper">
+          <table class="matrix-table">
+            <thead>
+              <tr>
+                <th style="width: 40%;">Statutory Computation Line Item</th>
+                <th style="width: 25%; text-align: right;">Old Tax Regime (₹)</th>
+                <th style="width: 25%; text-align: right;">New Tax Regime u/s 115BAC (₹)</th>
+                <th style="width: 10%; text-align: center;">Variance</th>
+              </tr>
+            </thead>
+            <tbody id="regimeComparisonTableBody">
+              <!-- Dynamically rendered rows -->
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Visual Comparison Chart -->
+        <div style="margin-top: 2rem;">
+          <h3 style="font-size: 1rem; font-weight: 700; margin-bottom: 1rem; color: var(--text-primary);">Visual Tax Distribution Comparison</h3>
+          <div class="chart-container" id="regimeComparisonChartContainer">
+            <!-- Dynamically injected SVG Chart -->
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB 5: ADVANCE TAX & SEC 234 INTEREST -->
+    <div id="tab-advance-tax" class="tab-content">
+      <div class="card">
+        <div class="card-header">
+          <div>
+            <h2 class="card-title"><span>⏱️</span> Advance Tax Schedule & Statutory Penal Interest Engine</h2>
+            <p class="card-subtitle">Quarterly advance tax compliance tracker for FY 2025-26 & FY 2026-27 with exact Section 234A, 234B, and 234C interest formulas.</p>
+          </div>
+          <span class="badge-tag" id="advanceTaxApplicabilityBadge">Section 208 Status</span>
+        </div>
+
+        <div class="grid-3" style="margin-bottom: 1.5rem;">
+          <div class="form-group">
+            <label class="form-label" for="advanceTaxDueDateSelect">Statutory ITR Filing Due Date</label>
+            <select id="advanceTaxDueDateSelect" class="select-control">
+              <option value="2026-07-31" selected>31 July 2026 (Non-Audit Individual / HUF / Firm)</option>
+              <option value="2026-10-31">31 October 2026 (Tax Audit Assessee u/s 44AB / Corporate)</option>
+              <option value="2026-11-30">30 November 2026 (Transfer Pricing u/s 92E)</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="advanceTaxActualFilingDate">Actual / Expected Return Filing Date</label>
+            <input type="date" id="advanceTaxActualFilingDate" class="input-control" value="2026-07-25">
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Total Assessed Tax Liability</label>
+            <div class="kpi-value" style="font-size: 1.25rem; color: var(--accent-primary);" id="advTaxAssessedAmount">₹0</div>
+          </div>
+        </div>
+
+        <!-- Quarterly Installments Ledger -->
+        <h3 style="font-size: 1rem; font-weight: 700; margin-bottom: 0.75rem; color: var(--text-primary);">Quarterly Advance Tax Installments Ledger</h3>
+        <div class="matrix-table-wrapper">
+          <table class="matrix-table">
+            <thead>
+              <tr>
+                <th>Quarterly Due Date</th>
+                <th>Target %</th>
+                <th style="text-align: right;">Required Cumulative (₹)</th>
+                <th style="text-align: right;">Actual Paid in Quarter (₹)</th>
+                <th style="text-align: right;">Cumulative Paid (₹)</th>
+                <th style="text-align: right;">Shortfall (₹)</th>
+                <th style="text-align: right;">Sec 234C Interest (₹)</th>
+                <th style="text-align: center;">Compliance Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><strong>1st Installment (15 June 2025)</strong></td>
+                <td>15%</td>
+                <td class="amount-cell" id="advReqQ1">₹0</td>
+                <td>
+                  <input type="number" id="advPaidQ1" class="input-control" style="width: 130px; text-align: right;" value="15000">
+                </td>
+                <td class="amount-cell" id="advCumPaidQ1">₹0</td>
+                <td class="amount-cell" style="color: var(--accent-crimson);" id="advShortfallQ1">₹0</td>
+                <td class="amount-cell" id="advIntQ1">₹0</td>
+                <td style="text-align: center;" id="advStatusQ1">-</td>
+              </tr>
+              <tr>
+                <td><strong>2nd Installment (15 September 2025)</strong></td>
+                <td>45%</td>
+                <td class="amount-cell" id="advReqQ2">₹0</td>
+                <td>
+                  <input type="number" id="advPaidQ2" class="input-control" style="width: 130px; text-align: right;" value="20000">
+                </td>
+                <td class="amount-cell" id="advCumPaidQ2">₹0</td>
+                <td class="amount-cell" style="color: var(--accent-crimson);" id="advShortfallQ2">₹0</td>
+                <td class="amount-cell" id="advIntQ2">₹0</td>
+                <td style="text-align: center;" id="advStatusQ2">-</td>
+              </tr>
+              <tr>
+                <td><strong>3rd Installment (15 December 2025)</strong></td>
+                <td>75%</td>
+                <td class="amount-cell" id="advReqQ3">₹0</td>
+                <td>
+                  <input type="number" id="advPaidQ3" class="input-control" style="width: 130px; text-align: right;" value="15000">
+                </td>
+                <td class="amount-cell" id="advCumPaidQ3">₹0</td>
+                <td class="amount-cell" style="color: var(--accent-crimson);" id="advShortfallQ3">₹0</td>
+                <td class="amount-cell" id="advIntQ3">₹0</td>
+                <td style="text-align: center;" id="advStatusQ3">-</td>
+              </tr>
+              <tr>
+                <td><strong>4th Installment (15 March 2026)</strong></td>
+                <td>100%</td>
+                <td class="amount-cell" id="advReqQ4">₹0</td>
+                <td>
+                  <input type="number" id="advPaidQ4" class="input-control" style="width: 130px; text-align: right;" value="10000">
+                </td>
+                <td class="amount-cell" id="advCumPaidQ4">₹0</td>
+                <td class="amount-cell" style="color: var(--accent-crimson);" id="advShortfallQ4">₹0</td>
+                <td class="amount-cell" id="advIntQ4">₹0</td>
+                <td style="text-align: center;" id="advStatusQ4">-</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Penal Interest Summary Cards -->
+        <div class="grid-3" style="margin-top: 1.5rem;">
+          <div class="card" style="background: var(--bg-secondary);">
+            <div style="font-size: 0.8rem; color: var(--text-muted); text-transform: uppercase;">Interest u/s 234C (Deferment)</div>
+            <div class="kpi-value" style="font-size: 1.35rem; color: var(--accent-gold); margin-top: 0.25rem;" id="totalInt234C">₹0</div>
+            <div style="font-size: 0.72rem; color: var(--text-secondary); margin-top: 0.25rem;">1% per month on installment shortfalls</div>
+          </div>
+
+          <div class="card" style="background: var(--bg-secondary);">
+            <div style="font-size: 0.8rem; color: var(--text-muted); text-transform: uppercase;">Interest u/s 234B (Default < 90%)</div>
+            <div class="kpi-value" style="font-size: 1.35rem; color: var(--accent-crimson); margin-top: 0.25rem;" id="totalInt234B">₹0</div>
+            <div style="font-size: 0.72rem; color: var(--text-secondary); margin-top: 0.25rem;">1% per month from 1st April of AY</div>
+          </div>
+
+          <div class="card" style="background: var(--bg-secondary);">
+            <div style="font-size: 0.8rem; color: var(--text-muted); text-transform: uppercase;">Interest u/s 234A (Late Filing)</div>
+            <div class="kpi-value" style="font-size: 1.35rem; color: var(--accent-purple); margin-top: 0.25rem;" id="totalInt234A">₹0</div>
+            <div style="font-size: 0.72rem; color: var(--text-secondary); margin-top: 0.25rem;">1% per month beyond statutory due date</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB 6: STATUTORY MASTER RATES REFERENCE -->
+    <div id="tab-master-rates" class="tab-content">
+      <div class="card">
+        <div class="card-header">
+          <div>
+            <h2 class="card-title"><span>📚</span> Statutory Master Rates & Legal Schedules Reference</h2>
+            <p class="card-subtitle">Complete reference library for Tax Slabs, Surcharge, TDS/TCS rates, and Section 32 IT Depreciation Blocks for FY 2025-26 & FY 2026-27.</p>
+          </div>
+          <span class="brand-badge">Finance (No. 2) Act 2024</span>
+        </div>
+
+        <div class="subtab-nav" style="margin-bottom: 1.25rem;">
+          <button class="subtab-btn active" data-mastertab="mtab-slabs">Income Tax Slabs</button>
+          <button class="subtab-btn" data-mastertab="mtab-surcharge">Surcharge & Marginal Relief</button>
+          <button class="subtab-btn" data-mastertab="mtab-tds">TDS / TCS Master</button>
+          <button class="subtab-btn" data-mastertab="mtab-depr">Sec 32 Depreciation Blocks</button>
+        </div>
+
+        <div id="masterRatesContentContainer">
+          <!-- Dynamically injected master table -->
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB 7: CERTIFIED COMPUTATION & AI MEMORANDUM -->
+    <div id="tab-certified-statement" class="tab-content">
+      <!-- Action Bar for Certified Sheet -->
+      <div class="card no-print" style="margin-bottom: 1rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
+        <div>
+          <h2 class="card-title"><span>📜</span> Formal Certified Statement of Total Income & AI Advisory</h2>
+          <p class="card-subtitle">Print-ready ICAI format with complete statutory verification blocks, UDIN, and AI Tax Memorandum.</p>
+        </div>
+        <div style="display: flex; gap: 0.75rem;">
+          <button id="btnCopyMemo" class="btn btn-secondary">
+            <span>📋</span> Copy AI Memo
+          </button>
+          <button onclick="window.print()" class="btn btn-primary">
+            <span>🖨️</span> Print / Save as PDF
+          </button>
+        </div>
+      </div>
+
+      <!-- AI Tax Planning & Audit Memorandum Section -->
+      <div class="card no-print" style="margin-bottom: 1.5rem; border: 1px solid var(--accent-primary);">
+        <div class="card-header">
+          <div>
+            <h3 class="card-title" style="color: var(--accent-primary);"><span>🧠</span> AI Tax Planning & Audit Memorandum</h3>
+            <p class="card-subtitle">Statutory risk analysis, regime optimization insights, and compensation restructuring recommendations.</p>
+          </div>
+          <span class="badge-tag badge-new">CA Advisory Intelligence</span>
+        </div>
+
+        <div id="aiAdvisoryContainer">
+          <!-- Dynamically populated AI Advisory Cards -->
+        </div>
+      </div>
+
+      <!-- Formal Print Sheet Container -->
+      <div class="card print-page-container" id="printableCertifiedStatement">
+        <div class="print-header">
+          <h1>STATEMENT OF TOTAL INCOME & TAX COMPUTATION</h1>
+          <h2>Assessment Year: <span id="stmtAy">2026-27</span> (Previous Year: <span id="stmtFy">2025-26</span>)</h2>
+          <p style="font-size: 9pt; color: var(--text-muted);">Prepared in accordance with the provisions of the Income-tax Act, 1961</p>
+        </div>
+
+        <!-- Assessee Info Grid -->
+        <div class="print-assessee-grid">
+          <div class="print-assessee-item">
+            <span class="print-assessee-label">Name of Assessee:</span>
+            <strong id="stmtName">Aditya Vikram Sharma</strong>
+          </div>
+          <div class="print-assessee-item">
+            <span class="print-assessee-label">PAN:</span>
+            <strong id="stmtPan" style="font-family: monospace;">ABCPS1234F</strong>
+          </div>
+          <div class="print-assessee-item">
+            <span class="print-assessee-label">Status / Category:</span>
+            <span id="stmtStatus">Individual (Resident)</span>
+          </div>
+          <div class="print-assessee-item">
+            <span class="print-assessee-label">Tax Regime Opted:</span>
+            <strong id="stmtRegime">New Tax Regime u/s 115BAC(1A)</strong>
+          </div>
+        </div>
+
+        <!-- Certified Computation Table -->
+        <table class="print-table">
+          <thead>
+            <tr>
+              <th style="width: 10%;">Schedule</th>
+              <th style="width: 60%;">Particulars / Head of Income</th>
+              <th style="width: 30%; text-align: right;">Amount (₹)</th>
+            </tr>
+          </thead>
+          <tbody id="stmtTableBody">
+            <!-- Populated via JavaScript -->
+          </tbody>
+        </table>
+
+        <!-- Verification Section -->
+        <div class="print-verification-section">
+          <div class="print-verification-statement">
+            <strong>VERIFICATION:</strong> I, <span id="stmtVerifyName">Aditya Vikram Sharma</span>, holding PAN <span id="stmtVerifyPan">ABCPS1234F</span>, solemnly declare that to the best of my knowledge and belief, the information given in this computation statement is true, correct, and complete in accordance with the provisions of the Income-tax Act, 1961.
+          </div>
+
+          <div class="print-signatures-grid">
+            <div class="print-signature-box">
+              <strong>Signature of Assessee / Authorized Signatory</strong>
+              <div>Date: <span id="stmtDate"></span></div>
+              <div>Place: Bengaluru</div>
+            </div>
+
+            <div class="print-signature-box">
+              <strong>Chartered Accountant / Tax Auditor Certification</strong>
+              <div>Firm: <span id="stmtCaFirm">R. K. Agrawal & Co.</span></div>
+              <div>Membership No: <span id="stmtCaMno">054321</span> | FRN: <span id="stmtCaFrn">001234N</span></div>
+              <div>UDIN: <span class="udin-badge" id="stmtUdin">26054321AAAAAA1122</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- Toast Notification Container -->
+  <div class="toast-container" id="toastContainer"></div>
+
+  <!-- Footer -->
+  <footer class="app-footer">
+    <p>TaxCompute Pro &copy; 2026. Calibrated for Finance (No. 2) Act 2024 & Direct Tax Provisions for FY 2025-26 & FY 2026-27.</p>
+  </footer>
+
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>
