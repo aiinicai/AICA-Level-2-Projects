@@ -1,0 +1,383 @@
+{
+  "name": "ITR Knowledge Base — Ingestion",
+  "nodes": [
+    {
+      "parameters": {
+        "pollTimes": {
+          "item": [
+            {
+              "mode": "everyMinute"
+            }
+          ]
+        },
+        "triggerOn": "specificFolder",
+        "folderToWatch": {
+          "__rl": true,
+          "mode": "id",
+          "value": "REPLACE_WITH_YOUR_TAX_LAW_FOLDER_ID",
+          "cachedResultName": "Tax Law Source Documents"
+        },
+        "event": "fileCreated",
+        "options": {
+          "fileType": "all"
+        }
+      },
+      "id": "234b8fc5-2e1f-4fff-b722-ddf8c36d2412",
+      "name": "Watch Tax Law Folder",
+      "type": "n8n-nodes-base.googleDriveTrigger",
+      "typeVersion": 1,
+      "position": [
+        272,
+        128
+      ],
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "REPLACE_WITH_YOUR_CREDENTIAL_ID",
+          "name": "Google Drive account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "download",
+        "fileId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $json.id }}"
+        },
+        "options": {
+          "binaryPropertyName": "data"
+        }
+      },
+      "id": "48a910e2-35c7-4918-9934-f10d82ea722c",
+      "name": "Download Tax Law Document",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        880,
+        304
+      ],
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "REPLACE_WITH_YOUR_CREDENTIAL_ID",
+          "name": "Google Drive account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "pdf",
+        "options": {
+          "joinPages": true
+        }
+      },
+      "id": "4127bd1f-7795-436c-94e4-1570b078bb7b",
+      "name": "Extract PDF Text",
+      "type": "n8n-nodes-base.extractFromFile",
+      "typeVersion": 1.1,
+      "position": [
+        1184,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "1",
+              "name": "source_filename",
+              "value": "={{ $('Download Tax Law Document').item.json.name }}",
+              "type": "string"
+            },
+            {
+              "id": "2",
+              "name": "section_reference",
+              "value": "Section 80C",
+              "type": "string"
+            },
+            {
+              "id": "3",
+              "name": "effective_from",
+              "value": "AY 2025-26",
+              "type": "string"
+            },
+            {
+              "id": "4",
+              "name": "document_type",
+              "value": "bare-act-section",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "id": "084b8b55-5d08-4dc2-a6e9-acc260372397",
+      "name": "Add Document Metadata",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        1472,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "insert",
+        "tableName": {
+          "__rl": true,
+          "mode": "id",
+          "value": "tax_knowledge_base"
+        },
+        "options": {
+          "queryName": "match_documents"
+        }
+      },
+      "id": "1b95883f-6aaf-47f6-85a3-0e0806011b9f",
+      "name": "Insert into Tax Knowledge Base",
+      "type": "@n8n/n8n-nodes-langchain.vectorStoreSupabase",
+      "typeVersion": 1.3,
+      "position": [
+        1776,
+        304
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "id": "REPLACE_WITH_YOUR_CREDENTIAL_ID",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "id": "e9745257-c15a-4604-bd91-2c5bd1821e55",
+      "name": "Tax KB Embeddings (Ingestion)",
+      "type": "@n8n/n8n-nodes-langchain.embeddingsOpenAi",
+      "typeVersion": 1.2,
+      "position": [
+        1776,
+        128
+      ],
+      "credentials": {
+        "openAiApi": {
+          "id": "REPLACE_WITH_YOUR_CREDENTIAL_ID",
+          "name": "OpenAI account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsonMode": "expressionData",
+        "jsonData": "={{ $json.text }}",
+        "textSplittingMode": "custom",
+        "options": {
+          "metadata": {
+            "metadataValues": [
+              {
+                "name": "source_filename",
+                "value": "={{ $json.source_filename }}"
+              },
+              {
+                "name": "section_reference",
+                "value": "={{ $json.section_reference }}"
+              },
+              {
+                "name": "effective_from",
+                "value": "={{ $json.effective_from }}"
+              },
+              {
+                "name": "document_type",
+                "value": "={{ $json.document_type }}"
+              }
+            ]
+          }
+        }
+      },
+      "id": "4aa1b2e3-dd9e-41f9-ae2d-02e4cbcddde3",
+      "name": "Load Document with Metadata",
+      "type": "@n8n/n8n-nodes-langchain.documentDefaultDataLoader",
+      "typeVersion": 1.1,
+      "position": [
+        1776,
+        480
+      ]
+    },
+    {
+      "parameters": {
+        "chunkOverlap": 150,
+        "options": {}
+      },
+      "id": "e5c69708-4fee-410b-b253-d15b96cf53a9",
+      "name": "Split Text into Chunks",
+      "type": "@n8n/n8n-nodes-langchain.textSplitterRecursiveCharacterTextSplitter",
+      "typeVersion": 1,
+      "position": [
+        1776,
+        656
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "11a4e02b-f953-43c6-a404-958c63e34e84",
+      "name": "Manual Backfill Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        272,
+        480
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "fileFolder",
+        "returnAll": true,
+        "filter": {
+          "folderId": {
+            "__rl": true,
+            "mode": "id",
+            "value": "REPLACE_WITH_YOUR_TAX_LAW_FOLDER_ID",
+            "cachedResultName": "Tax Law Source Documents"
+          },
+          "whatToSearch": "files"
+        },
+        "options": {}
+      },
+      "id": "b293d7f1-c402-4c44-9c11-fbac44385936",
+      "name": "List Files in Folder",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        576,
+        480
+      ],
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "REPLACE_WITH_YOUR_CREDENTIAL_ID",
+          "name": "Google Drive account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "content": "## Tax Law Knowledge Base Ingestion\nWatches the \"Tax Law Source Documents\" Drive folder and embeds new PDFs into the Supabase tax_knowledge_base table.\n\nBefore/after running the Manual Backfill Trigger, open \"Add Document Metadata\" and fill in section_reference, effective_from and document_type for accuracy — otherwise these are left blank.",
+        "height": 448,
+        "color": 4
+      },
+      "id": "74edaa62-16e3-4789-ab83-929ff0bd8343",
+      "name": "Sticky Note 515df34d",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ]
+    }
+  ],
+  "connections": {
+    "Watch Tax Law Folder": {
+      "main": [
+        [
+          {
+            "node": "Download Tax Law Document",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download Tax Law Document": {
+      "main": [
+        [
+          {
+            "node": "Extract PDF Text",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract PDF Text": {
+      "main": [
+        [
+          {
+            "node": "Add Document Metadata",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Add Document Metadata": {
+      "main": [
+        [
+          {
+            "node": "Insert into Tax Knowledge Base",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tax KB Embeddings (Ingestion)": {
+      "ai_embedding": [
+        [
+          {
+            "node": "Insert into Tax Knowledge Base",
+            "type": "ai_embedding",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Load Document with Metadata": {
+      "ai_document": [
+        [
+          {
+            "node": "Insert into Tax Knowledge Base",
+            "type": "ai_document",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Text into Chunks": {
+      "ai_textSplitter": [
+        [
+          {
+            "node": "Load Document with Metadata",
+            "type": "ai_textSplitter",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Manual Backfill Trigger": {
+      "main": [
+        [
+          {
+            "node": "List Files in Folder",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "List Files in Folder": {
+      "main": [
+        [
+          {
+            "node": "Download Tax Law Document",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}
