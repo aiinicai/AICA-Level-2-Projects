@@ -1,0 +1,2 @@
+VITE_SUPABASE_URL=https://YOUR-PROJECT-REF.supabase.co
+VITE_SUPABASE_ANON_KEY=your-anon-public-key
