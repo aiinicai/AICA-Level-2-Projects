@@ -1,0 +1,1011 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full bg-slate-900 text-slate-100">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Offline NotebookLM Studio</title>
+  <!-- Tailwind CSS via CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <!-- Marked for Markdown Parsing -->
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#f0f9ff',
+              500: '#0ea5e9',
+              600: '#0284c7',
+              700: '#0369a1',
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    /* Custom scrollbars */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: #0f172a; }
+    ::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: #475569; }
+    .prose-dark { color: #cbd5e1; }
+    .prose-dark h1, .prose-dark h2, .prose-dark h3 { color: #f8fafc; font-weight: 700; }
+    .prose-dark h1 { font-size: 1.5rem; margin-top: 1rem; margin-bottom: 0.5rem; }
+    .prose-dark h2 { font-size: 1.25rem; margin-top: 0.875rem; margin-bottom: 0.5rem; }
+    .prose-dark h3 { font-size: 1.1rem; margin-top: 0.75rem; margin-bottom: 0.375rem; }
+    .prose-dark ul { list-style-type: disc; padding-left: 1.25rem; margin-bottom: 0.75rem; }
+    .prose-dark ol { list-style-type: decimal; padding-left: 1.25rem; margin-bottom: 0.75rem; }
+    .prose-dark p { margin-bottom: 0.75rem; line-height: 1.6; }
+    .prose-dark code { background: #1e293b; padding: 0.15rem 0.35rem; border-radius: 0.25rem; font-family: monospace; font-size: 0.875em; color: #38bdf8; }
+    .prose-dark pre { background: #0f172a; padding: 0.75rem; border-radius: 0.5rem; overflow-x: auto; margin-bottom: 0.75rem; border: 1px solid #334155; }
+    .prose-dark blockquote { border-left: 3px solid #0284c7; padding-left: 0.75rem; font-style: italic; color: #94a3b8; margin-bottom: 0.75rem; }
+  </style>
+</head>
+<body class="h-full flex flex-col overflow-hidden bg-slate-950 font-sans antialiased text-slate-200">
+
+  <!-- Top Header Navigation -->
+  <header class="h-14 border-b border-slate-800 bg-slate-900/90 backdrop-blur px-4 flex items-center justify-between shrink-0 z-20">
+    <div class="flex items-center gap-3">
+      <div class="w-8 h-8 rounded-lg bg-gradient-to-tr from-sky-500 to-indigo-600 flex items-center justify-center shadow-lg shadow-sky-500/20">
+        <i data-lucide="book-open-check" class="w-5 h-5 text-white"></i>
+      </div>
+      <div>
+        <h1 class="text-sm font-bold text-white tracking-tight flex items-center gap-2">
+          Offline NotebookLM Studio
+          <span class="text-[10px] uppercase font-semibold tracking-wider px-1.5 py-0.5 rounded bg-sky-500/10 text-sky-400 border border-sky-500/20">Local AI</span>
+        </h1>
+      </div>
+    </div>
+
+    <!-- Status & Config Bar -->
+    <div class="flex items-center gap-3">
+      <!-- LM Studio Connection Pill -->
+      <div id="lmStatusPill" class="flex items-center gap-2 px-3 py-1 rounded-full bg-slate-800/80 border border-slate-700 text-xs text-slate-300">
+        <span id="lmPulse" class="w-2 h-2 rounded-full bg-amber-400 animate-pulse"></span>
+        <span id="lmStatusText">Checking LM Studio...</span>
+        <button id="refreshLmBtn" title="Test Connection" class="hover:text-white p-0.5 rounded hover:bg-slate-700 transition">
+          <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
+        </button>
+      </div>
+
+      <!-- Settings / Help Button -->
+      <button id="openConfigModalBtn" class="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition">
+        <i data-lucide="settings-2" class="w-3.5 h-3.5 text-slate-400"></i>
+        <span>Endpoint Config</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- Main 3-Panel Grid Container -->
+  <main class="flex-1 grid grid-cols-12 gap-0 overflow-hidden">
+
+    <!-- ========================================== -->
+    <!-- PANEL 1 (LEFT): SOURCE MANAGER (col-span-3) -->
+    <!-- ========================================== -->
+    <section class="col-span-3 border-r border-slate-800 bg-slate-900/50 flex flex-col h-full overflow-hidden">
+      <!-- Panel Header -->
+      <div class="p-3.5 border-b border-slate-800 flex items-center justify-between">
+        <div class="flex items-center gap-2">
+          <i data-lucide="files" class="w-4 h-4 text-sky-400"></i>
+          <h2 class="text-xs font-semibold text-slate-200 uppercase tracking-wider">Sources</h2>
+          <span id="sourceCountBadge" class="text-[11px] px-1.5 py-0.2 rounded-full bg-slate-800 text-slate-400 border border-slate-700">0</span>
+        </div>
+        <div class="flex items-center gap-1">
+          <button id="selectAllBtn" class="text-[11px] text-sky-400 hover:text-sky-300 hover:underline px-1 py-0.5">Select All</button>
+          <span class="text-slate-600">•</span>
+          <button id="deselectAllBtn" class="text-[11px] text-slate-400 hover:text-slate-300 hover:underline px-1 py-0.5">Clear</button>
+        </div>
+      </div>
+
+      <!-- Upload Dropzone Area -->
+      <div class="p-3 border-b border-slate-800 bg-slate-950/40">
+        <label id="dropZone" class="flex flex-col items-center justify-center p-4 border-2 border-dashed border-slate-700 hover:border-sky-500/60 rounded-xl cursor-pointer bg-slate-900/40 hover:bg-sky-950/10 transition group text-center">
+          <input type="file" id="fileInput" multiple accept=".pdf,.docx,.doc,.xlsx,.xls,.csv,.txt,.md,.png,.jpg,.jpeg" class="hidden" />
+          <div class="w-8 h-8 rounded-lg bg-slate-800 group-hover:bg-sky-500/20 text-slate-400 group-hover:text-sky-400 flex items-center justify-center mb-1.5 transition">
+            <i data-lucide="upload-cloud" class="w-4 h-4"></i>
+          </div>
+          <p class="text-xs font-medium text-slate-200">Click to upload or drag & drop</p>
+          <p class="text-[10px] text-slate-500 mt-0.5">PDF, DOCX, XLSX, CSV, PNG, JPG, TXT</p>
+        </label>
+        <div id="uploadProgress" class="hidden mt-2 text-xs text-sky-400 flex items-center justify-center gap-2">
+          <i data-lucide="loader-2" class="w-3.5 h-3.5 animate-spin"></i>
+          <span>Extracting text content...</span>
+        </div>
+      </div>
+
+      <!-- Sources List (Scrollable) -->
+      <div id="sourcesList" class="flex-1 overflow-y-auto p-3 space-y-2">
+        <!-- Dynamic Source Cards will be injected here -->
+        <div id="emptySourcesState" class="py-12 text-center text-slate-500 px-4">
+          <i data-lucide="inbox" class="w-8 h-8 mx-auto stroke-1 mb-2 text-slate-600"></i>
+          <p class="text-xs">No documents uploaded yet.</p>
+          <p class="text-[11px] text-slate-600 mt-1">Upload your research papers, notes, or spreadsheets to ground the AI.</p>
+        </div>
+      </div>
+
+      <!-- Sources Footer / Grounding Stats -->
+      <div class="p-3 border-t border-slate-800 bg-slate-950/70 flex items-center justify-between text-[11px] text-slate-400">
+        <span id="selectedStats">0 sources selected for chat</span>
+        <span id="totalCharStats" class="font-mono text-[10px] text-slate-500">0 chars</span>
+      </div>
+    </section>
+
+    <!-- ========================================== -->
+    <!-- PANEL 2 (CENTER): GROUNDED CHAT (col-span-5) -->
+    <!-- ========================================== -->
+    <section class="col-span-5 border-r border-slate-800 bg-slate-950 flex flex-col h-full overflow-hidden">
+      <!-- Chat Header -->
+      <div class="p-3.5 border-b border-slate-800 bg-slate-900/30 flex items-center justify-between">
+        <div class="flex items-center gap-2">
+          <i data-lucide="message-square-code" class="w-4 h-4 text-indigo-400"></i>
+          <h2 class="text-xs font-semibold text-slate-200 uppercase tracking-wider">Grounded Analysis & Chat</h2>
+        </div>
+        <div class="flex items-center gap-2">
+          <button id="clearChatBtn" title="Clear Conversation" class="text-xs text-slate-400 hover:text-slate-200 px-2 py-1 rounded hover:bg-slate-800 transition flex items-center gap-1">
+            <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+            <span>Clear</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Quick Action Prompts Bar -->
+      <div class="px-3.5 py-2 border-b border-slate-800/80 bg-slate-900/20 flex gap-2 overflow-x-auto text-[11px]">
+        <button class="quick-prompt-btn whitespace-nowrap px-2.5 py-1 rounded-md bg-slate-800/60 hover:bg-slate-700 text-slate-300 border border-slate-700/60 transition">
+          📊 Executive Summary
+        </button>
+        <button class="quick-prompt-btn whitespace-nowrap px-2.5 py-1 rounded-md bg-slate-800/60 hover:bg-slate-700 text-slate-300 border border-slate-700/60 transition">
+          🔍 Extract Key Insights
+        </button>
+        <button class="quick-prompt-btn whitespace-nowrap px-2.5 py-1 rounded-md bg-slate-800/60 hover:bg-slate-700 text-slate-300 border border-slate-700/60 transition">
+          📑 Outline Presentation
+        </button>
+        <button class="quick-prompt-btn whitespace-nowrap px-2.5 py-1 rounded-md bg-slate-800/60 hover:bg-slate-700 text-slate-300 border border-slate-700/60 transition">
+          ⚖️ Compare Sources
+        </button>
+      </div>
+
+      <!-- Chat Messages Container -->
+      <div id="chatMessages" class="flex-1 overflow-y-auto p-4 space-y-4">
+        <!-- Initial Welcome Message -->
+        <div class="flex gap-3 bg-slate-900/60 border border-slate-800 rounded-xl p-4">
+          <div class="w-7 h-7 rounded-lg bg-indigo-600 flex items-center justify-center shrink-0 text-white shadow">
+            <i data-lucide="sparkles" class="w-4 h-4"></i>
+          </div>
+          <div class="flex-1 text-xs leading-relaxed space-y-2">
+            <p class="font-semibold text-slate-200 text-sm">Welcome to your Offline NotebookLM Studio!</p>
+            <p class="text-slate-400">
+              1. Upload documents on the <strong>Left Panel</strong>.<br>
+              2. Check the sources you want to ground your inquiry on.<br>
+              3. Ask questions here. You can click <strong>"Send to Report"</strong> or <strong>"Create Word Doc"</strong> on any response to build final deliverables in the Right Panel.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Chat Input Form -->
+      <div class="p-3.5 border-t border-slate-800 bg-slate-900/40">
+        <form id="chatForm" class="relative">
+          <textarea
+            id="chatInput"
+            rows="3"
+            placeholder="Ask a question or request a synthesis based on your selected sources..."
+            class="w-full bg-slate-900 border border-slate-700 focus:border-sky-500 rounded-xl p-3 pr-24 text-xs text-slate-200 placeholder-slate-500 focus:outline-none resize-none shadow-inner"
+          ></textarea>
+          <div class="absolute right-2.5 bottom-3.5 flex items-center gap-1.5">
+            <button
+              type="submit"
+              id="sendBtn"
+              class="px-3 py-1.5 bg-sky-600 hover:bg-sky-500 text-white rounded-lg text-xs font-semibold flex items-center gap-1.5 shadow-lg shadow-sky-600/30 transition disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <i data-lucide="send" class="w-3.5 h-3.5"></i>
+              <span>Send</span>
+            </button>
+          </div>
+        </form>
+        <div class="flex items-center justify-between mt-2 text-[10px] text-slate-500 px-1">
+          <span id="groundingIndicator" class="flex items-center gap-1.5 text-sky-400">
+            <i data-lucide="shield-check" class="w-3 h-3"></i>
+            <span>0 sources active in context</span>
+          </span>
+          <span>Shift+Enter for newline</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- ========================================== -->
+    <!-- PANEL 3 (RIGHT): OUTPUT STUDIO & EXPORTS (col-span-4) -->
+    <!-- ========================================== -->
+    <section class="col-span-4 bg-slate-900/70 flex flex-col h-full overflow-hidden">
+      <!-- Output Studio Header -->
+      <div class="p-3.5 border-b border-slate-800 flex items-center justify-between bg-slate-900">
+        <div class="flex items-center gap-2">
+          <i data-lucide="file-output" class="w-4 h-4 text-emerald-400"></i>
+          <h2 class="text-xs font-semibold text-slate-200 uppercase tracking-wider">Output Studio</h2>
+        </div>
+        <!-- Editor View Mode Toggle -->
+        <div class="flex items-center bg-slate-800 p-0.5 rounded-lg border border-slate-700 text-xs">
+          <button id="viewEditBtn" class="px-2.5 py-0.5 rounded-md bg-slate-700 text-white font-medium">Edit</button>
+          <button id="viewPreviewBtn" class="px-2.5 py-0.5 rounded-md text-slate-400 hover:text-slate-200">Preview</button>
+        </div>
+      </div>
+
+      <!-- Export Configuration & Title -->
+      <div class="p-3 border-b border-slate-800 bg-slate-950/50 space-y-2">
+        <div>
+          <label class="block text-[10px] uppercase font-semibold tracking-wider text-slate-400 mb-1">Document / Presentation Title</label>
+          <input
+            type="text"
+            id="docTitleInput"
+            value="Research Synthesis & Action Plan"
+            class="w-full bg-slate-900 border border-slate-700 focus:border-emerald-500 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 focus:outline-none"
+          />
+        </div>
+
+        <!-- Export Buttons Toolbar -->
+        <div class="grid grid-cols-2 gap-2 pt-1">
+          <button
+            id="exportDocxBtn"
+            class="flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-600/20 hover:bg-blue-600/30 text-blue-300 border border-blue-500/30 text-xs font-semibold transition"
+          >
+            <i data-lucide="file-text" class="w-3.5 h-3.5 text-blue-400"></i>
+            <span>Export to Word (.docx)</span>
+          </button>
+          <button
+            id="exportPptxBtn"
+            class="flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-600/20 hover:bg-amber-600/30 text-amber-300 border border-amber-500/30 text-xs font-semibold transition"
+          >
+            <i data-lucide="presentation" class="w-3.5 h-3.5 text-amber-400"></i>
+            <span>Export Slides (.pptx)</span>
+          </button>
+        </div>
+
+        <!-- NotebookLM Recursive Loop Button -->
+        <button
+          id="useAsSourceBtn"
+          class="w-full flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold shadow-md shadow-emerald-600/20 transition"
+        >
+          <i data-lucide="repeat" class="w-3.5 h-3.5"></i>
+          <span>Use Output as Source (Recursive Loop)</span>
+        </button>
+      </div>
+
+      <!-- Editor / Preview Staging Body -->
+      <div class="flex-1 relative overflow-hidden bg-slate-950">
+        <!-- Markdown Raw Editor -->
+        <textarea
+          id="outputEditor"
+          placeholder="# Executive Synthesis&#10;&#10;Use this space to craft your report, or click 'Send to Report' on any AI response in the center panel...&#10;&#10;## Key Findings&#10;- Point 1&#10;- Point 2"
+          class="w-full h-full p-4 bg-transparent text-xs font-mono text-slate-300 placeholder-slate-600 focus:outline-none resize-none"
+        ></textarea>
+
+        <!-- Markdown Live HTML Preview -->
+        <div
+          id="outputPreview"
+          class="hidden w-full h-full p-4 overflow-y-auto prose-dark text-xs"
+        ></div>
+      </div>
+
+      <!-- Output Footer -->
+      <div class="p-2.5 border-t border-slate-800 bg-slate-900 text-[10px] text-slate-400 flex items-center justify-between">
+        <span id="wordCountStats">0 words • 0 characters</span>
+        <button id="copyMarkdownBtn" class="hover:text-white flex items-center gap-1">
+          <i data-lucide="copy" class="w-3 h-3"></i>
+          <span>Copy Markdown</span>
+        </button>
+      </div>
+    </section>
+  </main>
+
+  <!-- ========================================== -->
+  <!-- MODAL: VIEW FULL SOURCE TEXT -->
+  <!-- ========================================== -->
+  <div id="sourceModal" class="hidden fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-6">
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-3xl h-[80vh] flex flex-col shadow-2xl overflow-hidden">
+      <div class="p-4 border-b border-slate-800 flex items-center justify-between bg-slate-950/60">
+        <div class="flex items-center gap-2">
+          <i data-lucide="file-text" class="w-4 h-4 text-sky-400"></i>
+          <h3 id="modalSourceName" class="text-sm font-semibold text-white">Source Text Viewer</h3>
+        </div>
+        <button id="closeSourceModalBtn" class="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+      <div class="flex-1 p-4 overflow-y-auto bg-slate-950 font-mono text-xs text-slate-300 whitespace-pre-wrap leading-relaxed select-text" id="modalSourceText">
+        Loading source content...
+      </div>
+      <div class="p-3 border-t border-slate-800 bg-slate-900 flex justify-between items-center text-xs text-slate-400">
+        <span id="modalCharStats">0 characters</span>
+        <button id="copySourceTextBtn" class="px-3 py-1 bg-slate-800 hover:bg-slate-700 rounded-lg text-slate-200 flex items-center gap-1.5 transition">
+          <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+          <span>Copy Full Text</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========================================== -->
+  <!-- MODAL: ENDPOINT & SETTINGS CONFIG -->
+  <!-- ========================================== -->
+  <div id="configModal" class="hidden fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-6">
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-md p-5 shadow-2xl space-y-4">
+      <div class="flex items-center justify-between pb-2 border-b border-slate-800">
+        <h3 class="text-sm font-semibold text-white flex items-center gap-2">
+          <i data-lucide="settings" class="w-4 h-4 text-sky-400"></i>
+          LM Studio & Server Configuration
+        </h3>
+        <button id="closeConfigModalBtn" class="text-slate-400 hover:text-white">
+          <i data-lucide="x" class="w-4 h-4"></i>
+        </button>
+      </div>
+      <div class="space-y-3 text-xs">
+        <div>
+          <label class="block font-medium text-slate-300 mb-1">LM Studio Endpoint URL</label>
+          <input
+            type="text"
+            id="lmUrlInput"
+            value="http://localhost:1234/v1"
+            class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-slate-200 focus:outline-none focus:border-sky-500"
+          />
+          <p class="text-[11px] text-slate-500 mt-1">Default is `http://localhost:1234/v1`</p>
+        </div>
+        <div>
+          <label class="block font-medium text-slate-300 mb-1">Temperature (Creativity)</label>
+          <div class="flex items-center gap-3">
+            <input type="range" id="tempSlider" min="0" max="1" step="0.1" value="0.7" class="flex-1 accent-sky-500" />
+            <span id="tempValue" class="font-mono text-slate-300 w-8">0.7</span>
+          </div>
+        </div>
+      </div>
+      <div class="flex justify-end gap-2 pt-2 border-t border-slate-800">
+        <button id="saveConfigBtn" class="px-4 py-1.5 bg-sky-600 hover:bg-sky-500 text-white rounded-lg text-xs font-semibold transition">
+          Save Settings
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Notification Container -->
+  <div id="toastContainer" class="fixed bottom-5 right-5 z-50 flex flex-col gap-2 pointer-events-none"></div>
+
+  <!-- ========================================== -->
+  <!-- VANILLA JAVASCRIPT ASYNC CLIENT LOGIC -->
+  <!-- ========================================== -->
+  <script>
+    // State Management
+    let sources = [];
+    let selectedSourceIds = new Set();
+    let chatHistory = [];
+    let currentLmStudioUrl = localStorage.getItem('lm_studio_url') || 'http://localhost:1234/v1';
+    let currentTemperature = 0.7;
+    let isGenerating = false;
+
+    const API_BASE = window.location.origin.includes(':8000') || window.location.origin.includes(':3000') ? '' : '';
+
+    // Initialize Lucide Icons
+    function refreshIcons() {
+      if (window.lucide) lucide.createIcons();
+    }
+
+    // Toast Notification helper
+    function showToast(message, type = 'info') {
+      const container = document.getElementById('toastContainer');
+      const toast = document.createElement('div');
+      const bgColors = {
+        success: 'bg-emerald-950/90 border-emerald-500/50 text-emerald-200',
+        error: 'bg-rose-950/90 border-rose-500/50 text-rose-200',
+        info: 'bg-slate-900/90 border-slate-700 text-slate-200'
+      };
+      toast.className = `px-4 py-2.5 rounded-xl border shadow-xl text-xs font-medium backdrop-blur transition-all duration-300 pointer-events-auto flex items-center gap-2 ${bgColors[type] || bgColors.info}`;
+      toast.innerHTML = `<span>${message}</span>`;
+      container.appendChild(toast);
+      setTimeout(() => {
+        toast.style.opacity = '0';
+        toast.style.transform = 'translateY(10px)';
+        setTimeout(() => toast.remove(), 300);
+      }, 3500);
+    }
+
+    // Check LM Studio Status
+    async function checkLmStudio() {
+      const pill = document.getElementById('lmStatusPill');
+      const pulse = document.getElementById('lmPulse');
+      const text = document.getElementById('lmStatusText');
+      try {
+        const res = await fetch(`/api/lm-status?url=${encodeURIComponent(currentLmStudioUrl)}`);
+        const data = await res.json();
+        if (data.status === 'connected') {
+          pulse.className = 'w-2 h-2 rounded-full bg-emerald-400';
+          text.textContent = data.active_model ? `LM Studio: ${data.active_model}` : 'LM Studio Connected';
+          text.className = 'text-emerald-400 font-medium';
+        } else {
+          pulse.className = 'w-2 h-2 rounded-full bg-rose-400';
+          text.textContent = 'LM Studio Offline';
+          text.className = 'text-slate-400';
+        }
+      } catch (err) {
+        pulse.className = 'w-2 h-2 rounded-full bg-amber-400';
+        text.textContent = 'LM Studio (Port 1234)';
+      }
+    }
+
+    // Fetch and render sources list
+    async function fetchSources() {
+      try {
+        const res = await fetch('/api/sources');
+        const data = await res.json();
+        sources = data.sources || [];
+        renderSources();
+      } catch (err) {
+        console.error('Error fetching sources:', err);
+      }
+    }
+
+    function renderSources() {
+      const list = document.getElementById('sourcesList');
+      const countBadge = document.getElementById('sourceCountBadge');
+      const emptyState = document.getElementById('emptySourcesState');
+      countBadge.textContent = sources.length;
+
+      if (sources.length === 0) {
+        list.innerHTML = '';
+        list.appendChild(emptyState);
+        updateGroundingStats();
+        return;
+      }
+
+      list.innerHTML = '';
+      sources.forEach(source => {
+        const isSelected = selectedSourceIds.has(source.id);
+        const card = document.createElement('div');
+        card.className = `p-3 rounded-xl border transition-all ${
+          isSelected 
+            ? 'bg-sky-950/30 border-sky-500/40 shadow-sm' 
+            : 'bg-slate-900/60 border-slate-800 hover:border-slate-700'
+        }`;
+
+        const typeColors = {
+          PDF: 'bg-rose-500/10 text-rose-400 border-rose-500/20',
+          DOCX: 'bg-blue-500/10 text-blue-400 border-blue-500/20',
+          XLSX: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
+          CSV: 'bg-teal-500/10 text-teal-400 border-teal-500/20',
+          MD: 'bg-purple-500/10 text-purple-400 border-purple-500/20',
+          TXT: 'bg-slate-500/10 text-slate-300 border-slate-500/20',
+        };
+        const badgeClass = typeColors[source.file_type] || 'bg-slate-800 text-slate-300 border-slate-700';
+
+        card.innerHTML = `
+          <div class="flex items-start gap-2.5">
+            <input 
+              type="checkbox" 
+              ${isSelected ? 'checked' : ''} 
+              data-id="${source.id}" 
+              class="source-checkbox mt-1 w-3.5 h-3.5 rounded bg-slate-800 border-slate-600 text-sky-600 focus:ring-sky-500 cursor-pointer"
+            />
+            <div class="flex-1 min-w-0">
+              <div class="flex items-center justify-between gap-1">
+                <span class="text-xs font-semibold text-slate-200 truncate cursor-pointer hover:text-sky-300" onclick="viewSource('${source.id}')">
+                  ${source.name}
+                </span>
+                <span class="text-[9px] font-mono uppercase px-1 py-0.2 rounded border ${badgeClass} shrink-0">
+                  ${source.file_type}
+                </span>
+              </div>
+              <p class="text-[10px] text-slate-500 line-clamp-1 mt-0.5">${source.preview || 'No preview available'}</p>
+              <div class="flex items-center justify-between mt-2 pt-1 border-t border-slate-800/60 text-[10px] text-slate-500">
+                <span>${(source.char_count || 0).toLocaleString()} chars</span>
+                <div class="flex items-center gap-2">
+                  <button onclick="viewSource('${source.id}')" title="View Extracted Text" class="hover:text-sky-400 p-0.5"><i data-lucide="eye" class="w-3 h-3"></i></button>
+                  <button onclick="renameSourcePrompt('${source.id}', '${source.name}')" title="Rename Source" class="hover:text-amber-400 p-0.5"><i data-lucide="edit-3" class="w-3 h-3"></i></button>
+                  <button onclick="deleteSource('${source.id}')" title="Delete Source" class="hover:text-rose-400 p-0.5"><i data-lucide="trash-2" class="w-3 h-3"></i></button>
+                </div>
+              </div>
+            </div>
+          </div>
+        `;
+        list.appendChild(card);
+      });
+
+      // Bind checkboxes
+      list.querySelectorAll('.source-checkbox').forEach(cb => {
+        cb.addEventListener('change', (e) => {
+          const id = e.target.getAttribute('data-id');
+          if (e.target.checked) selectedSourceIds.add(id);
+          else selectedSourceIds.delete(id);
+          updateGroundingStats();
+          renderSources();
+        });
+      });
+
+      updateGroundingStats();
+      refreshIcons();
+    }
+
+    function updateGroundingStats() {
+      const stats = document.getElementById('selectedStats');
+      const charStats = document.getElementById('totalCharStats');
+      const indicator = document.getElementById('groundingIndicator');
+
+      const count = selectedSourceIds.size;
+      let totalChars = 0;
+      sources.forEach(s => {
+        if (selectedSourceIds.has(s.id)) totalChars += (s.char_count || 0);
+      });
+
+      stats.textContent = `${count} source(s) selected`;
+      charStats.textContent = `${totalChars.toLocaleString()} chars`;
+      indicator.innerHTML = `<i data-lucide="shield-check" class="w-3 h-3"></i><span>${count} source(s) active in context</span>`;
+      refreshIcons();
+    }
+
+    // Select/Deselect all
+    document.getElementById('selectAllBtn').addEventListener('click', () => {
+      selectedSourceIds = new Set(sources.map(s => s.id));
+      renderSources();
+    });
+    document.getElementById('deselectAllBtn').addEventListener('click', () => {
+      selectedSourceIds.clear();
+      renderSources();
+    });
+
+    // File Upload Handling
+    const dropZone = document.getElementById('dropZone');
+    const fileInput = document.getElementById('fileInput');
+    const uploadProgress = document.getElementById('uploadProgress');
+
+    fileInput.addEventListener('change', (e) => {
+      if (e.target.files.length > 0) uploadFiles(e.target.files);
+    });
+    dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('border-sky-500'); });
+    dropZone.addEventListener('dragleave', () => { dropZone.classList.remove('border-sky-500'); });
+    dropZone.addEventListener('drop', (e) => {
+      e.preventDefault();
+      dropZone.classList.remove('border-sky-500');
+      if (e.dataTransfer.files.length > 0) uploadFiles(e.dataTransfer.files);
+    });
+
+    async function uploadFiles(files) {
+      const formData = new FormData();
+      for (let i = 0; i < files.length; i++) {
+        formData.append('files', files[i]);
+      }
+      uploadProgress.classList.remove('hidden');
+      try {
+        const res = await fetch('/api/upload', { method: 'POST', body: formData });
+        const data = await res.json();
+        showToast(data.message || 'Files uploaded and extracted!', 'success');
+        // Auto-select newly uploaded sources
+        if (data.sources) {
+          data.sources.forEach(s => selectedSourceIds.add(s.id));
+        }
+        await fetchSources();
+      } catch (err) {
+        showToast('Error uploading files: ' + err.message, 'error');
+      } finally {
+        uploadProgress.classList.add('hidden');
+        fileInput.value = '';
+      }
+    }
+
+    // View Source Modal
+    async function viewSource(sourceId) {
+      const modal = document.getElementById('sourceModal');
+      const nameElem = document.getElementById('modalSourceName');
+      const textElem = document.getElementById('modalSourceText');
+      const statsElem = document.getElementById('modalCharStats');
+      
+      modal.classList.remove('hidden');
+      textElem.textContent = 'Loading source text...';
+
+      try {
+        const res = await fetch(`/api/sources/${sourceId}/text`);
+        const data = await res.json();
+        nameElem.textContent = data.name;
+        textElem.textContent = data.text;
+        statsElem.textContent = `${(data.char_count || 0).toLocaleString()} characters extracted`;
+      } catch (err) {
+        textElem.textContent = 'Error loading source text: ' + err.message;
+      }
+      refreshIcons();
+    }
+
+    document.getElementById('closeSourceModalBtn').addEventListener('click', () => {
+      document.getElementById('sourceModal').classList.add('hidden');
+    });
+    document.getElementById('copySourceTextBtn').addEventListener('click', () => {
+      const text = document.getElementById('modalSourceText').textContent;
+      navigator.clipboard.writeText(text);
+      showToast('Source text copied to clipboard!', 'success');
+    });
+
+    // Rename Source
+    async function renameSourcePrompt(sourceId, currentName) {
+      const newName = prompt('Enter new source name:', currentName);
+      if (!newName || newName.trim() === currentName) return;
+      try {
+        const res = await fetch(`/api/sources/${sourceId}/rename`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ new_name: newName.trim() })
+        });
+        if (res.ok) {
+          showToast('Source renamed', 'success');
+          await fetchSources();
+        }
+      } catch (err) {
+        showToast('Rename failed', 'error');
+      }
+    }
+
+    // Delete Source
+    async function deleteSource(sourceId) {
+      if (!confirm('Are you sure you want to delete this source?')) return;
+      try {
+        const res = await fetch(`/api/sources/${sourceId}`, { method: 'DELETE' });
+        if (res.ok) {
+          selectedSourceIds.delete(sourceId);
+          showToast('Source removed', 'info');
+          await fetchSources();
+        }
+      } catch (err) {
+        showToast('Delete failed', 'error');
+      }
+    }
+
+    // Chat Management & Streaming
+    const chatForm = document.getElementById('chatForm');
+    const chatInput = document.getElementById('chatInput');
+    const chatMessages = document.getElementById('chatMessages');
+
+    chatInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        chatForm.dispatchEvent(new Event('submit'));
+      }
+    });
+
+    document.querySelectorAll('.quick-prompt-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        chatInput.value = btn.textContent.trim();
+        chatInput.focus();
+      });
+    });
+
+    document.getElementById('clearChatBtn').addEventListener('click', () => {
+      chatHistory = [];
+      chatMessages.innerHTML = '';
+      showToast('Chat history cleared', 'info');
+    });
+
+    chatForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const message = chatInput.value.trim();
+      if (!message || isGenerating) return;
+
+      chatInput.value = '';
+      isGenerating = true;
+
+      // Add user message
+      chatHistory.push({ role: 'user', content: message });
+      appendChatMessage('user', message);
+
+      // Create assistant message placeholder for streaming
+      const assistantMsgObj = appendChatMessage('assistant', '');
+      const contentElem = assistantMsgObj.contentElem;
+      const actionsElem = assistantMsgObj.actionsElem;
+
+      try {
+        const response = await fetch('/api/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            messages: chatHistory,
+            selected_source_ids: Array.from(selectedSourceIds),
+            temperature: currentTemperature,
+            lm_studio_url: currentLmStudioUrl
+          })
+        });
+
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder('utf-8');
+        let fullAssistantText = '';
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          const chunk = decoder.decode(value, { stream: true });
+          const lines = chunk.split('\n');
+
+          for (const line of lines) {
+            if (line.startsWith('data: ')) {
+              const dataStr = line.slice(6).trim();
+              if (dataStr === '[DONE]') continue;
+              try {
+                const parsed = JSON.parse(dataStr);
+                if (parsed.text) {
+                  fullAssistantText += parsed.text;
+                  contentElem.innerHTML = marked.parse(fullAssistantText);
+                  chatMessages.scrollTop = chatMessages.scrollHeight;
+                }
+              } catch (e) {
+                // Ignore parse errors on raw tokens
+              }
+            }
+          }
+        }
+
+        chatHistory.push({ role: 'assistant', content: fullAssistantText });
+        assistantMsgObj.setFullText(fullAssistantText);
+        actionsElem.classList.remove('hidden');
+
+      } catch (err) {
+        contentElem.innerHTML = `<div class="text-rose-400">Error generating response: ${err.message}</div>`;
+      } finally {
+        isGenerating = false;
+        refreshIcons();
+      }
+    });
+
+    function appendChatMessage(role, text) {
+      const wrapper = document.createElement('div');
+      wrapper.className = `flex gap-3 p-3.5 rounded-xl border ${
+        role === 'user'
+          ? 'bg-slate-900/90 border-slate-700/60 ml-6'
+          : 'bg-slate-900/40 border-slate-800 mr-2'
+      }`;
+
+      const avatar = role === 'user' 
+        ? '<div class="w-6 h-6 rounded-lg bg-sky-600 text-white flex items-center justify-center shrink-0 text-xs font-bold">U</div>'
+        : '<div class="w-6 h-6 rounded-lg bg-indigo-600 text-white flex items-center justify-center shrink-0"><i data-lucide="sparkles" class="w-3.5 h-3.5"></i></div>';
+
+      let fullText = text;
+
+      wrapper.innerHTML = `
+        ${avatar}
+        <div class="flex-1 min-w-0">
+          <div class="flex items-center justify-between mb-1">
+            <span class="text-[11px] font-semibold text-slate-400">${role === 'user' ? 'You' : 'LM Studio Grounded Analyst'}</span>
+          </div>
+          <div class="message-content prose-dark text-xs leading-relaxed select-text">
+            ${marked.parse(text || 'Thinking...')}
+          </div>
+          <div class="message-actions hidden mt-3 pt-2 border-t border-slate-800/80 flex flex-wrap items-center gap-2">
+            <button class="send-to-report-btn text-[10px] font-medium px-2 py-1 rounded bg-emerald-950/60 hover:bg-emerald-900/80 text-emerald-300 border border-emerald-700/50 flex items-center gap-1">
+              <i data-lucide="file-plus-2" class="w-3 h-3"></i>
+              <span>Send to Report</span>
+            </button>
+            <button class="create-doc-btn text-[10px] font-medium px-2 py-1 rounded bg-blue-950/60 hover:bg-blue-900/80 text-blue-300 border border-blue-700/50 flex items-center gap-1">
+              <i data-lucide="file-text" class="w-3 h-3"></i>
+              <span>Create Word Doc</span>
+            </button>
+            <button class="create-ppt-btn text-[10px] font-medium px-2 py-1 rounded bg-amber-950/60 hover:bg-amber-900/80 text-amber-300 border border-amber-700/50 flex items-center gap-1">
+              <i data-lucide="presentation" class="w-3 h-3"></i>
+              <span>Create Presentation</span>
+            </button>
+            <button class="copy-text-btn text-[10px] text-slate-400 hover:text-white px-2 py-1 rounded hover:bg-slate-800 flex items-center gap-1">
+              <i data-lucide="copy" class="w-3 h-3"></i>
+              <span>Copy</span>
+            </button>
+          </div>
+        </div>
+      `;
+
+      chatMessages.appendChild(wrapper);
+      chatMessages.scrollTop = chatMessages.scrollHeight;
+      refreshIcons();
+
+      const contentElem = wrapper.querySelector('.message-content');
+      const actionsElem = wrapper.querySelector('.message-actions');
+
+      // Bind action buttons
+      wrapper.querySelector('.send-to-report-btn')?.addEventListener('click', () => {
+        sendToReportStudio(fullText);
+      });
+      wrapper.querySelector('.create-doc-btn')?.addEventListener('click', () => {
+        exportWordDirect(fullText);
+      });
+      wrapper.querySelector('.create-ppt-btn')?.addEventListener('click', () => {
+        exportPptxDirect(fullText);
+      });
+      wrapper.querySelector('.copy-text-btn')?.addEventListener('click', () => {
+        navigator.clipboard.writeText(fullText);
+        showToast('Response copied!', 'success');
+      });
+
+      return {
+        contentElem,
+        actionsElem,
+        setFullText: (t) => { fullText = t; }
+      };
+    }
+
+    // Output Studio Management
+    const outputEditor = document.getElementById('outputEditor');
+    const outputPreview = document.getElementById('outputPreview');
+    const docTitleInput = document.getElementById('docTitleInput');
+    const viewEditBtn = document.getElementById('viewEditBtn');
+    const viewPreviewBtn = document.getElementById('viewPreviewBtn');
+
+    function updateOutputStats() {
+      const text = outputEditor.value;
+      const words = text.trim() ? text.trim().split(/\s+/).length : 0;
+      document.getElementById('wordCountStats').textContent = `${words.toLocaleString()} words • ${text.length.toLocaleString()} characters`;
+    }
+    outputEditor.addEventListener('input', updateOutputStats);
+
+    viewEditBtn.addEventListener('click', () => {
+      viewEditBtn.className = 'px-2.5 py-0.5 rounded-md bg-slate-700 text-white font-medium';
+      viewPreviewBtn.className = 'px-2.5 py-0.5 rounded-md text-slate-400 hover:text-slate-200';
+      outputEditor.classList.remove('hidden');
+      outputPreview.classList.add('hidden');
+    });
+
+    viewPreviewBtn.addEventListener('click', () => {
+      viewPreviewBtn.className = 'px-2.5 py-0.5 rounded-md bg-slate-700 text-white font-medium';
+      viewEditBtn.className = 'px-2.5 py-0.5 rounded-md text-slate-400 hover:text-slate-200';
+      outputPreview.innerHTML = marked.parse(outputEditor.value || '*No content in output studio.*');
+      outputEditor.classList.add('hidden');
+      outputPreview.classList.remove('hidden');
+    });
+
+    function sendToReportStudio(markdownText) {
+      if (outputEditor.value.trim()) {
+        outputEditor.value += `\n\n---\n\n${markdownText}`;
+      } else {
+        outputEditor.value = markdownText;
+      }
+      updateOutputStats();
+      showToast('Sent to Output Studio (Right Panel)!', 'success');
+    }
+
+    document.getElementById('copyMarkdownBtn').addEventListener('click', () => {
+      navigator.clipboard.writeText(outputEditor.value);
+      showToast('Markdown copied to clipboard!', 'success');
+    });
+
+    // Use Output as Source (Recursive Loop)
+    document.getElementById('useAsSourceBtn').addEventListener('click', async () => {
+      const content = outputEditor.value.trim();
+      if (!content) {
+        showToast('Please enter or generate content first.', 'error');
+        return;
+      }
+      const title = docTitleInput.value.trim() || 'Output Synthesis';
+      try {
+        const res = await fetch('/api/sources/from-output', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ content, title })
+        });
+        const data = await res.json();
+        showToast('Output added to Sources on the Left Panel!', 'success');
+        if (data.source) selectedSourceIds.add(data.source.id);
+        await fetchSources();
+      } catch (err) {
+        showToast('Failed to save output as source: ' + err.message, 'error');
+      }
+    });
+
+    // Export DOCX
+    document.getElementById('exportDocxBtn').addEventListener('click', async () => {
+      const content = outputEditor.value.trim();
+      if (!content) {
+        showToast('Output studio is empty.', 'error');
+        return;
+      }
+      const title = docTitleInput.value.trim() || 'Grounded Research Synthesis';
+      await triggerDocxDownload(content, title);
+    });
+
+    async function exportWordDirect(content) {
+      const title = docTitleInput.value.trim() || 'Response Synthesis';
+      await triggerDocxDownload(content, title);
+    }
+
+    async function triggerDocxDownload(content, title) {
+      showToast('Generating Word document...', 'info');
+      try {
+        const res = await fetch('/api/export/docx', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            markdown_content: content,
+            title: title,
+            filename: `${title.replace(/[^a-zA-Z0-9_-]/g, '_')}.docx`
+          })
+        });
+        if (!res.ok) throw new Error('Failed to generate DOCX');
+        const blob = await res.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${title.replace(/[^a-zA-Z0-9_-]/g, '_')}.docx`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        showToast('Word document downloaded!', 'success');
+      } catch (err) {
+        showToast('Export failed: ' + err.message, 'error');
+      }
+    }
+
+    // Export PPTX
+    document.getElementById('exportPptxBtn').addEventListener('click', async () => {
+      const content = outputEditor.value.trim();
+      if (!content) {
+        showToast('Output studio is empty.', 'error');
+        return;
+      }
+      const title = docTitleInput.value.trim() || 'Executive Presentation';
+      await triggerPptxDownload(content, title);
+    });
+
+    async function exportPptxDirect(content) {
+      const title = docTitleInput.value.trim() || 'Presentation Deck';
+      await triggerPptxDownload(content, title);
+    }
+
+    async function triggerPptxDownload(content, title) {
+      showToast('Generating Presentation slides...', 'info');
+      try {
+        const res = await fetch('/api/export/pptx', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            markdown_content: content,
+            title: title,
+            filename: `${title.replace(/[^a-zA-Z0-9_-]/g, '_')}.pptx`
+          })
+        });
+        if (!res.ok) throw new Error('Failed to generate PPTX');
+        const blob = await res.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${title.replace(/[^a-zA-Z0-9_-]/g, '_')}.pptx`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        showToast('PowerPoint deck downloaded!', 'success');
+      } catch (err) {
+        showToast('Export failed: ' + err.message, 'error');
+      }
+    }
+
+    // Settings Modal
+    const configModal = document.getElementById('configModal');
+    document.getElementById('openConfigModalBtn').addEventListener('click', () => {
+      document.getElementById('lmUrlInput').value = currentLmStudioUrl;
+      configModal.classList.remove('hidden');
+      refreshIcons();
+    });
+    document.getElementById('closeConfigModalBtn').addEventListener('click', () => {
+      configModal.classList.add('hidden');
+    });
+    document.getElementById('tempSlider').addEventListener('input', (e) => {
+      currentTemperature = parseFloat(e.target.value);
+      document.getElementById('tempValue').textContent = currentTemperature.toFixed(1);
+    });
+    document.getElementById('saveConfigBtn').addEventListener('click', () => {
+      currentLmStudioUrl = document.getElementById('lmUrlInput').value.trim();
+      localStorage.setItem('lm_studio_url', currentLmStudioUrl);
+      configModal.classList.add('hidden');
+      showToast('Settings saved!', 'success');
+      checkLmStudio();
+    });
+    document.getElementById('refreshLmBtn').addEventListener('click', checkLmStudio);
+
+    // Initial Load
+    window.addEventListener('DOMContentLoaded', () => {
+      fetchSources();
+      checkLmStudio();
+      updateOutputStats();
+      refreshIcons();
+    });
+  </script>
+</body>
+</html>
