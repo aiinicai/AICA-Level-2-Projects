@@ -1,0 +1,806 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Task Checker Agent Platform</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <link rel="stylesheet" href="/static/css/app.css?v=27">
+</head>
+<body>
+<!--
+  DIRECTION CONTRACT — Task Checker
+  THESIS: A check is a specification with a found value beside it, so the app is
+  the certificate that states whether delivered work conforms. Refuses the
+  dashboard-of-cards arrangement this category always ships.
+  OWN-WORLD: Warm-neutral ground (#efeae9) carrying white sheets (#fffdfd);
+  hairline rules instead of boxes; squared corners; tabular figures; one
+  grotesque in four weights; indigo #25477a for structure and authority; colour
+  otherwise ONLY for state - conform #1d6e42, deviation #a63129, review #875d13.
+  STORY: The admin sees a verdict they can trust in one glance, then the exact
+  deviations to fix, and understands whether it is signed off or provisional.
+  FIRST VIEWPORT: Ruled certificate header across the sheet - verdict at 34px
+  with its standing beside it - then findings as specification/found rows,
+  citations indented in mono, sign-off block at the foot.
+  FORM: Certificate of Analysis; candidate 2 of the grounded list; seed 6da81835
+  (safer register, round 2; chosen by the user delegating the call).
+  RAISES: evidence carries an exact address, not prose (Proof Galley); status
+  lives in a column that never moves (Inspection Ledger); colour names a state
+  or is absent (HyperCard); the run reads at four densities (Miura sheet).
+  FINISH: unreviewed and undocumented is unfinished; this build ends with the
+  finish review, the verdict, DESIGN.md, and every shipping raster carrying its
+  provenance.
+-->
+    <!-- Loading Screen -->
+    <div id="loading-screen" class="loading-screen">
+        <div class="spinner"></div>
+        <p>Loading...</p>
+    </div>
+
+    <!-- Auth Section (Login) -->
+    <div id="auth-section" class="section auth-section" style="display: none;">
+        <div class="auth-navbar">
+            <div class="container auth-navbar-inner">
+                <a class="auth-logo" href="/">Task Checker</a>
+                <nav class="auth-nav-links">
+                    <a id="nav-login-link" href="/">Login</a>
+                    <a href="/pricing">Pricing</a>
+                </nav>
+            </div>
+        </div>
+        <div class="container auth-container">
+            <div class="auth-hero">
+                <div class="auth-brand">
+                    <div class="brand-mark">TC</div>
+                    <div class="brand-text">
+                        <h1>Task Checker</h1>
+                        <p class="tagline">Agent Platform</p>
+                    </div>
+                </div>
+                <h2 class="auth-headline">Quality checks that scale with your team.</h2>
+                <p class="auth-lede">Create specialized agents to validate accuracy, completeness, and compliance across your workflows.</p>
+                <div class="auth-metrics">
+                    <div class="metric-card">
+                        <h3>Define standards</h3>
+                        <p>Teach agents with examples, policies, and reference docs.</p>
+                    </div>
+                    <div class="metric-card">
+                        <h3>Run with confidence</h3>
+                        <p>Automated checks surface gaps before delivery.</p>
+                    </div>
+                    <div class="metric-card">
+                        <h3>Stay in control</h3>
+                        <p>Use OneDrive folders and approvals you already trust.</p>
+                    </div>
+                    <div class="metric-card">
+                        <h3>Scale review</h3>
+                        <p>Create repeatable workflows for every team.</p>
+                    </div>
+                </div>
+                <div class="auth-support">
+                    <p>Need access for your org? Contact admin@infinitysolutions.app</p>
+                </div>
+            </div>
+            <div class="auth-panel">
+                <div class="auth-card">
+                    <h2>Welcome</h2>
+                    <p>Sign in to manage agents, run checks, and review results.</p>
+                    <form id="password-login-form" class="auth-form">
+                        <div class="form-group">
+                            <label for="password-login-email">Email</label>
+                            <input type="email" id="password-login-email" required placeholder="you@company.com">
+                        </div>
+                        <div class="form-group">
+                            <label for="password-login-password">Password</label>
+                            <input type="password" id="password-login-password" required placeholder="Temporary or new password" minlength="8">
+                        </div>
+                        <button type="submit" id="password-login-btn" class="btn btn-primary btn-large">
+                            Sign in
+                        </button>
+                    </form>
+                    <p class="auth-note">If you received a temporary password, you will be prompted to change it after signing in.</p>
+                    <div class="features">
+                        <div class="feature">
+                            <span class="feature-icon">&#10003;</span>
+                            <span>Create custom agents</span>
+                        </div>
+                        <div class="feature">
+                            <span class="feature-icon">&#10003;</span>
+                            <span>Connect your OneDrive</span>
+                        </div>
+                        <div class="feature">
+                            <span class="feature-icon">&#10003;</span>
+                            <span>Automate task checking</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="container auth-pricing">
+            <div class="auth-pricing-header">
+                <p class="eyebrow">Plans</p>
+                <h3>Pick the right plan to get started</h3>
+                <p class="text-muted">Upgrade anytime. All plans include secure workflow setup.</p>
+            </div>
+            <div class="auth-pricing-grid">
+                <article class="auth-pricing-card">
+                    <div class="plan-name">Free</div>
+                    <div class="plan-price">$0<span>/month</span></div>
+                    <p class="plan-description">Perfect for trying out Task Checker</p>
+                    <ul class="auth-pricing-list">
+                        <li>Up to 3 agents</li>
+                        <li>10 checks per month</li>
+                        <li>Basic AI model</li>
+                    </ul>
+                    <div class="auth-pricing-actions">
+                        <button type="button" class="btn btn-secondary auth-pricing-btn" data-plan="free" data-price="0">Choose Free</button>
+                    </div>
+                </article>
+
+                <article class="auth-pricing-card featured">
+                    <div class="plan-name">Standard</div>
+                    <div class="plan-price">$29<span>/month</span></div>
+                    <p class="plan-description">Great for individuals and small teams</p>
+                    <ul class="auth-pricing-list">
+                        <li>Up to 10 agents</li>
+                        <li>100 checks per month</li>
+                        <li>OneDrive integration</li>
+                    </ul>
+                    <div class="auth-pricing-actions">
+                        <button type="button" class="btn btn-primary auth-pricing-btn" data-plan="standard" data-price="29">Choose Standard</button>
+                        <a class="auth-pricing-link" href="/pricing">View details</a>
+                    </div>
+                </article>
+
+                <article class="auth-pricing-card">
+                    <div class="plan-name">Professional</div>
+                    <div class="plan-price">$99<span>/month</span></div>
+                    <p class="plan-description">Advanced features for growing teams</p>
+                    <ul class="auth-pricing-list">
+                        <li>Unlimited agents</li>
+                        <li>500 checks per month</li>
+                        <li>Consensus mode</li>
+                    </ul>
+                    <div class="auth-pricing-actions">
+                        <button type="button" class="btn btn-secondary auth-pricing-btn" data-plan="professional" data-price="99">Choose Pro</button>
+                        <a class="auth-pricing-link" href="mailto:admin@infinitysolutions.app">Contact sales</a>
+                    </div>
+                </article>
+            </div>
+        </div>
+    </div>
+
+    <!-- Dashboard Section -->
+    <div id="dashboard-section" class="section dashboard-section" style="display: none;">
+        <div class="dashboard-shell">
+            <aside class="dashboard-side">
+                <div class="side-brand">
+                    <div class="brand-mark">TC</div>
+                    <div class="brand-text">
+                        <a class="brand-link" href="/">Task Checker</a>
+                        <span class="subtitle">Agent Platform</span>
+                    </div>
+                </div>
+                <nav class="side-nav">
+                    <button id="nav-agents-btn" class="side-link" type="button">Agents</button>
+                    <button id="nav-tasks-btn" class="side-link active" type="button">Tasks</button>
+                    <button id="settings-btn" class="side-link" type="button" style="display: none;">Settings</button>
+                    <button id="logout-btn" class="side-link side-link-muted" type="button">Sign out</button>
+                </nav>
+                <div class="side-user">
+                    <span id="user-email" class="user-email"></span>
+                    <span id="user-role" class="user-role"></span>
+                </div>
+            </aside>
+
+            <main class="dashboard-main">
+                <section id="agents-page" class="workspace-page">
+                <div class="dashboard-top">
+                    <div class="dashboard-title">
+                        <h2>Agents</h2>
+                        <p class="page-lede">An agent holds the standards to check against: its instructions, reference examples and knowledge files. Tasks point at an agent, and runs start from the Tasks page.</p>
+                    </div>
+                    <div class="dashboard-actions">
+                        <button id="create-agent-btn" class="btn btn-primary">
+                            New agent
+                        </button>
+                    </div>
+                </div>
+
+                <div class="dashboard-panel">
+                    <div id="agents-list" class="agent-list">
+                        <!-- Agents will be loaded here -->
+                    </div>
+
+                    <div id="empty-state" class="empty-state" style="display: none;">
+                        <div class="empty-icon">TC</div>
+                        <h3>No Agents Yet</h3>
+                        <p>Create your first Task Checker agent to get started</p>
+                        <button class="btn btn-primary" onclick="document.getElementById('create-agent-btn').click()">Create an agent</button>
+                    </div>
+                </div>
+                </section>
+
+                <section id="tasks-page" class="workspace-page" style="display: none;">
+                    <div class="dashboard-top">
+                        <div class="dashboard-title">
+                            <h2>Tasks</h2>
+                            <p class="page-lede">Each task binds its files and workflow to an agent. Run a check from its row.</p>
+                        </div>
+                        <div class="dashboard-actions">
+                            <button id="create-task-btn" class="btn btn-primary">New task</button>
+                        </div>
+                    </div>
+                    <div class="dashboard-panel">
+                        <div id="tasks-list" class="task-table-wrap"></div>
+                        <div id="tasks-empty-state" class="empty-state" style="display: none;">
+                            <div class="empty-icon">TK</div>
+                            <h3>No Tasks Yet</h3>
+                            <p>Create a task and assign it to one of your agents.</p>
+                            <button id="create-first-task-btn" class="btn btn-primary">Create a task</button>
+                        </div>
+                    </div>
+                </section>
+            </main>
+        </div>
+    </div>
+
+    <!-- Create/Edit Agent Modal -->
+    <div id="agent-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="modal-title">Create Task Checker Agent</h2>
+                <button type="button" class="close" aria-label="Close dialog">&times;</button>
+            </div>
+
+            <form id="agent-form">
+                <input type="hidden" id="agent-id">
+
+                <section class="agent-form-section" aria-labelledby="agent-details-heading">
+                    <div class="agent-section-header">
+                        <h3 id="agent-details-heading">Agent details</h3>
+                        <p>Name the checker and describe the work it is responsible for.</p>
+                    </div>
+                    <div class="form-group">
+                        <label for="agent-name">Agent Name *</label>
+                        <input type="text" id="agent-name" required placeholder="e.g., Sales Report Checker" maxlength="100">
+                    </div>
+                    <div class="form-group">
+                        <label for="agent-description">Description (optional)</label>
+                        <textarea id="agent-description" rows="2" placeholder="Brief description of what this agent checks" maxlength="500"></textarea>
+                    </div>
+                </section>
+
+                <section class="agent-form-section" aria-labelledby="agent-behavior-heading">
+                    <div class="agent-section-header">
+                        <h3 id="agent-behavior-heading">Validation behavior</h3>
+                        <p>Control how this agent interprets workflows and performs each check.</p>
+                    </div>
+                    <div class="form-group">
+                        <label for="agent-prompt">Additional Instructions (optional)</label>
+                        <p class="field-hint">Use this only for short instructions that supplement the selected workflow documents.</p>
+                        <textarea id="agent-prompt" rows="4" placeholder="Optional instructions that apply in addition to the selected workflows..."></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label for="agent-codex-model">Codex Model</label>
+                        <select id="agent-codex-model">
+                            <option value="gpt-5.6-sol">GPT-5.6 Sol</option>
+                            <option value="gpt-5.6-terra">GPT-5.6 Terra</option>
+                            <option value="gpt-5.6-luna">GPT-5.6 Luna</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="agent-codex-effort">Reasoning Effort</label>
+                        <select id="agent-codex-effort">
+                            <option value="high">High</option>
+                            <option value="xhigh" selected>Extra high</option>
+                            <option value="medium">Medium</option>
+                            <option value="low">Low</option>
+                        </select>
+                    </div>
+                </section>
+
+                <section class="agent-form-section" aria-labelledby="agent-access-heading">
+                    <div class="agent-section-header">
+                        <h3 id="agent-access-heading">Access</h3>
+                        <p>Choose which admins can see and run this agent.</p>
+                    </div>
+                    <div class="form-group">
+                        <label>Assigned Admins</label>
+                        <div id="agent-admin-assignments" class="users-list"><p class="text-muted">Loading admins...</p></div>
+                    </div>
+                </section>
+
+                <section class="agent-form-section" aria-labelledby="agent-reference-heading">
+                    <div class="agent-section-header">
+                        <h3 id="agent-reference-heading">Reference material <span>Optional</span></h3>
+                        <p>Add examples and domain material the agent can consult during checks.</p>
+                    </div>
+                    <div class="form-group">
+                        <label>Reference examples</label>
+                        <p class="field-hint">Select example files from OneDrive to show the agent what good inputs and outputs look like.</p>
+                        <div class="reference-files-upload">
+                            <div class="file-type-section">
+                                <p class="field-hint-small">Example input files — properly formatted source data</p>
+                                <div id="example-input-selector"></div>
+                            </div>
+                            <div class="file-type-section">
+                                <p class="field-hint-small">Example output files — correct, high-quality results</p>
+                                <div id="example-output-selector"></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>Knowledge base files</label>
+                        <p class="field-hint">Select OneDrive files that provide domain-specific knowledge for this agent.</p>
+                        <div id="kb-files-selector"></div>
+                    </div>
+                </section>
+
+                <div class="form-actions">
+                    <button type="button" class="btn btn-secondary" id="cancel-btn">Cancel</button>
+                    <button type="submit" class="btn btn-primary" id="save-agent-btn">
+                        <span class="btn-text">Save Agent</span>
+                        <span class="btn-loading" style="display: none;">Saving...</span>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Create/Edit Task Modal -->
+    <div id="task-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="task-modal-title">Create Task</h2>
+                <button type="button" class="close" aria-label="Close dialog">&times;</button>
+            </div>
+            <form id="task-form">
+                <input type="hidden" id="task-id">
+                <section class="task-form-section" aria-labelledby="task-details-heading">
+                    <div class="task-section-header">
+                        <h3 id="task-details-heading">Task details</h3>
+                        <p>Name this file configuration so it is easy to find again.</p>
+                    </div>
+                    <div class="form-group">
+                        <label for="task-name">Task Name *</label>
+                        <input id="task-name" type="text" required maxlength="100" placeholder="e.g., August invoice review">
+                    </div>
+                </section>
+
+                <section class="task-form-section" aria-labelledby="task-client-heading">
+                    <div class="task-section-header">
+                        <h3 id="task-client-heading">Client context <span>Optional</span></h3>
+                        <p>Add policies, organization details, or other client-specific material.</p>
+                    </div>
+                    <div class="form-group">
+                        <div id="task-client-files-selector"></div>
+                    </div>
+                </section>
+
+                <section class="task-form-section" aria-labelledby="task-files-heading">
+                    <div class="task-section-header">
+                        <h3 id="task-files-heading">Input/Output files</h3>
+                        <p>Choose the source material and completed outputs that should be validated.</p>
+                    </div>
+                    <div class="form-group">
+                        <div id="task-input-output-selector"></div>
+                    </div>
+                </section>
+
+                <section class="task-form-section" aria-labelledby="task-workflow-heading">
+                    <div class="task-section-header">
+                        <h3 id="task-workflow-heading">Workflow files</h3>
+                        <p>Choose the workflow documents that define how the task should be validated.</p>
+                    </div>
+                    <div class="form-group">
+                        <div id="task-workflow-selector"></div>
+                    </div>
+                </section>
+
+                <section class="task-form-section" aria-labelledby="task-assignment-heading">
+                    <div class="task-section-header">
+                        <h3 id="task-assignment-heading">Assignment</h3>
+                        <p>Choose the agent that will combine these files with its knowledge, references, and instructions.</p>
+                    </div>
+                    <div class="form-group">
+                        <label for="task-agent-id">Assigned Agent *</label>
+                        <select id="task-agent-id" required>
+                            <option value="">Select an agent...</option>
+                        </select>
+                    </div>
+                </section>
+                <div class="form-actions">
+                    <button type="button" class="btn btn-secondary" id="cancel-task-btn">Cancel</button>
+                    <button type="submit" class="btn btn-primary" id="save-task-btn">
+                        <span class="btn-text">Save Task</span>
+                        <span class="btn-loading" style="display: none;">Saving...</span>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+
+    <!-- Check Results Modal -->
+    <div id="results-modal" class="modal">
+        <div class="modal-content modal-large">
+            <div class="modal-header">
+                <h2 id="results-modal-title">Check Results</h2>
+                <button type="button" class="close" aria-label="Close dialog">&times;</button>
+            </div>
+
+            <div id="results-content" class="results-content">
+                <div class="loading">
+                    <div class="spinner"></div>
+                    <p>Running check... This may take 30-60 seconds.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+
+    <!-- Settings Modal -->
+    <div id="settings-modal" class="modal">
+        <div class="modal-content modal-large settings-modal">
+            <div class="modal-header">
+                <div>
+                    <p class="eyebrow">Workspace Settings</p>
+                    <h2>Settings</h2>
+                </div>
+                <button type="button" class="close" aria-label="Close dialog">&times;</button>
+            </div>
+
+            <div class="settings-shell">
+                <aside class="settings-nav">
+                    <div class="settings-tabs">
+                        <button class="settings-tab active" data-tab="onedrive">OneDrive Connection</button>
+                        <button class="settings-tab" data-tab="codex">ChatGPT / Codex</button>
+                        <button class="settings-tab" data-tab="users">User Management</button>
+                    </div>
+
+                    <div class="settings-help">
+                        <span>Need help?</span>
+                        <a href="mailto:admin@infinitysolutions.app">Contact support</a>
+                    </div>
+                </aside>
+
+                <div class="settings-content">
+                    <!-- OneDrive Tab -->
+                    <div id="onedrive-tab" class="settings-tab-content active">
+                        <div class="settings-block onedrive-setup">
+                            <div class="settings-block-header">
+                                <div>
+                                    <h3>Tenant OneDrive Account</h3>
+                                    <p>Connect the one OneDrive account used by every configured agent in this tenant.</p>
+                                </div>
+                                <button id="add-onedrive-connection-btn" class="btn btn-primary">
+                                    + Add Connection
+                                </button>
+                            </div>
+
+                            <!-- Loading Spinner -->
+                            <div id="onedrive-loading" class="onedrive-loading" style="display: none;">
+                                <div class="spinner"></div>
+                                <p id="onedrive-loading-text">Loading connections...</p>
+                            </div>
+
+                            <!-- List of Connections -->
+                            <div id="onedrive-connections-list" class="onedrive-connections-list">
+                                <!-- Populated by JavaScript -->
+                            </div>
+
+                            <div id="no-connections-message" style="display: none; padding: 24px; text-align: center; color: var(--text-muted);">
+                                <p>No OneDrive connections yet. Click "Add Connection" to get started.</p>
+                            </div>
+                        </div>
+
+                        <!-- Add/Edit Connection Form (hidden by default) -->
+                        <div id="onedrive-connection-form" class="settings-block" style="display: none;">
+                            <h3 id="connection-form-title">Add OneDrive Connection</h3>
+                            <form id="save-connection-form">
+                                <input type="hidden" id="editing-connection-id" value="">
+
+                                <div class="form-group">
+                                    <label for="connection-account-name">Connection Name *</label>
+                                    <input
+                                        type="text"
+                                        id="connection-account-name"
+                                        placeholder="e.g., Jolly Associates OneDrive"
+                                        maxlength="100"
+                                        required
+                                    >
+                                    <p class="field-hint">A name your team will recognize when selecting files.</p>
+                                </div>
+
+                                <div class="form-group">
+                                    <label for="connection-account-email">Account Email</label>
+                                    <input
+                                        type="email"
+                                        id="connection-account-email"
+                                        placeholder="user@example.com"
+                                        readonly
+                                    >
+                                    <p class="field-hint">Connected Microsoft account</p>
+                                </div>
+
+                                <div class="form-group">
+                                    <label for="connection-base-path">Base Folder Path</label>
+                                    <input
+                                        type="text"
+                                        id="connection-base-path"
+                                        placeholder="/Documents/TaskChecker"
+                                        pattern="^/.*"
+                                        title="Path must start with /"
+                                        value="/"
+                                    >
+                                    <p class="field-hint">Path must start with / (e.g., /Documents/MyFolder)</p>
+                                </div>
+
+                                <div id="onedrive-connected-status" style="display: none; margin-top: 16px;">
+                                    <div style="padding: 12px; background: var(--accent-soft); border: 1px solid var(--accent-primary); border-radius: var(--radius-sm); color: var(--accent-ink);">
+                                        ✓ Microsoft account connected successfully
+                                    </div>
+                                </div>
+
+                                <div class="settings-actions" style="margin-top: 24px;">
+                                    <button type="submit" class="btn btn-primary">
+                                        Save Connection
+                                    </button>
+                                    <button type="button" id="cancel-connection-form-btn" class="btn btn-secondary">
+                                        Cancel
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+
+                    <div id="codex-tab" class="settings-tab-content" style="display: none;">
+                        <div class="settings-block">
+                            <div class="settings-block-header">
+                                <div>
+                                    <h3>Tenant ChatGPT Account</h3>
+                                    <p>Connect the one ChatGPT account whose Codex subscription powers every assigned admin run in this tenant.</p>
+                                </div>
+                            </div>
+                            <div id="codex-connection-status"><p class="text-muted">Loading connection status...</p></div>
+                            <div class="settings-actions" style="margin-top: 24px;">
+                                <button id="connect-codex-btn" type="button" class="btn btn-primary">Connect ChatGPT</button>
+                                <button id="disconnect-codex-btn" type="button" class="btn btn-danger" style="display: none;">Disconnect</button>
+                            </div>
+                            <div id="codex-device-login" style="display: none; margin-top: 24px;">
+                                <p>Open <a id="codex-verification-url" href="#" target="_blank" rel="noopener">the ChatGPT verification page</a> and enter:</p>
+                                <p id="codex-user-code" style="font-size: 28px; font-weight: 700; letter-spacing: 4px;"></p>
+                                <p class="text-muted">This page updates automatically after login.</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- User Management Tab -->
+                    <div id="users-tab" class="settings-tab-content" style="display: none;">
+                        <div class="settings-block user-management-section">
+                            <div class="section-header">
+                                <h3>Create New User</h3>
+                                <p class="text-muted">Invite new users with role-based access.</p>
+                            </div>
+                            <form id="create-user-form">
+                                <div class="form-group">
+                                    <label for="new-user-email">Email *</label>
+                                    <input type="email" id="new-user-email" required placeholder="user@example.com">
+                                </div>
+                                <div class="form-group">
+                                    <label>Temporary Password</label>
+                                    <p class="field-hint">A temporary password will be auto-generated and the user will be required to change it on first login.</p>
+                                </div>
+                                <div class="form-group">
+                                    <label for="new-user-display-name">Display Name</label>
+                                    <input type="text" id="new-user-display-name" placeholder="Optional">
+                                </div>
+                                <div class="form-group">
+                                    <label for="new-user-role">Role *</label>
+                                    <select id="new-user-role" required disabled>
+                                        <option value="admin" selected>Admin (Runs assigned agents only)</option>
+                                    </select>
+                                </div>
+                                <button type="submit" class="btn btn-primary">Create User</button>
+                            </form>
+                        </div>
+
+                        <div class="settings-block user-management-section">
+                            <div class="section-header">
+                                <h3>Existing Users</h3>
+                                <p class="text-muted">Manage roles and access for your team.</p>
+                            </div>
+                            <div id="users-list" class="users-list">
+                                <!-- Users will be loaded here -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Custom Alert Modal -->
+    <div id="custom-alert-modal" class="modal custom-alert-modal">
+        <div class="modal-content custom-dialog">
+            <div class="modal-header">
+                <h3 id="alert-title">Notice</h3>
+            </div>
+            <div class="modal-body">
+                <p id="alert-message"></p>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-primary" id="alert-ok-btn">OK</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Custom Confirm Modal -->
+    <div id="custom-confirm-modal" class="modal custom-confirm-modal">
+        <div class="modal-content custom-dialog">
+            <div class="modal-header">
+                <h3 id="confirm-title">Confirm</h3>
+            </div>
+            <div class="modal-body">
+                <p id="confirm-message"></p>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" id="confirm-cancel-btn">Cancel</button>
+                <button class="btn btn-danger" id="confirm-ok-btn">Confirm</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Password Reset Modal -->
+    <div id="password-reset-modal" class="modal" data-modal-persistent>
+        <div class="modal-content custom-dialog password-reset-dialog">
+            <div class="modal-header">
+                <h3>Change Temporary Password</h3>
+            </div>
+            <div class="modal-body">
+                <p>For security, set a new password before continuing.</p>
+                <form id="password-reset-form" class="auth-form">
+                    <div class="form-group">
+                        <label for="password-reset-new">New Password</label>
+                        <input type="password" id="password-reset-new" required minlength="8" placeholder="Min 8 characters">
+                    </div>
+                    <div class="form-group">
+                        <label for="password-reset-confirm">Confirm Password</label>
+                        <input type="password" id="password-reset-confirm" required minlength="8" placeholder="Re-enter new password">
+                    </div>
+                    <div id="password-reset-error" class="form-error" style="display: none;"></div>
+                    <button type="submit" class="btn btn-primary btn-large">
+                        Update Password
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Configuration
+        const SUPABASE_URL = 'https://fejjydsebnhtuzyktvgd.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZlamp5ZHNlYm5odHV6eWt0dmdkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE2ODU1MTgsImV4cCI6MjA5NzI2MTUxOH0.M0zqMXo5L8NELhuqm0tUJuFJsLeC5t9OFMZ221BuGco';
+        const API_URL = window.location.origin;
+
+        // Initialize Supabase client
+        const { createClient } = supabase;
+        const supabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+        // Global state
+        let currentUser = null;
+        let currentUserRole = null;
+        let currentAgents = [];
+        let currentTasks = [];
+        let editingAgentId = null;
+
+
+        // Update Agent Client folder path when dropdown changes
+        function updateAgentClientFolderPath() {
+            const select = document.getElementById('agent-client-folder-select');
+            const input = document.getElementById('agent-client-folder');
+            if (select && input && select.value) {
+                input.value = select.value;
+            }
+        }
+
+// Custom Alert Function
+        window.customAlert = function(message, title = 'Notice') {
+            return new Promise((resolve) => {
+                const modal = document.getElementById('custom-alert-modal');
+                const titleEl = document.getElementById('alert-title');
+                const messageEl = document.getElementById('alert-message');
+                const okBtn = document.getElementById('alert-ok-btn');
+
+                titleEl.textContent = title;
+                messageEl.textContent = message;
+                modal.style.display = 'block';
+
+                const handleOk = () => {
+                    modal.style.display = 'none';
+                    okBtn.removeEventListener('click', handleOk);
+                    resolve();
+                };
+
+                okBtn.addEventListener('click', handleOk);
+            });
+        };
+
+        // Custom Confirm Function
+        window.customConfirm = function(message, title = 'Confirm') {
+            return new Promise((resolve) => {
+                const modal = document.getElementById('custom-confirm-modal');
+                const titleEl = document.getElementById('confirm-title');
+                const messageEl = document.getElementById('confirm-message');
+                const okBtn = document.getElementById('confirm-ok-btn');
+                const cancelBtn = document.getElementById('confirm-cancel-btn');
+
+                titleEl.textContent = title;
+                messageEl.textContent = message;
+                modal.style.display = 'block';
+
+                const handleOk = () => {
+                    modal.style.display = 'none';
+                    okBtn.removeEventListener('click', handleOk);
+                    cancelBtn.removeEventListener('click', handleCancel);
+                    resolve(true);
+                };
+
+                const handleCancel = () => {
+                    modal.style.display = 'none';
+                    okBtn.removeEventListener('click', handleOk);
+                    cancelBtn.removeEventListener('click', handleCancel);
+                    resolve(false);
+                };
+
+                okBtn.addEventListener('click', handleOk);
+                cancelBtn.addEventListener('click', handleCancel);
+            });
+        };
+
+        const navLoginLink = document.getElementById('nav-login-link');
+        if (navLoginLink) {
+            navLoginLink.addEventListener('click', (event) => {
+                if (currentUser) {
+                    event.preventDefault();
+                    if (typeof showDashboard === 'function') {
+                        showDashboard();
+                    } else {
+                        window.location.href = '/';
+                    }
+                }
+            });
+        }
+
+        document.querySelectorAll('.auth-pricing-btn').forEach((button) => {
+            button.addEventListener('click', () => {
+                const plan = button.dataset.plan;
+                const rawPrice = button.dataset.price;
+                const price = rawPrice === 'custom' ? 'custom' : Number(rawPrice);
+
+                localStorage.setItem('selectedPlan', JSON.stringify({
+                    name: plan,
+                    price: price
+                }));
+
+                window.location.href = '/checkout';
+            });
+        });
+    </script>
+
+    <script src="/static/js/modal-a11y.js?v=2"></script>
+    <script src="/static/js/file-selector.js?v=10"></script>
+    <script src="/static/js/onedrive-connections.js?v=3"></script>
+    <script src="/static/js/codex-integration.js?v=3"></script>
+    <script src="/static/js/auth.js?v=5"></script>
+    <script src="/static/js/agents.js?v=12"></script>
+    <script src="/static/js/tasks.js?v=6"></script>
+    <script src="/static/js/run-progress.js?v=4"></script>
+    <script src="/static/js/checker.js?v=13"></script>
+    <script src="/static/js/app.js?v=3"></script>
+</body>
+</html>
