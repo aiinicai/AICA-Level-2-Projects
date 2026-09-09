@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+{% block title %}Leave{% endblock %}
+{% block content %}
+<h1 class="text-2xl font-bold mb-4">Leave Management</h1>
+
+{% if balances %}
+<div class="card mb-4">
+  <h2 class="font-semibold mb-3">My leave balance (this year)</h2>
+  <div class="grid sm:grid-cols-2 md:grid-cols-4 gap-3">
+    {% for b in balances %}
+    <div class="border rounded p-3">
+      <div class="text-xs text-slate-500">{{ b.leave_type.name }}</div>
+      <div class="text-2xl font-bold">{{ b.balance }}<span class="text-sm font-normal text-slate-400"> / {{ b.allocated }}</span></div>
+      <div class="text-xs text-slate-400">{{ b.used }} used this year</div>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
+{% if user.role == "CEO" %}
+<div class="card mb-4 text-sm text-slate-500">Your own leave requests are auto-approved since there is no one above the CEO role to approve them.</div>
+{% endif %}
+
+<div class="grid md:grid-cols-2 gap-4">
+  <div class="card">
+    <h2 class="font-semibold mb-3">Apply for leave</h2>
+    <form method="post" action="/leave/apply" class="space-y-2 text-sm">
+      <select name="leave_type_id" required class="w-full border rounded px-2 py-1">
+        {% for lt in leave_types %}
+        <option value="{{ lt.id }}">{{ lt.name }}</option>
+        {% endfor %}
+      </select>
+      <div class="flex gap-2">
+        <input name="start_date" type="date" required class="w-full border rounded px-2 py-1">
+        <input name="end_date" type="date" required class="w-full border rounded px-2 py-1">
+      </div>
+      <textarea name="reason" placeholder="Reason" class="w-full border rounded px-2 py-1"></textarea>
+      <button class="w-full bg-slate-900 text-white py-1.5 rounded">Submit Request</button>
+    </form>
+  </div>
+
+  <div class="card">
+    <h2 class="font-semibold mb-3">My requests</h2>
+    <table class="w-full text-sm">
+      <thead><tr class="text-left text-slate-500 border-b"><th class="py-1">Type</th><th>Dates</th><th>Status</th></tr></thead>
+      <tbody>
+      {% for r in my_requests %}
+        <tr class="border-b">
+          <td class="py-1">{{ r.leave_type.name if r.leave_type else "-" }}</td>
+          <td>{{ r.start_date }} - {{ r.end_date }}</td>
+          <td><span class="badge badge-{{ r.status|lower }}">{{ r.status }}</span></td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{% if approvals %}
+<div class="card mt-4">
+  <h2 class="font-semibold mb-3">Pending approvals</h2>
+  <table class="w-full text-sm">
+    <thead><tr class="text-left text-slate-500 border-b"><th class="py-1">Employee</th><th>Type</th><th>Dates</th><th>Reason</th><th></th></tr></thead>
+    <tbody>
+    {% for r in approvals %}
+      <tr class="border-b">
+        <td class="py-1">{{ r.user.name }}</td>
+        <td>{{ r.leave_type.name if r.leave_type else "-" }}</td>
+        <td>{{ r.start_date }} - {{ r.end_date }}</td>
+        <td class="max-w-xs truncate">{{ r.reason }}</td>
+        <td class="flex gap-1 py-1">
+          <form method="post" action="/leave/{{ r.id }}/decision"><input type="hidden" name="decision" value="approve"><button class="text-xs bg-green-100 text-green-800 px-2 py-1 rounded">Approve</button></form>
+          <form method="post" action="/leave/{{ r.id }}/decision"><input type="hidden" name="decision" value="reject"><button class="text-xs bg-red-100 text-red-800 px-2 py-1 rounded">Reject</button></form>
+        </td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+{% endblock %}

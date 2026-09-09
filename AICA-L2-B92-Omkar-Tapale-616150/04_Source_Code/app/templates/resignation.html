@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% block title %}Resignation{% endblock %}
+{% block content %}
+<h1 class="text-2xl font-bold mb-4">Employee Lifecycle &amp; Resignation</h1>
+
+<div class="grid md:grid-cols-2 gap-4">
+  <div class="card">
+    <h2 class="font-semibold mb-2">Your status</h2>
+    <p class="text-sm mb-3">Joined: {{ user.date_of_joining }} &middot; Status: <span class="badge badge-{{ user.employment_status|lower|replace('_','') }}">{{ user.employment_status }}</span></p>
+    {% if user.role == "CEO" %}
+    <p class="text-sm text-slate-400">Resignation is not applicable to the CEO account &mdash; there's no one above this role to submit it to.</p>
+    {% elif user.employment_status == "ACTIVE" %}
+    <details>
+      <summary class="cursor-pointer text-sm text-red-700 font-medium">Submit resignation</summary>
+      <form method="post" action="/resignation/submit" class="space-y-2 text-sm mt-2">
+        <label class="block text-xs text-slate-500">Proposed last working day</label>
+        <input name="last_working_day" type="date" required class="w-full border rounded px-2 py-1">
+        <textarea name="reason" placeholder="Reason (optional)" class="w-full border rounded px-2 py-1"></textarea>
+        <button class="w-full bg-red-700 text-white py-1.5 rounded">Submit Resignation</button>
+      </form>
+    </details>
+    {% else %}
+    <div class="text-sm space-y-1">
+      <p>Resignation date: {{ user.resignation_date }}</p>
+      <p>Notice period: {{ user.notice_period_days }} days</p>
+      <p>Last working day: {{ user.last_working_day }}</p>
+      <p class="text-slate-500">{{ user.resignation_reason }}</p>
+    </div>
+    {% endif %}
+  </div>
+
+  {% if team_on_notice %}
+  <div class="card">
+    <h2 class="font-semibold mb-2">Team members on notice / exited (senior view only)</h2>
+    <div class="space-y-3">
+      {% for t in team_on_notice %}
+      <div class="border rounded p-3 text-sm">
+        <div class="flex justify-between">
+          <span class="font-medium">{{ t.name }} ({{ t.employee_code }})</span>
+          <span class="badge badge-{{ t.employment_status|lower|replace('_','') }}">{{ t.employment_status }}</span>
+        </div>
+        <p class="text-slate-500">Resigned: {{ t.resignation_date }} &middot; LWD: {{ t.last_working_day }} &middot; Notice: {{ t.notice_period_days }} days</p>
+        {% if t.exit_notes %}<p class="mt-1 text-slate-600">Exit notes: {{ t.exit_notes }}</p>{% endif %}
+        {% if t.employment_status == "ON_NOTICE" %}
+        <form method="post" action="/resignation/{{ t.id }}/exit-notes" class="mt-2 flex gap-2">
+          <input name="exit_notes" placeholder="Asset return / handover / exit interview notes" class="flex-1 border rounded px-2 py-1 text-xs">
+          <button class="text-xs bg-slate-900 text-white px-2 py-1 rounded">Save</button>
+        </form>
+        <form method="post" action="/resignation/{{ t.id }}/finalize-exit" class="mt-1">
+          <button class="text-xs bg-red-100 text-red-800 px-2 py-1 rounded">Finalize Exit (deactivate account)</button>
+        </form>
+        {% endif %}
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}
