@@ -1,0 +1,3 @@
+ALTER TABLE check_runs
+ADD COLUMN IF NOT EXISTS run_metadata JSONB,
+ADD COLUMN IF NOT EXISTS prompt_hash TEXT;
