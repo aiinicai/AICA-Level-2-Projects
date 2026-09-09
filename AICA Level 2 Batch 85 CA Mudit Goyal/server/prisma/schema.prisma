@@ -1,0 +1,252 @@
+// MGSG Capstone — Invoicing & Attendance
+//
+// A deliberately small subset of the MGSG Office Management schema. The
+// clients and tasks modules are out of scope, so an invoice carries the
+// customer's details on the invoice itself (entered by hand at billing time)
+// rather than pointing at a Client row.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        Int      @id @default(autoincrement())
+  email     String   @unique
+  password  String
+  role      Role     @default(STAFF)
+  staff     Staff?   @relation(fields: [staffId], references: [id])
+  staffId   Int?     @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Staff {
+  id          Int          @id @default(autoincrement())
+  staffName   String
+  email       String       @unique
+  phone       String?
+  designation String?
+  joiningDate DateTime?    @db.Date
+  isActive    Boolean      @default(true)
+  user        User?
+  invoices    Invoice[]    @relation("InvoiceCreator")
+  payments    Payment[]
+  attendance  Attendance[]
+  punches     AttendancePunch[]
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+}
+
+// ── Invoicing ───────────────────────────────────────────────────────────────
+
+/// The running serial behind invoice numbers, one row per financial year.
+/// Incremented atomically so two people billing at the same moment can never
+/// be handed the same number.
+model InvoiceSequence {
+  id           Int      @id @default(autoincrement())
+  financialYear String  @unique
+  nextNumber   Int      @default(1)
+  updatedAt    DateTime @updatedAt
+}
+
+model Invoice {
+  id            Int           @id @default(autoincrement())
+  invoiceNumber String        @unique
+
+  // Customer details, typed at billing time (no Client module in this subset).
+  clientName    String
+  clientGstin   String?
+  clientAddress String?
+  clientState   String?
+  clientEmail   String?
+
+  invoiceDate   DateTime      @db.Date
+  dueDate       DateTime?     @db.Date
+
+  // Taxable value — the sum of the line items below.
+  amount        Decimal       @db.Decimal(12, 2)
+  taxType       TaxType       @default(NONE)
+  cgstRate      Decimal?      @db.Decimal(5, 2)
+  sgstRate      Decimal?      @db.Decimal(5, 2)
+  igstRate      Decimal?      @db.Decimal(5, 2)
+  cgstAmount    Decimal?      @db.Decimal(12, 2)
+  sgstAmount    Decimal?      @db.Decimal(12, 2)
+  igstAmount    Decimal?      @db.Decimal(12, 2)
+  totalAmount   Decimal       @db.Decimal(12, 2)
+
+  status        InvoiceStatus @default(DRAFT)
+  /// Running total of payments received. Kept on the header so the list and
+  /// the receivables tiles never have to sum the payment rows.
+  paidAmount    Decimal       @default(0) @db.Decimal(12, 2)
+  notes         String?
+
+  createdBy     Staff?        @relation("InvoiceCreator", fields: [createdById], references: [id])
+  createdById   Int?
+
+  lineItems     InvoiceLineItem[]
+  payments      Payment[]
+
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  /// Soft delete — distinct from status CANCELLED, which stays in the list as
+  /// a voided invoice for audit visibility.
+  deletedAt     DateTime?
+
+  @@index([status])
+  @@index([invoiceDate])
+  @@index([deletedAt])
+}
+
+model InvoiceLineItem {
+  id          Int      @id @default(autoincrement())
+  invoice     Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  invoiceId   Int
+  slNo        Int
+  description String
+  hsnSac      String?
+  quantity    Decimal  @default(1) @db.Decimal(10, 3)
+  rate        Decimal  @db.Decimal(12, 2)
+  amount      Decimal  @db.Decimal(12, 2)
+
+  @@index([invoiceId])
+}
+
+model Payment {
+  id          Int         @id @default(autoincrement())
+  invoice     Invoice     @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  invoiceId   Int
+  paymentDate DateTime    @db.Date
+  amount      Decimal     @db.Decimal(12, 2)
+  mode        PaymentMode @default(BANK)
+  reference   String?
+  notes       String?
+  createdBy   Staff?      @relation(fields: [createdById], references: [id])
+  createdById Int?
+  createdAt   DateTime    @default(now())
+
+  @@index([invoiceId])
+}
+
+// ── Attendance ──────────────────────────────────────────────────────────────
+
+/// One row per person per day, summarising the punches below it. Every screen
+/// and report reads checkedInAt / checkOutAt / workedMinutes from here.
+model Attendance {
+  id            Int              @id @default(autoincrement())
+  staff         Staff            @relation(fields: [staffId], references: [id])
+  staffId       Int
+  date          DateTime         @db.Date
+  status        AttendanceStatus @default(PRESENT)
+  notes         String?
+  checkedInAt   DateTime?
+  checkOutAt    DateTime?
+  /// Sum of the completed IN→OUT intervals, so a day broken by a lunch break
+  /// reports the hours actually worked rather than last-minus-first.
+  workedMinutes Int?
+  punches       AttendancePunch[]
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+
+  @@unique([staffId, date])
+  @@index([date])
+  @@index([status])
+}
+
+/// One tap of Check In or Check Out. staffId and date are denormalised from
+/// the parent so "today's punches for this person" is a single indexed lookup.
+model AttendancePunch {
+  id               Int            @id @default(autoincrement())
+  attendance       Attendance     @relation(fields: [attendanceId], references: [id], onDelete: Cascade)
+  attendanceId     Int
+  staff            Staff          @relation(fields: [staffId], references: [id])
+  staffId          Int
+  date             DateTime       @db.Date
+  direction        PunchDirection
+  punchedAt        DateTime
+  latitude         Decimal?       @db.Decimal(10, 7)
+  longitude        Decimal?       @db.Decimal(10, 7)
+  locationAccuracy Decimal?       @db.Decimal(8, 2)
+  notes            String?
+  createdAt        DateTime       @default(now())
+
+  @@index([attendanceId])
+  @@index([staffId, date])
+}
+
+enum Role {
+  ADMIN
+  STAFF
+}
+
+enum TaxType {
+  CGST_SGST
+  IGST
+  NONE
+}
+
+enum InvoiceStatus {
+  DRAFT
+  SENT
+  PARTIALLY_PAID
+  PAID
+  CANCELLED
+}
+
+enum PaymentMode {
+  CASH
+  BANK
+  CHEQUE
+  UPI
+  OTHER
+}
+
+enum AttendanceStatus {
+  PRESENT
+  ABSENT
+  HALF_DAY
+  WFH
+  ON_LEAVE
+}
+
+enum PunchDirection {
+  IN
+  OUT
+}
+
+// ── Settings ────────────────────────────────────────────────────────────────
+
+/// Firm-wide settings — a single row, always id 1.
+///
+/// A singleton rather than a key/value table: the settings here are a fixed,
+/// known set, and columns give them types and defaults that a bag of strings
+/// cannot. The fixed id is what lets every read and write be an upsert, so the
+/// row exists from the first request without a migration having to seed it.
+model Settings {
+  id Int @id @default(1)
+
+  // Printed on every invoice. These were hardcoded in the PDF generator until
+  // a firm other than the demo one needed to raise a bill.
+  firmName    String @default("M G S G & Associates")
+  firmAddress String @default("2nd Floor, Civil Lines, Jaipur, Rajasthan 302006")
+  firmGstin   String @default("08AAAFM1234C1ZV")
+  firmEmail   String @default("billing@mgsg.example")
+  firmPhone   String @default("+91 141 400 0000")
+
+  /// Leads every invoice number, before the financial year: "MGSG/26-27/0007".
+  invoicePrefix String @default("MGSG")
+
+  // What a new invoice starts out as. Defaults only — each invoice keeps
+  // whatever rates it was raised with, so changing these never re-rates a bill
+  // that already exists.
+  defaultTaxType        TaxType @default(CGST_SGST)
+  defaultGstRate        Decimal @default(18) @db.Decimal(5, 2)
+  /// Days after the invoice date that payment falls due.
+  defaultPaymentTermDays Int    @default(30)
+
+  updatedAt DateTime @updatedAt
+}
