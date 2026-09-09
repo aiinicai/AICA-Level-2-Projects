@@ -1,0 +1,230 @@
+{% extends "base.html" %}
+{% block content %}
+  <div class="fs-page-header">
+    <h1 class="fs-page-title">Tax Review</h1>
+    {% if engagement %}
+      <p class="fs-page-subtitle">{{ engagement.entity_name }} &middot; FY {{ engagement.financial_year }}</p>
+    {% else %}
+      <p class="fs-page-subtitle">Tax analytical review against your validated, confirmed-mapped data.</p>
+    {% endif %}
+  </div>
+
+  <div class="fs-panel">
+    <p class="fs-muted">
+      This module runs <strong>Tax analytical checks</strong> — Income-tax analytical review, Tax Audit
+      applicability, related-party payment screening, tax depreciation recompute, an MSME-payment review screen,
+      and GST invoice reconciliation — against your validated, confirmed-mapped data. It never states that a tax
+      disallowance or violation is confirmed; every finding is labeled <strong>Potential Tax Issue</strong>,
+      <strong>Tax Review Required</strong>, <strong>Potential Disallowance &mdash; Review Required</strong>,
+      <strong>Potential MSME Payment Review</strong>, or <strong>Insufficient Data</strong>, for a professional to
+      review and confirm.
+    </p>
+    <p class="fs-muted">
+      <strong>Act-transition scope (important):</strong> India's Income-tax Act, 1961 is being replaced by the
+      Income-tax Act, 2025, effective 1 April 2026. Every tax rule below is verified and executable against the
+      <strong>Income-tax Act, 1961 only</strong> &mdash; covering FY 2025-26 (Assessment Year 2026-27) and all
+      prior years. An engagement whose financial year is FY 2026-27 or later falls under the Income-tax Act, 2025,
+      whose provisions have not yet been independently verified &mdash; no tax rule will run for such an
+      engagement, and this screen will show why rather than silently producing no findings.
+    </p>
+    <p class="fs-muted">
+      <strong>Legal provision &rarr; FinSight analytical test &rarr; limitation &rarr; suggested query.</strong>
+      Every rule below is shown in this order. The <strong>Provision</strong> is the verified Income-tax Act, 1961
+      section and its own statutory threshold, where the Act itself sets one. The <strong>FinSight Analytical
+      Test</strong> is what FinSight actually computed from your data &mdash; the identification method is always
+      FinSight's own, even on the rules where the rupee threshold is the Act's. No finding states a disallowance
+      or violation is confirmed from FinSight's analytical test alone.
+    </p>
+  </div>
+
+  {% if not engagement %}
+    <div class="fs-empty-banner">
+      <span>&#9432;</span>
+      <span>
+        No current engagement selected.
+        <a href="{{ url_for('engagement.index') }}">Select or create one first</a> to run the review — the
+        rule catalogue below is still visible.
+      </span>
+    </div>
+  {% elif error %}
+    <div class="fs-empty-banner">
+      <span>&#9432;</span>
+      <span>{{ error }}</span>
+    </div>
+  {% else %}
+    {% if ran %}
+      <div class="fs-empty-banner fs-empty-banner-ok">
+        <span>&#10003;</span>
+        <span>
+          Review run and saved. {{ review.persisted_exception_count }} exception(s) recorded this run
+          {% if review.preserved_exception_count %}
+            &middot; {{ review.preserved_exception_count }} previously-reviewed exception(s) left untouched
+          {% endif %}.
+        </span>
+      </div>
+    {% endif %}
+
+    <form method="post" class="fs-form-actions">
+      {{ csrf_field() }}
+      <button type="submit" class="fs-btn fs-btn-primary" data-loading-text="Running Tax Review...">Run Tax Review &amp; Save Exceptions</button>
+      <span class="fs-muted">The results below already reflect the current data — running just saves them.</span>
+    </form>
+
+    {% if review %}
+      <div class="fs-panel">
+        <h2>This Run's Results, by Rule</h2>
+        {% for rule_id, outcome in review.rule_outcomes.items() %}
+          {% set rule = rules_by_id.get(rule_id) %}
+          <details class="fs-panel" style="margin-bottom: 0.75rem;">
+            <summary>
+              <strong>{{ rule_id }}</strong> &middot; {{ rule.topic if rule else '' }}
+              &middot; evaluated {{ outcome.evaluated_count }} item(s)
+              {% if outcome.insufficient_data_reason %}
+                <span class="fs-badge fs-badge-neutral">Insufficient Data</span>
+              {% elif outcome.exceptions %}
+                <span class="fs-badge fs-badge-high">{{ outcome.exceptions | length }} finding(s)</span>
+              {% else %}
+                <span class="fs-badge fs-badge-low">No findings</span>
+              {% endif %}
+            </summary>
+
+            {% if rule %}
+              <p class="fs-muted">
+                <strong>Provision (Income-tax Act, 1961):</strong> {{ rule.provision_reference or '—' }}
+                &middot; <strong>Applicable from:</strong> {{ rule.applicable_from_ay or '—' }}
+              </p>
+              <p class="fs-muted">
+                <strong>FinSight Analytical Test:</strong> {{ rule.logic_summary or '—' }}
+              </p>
+              <p class="fs-muted">
+                <strong>New Act 2025 forward reference (unverified, non-gating):</strong> {{ rule.description or '—' }}
+              </p>
+            {% endif %}
+
+            {% if outcome.insufficient_data_reason %}
+              <div class="fs-empty-banner fs-empty-banner-warning">
+                <span>&#9432;</span>
+                <span>
+                  <strong>Insufficient Data —</strong> {{ outcome.insufficient_data_reason }}
+                  <a href="{{ url_for('upload.index') }}" class="fs-link">Upload the missing data to complete this check &rarr;</a>
+                </span>
+              </div>
+            {% endif %}
+
+            {% if outcome.partial_insufficient_data_notes %}
+              <p class="fs-muted"><strong>Partially insufficient data:</strong></p>
+              <ul>
+                {% for note in outcome.partial_insufficient_data_notes %}<li class="fs-muted">{{ note }}</li>{% endfor %}
+              </ul>
+            {% endif %}
+
+            {% for finding in outcome.exceptions %}
+              <div class="fs-table-wrap" style="margin-top: 0.5rem;">
+                <table class="fs-table">
+                  <tbody>
+                    <tr><th style="width: 14rem;">Label</th><td><span class="fs-badge fs-badge-medium">{{ finding.label }}</span></td></tr>
+                    <tr><th>Area</th><td>{{ rule.topic if rule else finding.area }}</td></tr>
+                    <tr><th>Provision</th><td>{{ rule.provision_reference if rule else '—' }}</td></tr>
+                    <tr><th>Trigger / Why Flagged</th><td>{{ finding.trigger_condition }}</td></tr>
+                    <tr><th>Explanation</th><td>{{ finding.explanation }}</td></tr>
+                    <tr><th>Suggested Query</th><td>{{ finding.suggested_query }}</td></tr>
+                    <tr><th>Risk Level</th><td>{{ finding.risk_level }}</td></tr>
+                    {% if finding.amount_paise is not none %}
+                      <tr><th>Amount</th><td>{{ finding.amount_paise | paise_display }}</td></tr>
+                    {% endif %}
+                    <tr><th>Data Used (file IDs)</th><td>{{ finding.data_sources | join(', ') if finding.data_sources else '—' }}</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            {% endfor %}
+          </details>
+        {% endfor %}
+      </div>
+    {% endif %}
+
+    <div class="fs-panel">
+      <h2>Persisted Exceptions (this engagement)</h2>
+      {% if not persisted_exceptions %}
+        <p class="fs-muted">No tax exceptions have been saved for this engagement yet.</p>
+      {% else %}
+        <div class="fs-table-wrap">
+          <table class="fs-table">
+            <thead>
+              <tr>
+                <th>Rule</th>
+                <th>Provision (Income-tax Act, 1961)</th>
+                <th>FinSight Analytical Test</th>
+                <th>Trigger</th>
+                <th>Explanation</th>
+                <th>Suggested Query</th>
+                <th>Risk</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for item in persisted_exceptions %}
+                {% set item_rule = rules_by_id.get(item.exception.rule_id) %}
+                <tr>
+                  <td>{{ item.exception.rule_id }}<br><span class="fs-muted">{{ item.exception.area }}</span></td>
+                  <td>{{ item.exception.standard_reference or '—' }}</td>
+                  <td>{{ item_rule.logic_summary if item_rule else '—' }}</td>
+                  <td>{{ item.exception.trigger_condition }}</td>
+                  <td>{{ item.exception.description }}</td>
+                  <td>{{ item.query.question_text if item.query else '—' }}</td>
+                  <td>
+                    {% if item.exception.risk_level == 'HIGH' or item.exception.risk_level == 'CRITICAL' %}
+                      <span class="fs-badge fs-badge-high">{{ item.exception.risk_level }}</span>
+                    {% elif item.exception.risk_level == 'MEDIUM' %}
+                      <span class="fs-badge fs-badge-medium">{{ item.exception.risk_level }}</span>
+                    {% else %}
+                      <span class="fs-badge fs-badge-low">{{ item.exception.risk_level }}</span>
+                    {% endif %}
+                  </td>
+                  <td><span class="fs-badge fs-badge-neutral">{{ item.exception.status }}</span></td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% endif %}
+    </div>
+  {% endif %}
+
+  <div class="fs-panel">
+    <h2>Rule Catalogue</h2>
+    <p class="fs-muted">
+      Every proposed Stage 10 tax rule is listed below, executable and gated alike, so the current verification
+      state is always visible — never only the rules that happen to run today.
+    </p>
+    <div class="fs-table-wrap">
+      <table class="fs-table">
+        <thead>
+          <tr>
+            <th>Rule ID</th>
+            <th>Topic</th>
+            <th>Provision (Income-tax Act, 1961)</th>
+            <th>Applicable From</th>
+            <th>FinSight Analytical Test</th>
+            <th>Verified Source</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for entry in catalogue %}
+            <tr>
+              <td>{{ entry.rule.rule_id }}</td>
+              <td>{{ entry.rule.topic }}</td>
+              <td>{{ entry.rule.provision_reference or '—' }}</td>
+              <td>{{ entry.rule.applicable_from_ay or '—' }}</td>
+              <td>{{ entry.rule.logic_summary or '—' }}</td>
+              <td>{{ entry.rule.verified_source or '—' }}</td>
+              <td><span class="fs-badge {{ entry.status_class }}">{{ entry.status_label }}</span></td>
+            </tr>
+          {% else %}
+            <tr><td colspan="7" class="fs-muted">No tax rules have been seeded yet.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+{% endblock %}

@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block title %}{{ cycle.name }}{% endblock %}
+{% block content %}
+<h4>{{ cycle.name }}</h4>
+<p class="text-muted small">{{ cycle.entity }} &middot; {{ cycle.scope_location.breadcrumb|default:"Whole entity" }} &middot; {{ coverage_pct }}% covered</p>
+
+<h6>Pending verification ({{ pending|length }})</h6>
+<div class="card stat-card p-3 mb-3">
+<table class="table table-sm">
+  <thead><tr><th>Asset</th><th>Location</th><th>Condition</th><th>Notes</th><th>Mark verified</th></tr></thead>
+  <tbody>
+  {% for a in pending %}
+    <tr>
+      <td><a href="{{ a.get_absolute_url }}">{{ a.asset_id }}</a> {{ a.description }}</td>
+      <td>{{ a.location.breadcrumb }}</td>
+      <td colspan="3">
+        <form method="post" action="{% url 'verification:cycle_verify_asset' cycle.pk a.asset_id %}" class="d-flex gap-1">
+          {% csrf_token %}
+          <select name="condition" class="form-select form-select-sm">
+            <option value="GOOD">Good</option><option value="FAIR">Fair</option>
+            <option value="DAMAGED">Damaged</option><option value="NOT_FOUND">Not found</option>
+          </select>
+          <input type="text" name="discrepancy_notes" class="form-control form-control-sm" placeholder="Discrepancy notes (if any)">
+          <button class="btn btn-sm btn-success">Mark verified</button>
+        </form>
+      </td>
+    </tr>
+  {% empty %}<tr><td colspan="5" class="text-muted">All in-scope assets verified.</td></tr>{% endfor %}
+  </tbody>
+</table>
+</div>
+
+<h6>Completed records</h6>
+<div class="card stat-card p-3">
+<table class="table table-sm">
+  <thead><tr><th>Asset</th><th>Verified by</th><th>Date</th><th>Condition</th><th>Discrepancy</th></tr></thead>
+  <tbody>
+  {% for r in records %}
+    <tr><td><a href="{{ r.asset.get_absolute_url }}">{{ r.asset.asset_id }}</a></td><td>{{ r.verified_by }}</td><td>{{ r.verified_date }}</td><td>{{ r.get_condition_display }}</td><td>{{ r.discrepancy_notes|default:"—" }}</td></tr>
+  {% empty %}<tr><td colspan="5" class="text-muted">No records yet.</td></tr>{% endfor %}
+  </tbody>
+</table>
+</div>
+{% endblock %}

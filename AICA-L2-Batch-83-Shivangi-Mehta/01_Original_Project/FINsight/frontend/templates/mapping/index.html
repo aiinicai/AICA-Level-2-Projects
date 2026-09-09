@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% block content %}
+  <div class="fs-page-header">
+    <h1 class="fs-page-title">Data Mapping</h1>
+    {% if engagement %}
+      <p class="fs-page-subtitle">{{ engagement.entity_name }} &middot; FY {{ engagement.financial_year }}</p>
+    {% else %}
+      <p class="fs-page-subtitle">Select an engagement to map its uploaded files.</p>
+    {% endif %}
+  </div>
+
+  {% if not engagement %}
+    <div class="fs-empty-banner">
+      <span>&#9432;</span>
+      <span>
+        No current engagement selected.
+        <a href="{{ url_for('engagement.index') }}">Select or create one first</a>.
+      </span>
+    </div>
+  {% elif not uploads %}
+    <div class="fs-empty-banner">
+      <span>&#9432;</span>
+      <span>
+        No files uploaded yet.
+        <a href="{{ url_for('upload.index') }}">Upload a file first</a>.
+      </span>
+    </div>
+  {% else %}
+    <div class="fs-empty-banner">
+      <span>&#8505;</span>
+      <span>
+        This is a manual, file-by-file tool. FinSight normally maps and checks your files
+        automatically — go to <a href="{{ url_for('upload.index') }}"><strong>Upload</strong></a> and use
+        "Looks Good — Confirm &amp; Continue" instead of using this page one file at a time.
+      </span>
+    </div>
+    <div class="fs-table-wrap">
+      <table class="fs-table">
+        <thead>
+          <tr>
+            <th>File</th>
+            <th>Data Type</th>
+            <th>Status</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for upload in uploads %}
+            <tr>
+              <td>{{ upload.original_filename }}</td>
+              <td>{{ file_type_labels.get(upload.file_type, upload.file_type) }}</td>
+              <td><span class="fs-badge fs-badge-neutral">{{ upload.upload_status }}</span></td>
+              <td class="fs-table-actions">
+                <a href="{{ url_for('mapping.detail', file_id=upload.file_id) }}" class="fs-btn fs-btn-secondary fs-btn-sm">
+                  {{ "Review Mapping" if upload.upload_status != "UPLOADED" else "Map Columns" }}
+                </a>
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <div class="fs-form-actions">
+      <a href="{{ url_for('upload.index') }}" class="fs-btn fs-btn-primary">&larr; Back to Upload</a>
+    </div>
+  {% endif %}
+{% endblock %}

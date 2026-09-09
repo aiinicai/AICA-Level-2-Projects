@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+{% block content %}
+  <div class="fs-page-header">
+    <h1 class="fs-page-title">Applicability Matrix</h1>
+    <p class="fs-page-subtitle">{{ engagement.entity_name }} &middot; FY {{ engagement.financial_year }} — Step 3 of 3.</p>
+  </div>
+
+  <div class="fs-panel">
+    <p class="fs-muted">
+      Choose which checks FinSight should run for this engagement. Everything defaults to Yes; switch a check
+      to No if you don't want FinSight to perform it — only what you mark Yes below runs when you click
+      "Run Review" on the Upload screen.
+    </p>
+  </div>
+
+  <form method="post">
+    {{ csrf_field() }}
+    <div class="fs-table-wrap">
+      <table class="fs-table">
+        <thead>
+          <tr>
+            <th>Sr No</th>
+            <th>Client Name</th>
+            <th>Accounting Standard / Ind AS</th>
+            {% for task in tasks %}<th>{{ task.area }}</th>{% endfor %}
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>1</td>
+            <td>{{ engagement.entity_name }}</td>
+            <td>
+              {% if profile and profile.accounting_framework %}
+                {{ "Ind AS" if profile.accounting_framework == "IND_AS" else "AS" }}
+                <span class="fs-muted">(detected)</span>
+              {% else %}
+                <span class="fs-muted">Not set — complete the Entity Profile first.</span>
+              {% endif %}
+            </td>
+            {% for task in tasks %}
+              <td>
+                <div class="fs-radio-group">
+                  <label class="fs-radio-option">
+                    <input type="radio" name="{{ task.field_name }}" value="yes" {% if task.value == "yes" %}checked{% endif %}>
+                    Yes
+                  </label>
+                  <label class="fs-radio-option">
+                    <input type="radio" name="{{ task.field_name }}" value="no" {% if task.value == "no" %}checked{% endif %}>
+                    No
+                  </label>
+                </div>
+              </td>
+            {% endfor %}
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="fs-form-actions">
+      <button type="submit" class="fs-btn fs-btn-primary">Save</button>
+    </div>
+  </form>
+
+  <div class="fs-panel">
+    <p class="fs-muted">
+      Listed Entity / SEBI Review is outside the current FinSight V1 scope. FinSight V1 currently supports
+      Accounting, Audit and Tax review for non-listed entities.
+    </p>
+  </div>
+
+  <div class="fs-form-actions">
+    <a href="{{ url_for('engagement.index') }}" class="fs-btn fs-btn-secondary">Back to Engagements</a>
+    <form method="post" action="{{ url_for('engagement.select', engagement_id=engagement.engagement_id) }}" class="fs-inline-form">
+      {{ csrf_field() }}
+      <button type="submit" class="fs-btn fs-btn-primary">Set as Current Engagement &amp; Go to Dashboard</button>
+    </form>
+  </div>
+{% endblock %}

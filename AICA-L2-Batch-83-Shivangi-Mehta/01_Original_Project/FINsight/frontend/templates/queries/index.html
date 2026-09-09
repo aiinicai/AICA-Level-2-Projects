@@ -1,0 +1,222 @@
+{% extends "base.html" %}
+{% block content %}
+  <div class="fs-page-header">
+    <h1 class="fs-page-title">Query &amp; Working Papers</h1>
+    {% if engagement %}
+      <p class="fs-page-subtitle">{{ engagement.entity_name }} &middot; FY {{ engagement.financial_year }}</p>
+    {% else %}
+      <p class="fs-page-subtitle">Every query arising from Accounting, Audit and Tax findings, in one place.</p>
+    {% endif %}
+  </div>
+
+  {% if not engagement %}
+    <div class="fs-empty-banner">
+      <span>&#9432;</span>
+      <span>
+        No current engagement selected.
+        <a href="{{ url_for('engagement.index') }}">Select or create one first</a>.
+      </span>
+    </div>
+  {% else %}
+    {% if status_error %}
+      <div class="fs-empty-banner"><span>&#9432;</span><span>{{ status_error }}</span></div>
+    {% endif %}
+    <div class="fs-panel">
+      <p class="fs-muted">
+        This is the professional review workflow around FinSight's findings: each query below links to its
+        <strong>Working Paper</strong>, where you can edit the query wording, record the client/internal response,
+        note supporting evidence, and reach a reviewer conclusion &mdash; without leaving FinSight. FinSight's own
+        automated finding and original suggested query are never overwritten; your edits are recorded alongside
+        them, always distinguishable.
+      </p>
+    </div>
+
+    {% if summary %}
+      <div class="fs-panel">
+        <h2>Summary</h2>
+        <div class="fs-panel-grid" style="grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0.75rem;">
+          <div class="fs-panel">
+            <div class="fs-panel-title">Total Queries</div>
+            <div class="fs-panel-body" style="font-size: 1.6rem; font-weight: 700;">{{ summary.total }}</div>
+          </div>
+          {% for m in modules %}
+            <div class="fs-panel">
+              <div class="fs-panel-title">{{ m | title }}</div>
+              <div class="fs-panel-body" style="font-size: 1.6rem; font-weight: 700;">{{ summary.by_module.get(m, 0) }}</div>
+            </div>
+          {% endfor %}
+        </div>
+        <p class="fs-muted" style="margin-top: 0.75rem;">
+          By finding status:
+          {% for status_value in status_values %}
+            {% if summary.by_status.get(status_value) %}
+              <span class="fs-badge fs-badge-neutral">{{ conclusion_labels.get(status_value, status_value) }}: {{ summary.by_status[status_value] }}</span>
+            {% endif %}
+          {% endfor %}
+          {% if summary.total == 0 %}<span class="fs-muted">No queries recorded yet.</span>{% endif %}
+        </p>
+      </div>
+    {% endif %}
+
+    <form method="get" class="fs-panel">
+      <h2>Filters</h2>
+      <div class="fs-panel-grid" style="grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 0.75rem;">
+        <div class="fs-field" style="margin-bottom:0;">
+          <label for="module">Module</label>
+          <select name="module" id="module">
+            <option value="">All modules</option>
+            {% for m in modules %}
+              <option value="{{ m }}" {% if selected_module == m %}selected{% endif %}>{{ m | title }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="fs-field" style="margin-bottom:0;">
+          <label for="status">Finding Status</label>
+          <select name="status" id="status">
+            <option value="">All statuses</option>
+            {% for s in status_values %}
+              <option value="{{ s }}" {% if selected_status == s %}selected{% endif %}>{{ conclusion_labels.get(s, s) }} ({{ s }})</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="fs-field" style="margin-bottom:0;">
+          <label for="risk_level">Risk</label>
+          <select name="risk_level" id="risk_level">
+            <option value="">All risk levels</option>
+            {% for r in risk_levels %}
+              <option value="{{ r }}" {% if selected_risk_level == r %}selected{% endif %}>{{ r }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="fs-field" style="margin-bottom:0;">
+          <label for="rule_id">Rule ID</label>
+          <select name="rule_id" id="rule_id">
+            <option value="">All rules</option>
+            {% for r in rule_ids %}
+              <option value="{{ r }}" {% if selected_rule_id == r %}selected{% endif %}>{{ r }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="fs-field" style="margin-bottom:0;">
+          <label for="search">Search</label>
+          <input type="text" name="search" id="search" value="{{ search }}" placeholder="Query ID, Finding ID, Rule ID, text...">
+        </div>
+      </div>
+      <div class="fs-form-actions fs-form-actions-tight">
+        <button type="submit" class="fs-btn fs-btn-primary">Apply Filters</button>
+        <a href="{{ url_for('queries.index') }}" class="fs-link">Clear</a>
+      </div>
+    </form>
+
+    <div class="fs-panel">
+      <div class="fs-panel-header" style="display:flex; align-items:center; justify-content:space-between;">
+        <h2>Queries ({{ items | length }})</h2>
+        {% if items %}
+          <a href="{{ url_for('queries.export_xlsx') }}" class="fs-btn fs-btn-secondary">Download Excel</a>
+        {% endif %}
+      </div>
+      {% if not items %}
+        <p class="fs-muted">No queries match the current filters.</p>
+      {% else %}
+        <p class="fs-muted">
+          Account Name and Date are shown when a finding was raised against one specific transaction row.
+          A finding based on an aggregate or period-level check (or one raised before this was added) shows
+          &mdash; instead &mdash; add it by hand if needed. Additional Note and Client Remark can be edited
+          directly in the table.
+        </p>
+        <div class="fs-table-wrap">
+          <table class="fs-table">
+            <thead>
+              <tr>
+                <th>Sr No</th>
+                <th>Account Name</th>
+                <th>Date</th>
+                <th>Amount</th>
+                <th>Observation</th>
+                <th>Module / Risk</th>
+                <th>Status</th>
+                <th>Additional Note</th>
+                <th>Client Remark</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for item in items %}
+                <tr>
+                  <td>{{ loop.index }}</td>
+                  <td>{{ item.account_name or "—" }}</td>
+                  <td>{{ item.transaction_date or "—" }}</td>
+                  <td>{{ item.exception.amount | paise_display if item.exception.amount is not none else '—' }}</td>
+                  <td>
+                    {{ item.effective_query_text or '—' }}
+                    {% if item.query.reviewer_query_text %}<br><span class="fs-badge fs-badge-neutral">Reviewer-edited</span>{% endif %}
+                  </td>
+                  <td>
+                    {{ item.module | title }}
+                    {% if item.exception.risk_level == 'HIGH' or item.exception.risk_level == 'CRITICAL' %}
+                      <span class="fs-badge fs-badge-high">{{ item.exception.risk_level }}</span>
+                    {% elif item.exception.risk_level == 'MEDIUM' %}
+                      <span class="fs-badge fs-badge-medium">{{ item.exception.risk_level }}</span>
+                    {% elif item.exception.risk_level %}
+                      <span class="fs-badge fs-badge-low">{{ item.exception.risk_level }}</span>
+                    {% endif %}
+                  </td>
+                  {% set form_id = "remarks-form-" ~ item.exception.exception_id %}
+                  <td>
+                    <select name="finding_status" form="{{ form_id }}" class="fs-inline-input">
+                      {% if item.exception.status not in inline_status_values %}
+                        <option value="{{ item.exception.status }}" selected>{{ item.conclusion_label }}</option>
+                      {% endif %}
+                      {% for s in inline_status_values %}
+                        <option value="{{ s }}" {% if item.exception.status == s %}selected{% endif %}>{{ conclusion_labels.get(s, s) }}</option>
+                      {% endfor %}
+                    </select>
+                    {% if item.exception.status not in inline_status_values %}
+                      <br><span class="fs-muted">Change via Full Working Paper (reason required)</span>
+                    {% endif %}
+                  </td>
+                  <td>
+                    <input type="text" name="additional_note" form="{{ form_id }}" class="fs-inline-input"
+                           value="{{ (item.latest_response.reviewer_comments if item.latest_response else '') or '' }}"
+                           placeholder="Add a note...">
+                  </td>
+                  <td>
+                    <input type="text" name="client_remark" form="{{ form_id }}" class="fs-inline-input"
+                           value="{{ (item.latest_response.management_response if item.latest_response else '') or '' }}"
+                           placeholder="Client's remark...">
+                  </td>
+                  <td>
+                    <button type="submit" form="{{ form_id }}" class="fs-btn fs-btn-secondary">Save</button>
+                    <a href="{{ url_for('exceptions.working_paper', exception_id=item.exception.exception_id) }}" class="fs-link">Full Working Paper</a>
+                  </td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+
+        <!--
+          Each row's "Additional Note"/"Client Remark" inputs above
+          reference one of these forms by id (the HTML5 `form="..."`
+          attribute) rather than nesting a <form> inside a <tr> — a
+          <form> is not a valid direct child of a table row, and
+          browsers silently move/garble it there. Keeping the forms
+          themselves outside the table, one per row, is the standards-
+          compliant way to have per-row submit buttons inside a table.
+        -->
+        {% for item in items %}
+          <form id="remarks-form-{{ item.exception.exception_id }}" method="post"
+                action="{{ url_for('queries.update_remarks', exception_id=item.exception.exception_id) }}"
+                hidden>
+            {{ csrf_field() }}
+            <input type="hidden" name="module" value="{{ selected_module or '' }}">
+            <input type="hidden" name="status" value="{{ selected_status or '' }}">
+            <input type="hidden" name="risk_level" value="{{ selected_risk_level or '' }}">
+            <input type="hidden" name="rule_id" value="{{ selected_rule_id or '' }}">
+            <input type="hidden" name="search" value="{{ search or '' }}">
+          </form>
+        {% endfor %}
+      {% endif %}
+    </div>
+  {% endif %}
+{% endblock %}

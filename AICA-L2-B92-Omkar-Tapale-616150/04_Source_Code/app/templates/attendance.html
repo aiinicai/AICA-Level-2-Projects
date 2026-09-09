@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+{% block title %}Attendance{% endblock %}
+{% block content %}
+<div class="flex items-center justify-between mb-4 flex-wrap gap-2">
+  <div class="flex items-center gap-2">
+    <a href="/attendance?year={{ prev_year }}&month={{ prev_month }}" class="text-sm bg-white border rounded px-2 py-1 hover:bg-slate-50">&larr; Prev</a>
+    <h1 class="text-2xl font-bold">Attendance &mdash; {{ month_name }} {{ year }}</h1>
+    <a href="/attendance?year={{ next_year }}&month={{ next_month }}" class="text-sm bg-white border rounded px-2 py-1 hover:bg-slate-50">Next &rarr;</a>
+    <a href="/attendance" class="text-xs text-slate-500 underline">This month</a>
+  </div>
+</div>
+
+<div class="card mb-6">
+  <h2 class="font-semibold mb-2">Today ({{ today }}) &mdash; current: {{ today_status or "Not marked" }}</h2>
+  <form method="post" action="/attendance/mark" class="flex gap-2 flex-wrap">
+    <button name="status" value="WFO" class="bg-blue-100 text-blue-800 px-4 py-2 rounded hover:bg-blue-200">Work From Office</button>
+    <button name="status" value="WFH" class="bg-green-100 text-green-800 px-4 py-2 rounded hover:bg-green-200">Work From Home</button>
+    <button name="status" value="HALF_DAY" class="bg-purple-100 text-purple-800 px-4 py-2 rounded hover:bg-purple-200">Half Day</button>
+    <button name="status" value="LEAVE" class="bg-amber-100 text-amber-800 px-4 py-2 rounded hover:bg-amber-200">On Leave</button>
+  </form>
+</div>
+
+<div class="card mb-6">
+  <h2 class="font-semibold mb-3">My attendance &mdash; {{ month_name }} {{ year }}</h2>
+  {% if my_records %}
+  <div class="flex flex-wrap gap-2">
+    {% for r in my_records %}
+    <span class="badge badge-{{ r.status|lower|replace('_','') }}">{{ r.date.strftime('%d %b') }}: {{ r.status }}</span>
+    {% endfor %}
+  </div>
+  {% else %}
+  <p class="text-slate-500 text-sm">No records for this month.</p>
+  {% endif %}
+</div>
+
+{% if team_matrix %}
+<div class="card">
+  <h2 class="font-semibold mb-3">Team attendance matrix &mdash; {{ month_name }} {{ year }} ({{ team_matrix|length }} people)</h2>
+  <div class="overflow-x-auto">
+    <table class="text-xs border-collapse">
+      <thead>
+        <tr>
+          <th class="sticky left-0 bg-white text-left pr-3 py-1 border-b">Employee</th>
+          {% for d in matrix_days %}
+          <th class="px-1 py-1 border-b text-center {% if d.weekday() >= 5 %}text-slate-300{% endif %}">{{ d.day }}</th>
+          {% endfor %}
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in team_matrix %}
+        <tr class="border-b">
+          <td class="sticky left-0 bg-white pr-3 py-1 whitespace-nowrap font-medium">{{ row.user.name }}</td>
+          {% for status in row.days %}
+          <td class="px-0.5 py-1 text-center">
+            {% if status %}
+            <span class="cal-att-dot badge-{{ status|lower|replace('_','') }}" title="{{ status }}">{{ status[:3] }}</span>
+            {% else %}
+            <span class="text-slate-300">&middot;</span>
+            {% endif %}
+          </td>
+          {% endfor %}
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <p class="text-xs text-slate-400 mt-2">&middot; = not marked for that day</p>
+</div>
+{% endif %}
+{% endblock %}

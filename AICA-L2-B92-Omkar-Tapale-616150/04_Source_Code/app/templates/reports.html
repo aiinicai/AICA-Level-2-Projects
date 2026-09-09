@@ -1,0 +1,116 @@
+{% extends "base.html" %}
+{% block title %}Reports{% endblock %}
+{% block content %}
+<h1 class="text-2xl font-bold mb-4">Reports &amp; Excel Export</h1>
+<div class="card max-w-3xl mb-6">
+  <form method="get" action="/reports" id="reportForm" class="space-y-3 text-sm">
+    <input type="hidden" name="preview" id="previewFlag" value="">
+    <div class="grid md:grid-cols-2 gap-3">
+      <div>
+        <label class="block text-xs text-slate-500 mb-1">Department</label>
+        <select name="department_id" class="w-full border rounded px-2 py-1">
+          <option value="">All (within my access)</option>
+          {% for d in departments %}<option value="{{ d.id }}" {% if filters.department_id == d.id|string %}selected{% endif %}>{{ d.name }}</option>{% endfor %}
+        </select>
+      </div>
+      <div>
+        <label class="block text-xs text-slate-500 mb-1">Employee</label>
+        <select name="employee_id" class="w-full border rounded px-2 py-1">
+          <option value="">All (within my access)</option>
+          {% for u in scope_users %}<option value="{{ u.id }}" {% if filters.employee_id == u.id|string %}selected{% endif %}>{{ u.name }} ({{ u.employee_code }})</option>{% endfor %}
+        </select>
+      </div>
+      <div>
+        <label class="block text-xs text-slate-500 mb-1">Start date</label>
+        <input name="start_date" type="date" value="{{ filters.start_date }}" class="w-full border rounded px-2 py-1">
+      </div>
+      <div>
+        <label class="block text-xs text-slate-500 mb-1">End date</label>
+        <input name="end_date" type="date" value="{{ filters.end_date }}" class="w-full border rounded px-2 py-1">
+      </div>
+    </div>
+    <div class="flex gap-2">
+      <button type="button" onclick="submitReport('/reports', '1')" class="flex-1 bg-slate-200 hover:bg-slate-300 py-2 rounded">Preview</button>
+      <button type="button" onclick="submitReport('/reports/export', '')" class="flex-1 bg-slate-900 text-white py-2 rounded hover:bg-slate-800">Export to Excel</button>
+    </div>
+    <p class="text-xs text-slate-400">Leave dates blank for the current month. The confidential Leave &amp; Notice sheet/table is only included if your role is permitted to see it for every selected employee.</p>
+  </form>
+  <script>
+  function submitReport(action, previewValue) {
+    const form = document.getElementById('reportForm');
+    document.getElementById('previewFlag').value = previewValue;
+    form.action = action;
+    form.submit();
+  }
+  </script>
+</div>
+
+{% if report %}
+<div class="space-y-6">
+  <div class="card overflow-x-auto">
+    <h2 class="font-semibold mb-3">Summary &mdash; {{ report.d_start }} to {{ report.d_end }} ({{ report.users|length }} employee(s))</h2>
+    {% if report.summary_rows %}
+    <table class="w-full text-sm">
+      <thead><tr class="text-left text-slate-500 border-b">{% for h in summary_headers %}<th class="py-1 pr-3">{{ h }}</th>{% endfor %}</tr></thead>
+      <tbody>
+        {% for row in report.summary_rows %}
+        <tr class="border-b">{% for cell in row %}<td class="py-1 pr-3">{{ cell }}</td>{% endfor %}</tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}<p class="text-slate-500 text-sm">No employees match this filter.</p>{% endif %}
+  </div>
+
+  <div class="card overflow-x-auto">
+    <h2 class="font-semibold mb-3">Attendance Detail ({{ report.attendance_rows|length }} records)</h2>
+    {% if report.attendance_rows %}
+    <table class="w-full text-sm">
+      <thead><tr class="text-left text-slate-500 border-b">{% for h in attendance_headers %}<th class="py-1 pr-3">{{ h }}</th>{% endfor %}</tr></thead>
+      <tbody>
+        {% for row in report.attendance_rows %}
+        <tr class="border-b"><td class="py-1 pr-3">{{ row[0] }}</td><td class="pr-3">{{ row[1] }}</td><td class="pr-3">{{ row[2] }}</td><td class="pr-3"><span class="badge badge-{{ row[3]|lower|replace('_','') }}">{{ row[3] }}</span></td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}<p class="text-slate-500 text-sm">No attendance records in range.</p>{% endif %}
+  </div>
+
+  <div class="card overflow-x-auto">
+    <h2 class="font-semibold mb-3">Tasks &amp; Calendar ({{ report.task_rows|length }} records)</h2>
+    {% if report.task_rows %}
+    <table class="w-full text-sm">
+      <thead><tr class="text-left text-slate-500 border-b">{% for h in task_headers %}<th class="py-1 pr-3">{{ h }}</th>{% endfor %}</tr></thead>
+      <tbody>
+        {% for row in report.task_rows %}
+        <tr class="border-b">
+          <td class="py-1 pr-3">{{ row[0] }}</td><td class="pr-3">{{ row[1] }}</td><td class="pr-3">{{ row[2].replace('_',' ') }}</td>
+          <td class="pr-3">{{ row[3] }}</td><td class="pr-3">{{ row[4] }}</td>
+          <td class="pr-3"><span class="badge badge-{{ row[5]|lower }}">{{ row[5] }}</span></td>
+          <td class="pr-3"><span class="badge badge-{{ row[6]|lower|replace('_','') }}">{{ row[6].replace('_',' ') }}</span></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}<p class="text-slate-500 text-sm">No tasks/events in range.</p>{% endif %}
+  </div>
+
+  {% if report.confidential_rows is not none %}
+  <div class="card overflow-x-auto border-2 border-amber-200">
+    <h2 class="font-semibold mb-3">Leave &amp; Notice (Confidential) ({{ report.confidential_rows|length }} rows)</h2>
+    {% if report.confidential_rows %}
+    <table class="w-full text-sm">
+      <thead><tr class="text-left text-slate-500 border-b">{% for h in confidential_headers %}<th class="py-1 pr-3">{{ h }}</th>{% endfor %}</tr></thead>
+      <tbody>
+        {% for row in report.confidential_rows %}
+        <tr class="border-b">{% for cell in row %}<td class="py-1 pr-3">{{ cell }}</td>{% endfor %}</tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}<p class="text-slate-500 text-sm">No records.</p>{% endif %}
+  </div>
+  {% else %}
+  <div class="card text-sm text-slate-500">The confidential Leave &amp; Notice data is not shown here or in the export because you don't have permission to see it for one or more of the selected employees.</div>
+  {% endif %}
+</div>
+{% endif %}
+{% endblock %}

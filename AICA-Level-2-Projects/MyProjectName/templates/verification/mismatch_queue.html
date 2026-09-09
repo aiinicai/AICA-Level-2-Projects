@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block title %}Location mismatch exceptions{% endblock %}
+{% block content %}
+<h4 class="mb-3">Open location-mismatch exceptions</h4>
+<p class="text-muted small">CARO 3(i)(b) evidence: a scan whose confirmed location doesn't match the register raises an exception instead of silently overwriting it.</p>
+<div class="card stat-card p-3">
+<table class="table table-sm table-hover">
+  <thead><tr><th>Asset</th><th>Register location</th><th>Scanned location</th><th>By</th><th>When</th><th>Resolve</th></tr></thead>
+  <tbody>
+  {% for s in items %}
+    <tr>
+      <td><a href="{{ s.asset.get_absolute_url }}">{{ s.asset.asset_id }}</a></td>
+      <td>{{ s.asset.location.breadcrumb }}</td>
+      <td class="text-danger">{{ s.confirmed_location.breadcrumb }}</td>
+      <td>{{ s.scanned_by }}</td>
+      <td>{{ s.scanned_at }}</td>
+      <td>
+        <form method="post" action="{% url 'verification:mismatch_resolve' s.pk %}" class="d-flex gap-1">
+          {% csrf_token %}
+          <input type="text" name="notes" class="form-control form-control-sm" placeholder="Resolution note">
+          <button name="action" value="accept_transfer" class="btn btn-sm btn-success">Raise transfer</button>
+          <button name="action" value="dismiss" class="btn btn-sm btn-outline-secondary">Dismiss</button>
+        </form>
+      </td>
+    </tr>
+  {% empty %}<tr><td colspan="6" class="text-muted">No open exceptions.</td></tr>{% endfor %}
+  </tbody>
+</table>
+</div>
+{% endblock %}

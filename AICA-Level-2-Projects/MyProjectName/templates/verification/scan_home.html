@@ -1,0 +1,119 @@
+{% extends "base.html" %}
+{% block title %}QR scan{% endblock %}
+{% block extra_head %}
+<script src="https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+{% endblock %}
+{% block content %}
+<h4>QR / barcode scan</h4>
+<p class="text-muted small">One code, every workflow — tag confirm, physical verification, transfer, maintenance log, or disposal check. Point your camera at the asset's tag, or type the asset ID manually.</p>
+
+<div class="row g-3">
+  <div class="col-md-5">
+    <div class="card stat-card p-3">
+      <div id="reader" style="width:100%"></div>
+      <button id="start-scan" class="btn btn-outline-primary btn-sm mt-2">Start camera scan</button>
+      <hr>
+      <label class="form-label small">...or enter asset ID manually</label>
+      <div class="input-group input-group-sm">
+        <input type="text" id="manual-asset-id" class="form-control" placeholder="AST-XXXXXXXX">
+        <button id="manual-lookup" class="btn btn-outline-secondary">Look up</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-md-7">
+    <div class="card stat-card p-3" id="asset-panel" style="display:none;">
+      <h6 id="a-desc"></h6>
+      <p class="small text-muted mb-2" id="a-meta"></p>
+      <div id="disposed-warning" class="alert alert-danger py-2" style="display:none;">
+        This asset is DISPOSED. Scanning its tag is an exception, not a valid check-in.
+      </div>
+
+      <form method="post" action="{% url 'verification:scan_submit' %}" id="scan-form">
+        {% csrf_token %}
+        <input type="hidden" name="asset_id" id="f-asset-id">
+        <input type="hidden" name="latitude" id="f-lat">
+        <input type="hidden" name="longitude" id="f-lng">
+
+        <label class="form-label small mt-2">Purpose</label>
+        <select name="purpose" class="form-select form-select-sm mb-2">
+          {% for value, label in purposes %}<option value="{{ value }}">{{ label }}</option>{% endfor %}
+        </select>
+
+        <label class="form-label small">Confirm location node</label>
+        <select name="confirmed_location" class="form-select form-select-sm mb-2">
+          <option value="">— not confirming location —</option>
+          {% for loc in locations %}<option value="{{ loc.pk }}">{{ loc.breadcrumb }}</option>{% endfor %}
+        </select>
+
+        <label class="form-label small">Condition (verification only)</label>
+        <select name="condition" class="form-select form-select-sm mb-2">
+          <option value="GOOD">Good</option><option value="FAIR">Fair</option>
+          <option value="DAMAGED">Damaged</option><option value="NOT_FOUND">Not found</option>
+        </select>
+
+        <label class="form-label small">Notes</label>
+        <textarea name="condition_notes" class="form-control form-control-sm mb-2" rows="2"></textarea>
+
+        <div class="small text-muted mb-2" id="geo-status">Requesting device location…</div>
+        <button class="btn btn-primary btn-sm">Submit scan</button>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let currentAsset = null;
+
+function geoTag() {
+  if (navigator.geolocation) {
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        document.getElementById('f-lat').value = pos.coords.latitude;
+        document.getElementById('f-lng').value = pos.coords.longitude;
+        document.getElementById('geo-status').innerText = 'Device location captured.';
+      },
+      () => { document.getElementById('geo-status').innerText = 'Location unavailable — proceeding without geo-stamp.'; }
+    );
+  }
+}
+
+function showAsset(data) {
+  const panel = document.getElementById('asset-panel');
+  panel.style.display = 'block';
+  document.getElementById('a-desc').innerText = data.asset_id + ' — ' + data.description;
+  document.getElementById('a-meta').innerText = data.asset_class + ' · currently at ' + data.current_location + ' · ' + data.life_status;
+  document.getElementById('f-asset-id').value = data.asset_id;
+  document.getElementById('disposed-warning').style.display = data.is_disposed ? 'block' : 'none';
+  geoTag();
+}
+
+async function lookup(assetId) {
+  const resp = await fetch(`/verification/scan/lookup/${assetId}/`);
+  const data = await resp.json();
+  if (data.found) { showAsset(data); }
+  else { alert('No asset found for ' + assetId); }
+}
+
+document.getElementById('manual-lookup').addEventListener('click', () => {
+  const id = document.getElementById('manual-asset-id').value.trim();
+  if (id) lookup(id);
+});
+
+document.getElementById('start-scan').addEventListener('click', () => {
+  const qr = new Html5Qrcode("reader");
+  Html5Qrcode.getCameras().then(devices => {
+    if (!devices || !devices.length) { alert('No camera available on this device.'); return; }
+    qr.start(devices[0].id, { fps: 10, qrbox: 220 }, (decodedText) => {
+      // payload is a URL like https://far.company.local/a/AST-XXXXXXXX
+      const parts = decodedText.split('/a/');
+      const assetId = parts.length > 1 ? parts[1] : decodedText;
+      qr.stop();
+      lookup(assetId);
+    });
+  }).catch(() => alert('Camera access was denied or is unavailable.'));
+});
+</script>
+{% endblock %}

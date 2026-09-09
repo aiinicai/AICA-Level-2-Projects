@@ -1,0 +1,110 @@
+{% extends "base.html" %}
+{% block content %}
+  <div class="fs-page-header">
+    <h1 class="fs-page-title">Data Quality Result</h1>
+    <p class="fs-page-subtitle">{{ upload.original_filename }} &middot; {{ result.total_rows }} data row(s)</p>
+  </div>
+
+  {% if saved %}
+    <div class="fs-empty-banner fs-empty-banner-ok">
+      <span>&#10003;</span>
+      <span>Saved. Current status: <strong>{{ upload.upload_status }}</strong>.</span>
+    </div>
+    <div class="fs-form-actions">
+      <a href="{{ url_for('upload.index') }}" class="fs-btn fs-btn-primary">&larr; Back to Upload</a>
+    </div>
+  {% endif %}
+
+  <div class="fs-panel">
+    <div class="fs-gauge-wrap">
+      <div class="fs-gauge-value">{{ result.data_quality_score }}%</div>
+      <div class="fs-gauge-caption">
+        Data Quality Score — invalid values and blanks in required fields are penalized;
+        blanks in optional fields are shown for information only and are not scored.
+      </div>
+    </div>
+
+    <p style="margin-top: 1rem;">
+      Result:
+      {% if result.status == "VALIDATED" %}
+        <span class="fs-badge fs-badge-low">VALIDATED</span>
+      {% else %}
+        <span class="fs-badge fs-badge-critical">ERROR</span>
+      {% endif %}
+      &middot; {{ result.mapped_field_count }} column(s) mapped
+    </p>
+
+    {% if result.messages %}
+      <ul>
+        {% for message in result.messages %}<li class="fs-muted">{{ message }}</li>{% endfor %}
+      </ul>
+    {% endif %}
+  </div>
+
+  {% if result.column_reports %}
+    <div class="fs-table-wrap">
+      <table class="fs-table">
+        <thead>
+          <tr>
+            <th>Mapped Field</th>
+            <th>Source Column</th>
+            <th>Required?</th>
+            <th>Blank</th>
+            <th>Valid</th>
+            <th>Stored as Text</th>
+            <th>Invalid</th>
+            <th>Sample Invalid Values</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for report in result.column_reports %}
+            <tr>
+              <td>{{ report.target_label }}</td>
+              <td>{{ report.source_column }}</td>
+              <td>
+                {% if report.is_required %}
+                  <span class="fs-badge fs-badge-medium">Required</span>
+                {% else %}
+                  <span class="fs-badge fs-badge-neutral">Optional</span>
+                {% endif %}
+              </td>
+              <td>
+                {% if report.blank_count %}
+                  {% if report.is_required %}
+                    <span class="fs-badge fs-badge-high">{{ report.blank_count }} (penalized)</span>
+                  {% else %}
+                    <span class="fs-badge fs-badge-neutral">{{ report.blank_count }} (informational)</span>
+                  {% endif %}
+                {% else %}
+                  0
+                {% endif %}
+              </td>
+              <td>{{ report.valid_count }}</td>
+              <td>{{ report.stored_as_text_count }}</td>
+              <td>
+                {% if report.invalid_count %}
+                  <span class="fs-badge fs-badge-high">{{ report.invalid_count }}</span>
+                {% else %}
+                  0
+                {% endif %}
+              </td>
+              <td>
+                {% if report.sample_invalid_values %}
+                  {{ report.sample_invalid_values | map('string') | join(', ') }}
+                {% else %}
+                  —
+                {% endif %}
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% endif %}
+
+  <form method="post" class="fs-form-actions">
+    {{ csrf_field() }}
+    <button type="submit" class="fs-btn fs-btn-primary" data-loading-text="Validating financial data...">Save Result &amp; Update Status</button>
+    <a href="{{ url_for('validation.index') }}" class="fs-btn fs-btn-secondary">Back to Data Quality</a>
+  </form>
+{% endblock %}

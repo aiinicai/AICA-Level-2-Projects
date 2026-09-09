@@ -1,0 +1,699 @@
+/*
+  FinSight design system — Stage 2 skeleton.
+
+  Only the tokens and shell layout needed to demonstrate the approved
+  navigation (Blueprint Section 8) and the approved visual language
+  (Blueprint Section 22: deep navy / white / light grey, muted accent,
+  red/amber/green reserved strictly for risk status, minimal animation).
+  Component-level styling (tables, badges, risk chips, charts) is added
+  alongside the stages that introduce those components.
+*/
+
+:root {
+  --fs-navy: #0f2a4a;
+  --fs-navy-dark: #0a1d33;
+  --fs-white: #ffffff;
+  --fs-grey-light: #f4f6f8;
+  --fs-grey-border: #dfe4ea;
+  --fs-text: #1c2733;
+  --fs-text-muted: #5b6b7c;
+  --fs-accent: #2f6f8f;
+
+  /* Stage 14 — Slate secondary, formally named (was previously only
+     reached indirectly via --fs-text-muted / --fs-grey-border). Used
+     for secondary buttons, quiet labels and dividers that need to read
+     as "structural", not "muted text". */
+  --fs-slate: #47566b;
+  --fs-slate-light: #eef1f4;
+
+  /* Reserved exclusively for risk-level indicators — never decorative */
+  --fs-risk-critical: #c0392b;
+  --fs-risk-high: #e08a00;
+  --fs-risk-medium: #d6a400;
+  --fs-risk-low: #2f8f5b;
+
+  /* Stage 14 — named status-communication tokens (Blueprint Section 22 /
+     Stage 14 section 4). These intentionally reuse the exact same
+     colour values as the risk tokens above (green/amber/red are a
+     single professional vocabulary in FinSight, not two competing
+     palettes) but are named for what they mean in a non-risk context —
+     e.g. "a save succeeded" vs. "a finding is high-risk" — so a future
+     reader of component CSS isn't left wondering why a success banner
+     references a "risk" token. --fs-info is new: FinSight had no
+     neutral/informational accent color before Stage 14 besides the
+     brand accent itself, so this is just --fs-accent under its
+     functional name. No new hex values were introduced by this block. */
+  --fs-success: var(--fs-risk-low);
+  --fs-warning: var(--fs-risk-medium);
+  --fs-critical: var(--fs-risk-critical);
+  --fs-info: var(--fs-accent);
+
+  /* Stage 14 — named type scale (Stage 14 section 5). Existing classes
+     below (.fs-page-title etc.) are updated to reference these instead
+     of a hardcoded rem value, so the hierarchy is declared once. */
+  --fs-text-2xl: 1.4rem;   /* page title */
+  --fs-text-xl: 1.15rem;   /* card / major title */
+  --fs-text-lg: 1rem;      /* section / panel title */
+  --fs-text-base: 0.9rem;  /* body */
+  --fs-text-sm: 0.85rem;   /* supporting text, links */
+  --fs-text-xs: 0.78rem;   /* labels, table text, captions */
+
+  --fs-radius: 4px;
+  --fs-font: "Segoe UI", -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: var(--fs-font);
+  color: var(--fs-text);
+  background: var(--fs-grey-light);
+}
+
+.fs-shell {
+  display: flex;
+  min-height: 100vh;
+}
+
+.fs-sidebar {
+  width: 240px;
+  background: var(--fs-navy);
+  color: var(--fs-white);
+  flex-shrink: 0;
+  padding: 1.25rem 0;
+}
+
+.fs-brand {
+  font-size: 1.1rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  padding: 0 1.25rem 1.25rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+  margin-bottom: 0.75rem;
+}
+
+.fs-nav { display: flex; flex-direction: column; }
+
+.fs-nav-item, .fs-nav-subitem {
+  color: rgba(255, 255, 255, 0.85);
+  text-decoration: none;
+  padding: 0.55rem 1.25rem;
+  font-size: 0.9rem;
+}
+
+.fs-nav-item:hover, .fs-nav-subitem:hover {
+  background: var(--fs-navy-dark);
+  color: var(--fs-white);
+}
+
+.fs-nav-group { display: flex; flex-direction: column; margin: 0.25rem 0; }
+
+.fs-nav-group-label {
+  padding: 0.55rem 1.25rem 0.15rem;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.fs-nav-subitem { padding-left: 2rem; }
+
+/* FinSight V1 scope decision: the SEBI nav item is a static, inert label
+   (see base.html's nav comment) — dimmed and non-interactive so it never
+   reads as a clickable/active module, distinct from .fs-nav-subitem-flagged
+   (still used elsewhere for a real, confirmable-but-pending module). */
+.fs-nav-subitem-disabled {
+  display: flex; align-items: center; gap: 0.4rem;
+  opacity: 0.55; cursor: default;
+}
+.fs-nav-subitem-disabled:hover { background: none; color: rgba(255, 255, 255, 0.85); }
+
+.fs-main { flex: 1; display: flex; flex-direction: column; }
+
+.fs-topbar {
+  background: var(--fs-white);
+  border-bottom: 1px solid var(--fs-grey-border);
+  padding: 1rem 1.75rem;
+}
+
+.fs-topbar-title { font-size: 1rem; font-weight: 600; }
+
+.fs-content { padding: 1.75rem; }
+
+.fs-card {
+  background: var(--fs-white);
+  border: 1px solid var(--fs-grey-border);
+  border-radius: var(--fs-radius);
+  padding: 1.5rem;
+  max-width: 640px;
+}
+
+.fs-card-title { margin: 0 0 0.5rem; font-size: 1.15rem; }
+
+.fs-muted { color: var(--fs-text-muted); font-size: 0.9rem; line-height: 1.5; }
+
+/*
+  Stage 4 — Dashboard / reusable component library.
+
+  Everything below is dependency-free (plain CSS + inline SVG built by
+  frontend/static/js/charts.js). No Chart.js, no CDN, no network access
+  required — see the Stage 4 blueprint addendum for why this replaces
+  the originally-approved Chart.js line in Section B/L.
+
+  Colors reuse the existing tokens above. Risk colors are used ONLY for
+  risk-level encoding (critical/high/medium/low), never decoratively,
+  per Blueprint Section 22 — chart "series" colors that are not risk
+  levels use --fs-accent and its tints instead.
+*/
+
+:root {
+  --fs-accent-tint-1: #4a8bab;
+  --fs-accent-tint-2: #7fb0c7;
+  --fs-accent-tint-3: #b7d4e2;
+  --fs-track: #e9edf1;
+  --fs-space-1: 0.5rem;
+  --fs-space-2: 1rem;
+  --fs-space-3: 1.5rem;
+}
+
+.fs-page-header { margin-bottom: var(--fs-space-3); }
+.fs-page-title { margin: 0 0 0.25rem; font-size: var(--fs-text-2xl); font-weight: 600; }
+.fs-page-subtitle { color: var(--fs-text-muted); font-size: var(--fs-text-base); margin: 0; }
+
+.fs-empty-banner {
+  display: flex;
+  align-items: center;
+  gap: var(--fs-space-2);
+  background: var(--fs-white);
+  border: 1px solid var(--fs-grey-border);
+  border-left: 4px solid var(--fs-accent);
+  border-radius: var(--fs-radius);
+  padding: 0.9rem 1.25rem;
+  margin-bottom: var(--fs-space-3);
+  font-size: 0.88rem;
+  color: var(--fs-text);
+}
+
+.fs-empty-banner strong { font-weight: 600; }
+
+/* Stat card row */
+.fs-stat-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: var(--fs-space-2);
+  margin-bottom: var(--fs-space-3);
+}
+
+.fs-stat-card {
+  background: var(--fs-white);
+  border: 1px solid var(--fs-grey-border);
+  border-radius: var(--fs-radius);
+  padding: 1.1rem 1.25rem;
+}
+
+.fs-stat-value { font-size: 1.7rem; font-weight: 700; line-height: 1.1; }
+.fs-stat-label {
+  color: var(--fs-text-muted);
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-top: 0.35rem;
+}
+
+/* Panel = a chart's card container */
+.fs-panel-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: var(--fs-space-3);
+}
+
+.fs-panel {
+  background: var(--fs-white);
+  border: 1px solid var(--fs-grey-border);
+  border-radius: var(--fs-radius);
+  padding: 1.25rem 1.4rem 1.4rem;
+  display: flex;
+  flex-direction: column;
+}
+
+.fs-panel-header { margin-bottom: var(--fs-space-2); }
+.fs-panel-title { margin: 0; font-size: var(--fs-text-lg); font-weight: 600; }
+.fs-panel-subtitle { margin: 0.2rem 0 0; font-size: var(--fs-text-xs); color: var(--fs-text-muted); }
+
+.fs-panel-body { flex: 1; display: flex; flex-direction: column; justify-content: center; }
+
+.fs-chart-empty {
+  text-align: center;
+  color: var(--fs-text-muted);
+  font-size: 0.85rem;
+  padding: 0.75rem 0;
+}
+
+/* Badges (risk-level only — see comment above) */
+.fs-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+  color: var(--fs-white);
+}
+
+.fs-badge-critical { background: var(--fs-risk-critical); }
+.fs-badge-high { background: var(--fs-risk-high); }
+.fs-badge-medium { background: var(--fs-risk-medium); color: #3a2c00; }
+.fs-badge-low { background: var(--fs-risk-low); }
+.fs-badge-neutral { background: var(--fs-text-muted); }
+
+/* Donut chart */
+.fs-donut-wrap {
+  display: flex;
+  align-items: center;
+  gap: var(--fs-space-3);
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.fs-donut-center-value { font-size: 1.3rem; font-weight: 700; fill: var(--fs-text); }
+.fs-donut-center-label { font-size: 0.6rem; fill: var(--fs-text-muted); text-transform: uppercase; letter-spacing: 0.03em; }
+
+.fs-legend { display: flex; flex-direction: column; gap: 0.45rem; }
+.fs-legend-item { display: flex; align-items: center; gap: 0.5rem; font-size: 0.83rem; }
+.fs-legend-swatch { width: 0.7rem; height: 0.7rem; border-radius: 2px; flex-shrink: 0; }
+.fs-legend-value { margin-left: auto; font-weight: 600; padding-left: 1rem; }
+
+/* Horizontal bar chart (counts) */
+.fs-barchart { display: flex; flex-direction: column; gap: 0.65rem; }
+.fs-barchart-row { display: grid; grid-template-columns: 118px 1fr 34px; align-items: center; gap: 0.6rem; }
+.fs-barchart-label { font-size: 0.82rem; color: var(--fs-text); text-align: right; }
+.fs-barchart-track { background: var(--fs-track); border-radius: 3px; height: 0.85rem; overflow: hidden; }
+.fs-barchart-fill { height: 100%; border-radius: 3px; background: var(--fs-accent); transition: width 0.2s ease; }
+.fs-barchart-value { font-size: 0.82rem; font-weight: 600; text-align: left; }
+
+/* Coverage bars (percentage) */
+.fs-coverage { display: flex; flex-direction: column; gap: 0.75rem; }
+.fs-coverage-row { display: flex; flex-direction: column; gap: 0.3rem; }
+.fs-coverage-heading { display: flex; justify-content: space-between; font-size: 0.82rem; }
+.fs-coverage-heading .fs-coverage-pct { font-weight: 600; }
+.fs-coverage-track { background: var(--fs-track); border-radius: 3px; height: 0.6rem; overflow: hidden; }
+.fs-coverage-fill { height: 100%; border-radius: 3px; background: var(--fs-accent-tint-1); transition: width 0.2s ease; }
+
+/* Gauge */
+.fs-gauge-wrap { display: flex; flex-direction: column; align-items: center; }
+.fs-gauge-value { font-size: 1.6rem; font-weight: 700; }
+.fs-gauge-caption { font-size: 0.78rem; color: var(--fs-text-muted); margin-top: 0.15rem; }
+
+@media (max-width: 720px) {
+  .fs-barchart-row { grid-template-columns: 92px 1fr 30px; }
+}
+
+/*
+  Stage 5 — Engagement / Entity Profile / Applicability Matrix
+  components: topbar engagement indicator, nav badge, forms, tables,
+  buttons, links. Reuses the existing tokens/badge classes above —
+  no new color meanings introduced (risk colors still reserved for
+  risk levels only; the SEBI nav "Review Required" badge reuses the
+  existing --fs-risk-medium/amber token via .fs-badge-medium, the same
+  class the Applicability Matrix and other screens use, not a new
+  color).
+*/
+
+.fs-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.fs-topbar-engagement {
+  font-size: 0.85rem;
+  color: var(--fs-text-muted);
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.fs-topbar-engagement strong { color: var(--fs-text); }
+
+.fs-nav-subitem-flagged { display: flex; align-items: center; gap: 0.4rem; }
+.fs-nav-badge { font-size: 0.62rem; padding: 0.1rem 0.4rem; }
+
+/* Buttons */
+.fs-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  padding: 0.55rem 1.1rem;
+  border-radius: var(--fs-radius);
+  border: 1px solid transparent;
+  font-size: 0.88rem;
+  font-weight: 600;
+  text-decoration: none;
+  cursor: pointer;
+  line-height: 1.2;
+}
+
+.fs-btn-primary { background: var(--fs-navy); color: var(--fs-white); }
+.fs-btn-primary:hover { background: var(--fs-navy-dark); }
+
+.fs-btn-secondary { background: var(--fs-white); color: var(--fs-text); border-color: var(--fs-grey-border); }
+.fs-btn-secondary:hover { background: var(--fs-grey-light); }
+
+.fs-btn-sm { padding: 0.35rem 0.7rem; font-size: 0.78rem; }
+
+.fs-inline-form { display: inline-block; }
+
+.fs-link { color: var(--fs-accent); text-decoration: none; font-size: 0.85rem; }
+.fs-link:hover { text-decoration: underline; }
+
+/* A <button> made to look and sit like .fs-link, for an inline-form
+   action (e.g. "Remove") next to plain <a> links in the same table
+   cell — Stage 18 Phase 3. */
+.fs-link-btn {
+  background: none; border: none; padding: 0; margin: 0;
+  font: inherit; font-size: 0.85rem; color: var(--fs-accent);
+  text-decoration: none; cursor: pointer;
+}
+.fs-link-btn:hover { text-decoration: underline; }
+.fs-link-danger { color: var(--fs-critical); }
+
+.fs-toolbar { margin-bottom: var(--fs-space-2); }
+
+/* Tables */
+.fs-table-wrap { overflow-x: auto; background: var(--fs-white); border: 1px solid var(--fs-grey-border); border-radius: var(--fs-radius); }
+.fs-table { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
+.fs-table th, .fs-table td { padding: 0.75rem 1rem; text-align: left; border-bottom: 1px solid var(--fs-grey-border); }
+.fs-table th { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--fs-text-muted); background: var(--fs-grey-light); }
+.fs-table tbody tr:last-child td { border-bottom: none; }
+.fs-table-actions { display: flex; gap: 0.75rem; align-items: center; white-space: nowrap; }
+
+/* Forms */
+.fs-form { max-width: 640px; }
+.fs-form-narrow { max-width: 440px; }
+
+.fs-fieldset {
+  border: 1px solid var(--fs-grey-border);
+  border-radius: var(--fs-radius);
+  padding: 1.1rem 1.25rem 1.4rem;
+  margin: 0 0 var(--fs-space-2);
+  background: var(--fs-white);
+}
+
+.fs-fieldset legend { font-size: 0.85rem; font-weight: 600; padding: 0 0.4rem; }
+
+.fs-field { margin-bottom: 1rem; }
+.fs-field label { display: block; font-size: 0.82rem; font-weight: 600; margin-bottom: 0.3rem; }
+.fs-optional { font-weight: 400; color: var(--fs-text-muted); }
+
+.fs-field input[type="text"],
+.fs-field input[type="password"],
+.fs-field select,
+.fs-field textarea {
+  width: 100%;
+  padding: 0.55rem 0.7rem;
+  border: 1px solid var(--fs-grey-border);
+  border-radius: var(--fs-radius);
+  font-size: 0.88rem;
+  font-family: inherit;
+  background: var(--fs-white);
+  color: var(--fs-text);
+}
+
+.fs-field input[type="text"]:focus,
+.fs-field input[type="password"]:focus,
+.fs-field select:focus,
+.fs-field textarea:focus {
+  outline: 2px solid var(--fs-accent-tint-2);
+  outline-offset: 1px;
+}
+
+.fs-field-inline { max-width: 260px; }
+
+/* Stage 16 — LAN access gate (login / first-run setup). These pages
+   render outside the normal app shell (no sidebar/topbar — nothing is
+   authenticated yet), so they get their own minimal centered wrapper
+   rather than the fs-shell grid. */
+.fs-access-page {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+  background: var(--fs-grey-light);
+}
+.fs-access-card {
+  width: 100%;
+  max-width: 380px;
+  background: var(--fs-white);
+  border: 1px solid var(--fs-grey-border);
+  border-radius: var(--fs-radius);
+  padding: 2rem 1.75rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+}
+.fs-access-brand { font-size: var(--fs-text-lg); font-weight: 700; margin-bottom: 0.25rem; }
+.fs-access-subtitle { color: var(--fs-text-muted); font-size: 0.88rem; margin: 0 0 1.25rem; }
+
+.fs-field-error { color: var(--fs-risk-critical); font-size: 0.78rem; margin: 0.3rem 0 0; }
+
+.fs-checkbox-field { margin-bottom: 0.85rem; font-size: 0.88rem; }
+.fs-checkbox-field label { display: flex; align-items: center; gap: 0.5rem; font-weight: 400; }
+
+.fs-radio-group { display: flex; flex-wrap: wrap; gap: 1rem; margin-bottom: 1rem; }
+.fs-radio-option { display: flex; align-items: center; gap: 0.4rem; font-size: 0.85rem; }
+
+.fs-form-actions { display: flex; gap: 0.75rem; align-items: center; margin-top: 1.25rem; }
+.fs-form-actions-tight { margin-top: 0.75rem; }
+
+/* Applicability Matrix */
+.fs-applicability-list { display: flex; flex-direction: column; gap: var(--fs-space-2); margin-bottom: var(--fs-space-3); }
+.fs-applicability-row { max-width: 720px; }
+.fs-applicability-head { display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
+.fs-confirmed-note { background: var(--fs-grey-light); border-radius: var(--fs-radius); padding: 0.6rem 0.8rem; font-size: 0.85rem; margin: 0.5rem 0; }
+.fs-confirm-form { border-top: 1px solid var(--fs-grey-border); padding-top: 0.9rem; margin-top: 0.9rem; }
+
+/* Stage 5 round 2: Entity Profile Input / System Suggestion / Professional
+   Confirmation shown as three explicitly-labeled, visually separate rows —
+   never merged into one sentence a reader could mistake for a conclusion. */
+.fs-applicability-facts { display: flex; flex-direction: column; gap: 0.35rem; margin: 0.6rem 0; }
+.fs-applicability-fact { display: grid; grid-template-columns: 180px 1fr; gap: 0.75rem; align-items: baseline; }
+.fs-applicability-fact dt { font-size: 0.78rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.02em; color: var(--fs-text-muted); }
+.fs-applicability-fact dd { margin: 0; font-size: 0.9rem; }
+
+/*
+  Stage 7 — Data Mapping / Data Quality. `.fs-empty-banner`'s left
+  accent border is reused with two colour modifiers here rather than
+  inventing new banner markup: `-warning` for the file-type-mismatch /
+  structure-warning case (amber, same --fs-risk-medium token the SEBI
+  nav badge already reuses) and `-ok` for a successful save (green,
+  same --fs-risk-low token the badges use). No new colour tokens.
+*/
+.fs-empty-banner-warning { border-left-color: var(--fs-warning); }
+.fs-empty-banner-ok { border-left-color: var(--fs-success); }
+.fs-applicability-reason { font-size: 0.82rem; }
+
+/*
+  Stage 14 — Final UX & Application Polish.
+
+  Everything below is additive: new component classes and a visible
+  keyboard-focus treatment for interactive elements that didn't have
+  one yet (Stage 14 section 22, "visible focus states"). No existing
+  class above is removed or renamed, so every template built in
+  Stages 2-13 keeps working unchanged unless this stage's own template
+  edits opt into one of these new classes.
+*/
+
+/* Visible focus for keyboard navigation — buttons and links previously
+   relied on the browser default outline, which some browsers suppress
+   on click; this makes Tab-navigation always visible without changing
+   mouse-click appearance. */
+.fs-btn:focus-visible,
+.fs-link:focus-visible,
+.fs-nav-item:focus-visible,
+.fs-nav-subitem:focus-visible {
+  outline: 2px solid var(--fs-accent-tint-2);
+  outline-offset: 2px;
+}
+
+/* Quick Actions — Dashboard (Stage 14 section 8). A restrained grid of
+   secondary-styled action buttons, not a second card system. */
+.fs-quick-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--fs-space-2);
+}
+
+/* Step indicator — Upload -> Detect Structure -> Map Columns ->
+   Validate -> Confirm -> Run Review (Stage 14 section 9). Plain text +
+   connector, deliberately not a graphical wizard widget, so it works
+   without JS and degrades gracefully at narrow widths. */
+.fs-steps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0;
+  margin-bottom: var(--fs-space-3);
+  font-size: var(--fs-text-xs);
+}
+.fs-step {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.4rem 0.75rem 0.4rem 0;
+  color: var(--fs-text-muted);
+}
+.fs-step:not(:last-child)::after {
+  content: "\2192";
+  margin-left: 0.75rem;
+  color: var(--fs-grey-border);
+}
+.fs-step-index {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.3rem;
+  height: 1.3rem;
+  border-radius: 50%;
+  background: var(--fs-grey-light);
+  border: 1px solid var(--fs-grey-border);
+  color: var(--fs-text-muted);
+  font-weight: 600;
+  font-size: 0.68rem;
+}
+.fs-step-done .fs-step-index { background: var(--fs-success); border-color: var(--fs-success); color: var(--fs-white); }
+.fs-step-current { color: var(--fs-text); font-weight: 600; }
+.fs-step-current .fs-step-index { background: var(--fs-navy); border-color: var(--fs-navy); color: var(--fs-white); }
+
+/* Loading / processing inline indicator (Stage 14 section 16) — a
+   plain text state swap on submit, no spinner graphic, kept dependency
+   free like the rest of the app. See frontend/static/js/forms.js. */
+.fs-btn[data-loading-text]:disabled { opacity: 0.75; cursor: wait; }
+
+/* Privacy / product-identity footer (Stage 14 sections 24-25). */
+.fs-app-footer {
+  padding: 1rem 1.75rem 1.5rem;
+  font-size: var(--fs-text-xs);
+  color: var(--fs-text-muted);
+  border-top: 1px solid var(--fs-grey-border);
+  margin-top: auto;
+}
+
+.fs-about-block { max-width: 640px; }
+.fs-about-block dt { font-size: var(--fs-text-xs); color: var(--fs-text-muted); text-transform: uppercase; letter-spacing: 0.03em; margin-top: 0.75rem; }
+.fs-about-block dd { margin: 0.15rem 0 0; font-size: var(--fs-text-base); }
+
+/*
+  FAQ accordion (Stage 21, approved) — a native <details>/<summary>
+  list, deliberately no JavaScript: each question opens/closes on its
+  own, "open" state is real HTML rather than a script-managed class,
+  and the whole screen still works with JS disabled. The chevron is a
+  single rotated ::after triangle (no icon font/SVG asset needed).
+*/
+.fs-faq-list { display: flex; flex-direction: column; }
+
+.fs-faq-item {
+  border-bottom: 1px solid var(--fs-grey-border);
+  padding: 0.9rem 0;
+}
+.fs-faq-item:first-child { padding-top: 0; }
+.fs-faq-item:last-child { border-bottom: none; padding-bottom: 0; }
+
+.fs-faq-question {
+  cursor: pointer;
+  list-style: none;
+  font-size: var(--fs-text-base);
+  font-weight: 600;
+  color: var(--fs-text);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--fs-space-2);
+}
+.fs-faq-question::-webkit-details-marker { display: none; }
+
+.fs-faq-question::after {
+  content: "";
+  flex: 0 0 auto;
+  width: 0.5rem;
+  height: 0.5rem;
+  border-right: 2px solid var(--fs-text-muted);
+  border-bottom: 2px solid var(--fs-text-muted);
+  transform: rotate(-45deg);
+  transition: transform 0.15s ease;
+}
+.fs-faq-item[open] .fs-faq-question::after { transform: rotate(45deg); }
+
+.fs-faq-answer {
+  margin: 0.6rem 0 0;
+  color: var(--fs-text-muted);
+  font-size: var(--fs-text-base);
+  line-height: 1.55;
+  max-width: 720px;
+}
+
+/*
+  Dashboard chart palette — Stage 20 revision (explicitly requested:
+  "colours of chart appearing on dashboard, they are very light. Make
+  it look beautiful"). This reverses the prior, deliberately muted/
+  desaturated palette below (kept here in history, not silently
+  dropped): that softened look is exactly what the user is now asking
+  to move away from. Every value below was picked and computationally
+  validated (not eyeballed) using Anthropic's dataviz skill's
+  `validate_palette.js` — OKLCH lightness band, OKLCH chroma floor
+  (so nothing reads as washed-out gray), simulated-CVD separation, and
+  a normal-vision separation floor, each run with `--pairs all` since
+  both charts also show every color together in a legend, not just
+  side-by-side.
+
+  Deliberately kept SEPARATE from the --fs-risk-* tokens above (which
+  stay exactly as they are and keep meaning "risk level" everywhere
+  else in the app — badges, Findings Centre, Query table): validating
+  --fs-risk-high/--fs-risk-medium (#e08a00/#d6a400) against the same
+  script found they FAIL the normal-vision separation floor (ΔE 6.4,
+  need >=15) — a pre-existing accessibility gap in that token pair,
+  outside this dashboard-chart task's scope, flagged here rather than
+  silently carried into the chart too. --fs-chart-risk-* below keeps
+  the same red/orange/gold/green severity ordering (so a viewer's
+  mental model of "red = worse" still holds) but with the medium/high
+  hues spread far enough apart to actually pass. These --fs-chart-*
+  tokens are consumed ONLY by frontend/static/js/dashboard.js, for
+  these two dashboard charts, so none of this touches any risk-level
+  badge or label elsewhere in FinSight.
+
+  Prior (muted) values, superseded by this revision:
+    --fs-chart-risk-critical: #b5564c;  --fs-chart-risk-high: #c3934f;
+    --fs-chart-risk-medium: #bfab5a;    --fs-chart-risk-low: #5c9575;
+    --fs-chart-module-accounting: #33506c; --fs-chart-module-audit: #5b7f95;
+    --fs-chart-module-tax: #94a6b8;
+*/
+:root {
+  /* Risk Distribution donut — red/orange/gold/green severity order,
+     vivid and validated: ALL CHECKS PASS (`--pairs all`, light,
+     surface #ffffff) — worst CVD ΔE 9.0, worst normal-vision ΔE 16.0
+     (both clear the >=8 / >=15 targets). Medium (#e0a300) and Low
+     (#1baf7a) sit under the 3:1 WCAG-contrast relief line, which is
+     why both this donut's legend and the bar chart below always show
+     a text label/value alongside the color — color is never the only
+     signal (see charts.js's renderDonut()/renderBarChart()). */
+  --fs-chart-risk-critical: #a5281c;
+  --fs-chart-risk-high: #e2571f;
+  --fs-chart-risk-medium: #e0a300;
+  --fs-chart-risk-low: #1baf7a;
+
+  /* Review Overview bars — three genuinely distinct hues (blue /
+     violet / rose), not a single-hue lightness ramp (the prior
+     slate-blue-on-slate-blue palette this replaces read as "one washed
+     -out color" precisely because a lightness ramp is not how
+     categorical/identity color should be encoded — see the dataviz
+     skill's color-formula guidance). Chosen to avoid red/orange/green
+     entirely (Blueprint Section 22 reserves those strictly for risk
+     status) and validated: ALL CHECKS PASS (`--pairs all`, light,
+     surface #ffffff) — worst CVD ΔE 13.0, worst normal-vision ΔE 16.3. */
+  --fs-chart-module-accounting: #2a78d6;
+  --fs-chart-module-audit: #4a3aa7;
+  --fs-chart-module-tax: #e87ba4;
+}

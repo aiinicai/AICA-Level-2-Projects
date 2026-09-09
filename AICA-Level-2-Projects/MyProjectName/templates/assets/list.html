@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% load humanize %}
+{% block title %}Asset master{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h4 class="mb-0">Asset master</h4>
+  <div class="d-flex gap-2">
+    {% if is_data_entry %}
+    <a href="{% url 'assets:create' %}" class="btn btn-primary btn-sm"><i class="bi bi-plus-lg"></i> New asset</a>
+    {% endif %}
+    <a href="{% url 'assets:bulk_import' %}" class="btn btn-outline-secondary btn-sm">Bulk import/export</a>
+  </div>
+</div>
+
+<form method="get" class="row g-2 mb-3">
+  <div class="col-auto"><input type="text" name="q" value="{{ q }}" class="form-control form-control-sm" placeholder="Search description / asset ID"></div>
+  <div class="col-auto">
+    <select name="status" class="form-select form-select-sm">
+      <option value="">All statuses</option>
+      {% for value, label in status_choices %}
+        <option value="{{ value }}" {% if status == value %}selected{% endif %}>{{ label }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <div class="col-auto"><button class="btn btn-sm btn-outline-primary">Filter</button></div>
+</form>
+
+<form method="get" action="{% url 'assets:label_print' %}">
+<div class="card stat-card p-3">
+  <div class="table-responsive">
+  <table class="table table-hover table-sm align-middle">
+    <thead><tr>
+      <th></th><th>Asset ID</th><th>Description</th><th>Class</th><th>Location</th>
+      <th>Tag</th><th>Status</th><th class="text-end">NBV</th>
+    </tr></thead>
+    <tbody>
+    {% for a in assets %}
+      <tr>
+        <td><input type="checkbox" name="asset" value="{{ a.asset_id }}"></td>
+        <td><a href="{{ a.get_absolute_url }}">{{ a.asset_id }}</a></td>
+        <td>{{ a.description }}</td>
+        <td>{{ a.asset_class }}</td>
+        <td class="small">{{ a.location.breadcrumb }}</td>
+        <td><span class="badge badge-status {% if a.tag_status == 'TAGGED' %}bg-success{% else %}bg-secondary{% endif %}">{{ a.get_tag_status_display }}</span></td>
+        <td><span class="badge badge-status bg-light text-dark">{{ a.get_life_status_display }}</span></td>
+        <td class="text-end">₹{{ a.net_book_value|floatformat:0|intcomma }}</td>
+      </tr>
+    {% empty %}
+      <tr><td colspan="8" class="text-muted">No assets match. Capitalise a CWIP item or use bulk import to get started.</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  <button class="btn btn-sm btn-outline-secondary mt-2" style="width:fit-content;"><i class="bi bi-printer"></i> Print QR labels for selected</button>
+</div>
+</form>
+{% endblock %}

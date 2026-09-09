@@ -1,0 +1,198 @@
+{% extends "base.html" %}
+{% block content %}
+  <div class="fs-page-header">
+    <h1 class="fs-page-title">Run Review</h1>
+    {% if engagement %}
+      <p class="fs-page-subtitle">{{ engagement.entity_name }} &middot; FY {{ engagement.financial_year }}</p>
+    {% else %}
+      <p class="fs-page-subtitle">Run Accounting, Audit and Tax review together in one workflow.</p>
+    {% endif %}
+  </div>
+
+  <div class="fs-panel">
+    <p class="fs-muted">
+      This screen combines FinSight's three approved review engines &mdash; <strong>Accounting</strong>,
+      <strong>Audit</strong> and <strong>Tax</strong> &mdash; into one run. Each engine still decides its own
+      applicable rules exactly as it does on its own screen (framework-aware for Accounting, Act-era-aware for
+      Tax); this screen does not add, remove, or change any rule logic. There is no SEBI / Listed Entity option
+      here &mdash; see the sidebar's <strong>SEBI &middot; Future Module</strong> label for why.
+    </p>
+  </div>
+
+  {% if not engagement %}
+    <div class="fs-empty-banner">
+      <span>&#9432;</span>
+      <span>
+        No current engagement selected.
+        <a href="{{ url_for('engagement.index') }}">Select or create one first</a> to run a review.
+      </span>
+    </div>
+  {% elif error %}
+    <div class="fs-empty-banner">
+      <span>&#9432;</span>
+      <span>{{ error }}</span>
+    </div>
+  {% else %}
+    {% with current_step = (4 if (readiness and not readiness.ready) else 6) %}{% include "partials/step_indicator.html" %}{% endwith %}
+
+    {% if readiness and not readiness.ready %}
+      <div class="fs-empty-banner">
+        <span>&#9432;</span>
+        <span>{{ readiness.reason }}</span>
+      </div>
+      {% if readiness.uploads %}
+        <div class="fs-panel">
+          <h2>Upload Status</h2>
+          <div class="fs-table-wrap">
+            <table class="fs-table">
+              <thead><tr><th>File</th><th>Type</th><th>Status</th></tr></thead>
+              <tbody>
+                {% for upload in readiness.uploads %}
+                  <tr>
+                    <td>{{ upload.original_filename }}</td>
+                    <td>{{ upload.file_type }}</td>
+                    <td>
+                      {% if upload.upload_status == 'VALIDATED' %}
+                        <span class="fs-badge fs-badge-low">VALIDATED</span>
+                      {% elif upload.upload_status == 'ERROR' %}
+                        <span class="fs-badge fs-badge-high">ERROR</span>
+                      {% else %}
+                        <span class="fs-badge fs-badge-neutral">{{ upload.upload_status }}</span>
+                      {% endif %}
+                    </td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+          <p class="fs-muted" style="margin-top: 0.75rem;">
+            <a href="{{ url_for('mapping.index') }}">Go to Mapping</a> &middot;
+            <a href="{{ url_for('validation.index') }}">Go to Data Quality</a>
+          </p>
+        </div>
+      {% else %}
+        <p class="fs-muted">
+          No files have been uploaded for this engagement yet. <a href="{{ url_for('upload.index') }}">Upload data</a> to begin.
+        </p>
+      {% endif %}
+    {% else %}
+
+      {% if ran %}
+        <div class="fs-panel {{ 'fs-empty-banner-ok' if not summary.any_failed and not summary.any_blocked else '' }}">
+          <h2>Review Result Summary</h2>
+          <p class="fs-muted">
+            Modules run: {{ summary.requested_modules | join(', ') }} &middot;
+            {{ summary.total_persisted_exceptions }} finding(s) recorded this run
+            {% if summary.total_preserved_exceptions %}
+              &middot; {{ summary.total_preserved_exceptions }} previously-reviewed finding(s) left untouched
+            {% endif %}.
+          </p>
+          {% if summary.any_failed %}
+            <p class="fs-muted"><strong>One or more modules did not complete successfully &mdash; see below. This review is NOT fully successful.</strong></p>
+          {% endif %}
+          <div class="fs-table-wrap">
+            <table class="fs-table">
+              <thead><tr><th>Module</th><th>Status</th><th>Findings Recorded</th><th>Preserved</th><th>Detail</th></tr></thead>
+              <tbody>
+                {% for outcome in summary.module_outcomes %}
+                  <tr>
+                    <td>{{ outcome.module | title }}</td>
+                    <td>
+                      {% if outcome.status == 'COMPLETED' %}
+                        <span class="fs-badge fs-badge-low">Completed</span>
+                      {% elif outcome.status == 'BLOCKED' %}
+                        <span class="fs-badge fs-badge-neutral">Blocked</span>
+                      {% else %}
+                        <span class="fs-badge fs-badge-high">Failed</span>
+                      {% endif %}
+                    </td>
+                    <td>{{ outcome.result.persisted_exception_count if outcome.result else '—' }}</td>
+                    <td>{{ outcome.result.preserved_exception_count if outcome.result else '—' }}</td>
+                    <td class="fs-muted">{{ outcome.error_message or '—' }}</td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+          <p class="fs-muted" style="margin-top: 0.75rem;">
+            <a href="{{ url_for('review.findings') }}">Open the Unified Findings Centre</a>
+          </p>
+        </div>
+      {% endif %}
+
+      <form method="post" class="fs-panel">
+        {{ csrf_field() }}
+        <h2>Review Configuration</h2>
+        <p class="fs-muted">All three modules are selected by default. Uncheck any module you don't want to run this time.</p>
+        <div class="fs-checkbox-field" style="margin-bottom: 0.5rem;">
+          <label><input type="checkbox" name="modules" value="ACCOUNTING" {% if 'ACCOUNTING' in selected_modules %}checked{% endif %}> Accounting Review</label>
+        </div>
+        <div class="fs-checkbox-field" style="margin-bottom: 0.5rem;">
+          <label><input type="checkbox" name="modules" value="AUDIT" {% if 'AUDIT' in selected_modules %}checked{% endif %}> Audit Review</label>
+        </div>
+        <div class="fs-checkbox-field" style="margin-bottom: 0.5rem;">
+          <label><input type="checkbox" name="modules" value="TAX" {% if 'TAX' in selected_modules %}checked{% endif %}> Tax Review</label>
+        </div>
+        <p class="fs-muted"><em>SEBI / Listed Entity Review &mdash; outside current V1 scope, not selectable.</em></p>
+        <div class="fs-form-actions">
+          <button type="submit" class="fs-btn fs-btn-primary" data-loading-text="Running FINsight Review...">Run Review &amp; Save Findings</button>
+          <span class="fs-muted">The preview below already reflects the current data — running just saves it.</span>
+        </div>
+      </form>
+
+      {% if summary and summary.executed %}
+        <div class="fs-panel">
+          <h2>{{ "This Run's Results" if ran else "Live Preview" }}, by Module</h2>
+          {% for outcome in summary.module_outcomes %}
+            <details class="fs-panel" style="margin-bottom: 0.75rem;" open>
+              <summary>
+                <strong>{{ outcome.module | title }}</strong>
+                {% if outcome.status == 'COMPLETED' %}
+                  {% set module_finding_count = outcome.result.rule_outcomes.values() | map(attribute='exceptions') | map('length') | sum %}
+                  <span class="fs-badge {{ 'fs-badge-medium' if module_finding_count else 'fs-badge-low' }}">
+                    {{ module_finding_count }} finding(s) across
+                    {{ outcome.result.rule_outcomes | length }} rule(s) evaluated
+                  </span>
+                {% elif outcome.status == 'BLOCKED' %}
+                  <span class="fs-badge fs-badge-neutral">Blocked</span>
+                {% else %}
+                  <span class="fs-badge fs-badge-high">Failed</span>
+                {% endif %}
+              </summary>
+              {% if outcome.status != 'COMPLETED' %}
+                <p class="fs-muted">{{ outcome.error_message }}</p>
+              {% else %}
+                {% for rule_id, rule_outcome in outcome.result.rule_outcomes.items() %}
+                  {% if rule_outcome.exceptions or rule_outcome.insufficient_data_reason %}
+                    <div class="fs-table-wrap" style="margin-top: 0.5rem;">
+                      <p class="fs-muted"><strong>{{ rule_id }}</strong>
+                        {% if rule_outcome.insufficient_data_reason %}
+                          &mdash; <span class="fs-badge fs-badge-neutral">Insufficient Data</span> {{ rule_outcome.insufficient_data_reason }}
+                        {% endif %}
+                      </p>
+                      {% if rule_outcome.exceptions %}
+                        <table class="fs-table">
+                          <thead><tr><th>Trigger</th><th>Explanation</th><th>Risk</th></tr></thead>
+                          <tbody>
+                            {% for finding in rule_outcome.exceptions %}
+                              <tr>
+                                <td>{{ finding.trigger_condition }}</td>
+                                <td>{{ finding.explanation }}</td>
+                                <td>{{ finding.risk_level }}</td>
+                              </tr>
+                            {% endfor %}
+                          </tbody>
+                        </table>
+                      {% endif %}
+                    </div>
+                  {% endif %}
+                {% endfor %}
+              {% endif %}
+            </details>
+          {% endfor %}
+        </div>
+      {% endif %}
+
+    {% endif %}
+  {% endif %}
+{% endblock %}

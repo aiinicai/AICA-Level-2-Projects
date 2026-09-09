@@ -1,0 +1,1813 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MSME & Expense Audit Tool - Dark Theme</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        :root {
+            --primary: #667eea;
+            --secondary: #764ba2;
+            --success: #38ef7d;
+            --danger: #f45c43;
+            --warning: #ffd166;
+            --dark-bg: #0f1419;
+            --dark-card: #1a202c;
+            --dark-border: #2d3748;
+            --text-light: #e2e8f0;
+            --text-muted: #a0aec0;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: var(--dark-bg);
+            padding: 20px;
+            color: var(--text-light);
+            min-height: 100vh;
+        }
+        
+        .container {
+            max-width: 1600px;
+            margin: 0 auto;
+            background: var(--dark-card);
+            border-radius: 15px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+            overflow: hidden;
+            border: 1px solid var(--dark-border);
+        }
+        
+        .header {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+            padding: 50px 40px;
+            text-align: center;
+        }
+        
+        .header h1 {
+            font-size: 3em;
+            margin-bottom: 10px;
+            font-weight: 800;
+            color: white;
+        }
+        
+        .header p {
+            font-size: 1.2em;
+            opacity: 0.95;
+            color: white;
+            margin-bottom: 5px;
+        }
+        
+        .tagline {
+            font-size: 0.95em;
+            opacity: 0.85;
+            font-style: italic;
+            color: rgba(255, 255, 255, 0.8);
+        }
+        
+        .main-nav {
+            display: flex;
+            background: var(--dark-bg);
+            border-bottom: 2px solid var(--dark-border);
+            overflow-x: auto;
+        }
+        
+        .nav-button {
+            flex: 1;
+            min-width: 150px;
+            padding: 18px 20px;
+            background: none;
+            border: none;
+            font-weight: 700;
+            font-size: 1em;
+            cursor: pointer;
+            color: var(--text-muted);
+            transition: all 0.3s;
+            border-bottom: 4px solid transparent;
+        }
+        
+        .nav-button:hover {
+            background: var(--dark-border);
+            color: var(--text-light);
+        }
+        
+        .nav-button.active {
+            color: var(--primary);
+            border-bottom-color: var(--primary);
+            background: var(--dark-card);
+        }
+        
+        .content-wrapper {
+            padding: 40px;
+            min-height: 600px;
+        }
+        
+        .tab-content {
+            display: none;
+        }
+        
+        .tab-content.active {
+            display: block;
+            animation: fadeIn 0.3s;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        
+        .section-header {
+            font-size: 1.8em;
+            font-weight: 800;
+            color: var(--primary);
+            margin-bottom: 25px;
+            padding-bottom: 15px;
+            border-bottom: 3px solid var(--primary);
+        }
+        
+        .form-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        
+        .form-group label {
+            font-weight: 700;
+            color: var(--text-light);
+            font-size: 0.95em;
+        }
+        
+        .form-group input,
+        .form-group textarea {
+            padding: 12px;
+            border: 2px solid var(--dark-border);
+            border-radius: 8px;
+            background: var(--dark-bg);
+            color: var(--text-light);
+            font-family: inherit;
+            font-size: 0.95em;
+            transition: all 0.3s;
+        }
+        
+        .form-group input::placeholder,
+        .form-group textarea::placeholder {
+            color: var(--text-muted);
+        }
+        
+        .form-group input:focus,
+        .form-group textarea:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.1);
+        }
+        
+        .form-group textarea {
+            resize: vertical;
+            min-height: 80px;
+        }
+        
+        .button-group {
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+            justify-content: center;
+            margin: 35px 0;
+            padding: 25px;
+            background: var(--dark-bg);
+            border-radius: 10px;
+            border: 1px solid var(--dark-border);
+        }
+        
+        button {
+            padding: 14px 28px;
+            border: none;
+            border-radius: 8px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-size: 0.95em;
+        }
+        
+        .btn-primary {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+            color: white;
+        }
+        
+        .btn-primary:hover:not(:disabled) {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 25px rgba(102, 126, 234, 0.4);
+        }
+        
+        .btn-success {
+            background: linear-gradient(135deg, #11998e 0%, var(--success) 100%);
+            color: white;
+        }
+        
+        .btn-success:hover:not(:disabled) {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 25px rgba(17, 153, 142, 0.4);
+        }
+        
+        .btn-info {
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+            color: white;
+        }
+        
+        .btn-info:hover:not(:disabled) {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 25px rgba(79, 172, 254, 0.4);
+        }
+        
+        .btn-danger {
+            background: linear-gradient(135deg, #eb3349 0%, var(--danger) 100%);
+            color: white;
+        }
+        
+        .btn-danger:hover:not(:disabled) {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 25px rgba(235, 51, 73, 0.4);
+        }
+        
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        
+        .file-input-wrapper {
+            position: relative;
+        }
+        
+        .file-input-wrapper input[type="file"] {
+            display: none;
+        }
+        
+        .file-label {
+            display: block;
+            padding: 14px;
+            background: var(--dark-bg);
+            border: 2px dashed var(--primary);
+            border-radius: 8px;
+            text-align: center;
+            cursor: pointer;
+            font-weight: 600;
+            color: var(--primary);
+            transition: all 0.3s;
+        }
+        
+        .file-label:hover {
+            background: rgba(102, 126, 234, 0.1);
+            border-color: var(--secondary);
+        }
+        
+        .file-info {
+            margin-top: 10px;
+            padding: 10px;
+            background: rgba(56, 239, 125, 0.1);
+            border-left: 3px solid var(--success);
+            border-radius: 6px;
+            color: var(--success);
+            font-weight: 600;
+            font-size: 0.9em;
+        }
+        
+        .file-error {
+            margin-top: 10px;
+            padding: 10px;
+            background: rgba(244, 92, 67, 0.1);
+            border-left: 3px solid var(--danger);
+            border-radius: 6px;
+            color: var(--danger);
+            font-weight: 600;
+            font-size: 0.9em;
+        }
+        
+        .table-container {
+            overflow-x: auto;
+            margin-bottom: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+            border: 1px solid var(--dark-border);
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background: var(--dark-card);
+        }
+        
+        thead {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+            color: white;
+        }
+        
+        th {
+            padding: 15px;
+            text-align: left;
+            font-weight: 700;
+            font-size: 0.9em;
+        }
+        
+        td {
+            padding: 12px 15px;
+            border-bottom: 1px solid var(--dark-border);
+            color: var(--text-light);
+        }
+        
+        tbody tr:hover {
+            background: var(--dark-bg);
+        }
+        
+        .badge {
+            display: inline-block;
+            padding: 6px 14px;
+            border-radius: 20px;
+            font-weight: 600;
+            font-size: 0.85em;
+        }
+        
+        .badge-matched {
+            background: rgba(56, 239, 125, 0.2);
+            color: var(--success);
+        }
+        
+        .badge-exception {
+            background: rgba(244, 92, 67, 0.2);
+            color: var(--danger);
+        }
+        
+        .badge-msme {
+            background: rgba(56, 239, 125, 0.2);
+            color: var(--success);
+        }
+        
+        .badge-non-msme {
+            background: rgba(160, 174, 192, 0.2);
+            color: var(--text-muted);
+        }
+        
+        .badge-delayed {
+            background: rgba(255, 209, 102, 0.2);
+            color: var(--warning);
+        }
+        
+        .badge-paid {
+            background: rgba(56, 239, 125, 0.2);
+            color: var(--success);
+        }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        
+        .stat-card {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+            color: white;
+            padding: 25px;
+            border-radius: 10px;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+            text-align: center;
+        }
+        
+        .stat-card.success {
+            background: linear-gradient(135deg, #11998e 0%, var(--success) 100%);
+        }
+        
+        .stat-card.warning {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+        }
+        
+        .stat-card.info {
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+        }
+        
+        .stat-value {
+            font-size: 2.2em;
+            font-weight: 800;
+            margin: 10px 0;
+        }
+        
+        .stat-label {
+            font-size: 0.95em;
+            opacity: 0.9;
+        }
+        
+        .alert {
+            padding: 15px;
+            margin-bottom: 20px;
+            border-radius: 8px;
+            border-left: 5px solid;
+        }
+        
+        .alert-info {
+            background: rgba(79, 172, 254, 0.1);
+            border-color: #4facfe;
+            color: #4facfe;
+        }
+        
+        .alert-success {
+            background: rgba(56, 239, 125, 0.1);
+            border-color: var(--success);
+            color: var(--success);
+        }
+        
+        .alert-danger {
+            background: rgba(244, 92, 67, 0.1);
+            border-color: var(--danger);
+            color: var(--danger);
+        }
+        
+        .alert-warning {
+            background: rgba(255, 209, 102, 0.1);
+            border-color: var(--warning);
+            color: var(--warning);
+        }
+        
+        .currency {
+            text-align: right;
+            font-weight: 600;
+            font-family: 'Courier New', monospace;
+        }
+        
+        .footer {
+            background: var(--dark-bg);
+            padding: 30px;
+            text-align: center;
+            color: var(--text-muted);
+            border-top: 1px solid var(--dark-border);
+        }
+        
+        .results-section {
+            margin-top: 30px;
+            padding: 20px;
+            background: var(--dark-bg);
+            border-radius: 8px;
+            border: 1px solid var(--dark-border);
+        }
+        
+        .results-header {
+            font-size: 1.5em;
+            font-weight: 700;
+            color: var(--primary);
+            margin-bottom: 20px;
+            margin-top: 0;
+        }
+        
+        code {
+            background: var(--dark-bg);
+            padding: 2px 6px;
+            border-radius: 4px;
+            color: #87d96c;
+            font-family: 'Courier New', monospace;
+        }
+        
+        .loading-spinner {
+            display: none;
+            text-align: center;
+            padding: 30px;
+        }
+        
+        .spinner {
+            border: 4px solid var(--dark-border);
+            border-top: 4px solid var(--primary);
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 20px auto;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .sample-data-section {
+            background: rgba(56, 239, 125, 0.1);
+            border: 2px solid var(--success);
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+
+        .sample-data-section h4 {
+            color: var(--success);
+            margin-bottom: 15px;
+        }
+
+        .sample-download-btn {
+            display: inline-block;
+            margin: 5px;
+            padding: 10px 16px;
+            background: rgba(56, 239, 125, 0.2);
+            border: 1px solid var(--success);
+            color: var(--success);
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 0.9em;
+            transition: all 0.3s;
+        }
+
+        .sample-download-btn:hover {
+            background: rgba(56, 239, 125, 0.3);
+            box-shadow: 0 0 10px rgba(56, 239, 125, 0.3);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🔍 MSME & Expense Audit Tool</h1>
+            <p>Complete Compliance & Financial Analysis</p>
+            <p class="tagline">Professional Excel Report Generation</p>
+        </div>
+        
+        <div class="main-nav">
+            <button class="nav-button active" onclick="switchTab('expense', this)">💼 Expense Audit</button>
+            <button class="nav-button" onclick="switchTab('msme', this)">🏢 MSME Tracking</button>
+        </div>
+        
+        <div class="content-wrapper">
+            <!-- EXPENSE AUDIT TAB -->
+            <div id="expense" class="tab-content active">
+                <div class="section-header">💼 Expense & Ledger Audit</div>
+                
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label>🏢 Company Name</label>
+                        <input type="text" id="companyName" placeholder="ABC Corporation Ltd." value="ABC Corporation Ltd.">
+                    </div>
+                    <div class="form-group">
+                        <label>📅 Audit Period From</label>
+                        <input type="text" id="expPeriodFrom" placeholder="01-04-2023" value="01-04-2023">
+                    </div>
+                    <div class="form-group">
+                        <label>📅 Audit Period To</label>
+                        <input type="text" id="expPeriodTo" placeholder="31-03-2024" value="31-03-2024">
+                    </div>
+                    <div class="form-group">
+                        <label>📝 Audit Year</label>
+                        <input type="text" id="auditYear" placeholder="2023-24" value="2023-24">
+                    </div>
+                </div>
+                
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label>👤 Auditor Name</label>
+                        <input type="text" id="auditorName" placeholder="CA Name" value="CA Sharma & Associates">
+                    </div>
+                    <div class="form-group">
+                        <label>📧 Auditor Email</label>
+                        <input type="text" id="auditorEmail" placeholder="auditor@email.com" value="auditor@example.com">
+                    </div>
+                    <div class="form-group">
+                        <label>🏛️ Auditor Address</label>
+                        <input type="text" id="auditorAddress" placeholder="123 Audit Street" value="123 Audit Street, New Delhi">
+                    </div>
+                </div>
+
+                <div class="sample-data-section">
+                    <h4>📥 Download Sample Files</h4>
+                    <button class="sample-download-btn" onclick="downloadSampleLedgerCSV()">📋 Sample Ledger CSV</button>
+                    <button class="sample-download-btn" onclick="downloadSampleBillsCSV()">📋 Sample Bills CSV</button>
+                </div>
+                
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label>📁 Upload Ledger CSV</label>
+                        <div class="file-input-wrapper">
+                            <input type="file" id="ledgerFile" accept=".csv">
+                            <label class="file-label" for="ledgerFile">📂 Click or drag Ledger CSV here</label>
+                        </div>
+                        <div id="ledgerFileInfo"></div>
+                    </div>
+                    <div class="form-group">
+                        <label>📁 Upload Bills CSV</label>
+                        <div class="file-input-wrapper">
+                            <input type="file" id="billsFile" accept=".csv">
+                            <label class="file-label" for="billsFile">📂 Click or drag Bills CSV here</label>
+                        </div>
+                        <div id="billsFileInfo"></div>
+                    </div>
+                </div>
+                
+                <div class="button-group">
+                    <button class="btn-primary" onclick="analyzeExpense()">🔍 Analyze Expenses</button>
+                    <button class="btn-success" onclick="exportExpenseExcel()" id="genExpenseExcelBtn" disabled>📊 Export to Excel</button>
+                    <button class="btn-info" onclick="printExpenseReport()" id="printExpenseBtn" disabled>🖨️ Print Report</button>
+                    <button class="btn-danger" onclick="resetExpense()">🔄 Reset</button>
+                </div>
+                
+                <div id="expenseLoading" class="loading-spinner">
+                    <div class="spinner"></div>
+                    <p>Processing data...</p>
+                </div>
+                
+                <div id="expenseResults"></div>
+            </div>
+            
+            <!-- MSME TAB -->
+            <div id="msme" class="tab-content">
+                <div class="section-header">🏢 MSME Vendor Tracking & Interest</div>
+                
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label>🏢 Company Name</label>
+                        <input type="text" id="msmeCompanyName" placeholder="ABC Corporation Ltd." value="ABC Corporation Ltd.">
+                    </div>
+                    <div class="form-group">
+                        <label>📅 Report As On Date</label>
+                        <input type="text" id="msmeReportDate" placeholder="31-03-2024" value="31-03-2024">
+                    </div>
+                    <div class="form-group">
+                        <label>💰 Interest Rate (%) p.a.</label>
+                        <input type="number" id="interestRate" placeholder="9" value="9" step="0.01">
+                    </div>
+                    <div class="form-group">
+                        <label>📋 Credit Terms (Days)</label>
+                        <input type="number" id="creditDays" placeholder="30" value="30">
+                    </div>
+                </div>
+                
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label>👤 Auditor Name</label>
+                        <input type="text" id="msmeAuditorName" placeholder="CA Name" value="CA Sharma & Associates">
+                    </div>
+                    <div class="form-group">
+                        <label>📧 Auditor Email</label>
+                        <input type="text" id="msmeAuditorEmail" placeholder="auditor@email.com" value="auditor@example.com">
+                    </div>
+                </div>
+
+                <div class="sample-data-section">
+                    <h4>📥 Download Sample Files</h4>
+                    <button class="sample-download-btn" onclick="downloadSampleMsmeLedgerCSV()">📋 Sample Ledger CSV</button>
+                    <button class="sample-download-btn" onclick="downloadSampleMsmeBillsCSV()">📋 Sample Bills CSV</button>
+                    <button class="sample-download-btn" onclick="downloadSampleMsmePaymentsCSV()">📋 Sample Payments CSV</button>
+                </div>
+                
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label>📁 Upload Ledger CSV</label>
+                        <div class="file-input-wrapper">
+                            <input type="file" id="msmeLedgerFile" accept=".csv">
+                            <label class="file-label" for="msmeLedgerFile">📂 Click or drag Ledger CSV here</label>
+                        </div>
+                        <div id="msmeLedgerFileInfo"></div>
+                    </div>
+                    <div class="form-group">
+                        <label>📁 Upload Bills CSV</label>
+                        <div class="file-input-wrapper">
+                            <input type="file" id="msmeBillsFile" accept=".csv">
+                            <label class="file-label" for="msmeBillsFile">📂 Click or drag Bills CSV here</label>
+                        </div>
+                        <div id="msmeBillsFileInfo"></div>
+                    </div>
+                    <div class="form-group">
+                        <label>📁 Upload Payments CSV</label>
+                        <div class="file-input-wrapper">
+                            <input type="file" id="msmePaymentsFile" accept=".csv">
+                            <label class="file-label" for="msmePaymentsFile">📂 Click or drag Payments CSV here</label>
+                        </div>
+                        <div id="msmePaymentsFileInfo"></div>
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label>👥 MSME Parties (comma-separated)</label>
+                    <textarea id="msmePartiesList" placeholder="Precision Job Works, Quick Fix Services, Steel Traders">Precision Job Works, Quick Fix Services, Steel Traders MSME, Tech Consultants</textarea>
+                </div>
+                
+                <div class="button-group">
+                    <button class="btn-primary" onclick="analyzeMsme()">🔍 Analyze MSME</button>
+                    <button class="btn-success" onclick="exportMsmeExcel()" id="genMsmeExcelBtn" disabled>📊 Export to Excel</button>
+                    <button class="btn-info" onclick="printMsmeReport()" id="printMsmeBtn" disabled>🖨️ Print Report</button>
+                    <button class="btn-danger" onclick="resetMsme()">🔄 Reset</button>
+                </div>
+                
+                <div id="msmeLoading" class="loading-spinner">
+                    <div class="spinner"></div>
+                    <p>Processing data...</p>
+                </div>
+                
+                <div id="msmeResults"></div>
+            </div>
+        </div>
+        
+        <div class="footer">
+            <p>🔐 Secure Audit Tool | All data processed locally | No server uploads</p>
+            <p style="font-size: 0.85em; margin-top: 10px;">© 2024 MSME & Expense Audit Platform</p>
+        </div>
+    </div>
+    
+    <script>
+        // Global Data Store
+        let auditData = {
+            expense: {
+                ledger: [],
+                bills: [],
+                matched: [],
+                exceptions: []
+            },
+            msme: {
+                ledger: [],
+                bills: [],
+                payments: [],
+                interest: [],
+                summary: {}
+            }
+        };
+        
+        // ============ UTILITY FUNCTIONS ============
+        function parseDate(dateStr) {
+            if (!dateStr) return null;
+            const [d, m, y] = dateStr.split('-');
+            return new Date(y, m - 1, d);
+        }
+        
+        function formatDate(date) {
+            if (!date) return 'N/A';
+            const d = String(date.getDate()).padStart(2, '0');
+            const m = String(date.getMonth() + 1).padStart(2, '0');
+            const y = date.getFullYear();
+            return `${d}-${m}-${y}`;
+        }
+        
+        function formatCurrency(amount) {
+            if (isNaN(amount)) return '₹0';
+            return '₹' + Math.round(amount).toLocaleString('en-IN');
+        }
+        
+        function parseCSV(text) {
+            const lines = text.trim().split('\n');
+            if (lines.length < 2) return [];
+            
+            const headers = lines[0].split(',').map(h => h.trim());
+            const rows = [];
+            
+            for (let i = 1; i < lines.length; i++) {
+                if (!lines[i].trim()) continue;
+                
+                const values = lines[i].split(',').map(v => v.trim());
+                const row = {};
+                headers.forEach((header, idx) => {
+                    row[header] = values[idx] || '';
+                });
+                rows.push(row);
+            }
+            return rows;
+        }
+        
+        function readFile(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = e => resolve(e.target.result);
+                reader.onerror = e => reject(e);
+                reader.readAsText(file);
+            });
+        }
+        
+        function calculateDaysDifference(date1Str, date2Str) {
+            try {
+                const date1 = parseDate(date1Str);
+                const date2 = parseDate(date2Str);
+                
+                if (!date1 || !date2) return 0;
+                
+                const diff = (date2 - date1) / (1000 * 60 * 60 * 24);
+                return Math.ceil(diff);
+            } catch (e) {
+                console.error('Date calculation error:', e, date1Str, date2Str);
+                return 0;
+            }
+        }
+        
+        function calculateInterestAmount(principal, daysDelayed, rate) {
+            if (daysDelayed <= 0 || !principal) return 0;
+            const interest = (principal * rate * daysDelayed) / 365;
+            return Math.round(interest);
+        }
+        
+        function switchTab(tabName, btn) {
+            document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.nav-button').forEach(b => b.classList.remove('active'));
+            
+            document.getElementById(tabName).classList.add('active');
+            btn.classList.add('active');
+        }
+
+        function downloadCSV(filename, data) {
+            const csv = data;
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            link.setAttribute('href', URL.createObjectURL(blob));
+            link.setAttribute('download', filename);
+            link.style.visibility = 'hidden';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+
+        // ============ SAMPLE DATA DOWNLOADS ============
+        function downloadSampleLedgerCSV() {
+            const data = `Date,Account,Debit,Credit,Party,Reference,Narration
+08-03-2024,Consultancy Charges,60000,0,Tech Consultants,INV-014,IT review
+22-01-2024,Professional Fees,30000,0,CA Sharma Associates,INV-003,Audit fees
+15-02-2024,Commission Expense,22000,0,Sales Agent Ram,INV-009,Commission
+25-03-2024,Job Work Charges,40000,0,Precision Job Works,INV-016,Job work
+12-02-2024,Raw Material,150000,0,Steel Traders MSME,INV-008,Steel sheets
+05-02-2024,Maintenance,18000,0,Quick Fix Services,INV-006,Repairs
+10-02-2024,Job Work Charges,42000,0,Precision Job Works,INV-007,Machining`;
+            downloadCSV('Sample_Ledger.csv', data);
+        }
+
+        function downloadSampleBillsCSV() {
+            const data = `Invoice,Date,Party,Amount,Description
+INV-001,15-01-2024,ABC Properties,50000,Office rent - Jan 2024
+INV-003,22-01-2024,CA Sharma Associates,30000,Audit & compliance fees
+INV-006,05-02-2024,Quick Fix Services,18000,Maintenance & repairs
+INV-007,10-02-2024,Precision Job Works,42000,Job work on components
+INV-008,12-02-2024,Steel Traders MSME,150000,Raw material - steel sheets
+INV-009,18-02-2024,Tech Consultants,28000,Software license renewal
+INV-014,15-03-2024,Tech Consultants,60000,IT consultancy services
+INV-016,25-03-2024,Precision Job Works,40000,Job work on steel components`;
+            downloadCSV('Sample_Bills.csv', data);
+        }
+
+        function downloadSampleMsmeLedgerCSV() {
+            const data = `Date,Account,Debit,Credit,Party,Reference,Narration
+12-02-2024,Raw Material Purchase,150000,0,Steel Traders MSME,INV-008,Steel sheets - bulk order
+15-05-2024,Trade Payables,0,150000,Steel Traders MSME,INV-008,Payment for INV-008
+15-05-2024,Interest Expense,0,7475,Steel Traders MSME,INV-008,Delayed payment interest
+25-03-2024,Job Work Charges,40000,0,Precision Job Works,INV-007,Job work on components
+18-03-2024,Trade Payables,0,42000,Precision Job Works,INV-007,Payment for INV-007
+18-03-2024,Interest Expense,0,309,Precision Job Works,INV-007,Delayed payment interest
+20-02-2024,Maintenance,18000,0,Quick Fix Services,INV-006,Building maintenance
+22-03-2024,Trade Payables,0,18000,Quick Fix Services,INV-006,Payment for INV-006
+22-03-2024,Interest Expense,0,374,Quick Fix Services,INV-006,Delayed payment interest`;
+            downloadCSV('Sample_MSME_Ledger.csv', data);
+        }
+
+        function downloadSampleMsmeBillsCSV() {
+            const data = `Invoice,Date,Party,Amount,Description
+INV-006,05-02-2024,Quick Fix Services,18000,Maintenance & repairs
+INV-007,10-02-2024,Precision Job Works,42000,Job work on components
+INV-008,12-02-2024,Steel Traders MSME,150000,Raw material - steel sheets
+INV-009,18-02-2024,Tech Consultants,28000,Software license renewal
+INV-012,05-03-2024,Quick Fix Services,16000,Plumbing & electrical repairs
+INV-013,12-03-2024,Precision Job Works,38000,Job work - machining services
+INV-014,15-03-2024,Steel Traders MSME,120000,Raw material - steel shapes`;
+            downloadCSV('Sample_MSME_Bills.csv', data);
+        }
+
+        function downloadSampleMsmePaymentsCSV() {
+            const data = `Party_Name,Invoice_No,Invoice_Date,Invoice_Amount,Payment_Date,Payment_Reference,Payment_Amount
+Steel Traders MSME,INV-008,12-02-2024,150000,15-05-2024,NEFT-ST-88,150000
+Precision Job Works,INV-007,10-02-2024,42000,18-03-2024,NEFT-PJW-01,42000
+Quick Fix Services,INV-006,05-02-2024,18000,22-03-2024,NEFT-QFS-01,18000
+Tech Consultants,INV-009,18-02-2024,28000,18-03-2024,NEFT-TC-02,28000
+Quick Fix Services,INV-012,05-03-2024,16000,20-04-2024,NEFT-QFS-02,16000
+Precision Job Works,INV-013,12-03-2024,38000,30-04-2024,NEFT-PJW-02,38000
+Steel Traders MSME,INV-014,15-03-2024,120000,15-04-2024,NEFT-ST-89,120000`;
+            downloadCSV('Sample_MSME_Payments.csv', data);
+        }
+        
+        // ============ FILE UPLOAD HANDLERS ============
+        document.getElementById('ledgerFile')?.addEventListener('change', function() {
+            const file = this.files[0];
+            const info = document.getElementById('ledgerFileInfo');
+            if (file) {
+                if (file.type === 'text/csv' || file.name.endsWith('.csv')) {
+                    info.innerHTML = `<div class="file-info">✅ Ledger: ${file.name}</div>`;
+                } else {
+                    info.innerHTML = `<div class="file-error">❌ Please upload a CSV file</div>`;
+                }
+            }
+        });
+        
+        document.getElementById('billsFile')?.addEventListener('change', function() {
+            const file = this.files[0];
+            const info = document.getElementById('billsFileInfo');
+            if (file) {
+                if (file.type === 'text/csv' || file.name.endsWith('.csv')) {
+                    info.innerHTML = `<div class="file-info">✅ Bills: ${file.name}</div>`;
+                } else {
+                    info.innerHTML = `<div class="file-error">❌ Please upload a CSV file</div>`;
+                }
+            }
+        });
+        
+        document.getElementById('msmeLedgerFile')?.addEventListener('change', function() {
+            const file = this.files[0];
+            const info = document.getElementById('msmeLedgerFileInfo');
+            if (file) {
+                if (file.type === 'text/csv' || file.name.endsWith('.csv')) {
+                    info.innerHTML = `<div class="file-info">✅ Ledger: ${file.name}</div>`;
+                } else {
+                    info.innerHTML = `<div class="file-error">❌ Please upload a CSV file</div>`;
+                }
+            }
+        });
+        
+        document.getElementById('msmeBillsFile')?.addEventListener('change', function() {
+            const file = this.files[0];
+            const info = document.getElementById('msmeBillsFileInfo');
+            if (file) {
+                if (file.type === 'text/csv' || file.name.endsWith('.csv')) {
+                    info.innerHTML = `<div class="file-info">✅ Bills: ${file.name}</div>`;
+                } else {
+                    info.innerHTML = `<div class="file-error">❌ Please upload a CSV file</div>`;
+                }
+            }
+        });
+
+        document.getElementById('msmePaymentsFile')?.addEventListener('change', function() {
+            const file = this.files[0];
+            const info = document.getElementById('msmePaymentsFileInfo');
+            if (file) {
+                if (file.type === 'text/csv' || file.name.endsWith('.csv')) {
+                    info.innerHTML = `<div class="file-info">✅ Payments: ${file.name}</div>`;
+                } else {
+                    info.innerHTML = `<div class="file-error">❌ Please upload a CSV file</div>`;
+                }
+            }
+        });
+        
+        // ============ EXPENSE AUDIT FUNCTIONS ============
+        async function analyzeExpense() {
+            const ledgerFile = document.getElementById('ledgerFile').files[0];
+            const billsFile = document.getElementById('billsFile').files[0];
+            
+            if (!ledgerFile || !billsFile) {
+                alert('❌ Please upload both Ledger and Bills files');
+                return;
+            }
+            
+            const loading = document.getElementById('expenseLoading');
+            loading.style.display = 'block';
+            
+            try {
+                const ledgerText = await readFile(ledgerFile);
+                const billsText = await readFile(billsFile);
+                
+                auditData.expense.ledger = parseCSV(ledgerText);
+                auditData.expense.bills = parseCSV(billsText);
+                
+                if (auditData.expense.ledger.length === 0 || auditData.expense.bills.length === 0) {
+                    throw new Error('CSV file is empty or invalid');
+                }
+                
+                matchLedgerBills();
+                displayExpenseResults();
+                document.getElementById('genExpenseExcelBtn').disabled = false;
+                document.getElementById('printExpenseBtn').disabled = false;
+            } catch (error) {
+                alert('❌ Error: ' + error.message);
+                console.error(error);
+            } finally {
+                loading.style.display = 'none';
+            }
+        }
+        
+        function matchLedgerBills() {
+            const ledger = auditData.expense.ledger;
+            const bills = auditData.expense.bills;
+            
+            auditData.expense.matched = [];
+            auditData.expense.exceptions = [];
+            
+            const ledgerMap = {};
+            ledger.forEach(row => {
+                if (row.Reference) {
+                    ledgerMap[row.Reference] = row;
+                }
+            });
+            
+            bills.forEach(bill => {
+                const ref = bill.Invoice || bill.Reference;
+                const ledgerEntry = ledgerMap[ref];
+                
+                if (ledgerEntry) {
+                    auditData.expense.matched.push({
+                        bill,
+                        ledger: ledgerEntry,
+                        status: 'MATCHED'
+                    });
+                } else {
+                    auditData.expense.exceptions.push({
+                        bill,
+                        status: 'UNMATCHED_BILL'
+                    });
+                }
+            });
+            
+            Object.values(ledgerMap).forEach(ledgerEntry => {
+                const ref = ledgerEntry.Reference;
+                const hasBill = bills.some(b => (b.Invoice || b.Reference) === ref);
+                
+                if (!hasBill) {
+                    auditData.expense.exceptions.push({
+                        ledger: ledgerEntry,
+                        status: 'UNMATCHED_LEDGER'
+                    });
+                }
+            });
+        }
+        
+        function displayExpenseResults() {
+            const matched = auditData.expense.matched;
+            const exceptions = auditData.expense.exceptions;
+            const resultsDiv = document.getElementById('expenseResults');
+            
+            const totalBills = auditData.expense.bills.length;
+            const totalAmount = auditData.expense.bills.reduce((sum, b) => sum + (parseInt(b.Amount) || 0), 0);
+            const matchedAmount = matched.reduce((sum, m) => sum + (parseInt(m.bill.Amount) || 0), 0);
+            const matchPercentage = totalBills > 0 ? ((matched.length / totalBills) * 100).toFixed(2) : 0;
+            
+            let html = `
+                <div class="results-section">
+                    <div class="stats-grid">
+                        <div class="stat-card">
+                            <div class="stat-label">Total Bills</div>
+                            <div class="stat-value">${totalBills}</div>
+                        </div>
+                        <div class="stat-card success">
+                            <div class="stat-label">Total Amount</div>
+                            <div class="stat-value">${formatCurrency(totalAmount)}</div>
+                        </div>
+                        <div class="stat-card info">
+                            <div class="stat-label">Matched</div>
+                            <div class="stat-value">${matched.length}</div>
+                        </div>
+                        <div class="stat-card warning">
+                            <div class="stat-label">Exceptions</div>
+                            <div class="stat-value">${exceptions.length}</div>
+                        </div>
+                    </div>
+                    
+                    <div class="alert alert-info">
+                        <strong>📊 Summary:</strong> Match Rate: <strong>${matchPercentage}%</strong> | Matched Amount: <strong>${formatCurrency(matchedAmount)}</strong> | Unmatched: <strong>${exceptions.length}</strong>
+                    </div>
+            `;
+            
+            if (matched.length > 0) {
+                html += `
+                    <h3 class="results-header">✅ Matched Records (${matched.length})</h3>
+                    <div class="table-container">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Invoice</th>
+                                    <th>Date</th>
+                                    <th>Account</th>
+                                    <th>Party</th>
+                                    <th>Amount</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${matched.slice(0, 15).map(m => `
+                                    <tr>
+                                        <td><code>${m.bill.Invoice || m.bill.Reference}</code></td>
+                                        <td>${m.bill.Date || m.ledger.Date}</td>
+                                        <td>${m.ledger.Account || '-'}</td>
+                                        <td>${m.bill.Party || m.ledger.Party}</td>
+                                        <td class="currency">${formatCurrency(parseInt(m.bill.Amount) || 0)}</td>
+                                        <td><span class="badge badge-matched">✓ Matched</span></td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
+                    </div>
+                `;
+            }
+            
+            if (exceptions.length > 0) {
+                html += `
+                    <h3 class="results-header" style="color: #f45c43;">🚨 Exceptions (${exceptions.length})</h3>
+                    <div class="alert alert-danger">
+                        <strong>⚠️ Found ${exceptions.length} unmatched records - Review required</strong>
+                    </div>
+                    <div class="table-container">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Reference</th>
+                                    <th>Party/Account</th>
+                                    <th>Amount</th>
+                                    <th>Date</th>
+                                    <th>Exception Type</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${exceptions.slice(0, 15).map(e => `
+                                    <tr>
+                                        <td><code>${e.bill?.Invoice || e.ledger?.Reference || 'N/A'}</code></td>
+                                        <td>${e.bill?.Party || e.ledger?.Account || e.ledger?.Party || 'N/A'}</td>
+                                        <td class="currency">${formatCurrency(parseInt(e.bill?.Amount || e.ledger?.Debit || 0) || 0)}</td>
+                                        <td>${e.bill?.Date || e.ledger?.Date || 'N/A'}</td>
+                                        <td><span class="badge badge-exception">${e.status}</span></td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
+                    </div>
+                `;
+            } else {
+                html += `<div class="alert alert-success"><strong>✅ Perfect Match! No exceptions found.</strong></div>`;
+            }
+            
+            html += `</div>`;
+            resultsDiv.innerHTML = html;
+        }
+        
+        function resetExpense() {
+            if (confirm('Reset Expense Audit data?')) {
+                document.getElementById('ledgerFile').value = '';
+                document.getElementById('billsFile').value = '';
+                document.getElementById('ledgerFileInfo').innerHTML = '';
+                document.getElementById('billsFileInfo').innerHTML = '';
+                document.getElementById('expenseResults').innerHTML = '';
+                document.getElementById('genExpenseExcelBtn').disabled = true;
+                document.getElementById('printExpenseBtn').disabled = true;
+                auditData.expense = { ledger: [], bills: [], matched: [], exceptions: [] };
+                alert('✅ Reset complete');
+            }
+        }
+        
+        // ============ MSME FUNCTIONS ============
+        async function analyzeMsme() {
+            const ledgerFile = document.getElementById('msmeLedgerFile').files[0];
+            const billsFile = document.getElementById('msmeBillsFile').files[0];
+            const paymentsFile = document.getElementById('msmePaymentsFile').files[0];
+            
+            if (!ledgerFile || !billsFile || !paymentsFile) {
+                alert('❌ Please upload Ledger, Bills, and Payments files');
+                return;
+            }
+            
+            const loading = document.getElementById('msmeLoading');
+            loading.style.display = 'block';
+            
+            try {
+                const ledgerText = await readFile(ledgerFile);
+                const billsText = await readFile(billsFile);
+                const paymentsText = await readFile(paymentsFile);
+                
+                auditData.msme.ledger = parseCSV(ledgerText);
+                auditData.msme.bills = parseCSV(billsText);
+                auditData.msme.payments = parseCSV(paymentsText);
+                
+                console.log('Payments data loaded:', auditData.msme.payments);
+                
+                if (auditData.msme.ledger.length === 0 || auditData.msme.bills.length === 0 || auditData.msme.payments.length === 0) {
+                    throw new Error('CSV file is empty or invalid');
+                }
+                
+                calculateMsmeInterest();
+                displayMsmeResults();
+                document.getElementById('genMsmeExcelBtn').disabled = false;
+                document.getElementById('printMsmeBtn').disabled = false;
+            } catch (error) {
+                alert('❌ Error: ' + error.message);
+                console.error(error);
+            } finally {
+                loading.style.display = 'none';
+            }
+        }
+        
+        function calculateMsmeInterest() {
+            const payments = auditData.msme.payments;
+            const bills = auditData.msme.bills;
+            const msmePartiesStr = document.getElementById('msmePartiesList').value;
+            const msmeParties = msmePartiesStr.split(',').map(p => p.trim()).filter(p => p);
+            const interestRate = parseFloat(document.getElementById('interestRate').value) || 9;
+            const creditDays = parseInt(document.getElementById('creditDays').value) || 30;
+            
+            console.log('MSME Parties:', msmeParties);
+            console.log('Interest Rate:', interestRate);
+            console.log('Credit Days:', creditDays);
+            
+            auditData.msme.interest = [];
+            auditData.msme.summary = {
+                totalBills: 0,
+                totalAmount: 0,
+                paidAmount: 0,
+                msmeBills: 0,
+                msmeAmount: 0,
+                delayedBills: 0,
+                totalInterest: 0,
+                parties: {}
+            };
+            
+            payments.forEach(payment => {
+                const partyName = payment.Party_Name || payment['Party Name'] || '';
+                const invoiceRef = payment.Invoice_No || payment['Invoice No'] || '';
+                const invoiceDateStr = payment.Invoice_Date || payment['Invoice Date'] || '';
+                const paymentDateStr = payment.Payment_Date || payment['Payment Date'] || '';
+                const amount = parseInt(payment.Invoice_Amount || payment['Invoice Amount'] || 0) || 0;
+                
+                console.log('Processing payment:', { partyName, invoiceRef, invoiceDateStr, paymentDateStr, amount });
+                
+                const isMsme = msmeParties.some(p => 
+                    partyName.toLowerCase().includes(p.toLowerCase()) || 
+                    p.toLowerCase().includes(partyName.toLowerCase())
+                );
+                
+                // Calculate days delayed
+                let daysDelayed = 0;
+                if (invoiceDateStr && paymentDateStr) {
+                    const totalDays = calculateDaysDifference(invoiceDateStr, paymentDateStr);
+                    daysDelayed = Math.max(0, totalDays - creditDays);
+                }
+                
+                let interestPayable = 0;
+                if (isMsme && daysDelayed > 0) {
+                    interestPayable = calculateInterestAmount(amount, daysDelayed, interestRate);
+                }
+                
+                console.log('Calculated:', { daysDelayed, interestPayable, isMsme });
+                
+                auditData.msme.interest.push({
+                    invoice: invoiceRef,
+                    party: partyName,
+                    isMsme,
+                    invoiceDate: invoiceDateStr,
+                    paymentDate: paymentDateStr,
+                    amount,
+                    daysDelayed,
+                    interestRate: isMsme ? interestRate : 0,
+                    interestPayable: isMsme ? interestPayable : 0
+                });
+                
+                // Update summary
+                auditData.msme.summary.totalBills++;
+                auditData.msme.summary.totalAmount += amount;
+                auditData.msme.summary.paidAmount += amount;
+                
+                if (isMsme) {
+                    auditData.msme.summary.msmeBills++;
+                    auditData.msme.summary.msmeAmount += amount;
+                    auditData.msme.summary.totalInterest += interestPayable;
+                    
+                    if (daysDelayed > 0) {
+                        auditData.msme.summary.delayedBills++;
+                    }
+                }
+                
+                // Party-wise summary
+                if (!auditData.msme.summary.parties[partyName]) {
+                    auditData.msme.summary.parties[partyName] = {
+                        bills: 0,
+                        amount: 0,
+                        interest: 0,
+                        isMsme,
+                        delayed: 0
+                    };
+                }
+                auditData.msme.summary.parties[partyName].bills++;
+                auditData.msme.summary.parties[partyName].amount += amount;
+                auditData.msme.summary.parties[partyName].interest += interestPayable;
+                if (daysDelayed > 0) {
+                    auditData.msme.summary.parties[partyName].delayed++;
+                }
+            });
+            
+            console.log('MSME Summary:', auditData.msme.summary);
+        }
+        
+        function displayMsmeResults() {
+            const summary = auditData.msme.summary;
+            const interest = auditData.msme.interest;
+            const resultsDiv = document.getElementById('msmeResults');
+            
+            let html = `
+                <div class="results-section">
+                    <div class="stats-grid">
+                        <div class="stat-card">
+                            <div class="stat-label">Total Bills</div>
+                            <div class="stat-value">${summary.totalBills}</div>
+                        </div>
+                        <div class="stat-card success">
+                            <div class="stat-label">MSME Bills</div>
+                            <div class="stat-value">${summary.msmeBills}</div>
+                        </div>
+                        <div class="stat-card info">
+                            <div class="stat-label">Total Amount</div>
+                            <div class="stat-value">${formatCurrency(summary.totalAmount)}</div>
+                        </div>
+                        <div class="stat-card warning">
+                            <div class="stat-label">Interest Payable</div>
+                            <div class="stat-value">${formatCurrency(summary.totalInterest)}</div>
+                        </div>
+                    </div>
+                    
+                    <div class="alert alert-info">
+                        <strong>📊 MSME Summary:</strong> ${summary.msmeBills} MSME bills for ${formatCurrency(summary.msmeAmount)} (${summary.totalAmount > 0 ? ((summary.msmeAmount / summary.totalAmount) * 100).toFixed(2) : 0}% of total) | Delayed: ${summary.delayedBills}
+                    </div>
+            `;
+            
+            html += `
+                <h3 class="results-header">🏢 MSME Vendor Summary</h3>
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Party Name</th>
+                                <th>Bills</th>
+                                <th>Amount</th>
+                                <th>Type</th>
+                                <th>Delayed</th>
+                                <th>Interest</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${Object.entries(summary.parties).map(([party, data]) => `
+                                <tr>
+                                    <td><strong>${party}</strong></td>
+                                    <td>${data.bills}</td>
+                                    <td class="currency">${formatCurrency(data.amount)}</td>
+                                    <td><span class="badge ${data.isMsme ? 'badge-msme' : 'badge-non-msme'}">${data.isMsme ? 'MSME' : 'Non-MSME'}</span></td>
+                                    <td>${data.delayed}</td>
+                                    <td class="currency" style="${data.interest > 0 ? 'color: #f45c43;' : ''}">${formatCurrency(data.interest)}</td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                </div>
+            `;
+            
+            const delayedInterest = interest.filter(i => i.isMsme && i.daysDelayed > 0);
+            if (delayedInterest.length > 0) {
+                html += `
+                    <h3 class="results-header">💹 Interest Calculation Details (Delayed Payments)</h3>
+                    <div class="table-container">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Invoice</th>
+                                    <th>Party</th>
+                                    <th>Amount</th>
+                                    <th>Invoice Date</th>
+                                    <th>Payment Date</th>
+                                    <th>Days Delayed</th>
+                                    <th>Rate %</th>
+                                    <th>Interest</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${delayedInterest.map(i => `
+                                    <tr>
+                                        <td><code>${i.invoice}</code></td>
+                                        <td>${i.party}</td>
+                                        <td class="currency">${formatCurrency(i.amount)}</td>
+                                        <td>${i.invoiceDate}</td>
+                                        <td>${i.paymentDate}</td>
+                                        <td><strong>${i.daysDelayed}</strong></td>
+                                        <td>${i.interestRate}%</td>
+                                        <td class="currency" style="color: #f45c43;"><strong>${formatCurrency(i.interestPayable)}</strong></td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
+                    </div>
+                `;
+            } else {
+                html += `<div class="alert alert-success"><strong>✅ No delayed MSME payments found!</strong></div>`;
+            }
+            
+            // All payments
+            html += `
+                <h3 class="results-header">📋 All Payments Details</h3>
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Invoice</th>
+                                <th>Party</th>
+                                <th>Invoice Date</th>
+                                <th>Payment Date</th>
+                                <th>Amount</th>
+                                <th>Type</th>
+                                <th>Days Delayed</th>
+                                <th>Interest</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${interest.map(i => `
+                                <tr>
+                                    <td><code>${i.invoice}</code></td>
+                                    <td>${i.party}</td>
+                                    <td>${i.invoiceDate}</td>
+                                    <td>${i.paymentDate}</td>
+                                    <td class="currency">${formatCurrency(i.amount)}</td>
+                                    <td><span class="badge ${i.isMsme ? 'badge-msme' : 'badge-non-msme'}">${i.isMsme ? 'MSME' : 'Non-MSME'}</span></td>
+                                    <td>${i.daysDelayed}</td>
+                                    <td class="currency" style="${i.interestPayable > 0 ? 'color: #f45c43;' : ''}">${formatCurrency(i.interestPayable)}</td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                </div>
+            `;
+            
+            html += `</div>`;
+            resultsDiv.innerHTML = html;
+        }
+        
+        function resetMsme() {
+            if (confirm('Reset MSME Analysis data?')) {
+                document.getElementById('msmeLedgerFile').value = '';
+                document.getElementById('msmeBillsFile').value = '';
+                document.getElementById('msmePaymentsFile').value = '';
+                document.getElementById('msmeLedgerFileInfo').innerHTML = '';
+                document.getElementById('msmeBillsFileInfo').innerHTML = '';
+                document.getElementById('msmePaymentsFileInfo').innerHTML = '';
+                document.getElementById('msmeResults').innerHTML = '';
+                document.getElementById('genMsmeExcelBtn').disabled = true;
+                document.getElementById('printMsmeBtn').disabled = true;
+                auditData.msme = { ledger: [], bills: [], payments: [], interest: [], summary: {} };
+                alert('✅ Reset complete');
+            }
+        }
+        
+        // ============ EXCEL EXPORT ============
+        function exportExpenseExcel() {
+            if (auditData.expense.bills.length === 0) {
+                alert('❌ No data to export');
+                return;
+            }
+
+            try {
+                const wb = XLSX.utils.book_new();
+                const matched = auditData.expense.matched;
+                const exceptions = auditData.expense.exceptions;
+                const totalBills = auditData.expense.bills.length;
+                const totalAmount = auditData.expense.bills.reduce((sum, b) => sum + (parseInt(b.Amount) || 0), 0);
+                const matchPercentage = totalBills > 0 ? ((matched.length / totalBills) * 100).toFixed(2) : 0;
+
+                // Summary Sheet
+                const summaryData = [
+                    ['EXPENSE & LEDGER AUDIT REPORT'],
+                    [''],
+                    ['Company', document.getElementById('companyName').value],
+                    ['Period From', document.getElementById('expPeriodFrom').value],
+                    ['Period To', document.getElementById('expPeriodTo').value],
+                    ['Auditor', document.getElementById('auditorName').value],
+                    ['Email', document.getElementById('auditorEmail').value],
+                    ['Address', document.getElementById('auditorAddress').value],
+                    ['Date', formatDate(new Date())],
+                    [''],
+                    ['SUMMARY STATISTICS'],
+                    ['Total Bills', totalBills],
+                    ['Total Amount', totalAmount],
+                    ['Matched Records', matched.length],
+                    ['Match Percentage', matchPercentage + '%'],
+                    ['Exceptions Found', exceptions.length]
+                ];
+
+                const summarySheet = XLSX.utils.aoa_to_sheet(summaryData);
+                XLSX.utils.book_append_sheet(wb, summarySheet, "Summary");
+
+                // Matched Records Sheet
+                const matchedData = [
+                    ['Invoice', 'Date', 'Party', 'Amount', 'Account', 'Status'],
+                    ...matched.map(m => [
+                        m.bill.Invoice || m.bill.Reference,
+                        m.bill.Date || m.ledger.Date,
+                        m.bill.Party || m.ledger.Party,
+                        parseInt(m.bill.Amount) || 0,
+                        m.ledger.Account || '-',
+                        'MATCHED'
+                    ])
+                ];
+
+                const matchedSheet = XLSX.utils.aoa_to_sheet(matchedData);
+                XLSX.utils.book_append_sheet(wb, matchedSheet, "Matched Records");
+
+                // Exceptions Sheet
+                if (exceptions.length > 0) {
+                    const exceptionData = [
+                        ['Reference', 'Party/Account', 'Amount', 'Date', 'Exception Type'],
+                        ...exceptions.map(e => [
+                            e.bill?.Invoice || e.ledger?.Reference || 'N/A',
+                            e.bill?.Party || e.ledger?.Account || e.ledger?.Party || 'N/A',
+                            parseInt(e.bill?.Amount || e.ledger?.Debit || 0) || 0,
+                            e.bill?.Date || e.ledger?.Date || 'N/A',
+                            e.status
+                        ])
+                    ];
+
+                    const exceptionSheet = XLSX.utils.aoa_to_sheet(exceptionData);
+                    XLSX.utils.book_append_sheet(wb, exceptionSheet, "Exceptions");
+                }
+
+                XLSX.writeFile(wb, `Expense_Audit_${formatDate(new Date())}.xlsx`);
+                alert('✅ Excel report generated successfully!');
+            } catch (error) {
+                alert('❌ Export Error: ' + error.message);
+                console.error(error);
+            }
+        }
+
+        function exportMsmeExcel() {
+            if (auditData.msme.interest.length === 0) {
+                alert('❌ No data to export');
+                return;
+            }
+
+            try {
+                const wb = XLSX.utils.book_new();
+                const summary = auditData.msme.summary;
+                const interest = auditData.msme.interest;
+                const msmePercentage = summary.totalAmount > 0 ? ((summary.msmeAmount / summary.totalAmount) * 100).toFixed(2) : 0;
+
+                // Summary Sheet
+                const summaryData = [
+                    ['MSME VENDOR AUDIT REPORT'],
+                    ['Payment Performance & Interest Analysis'],
+                    [''],
+                    ['Company', document.getElementById('msmeCompanyName').value],
+                    ['As On Date', document.getElementById('msmeReportDate').value],
+                    ['Interest Rate', document.getElementById('interestRate').value + '% p.a.'],
+                    ['Credit Terms', document.getElementById('creditDays').value + ' days'],
+                    ['Auditor', document.getElementById('msmeAuditorName').value],
+                    ['Email', document.getElementById('msmeAuditorEmail').value],
+                    ['Date', formatDate(new Date())],
+                    [''],
+                    ['SUMMARY STATISTICS'],
+                    ['Total Bills', summary.totalBills],
+                    ['MSME Bills', summary.msmeBills],
+                    ['Total Amount', summary.totalAmount],
+                    ['MSME Amount', summary.msmeAmount],
+                    ['MSME Percentage', msmePercentage + '%'],
+                    ['Delayed Bills', summary.delayedBills],
+                    ['Total Interest Payable', summary.totalInterest]
+                ];
+
+                const summarySheet = XLSX.utils.aoa_to_sheet(summaryData);
+                XLSX.utils.book_append_sheet(wb, summarySheet, "Summary");
+
+                // Vendor Summary Sheet
+                const vendorData = [
+                    ['Party Name', 'Bills', 'Amount', 'Type', 'Delayed', 'Interest'],
+                    ...Object.entries(summary.parties).map(([party, data]) => [
+                        party,
+                        data.bills,
+                        data.amount,
+                        data.isMsme ? 'MSME' : 'Non-MSME',
+                        data.delayed,
+                        data.interest
+                    ])
+                ];
+
+                const vendorSheet = XLSX.utils.aoa_to_sheet(vendorData);
+                XLSX.utils.book_append_sheet(wb, vendorSheet, "Vendor Summary");
+
+                // Interest Details Sheet
+                const interestData = [
+                    ['Invoice', 'Party', 'Invoice Date', 'Payment Date', 'Amount', 'Days Delayed', 'Rate %', 'Interest'],
+                    ...interest
+                        .filter(i => i.isMsme && i.daysDelayed > 0)
+                        .map(i => [
+                            i.invoice,
+                            i.party,
+                            i.invoiceDate,
+                            i.paymentDate,
+                            i.amount,
+                            i.daysDelayed,
+                            i.interestRate,
+                            i.interestPayable
+                        ])
+                ];
+
+                const interestSheet = XLSX.utils.aoa_to_sheet(interestData);
+                XLSX.utils.book_append_sheet(wb, interestSheet, "Interest Details");
+
+                // All Payments Sheet
+                const paymentData = [
+                    ['Invoice', 'Party', 'Invoice Date', 'Payment Date', 'Amount', 'Type', 'Days Delayed', 'Interest'],
+                    ...interest.map(i => [
+                        i.invoice,
+                        i.party,
+                        i.invoiceDate,
+                        i.paymentDate,
+                        i.amount,
+                        i.isMsme ? 'MSME' : 'Non-MSME',
+                        i.daysDelayed,
+                        i.interestPayable
+                    ])
+                ];
+
+                const paymentSheet = XLSX.utils.aoa_to_sheet(paymentData);
+                XLSX.utils.book_append_sheet(wb, paymentSheet, "All Payments");
+
+                XLSX.writeFile(wb, `MSME_Audit_${formatDate(new Date())}.xlsx`);
+                alert('✅ Excel report generated successfully!');
+            } catch (error) {
+                alert('❌ Export Error: ' + error.message);
+                console.error(error);
+            }
+        }
+
+        // Print Functions
+        function printExpenseReport() {
+            const printWindow = window.open('', '', 'height=600,width=800');
+            const matched = auditData.expense.matched;
+            const exceptions = auditData.expense.exceptions;
+            const totalBills = auditData.expense.bills.length;
+            const totalAmount = auditData.expense.bills.reduce((sum, b) => sum + (parseInt(b.Amount) || 0), 0);
+            const matchPercentage = totalBills > 0 ? ((matched.length / totalBills) * 100).toFixed(2) : 0;
+
+            let html = `
+                <html>
+                <head>
+                    <title>Expense Audit Report</title>
+                    <style>
+                        body { font-family: Arial, sans-serif; margin: 20px; }
+                        h1 { color: #667eea; border-bottom: 2px solid #667eea; }
+                        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+                        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+                        th { background-color: #667eea; color: white; }
+                        tr:nth-child(even) { background-color: #f9f9f9; }
+                        .summary { margin: 20px 0; }
+                    </style>
+                </head>
+                <body>
+                    <h1>EXPENSE & LEDGER AUDIT REPORT</h1>
+                    <div class="summary">
+                        <p><strong>Company:</strong> ${document.getElementById('companyName').value}</p>
+                        <p><strong>Period:</strong> ${document.getElementById('expPeriodFrom').value} to ${document.getElementById('expPeriodTo').value}</p>
+                        <p><strong>Auditor:</strong> ${document.getElementById('auditorName').value}</p>
+                        <p><strong>Date:</strong> ${formatDate(new Date())}</p>
+                    </div>
+
+                    <div class="summary">
+                        <h3>Summary</h3>
+                        <p>Total Bills: ${totalBills}</p>
+                        <p>Total Amount: ${formatCurrency(totalAmount)}</p>
+                        <p>Matched Records: ${matched.length} (${matchPercentage}%)</p>
+                        <p>Exceptions Found: ${exceptions.length}</p>
+                    </div>
+
+                    <h3>Matched Records</h3>
+                    <table>
+                        <tr>
+                            <th>Invoice</th>
+                            <th>Date</th>
+                            <th>Party</th>
+                            <th>Amount</th>
+                            <th>Status</th>
+                        </tr>
+                        ${matched.map(m => `
+                            <tr>
+                                <td>${m.bill.Invoice || m.bill.Reference}</td>
+                                <td>${m.bill.Date || m.ledger.Date}</td>
+                                <td>${m.bill.Party || m.ledger.Party}</td>
+                                <td>${formatCurrency(parseInt(m.bill.Amount) || 0)}</td>
+                                <td>MATCHED</td>
+                            </tr>
+                        `).join('')}
+                    </table>
+
+                    ${exceptions.length > 0 ? `
+                        <h3>Exceptions</h3>
+                        <table>
+                            <tr>
+                                <th>Reference</th>
+                                <th>Party/Account</th>
+                                <th>Amount</th>
+                                <th>Exception Type</th>
+                            </tr>
+                            ${exceptions.map(e => `
+                                <tr>
+                                    <td>${e.bill?.Invoice || e.ledger?.Reference || 'N/A'}</td>
+                                    <td>${e.bill?.Party || e.ledger?.Account || e.ledger?.Party || 'N/A'}</td>
+                                    <td>${formatCurrency(parseInt(e.bill?.Amount || e.ledger?.Debit || 0) || 0)}</td>
+                                    <td>${e.status}</td>
+                                </tr>
+                            `).join('')}
+                        </table>
+                    ` : ''}
+                </body>
+                </html>
+            `;
+            
+            printWindow.document.write(html);
+            printWindow.document.close();
+            printWindow.print();
+        }
+
+        function printMsmeReport() {
+            const printWindow = window.open('', '', 'height=600,width=800');
+            const summary = auditData.msme.summary;
+            const interest = auditData.msme.interest;
+            const msmePercentage = summary.totalAmount > 0 ? ((summary.msmeAmount / summary.totalAmount) * 100).toFixed(2) : 0;
+
+            let html = `
+                <html>
+                <head>
+                    <title>MSME Audit Report</title>
+                    <style>
+                        body { font-family: Arial, sans-serif; margin: 20px; }
+                        h1 { color: #667eea; border-bottom: 2px solid #667eea; }
+                        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+                        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+                        th { background-color: #667eea; color: white; }
+                        tr:nth-child(even) { background-color: #f9f9f9; }
+                        .summary { margin: 20px 0; }
+                        .highlight { color: #f45c43; font-weight: bold; }
+                    </style>
+                </head>
+                <body>
+                    <h1>MSME VENDOR AUDIT REPORT</h1>
+                    <div class="summary">
+                        <p><strong>Company:</strong> ${document.getElementById('msmeCompanyName').value}</p>
+                        <p><strong>As On Date:</strong> ${document.getElementById('msmeReportDate').value}</p>
+                        <p><strong>Interest Rate:</strong> ${document.getElementById('interestRate').value}% p.a.</p>
+                        <p><strong>Auditor:</strong> ${document.getElementById('msmeAuditorName').value}</p>
+                        <p><strong>Date:</strong> ${formatDate(new Date())}</p>
+                    </div>
+
+                    <div class="summary">
+                        <h3>Summary</h3>
+                        <p>Total Bills: ${summary.totalBills}</p>
+                        <p>MSME Bills: ${summary.msmeBills}</p>
+                        <p>Total Amount: ${formatCurrency(summary.totalAmount)}</p>
+                        <p>MSME Amount: ${formatCurrency(summary.msmeAmount)} (${msmePercentage}%)</p>
+                        <p>Delayed Bills: ${summary.delayedBills}</p>
+                        <p class="highlight">Total Interest Payable: ${formatCurrency(summary.totalInterest)}</p>
+                    </div>
+
+                    <h3>MSME Vendor Summary</h3>
+                    <table>
+                        <tr>
+                            <th>Party Name</th>
+                            <th>Bills</th>
+                            <th>Amount</th>
+                            <th>Delayed</th>
+                            <th>Interest</th>
+                        </tr>
+                        ${Object.entries(summary.parties).map(([party, data]) => `
+                            <tr>
+                                <td>${party}</td>
+                                <td>${data.bills}</td>
+                                <td>${formatCurrency(data.amount)}</td>
+                                <td>${data.delayed}</td>
+                                <td ${data.interest > 0 ? 'class="highlight"' : ''}>${formatCurrency(data.interest)}</td>
+                            </tr>
+                        `).join('')}
+                    </table>
+
+                    <h3>Interest Details (Delayed Payments)</h3>
+                    <table>
+                        <tr>
+                            <th>Invoice</th>
+                            <th>Party</th>
+                            <th>Amount</th>
+                            <th>Invoice Date</th>
+                            <th>Payment Date</th>
+                            <th>Days Delayed</th>
+                            <th>Interest</th>
+                        </tr>
+                        ${interest
+                            .filter(i => i.isMsme && i.daysDelayed > 0)
+                            .map(i => `
+                                <tr>
+                                    <td>${i.invoice}</td>
+                                    <td>${i.party}</td>
+                                    <td>${formatCurrency(i.amount)}</td>
+                                    <td>${i.invoiceDate}</td>
+                                    <td>${i.paymentDate}</td>
+                                    <td>${i.daysDelayed}</td>
+                                    <td class="highlight">${formatCurrency(i.interestPayable)}</td>
+                                </tr>
+                            `).join('')}
+                    </table>
+                </body>
+                </html>
+            `;
+            
+            printWindow.document.write(html);
+            printWindow.document.close();
+            printWindow.print();
+        }
+    </script>
+</body>
+</html>

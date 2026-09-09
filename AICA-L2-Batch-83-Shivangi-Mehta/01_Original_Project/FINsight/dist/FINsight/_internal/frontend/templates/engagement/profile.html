@@ -1,0 +1,158 @@
+{% extends "base.html" %}
+{% block content %}
+  <div class="fs-page-header">
+    <h1 class="fs-page-title">Entity Profile</h1>
+    <p class="fs-page-subtitle">{{ engagement.entity_name }} &middot; FY {{ engagement.financial_year }} — Step 2 of 3. Saving recalculates the Applicability Matrix suggestions.</p>
+  </div>
+
+  <form method="post" class="fs-form">
+    {{ csrf_field() }}
+    <fieldset class="fs-fieldset">
+      <legend>Entity Basics</legend>
+
+      <div class="fs-field">
+        <label for="entity_type">Entity Type</label>
+        <select id="entity_type" name="entity_type">
+          <option value="" {% if not form_values.entity_type %}selected{% endif %} disabled>Select...</option>
+          {% for t in entity_types %}
+            <option value="{{ t }}" {% if form_values.entity_type == t %}selected{% endif %}>{{ t }}</option>
+          {% endfor %}
+        </select>
+        {% if errors.entity_type %}<p class="fs-field-error">{{ errors.entity_type }}</p>{% endif %}
+      </div>
+
+      <div class="fs-field">
+        <label for="industry">Industry <span class="fs-optional">(optional)</span></label>
+        <input type="text" id="industry" name="industry" value="{{ form_values.industry }}">
+      </div>
+
+      <div class="fs-checkbox-field">
+        <label>
+          <input type="checkbox" name="is_listed" {% if form_values.is_listed %}checked{% endif %}>
+          Listed entity
+        </label>
+        <p class="fs-muted">
+          Listed Entity / SEBI Review is outside the current FinSight V1 scope. FinSight V1 currently supports
+          Accounting, Audit and Tax review for non-listed entities. This selection is recorded on the Entity
+          Profile for future reference, but does not trigger any SEBI analysis, and Accounting, Audit and Tax
+          review remain fully available regardless of it.
+        </p>
+      </div>
+
+      <div class="fs-field">
+        <label>Is this company required to follow Ind AS (Indian Accounting Standards)?</label>
+        <div class="fs-radio-group">
+          <label class="fs-radio-option">
+            <input type="radio" name="ind_as_mandated" value="yes" {% if form_values.ind_as_mandated == "yes" %}checked{% endif %}>
+            Yes — follows Ind AS
+          </label>
+          <label class="fs-radio-option">
+            <input type="radio" name="ind_as_mandated" value="no" {% if form_values.ind_as_mandated == "no" %}checked{% endif %}>
+            No — follows AS
+          </label>
+        </div>
+        <p class="fs-muted">
+          FinSight sets the Accounting Framework below automatically from this answer. If you're not sure, or
+          need to override the automatic result for this engagement, use "Override manually" below instead.
+        </p>
+        {% if errors.accounting_framework %}<p class="fs-field-error">{{ errors.accounting_framework }}</p>{% endif %}
+      </div>
+
+      {% set auto_from_yes_no = "IND_AS" if form_values.ind_as_mandated == "yes" else ("AS" if form_values.ind_as_mandated == "no" else None) %}
+      {% set is_manual_override = form_values.accounting_framework and form_values.accounting_framework != auto_from_yes_no %}
+      <div class="fs-field">
+        <label for="accounting_framework">Accounting Framework — Override manually <span class="fs-optional">(optional; leave blank to use the Yes/No answer above)</span></label>
+        <select id="accounting_framework" name="accounting_framework">
+          <option value="" {% if not is_manual_override %}selected{% endif %}>Use the Yes/No answer above</option>
+          {% for f in accounting_frameworks %}
+            <option value="{{ f }}" {% if is_manual_override and form_values.accounting_framework == f %}selected{% endif %}>{{ "Ind AS" if f == "IND_AS" else f }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div class="fs-field">
+        <label for="turnover">Turnover (&#8377;) <span class="fs-optional">(optional)</span></label>
+        <input type="text" id="turnover" name="turnover" value="{{ form_values.turnover }}" placeholder="e.g. 50000000">
+        {% if errors.turnover %}<p class="fs-field-error">{{ errors.turnover }}</p>{% endif %}
+      </div>
+    </fieldset>
+
+    <fieldset class="fs-fieldset">
+      <legend>Applicability Facts</legend>
+      <p class="fs-muted">These answers directly drive the system-suggested Applicability Matrix on the next screen — see the reasons shown there.</p>
+
+      <div class="fs-checkbox-field">
+        <label>
+          <input type="checkbox" name="is_gst_registered" {% if form_values.is_gst_registered %}checked{% endif %}>
+          GST registered
+        </label>
+      </div>
+
+      <div class="fs-checkbox-field">
+        <label>
+          <input type="checkbox" name="statutory_audit_applicable" {% if form_values.statutory_audit_applicable %}checked{% endif %}>
+          Statutory audit applicable
+        </label>
+      </div>
+
+      <div class="fs-field">
+        <label for="tax_audit_status">Tax Audit Status</label>
+        <select id="tax_audit_status" name="tax_audit_status">
+          {% for s in tax_audit_statuses %}
+            <option value="{{ s }}" {% if form_values.tax_audit_status == s %}selected{% endif %}>
+              {{ s.replace("_", " ").title() }}
+            </option>
+          {% endfor %}
+        </select>
+        {% if errors.tax_audit_status %}<p class="fs-field-error">{{ errors.tax_audit_status }}</p>{% endif %}
+      </div>
+
+      <div class="fs-checkbox-field">
+        <label>
+          <input type="checkbox" name="consolidated_fs_applicable" {% if form_values.consolidated_fs_applicable %}checked{% endif %}>
+          Consolidated financial statements applicable
+        </label>
+      </div>
+
+      <div class="fs-checkbox-field">
+        <label>
+          <input type="checkbox" name="prior_year_data_available" {% if form_values.prior_year_data_available %}checked{% endif %}>
+          Previous-year data available
+        </label>
+      </div>
+    </fieldset>
+
+    <fieldset class="fs-fieldset">
+      <legend>Materiality <span class="fs-optional">(optional — can be set later)</span></legend>
+      <p class="fs-muted">
+        One overall materiality figure for this engagement. FinSight uses this single amount everywhere a
+        materiality threshold is needed in the Accounting/Audit/Tax review checks.
+      </p>
+
+      <div class="fs-field">
+        <label for="overall_materiality">Overall Materiality (&#8377;)</label>
+        <input type="text" id="overall_materiality" name="overall_materiality" value="{{ form_values.overall_materiality }}">
+        {% if errors.overall_materiality %}<p class="fs-field-error">{{ errors.overall_materiality }}</p>{% endif %}
+      </div>
+      <!--
+        Performance Materiality and Clearly Trivial Threshold fields were
+        removed from this screen per an approved simplification request
+        (single-materiality-box UI). This is a UI-only change: both
+        columns still exist, unchanged, on EntityProfile
+        (app/models/engagement.py) — neither is dropped or backfilled —
+        because performance_materiality/clearly_trivial_threshold were
+        already optional and not read by any rule (only
+        overall_materiality is consumed, via
+        shared_detectors.resolve_materiality_threshold_paise()). A saved
+        engagement from before this change keeps whatever values it
+        already had in those two columns; they are simply never shown or
+        editable here going forward. No schema change was made.
+      -->
+    </fieldset>
+
+    <div class="fs-form-actions">
+      <a href="{{ url_for('engagement.index') }}" class="fs-btn fs-btn-secondary">Back to Engagements</a>
+      <button type="submit" class="fs-btn fs-btn-primary">Save &amp; Continue to Applicability Matrix</button>
+    </div>
+  </form>
+{% endblock %}

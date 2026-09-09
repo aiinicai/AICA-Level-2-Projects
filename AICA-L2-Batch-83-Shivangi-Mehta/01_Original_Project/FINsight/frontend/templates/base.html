@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>FinSight{% if section %} — {{ section }}{% endif %}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/design-system.css') }}">
+</head>
+<body>
+  <div class="fs-shell">
+    <aside class="fs-sidebar">
+      <div class="fs-brand">FinSight</div>
+      <nav class="fs-nav">
+        <a href="{{ url_for('dashboard.index') }}" class="fs-nav-item">Dashboard</a>
+        <a href="{{ url_for('engagement.index') }}" class="fs-nav-item">Engagement</a>
+
+        <div class="fs-nav-group">
+          <span class="fs-nav-group-label">Data</span>
+          <!--
+            Stage 18 (Upload automation, approved): Mapping and Data
+            Quality are no longer separate sidebar destinations — both
+            steps now happen automatically on the Upload screen itself
+            (see app/services/auto_pipeline_service.py and the "Ready to
+            Confirm" panel in frontend/templates/upload/index.html). The
+            `mapping.*`/`validation.*` ROUTES are untouched and still
+            fully work (a file can still be opened individually from the
+            Upload screen's "Review manually" link, or navigated to
+            directly) — only these two sidebar links are removed, so
+            nothing here is a functional rewrite of either blueprint.
+          -->
+          <a href="{{ url_for('upload.index') }}" class="fs-nav-subitem">Upload</a>
+        </div>
+
+        <div class="fs-nav-group">
+          <span class="fs-nav-group-label">Review</span>
+          <!--
+            Stage 12 (Unified Review Engine): "Findings Centre" combines
+            the three approved engines below into one workflow, so a
+            reviewer is never required to visit Accounting/Audit/Tax
+            separately just to run a complete review. The three
+            individual engine links are deliberately left in place,
+            unchanged — Stage 8/9/10 remain independently reachable and
+            functionally untouched (Stage 12 spec, "must not be
+            functionally rewritten").
+
+            Stage 18 (approved): the standalone "Run Review" sidebar
+            link is removed — running a review is now a one-click action
+            on the Upload screen itself (see upload/index.html's "Run
+            Review" panel, and app/api/review_bp.py's Stage 18 docstring
+            for the dual-path design behind it). The `/review/` ROUTE
+            (GET, and the original checkbox-based POST) is untouched and
+            still fully works — only this sidebar link is gone.
+          -->
+          <a href="{{ url_for('review.findings') }}" class="fs-nav-subitem">Findings Centre</a>
+          <!--
+            Stage 13 (Query & Working Papers Centre): the real Query
+            Centre lives at queries.index; the Working Paper detail
+            screen lives at exceptions.working_paper.
+
+            Stage 14 (nav dedup, section 6 — "Avoid duplicate navigation
+            links to the same screen unless there is a strong UX
+            reason"): this Review group is now the ONLY sidebar entry
+            point into Findings Centre / Query & Working Papers. The
+            previous top-level "Exceptions" and "Queries" nav items were
+            removed here (they pointed at these exact same destinations
+            with no distinct purpose). The underlying routes
+            (`/exceptions/`, `/queries/`) are untouched and still work —
+            `exceptions.working_paper` is still linked from Finding
+            Detail and the Query Centre table; only the redundant
+            sidebar links are gone. The pre-existing NAV_PATHS smoke
+            test in tests/test_app_factory.py checks these routes
+            directly, not sidebar markup, so it is unaffected.
+          -->
+          <a href="{{ url_for('queries.index') }}" class="fs-nav-subitem">Query &amp; Working Papers</a>
+          <a href="{{ url_for('accounting.index') }}" class="fs-nav-subitem">Accounting</a>
+          <a href="{{ url_for('audit.index') }}" class="fs-nav-subitem">Audit</a>
+          <a href="{{ url_for('tax.index') }}" class="fs-nav-subitem">Tax</a>
+          <!--
+            FinSight V1 scope decision: SEBI / Listed Entity review is
+            DEFERRED, not built (see documentation/finsight_v1_scope.md
+            and architecture.md's "Stage 11 Scope Change" addendum).
+            This nav item is therefore a static, non-clickable label —
+            never a link into sebi.index, and never conditionally shown
+            as SHOW/REVIEW_REQUIRED the way it was pre-scope-change —
+            regardless of `sebi_nav_state` (still computed and injected
+            by app/__init__.py's context processor, and still driven by
+            app/services/applicability_engine.py's compute_sebi_nav_state
+            — that framework is intentionally preserved, unused by this
+            template for now, so a future V2 can reactivate a real SEBI
+            module without rebuilding the applicability engine).
+          -->
+          <span class="fs-nav-subitem fs-nav-subitem-disabled" title="Listed Entity / SEBI Review is outside the current FinSight V1 scope.">
+            SEBI <span class="fs-badge fs-badge-neutral fs-nav-badge">Future Module</span>
+          </span>
+        </div>
+
+        <a href="{{ url_for('reports.index') }}" class="fs-nav-item">Reports</a>
+        <a href="{{ url_for('settings.index') }}" class="fs-nav-item">Settings</a>
+        <!-- Stage 21 (approved): FAQ is the last sidebar destination,
+             deliberately below every other nav item. -->
+        <a href="{{ url_for('faq.index') }}" class="fs-nav-item">FAQ</a>
+      </nav>
+    </aside>
+
+    <main class="fs-main">
+      <header class="fs-topbar">
+        <span class="fs-topbar-title">{{ section or "FinSight" }}</span>
+        <span class="fs-topbar-engagement">
+          {% if current_engagement %}
+            Current engagement: <strong>{{ current_engagement.entity_name }}</strong> &middot; FY {{ current_engagement.financial_year }}
+          {% else %}
+            No engagement selected
+          {% endif %}
+          <a href="{{ url_for('engagement.index') }}" class="fs-link">
+            {{ "Switch" if current_engagement else "Select engagement" }}
+          </a>
+        </span>
+        {% if lan_mode_active and lan_authenticated %}
+          <form method="post" action="{{ url_for('access.logout') }}" class="fs-inline-form">
+            {{ csrf_field() }}
+            <button type="submit" class="fs-btn fs-btn-secondary fs-btn-sm">Sign Out</button>
+          </form>
+        {% endif %}
+      </header>
+      <div class="fs-content">
+        {% block content %}{% endblock %}
+      </div>
+      <footer class="fs-app-footer">
+        FinSight is designed for local/offline financial data processing. Client financial data is not sent to
+        external AI or cloud services by the application.
+      </footer>
+    </main>
+  </div>
+  <script src="{{ url_for('static', filename='js/forms.js') }}"></script>
+  {% block scripts %}{% endblock %}
+</body>
+</html>

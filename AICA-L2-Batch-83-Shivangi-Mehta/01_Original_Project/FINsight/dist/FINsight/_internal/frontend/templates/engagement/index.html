@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% block content %}
+  <div class="fs-page-header">
+    <h1 class="fs-page-title">Engagements</h1>
+    <p class="fs-page-subtitle">Create an engagement, then select one as your current engagement to work on.</p>
+  </div>
+
+  <div class="fs-toolbar">
+    <a href="{{ url_for('engagement.new') }}" class="fs-btn fs-btn-primary">+ New Engagement</a>
+  </div>
+
+  {% if not engagements %}
+    <div class="fs-empty-banner">
+      <span>&#9432;</span>
+      <span>No engagements yet. Create one to begin the Entity Profile and Applicability Matrix workflow.</span>
+    </div>
+  {% else %}
+    <div class="fs-table-wrap">
+      <table class="fs-table">
+        <thead>
+          <tr>
+            <th>Entity Name</th>
+            <th>Financial Year</th>
+            <th>Status</th>
+            <th>Last Updated</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for e in engagements %}
+            <tr>
+              <td>
+                {{ e.entity_name }}
+                {% if current_id == e.engagement_id %}
+                  <span class="fs-badge fs-badge-neutral">Current</span>
+                {% endif %}
+              </td>
+              <td>{{ e.financial_year }}</td>
+              <td>{{ e.status }}</td>
+              <td>{{ e.updated_at }}</td>
+              <td class="fs-table-actions">
+                <a href="{{ url_for('engagement.profile', engagement_id=e.engagement_id) }}" class="fs-link">Entity Profile</a>
+                <a href="{{ url_for('engagement.applicability', engagement_id=e.engagement_id) }}" class="fs-link">Applicability</a>
+                {% if current_id != e.engagement_id %}
+                  <form method="post" action="{{ url_for('engagement.select', engagement_id=e.engagement_id) }}" class="fs-inline-form">
+                    {{ csrf_field() }}
+                    <button type="submit" class="fs-btn fs-btn-secondary fs-btn-sm">Select</button>
+                  </form>
+                {% endif %}
+                <form method="post" action="{{ url_for('engagement.delete', engagement_id=e.engagement_id) }}" class="fs-inline-form"
+                      onsubmit="return confirm('Permanently remove {{ e.entity_name }} ({{ e.financial_year }})? This deletes all of its uploaded files, transactions, exceptions, queries, and documents. This cannot be undone.');">
+                  {{ csrf_field() }}
+                  <button type="submit" class="fs-link-btn fs-link-danger">Remove</button>
+                </form>
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% endif %}
+{% endblock %}

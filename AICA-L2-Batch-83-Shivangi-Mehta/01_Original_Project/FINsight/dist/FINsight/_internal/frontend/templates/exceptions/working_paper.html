@@ -1,0 +1,134 @@
+{% extends "base.html" %}
+{% block content %}
+  <div class="fs-page-header">
+    <h1 class="fs-page-title">FinSight Working Paper</h1>
+    <p class="fs-page-subtitle">{{ engagement.entity_name }} &middot; FY {{ engagement.financial_year }}</p>
+  </div>
+
+  <div class="fs-panel">
+    <p class="fs-muted">
+      <a href="{{ url_for('queries.index') }}" class="fs-link">&larr; Back to Query &amp; Working Papers</a>
+      &middot;
+      <a href="{{ url_for('review.finding_detail', module=wp.exception.module, finding_id=wp.exception.exception_id) }}" class="fs-link">View Finding (Findings Centre)</a>
+    </p>
+
+    {% if saved %}
+      <div class="fs-empty-banner fs-empty-banner-ok"><span>&#10003;</span><span>Saved.</span></div>
+    {% endif %}
+    {% if error %}
+      <div class="fs-empty-banner"><span>&#9432;</span><span>{{ error }}</span></div>
+    {% endif %}
+
+    <div class="fs-table-wrap">
+      <table class="fs-table">
+        <tbody>
+          <tr><th style="width: 14rem;">Engagement</th><td>{{ engagement.entity_name }}</td></tr>
+          <tr><th>FY</th><td>{{ engagement.financial_year }}</td></tr>
+          <tr><th>Module</th><td>{{ wp.exception.module | title }}</td></tr>
+          <tr><th>Finding</th><td>{{ wp.finding.title if wp.finding else (wp.exception.area or '—') }}</td></tr>
+          <tr><th>Rule</th><td>{{ wp.exception.rule_id or '—' }}</td></tr>
+          <tr>
+            <th>Risk</th>
+            <td>
+              {% if wp.exception.risk_level %}<span class="fs-badge fs-badge-medium">{{ wp.exception.risk_level }}</span>{% else %}&mdash;{% endif %}
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h2 style="margin-top:1.5rem;">Why FinSight Flagged This</h2>
+    <p class="fs-muted">{{ wp.exception.trigger_condition or '—' }}</p>
+    <p class="fs-muted">{{ wp.exception.description or '—' }}</p>
+
+    <h2>Applicable Reference</h2>
+    <p class="fs-muted">{{ wp.exception.standard_reference or '—' }}</p>
+
+    <form method="post">
+      {{ csrf_field() }}
+      <h2>FinSight Suggested Query</h2>
+      <p class="fs-muted" style="white-space: pre-wrap;">{{ wp.query.question_text if wp.query else '—' }}</p>
+      <p class="fs-muted"><em>This is the original, FinSight-generated query. It is never edited or overwritten — your edited version is recorded separately below.</em></p>
+
+      <h2>Reviewer Query</h2>
+      <div class="fs-field">
+        <label for="reviewer_query_text">Edit the query wording to send, if needed</label>
+        <textarea name="reviewer_query_text" id="reviewer_query_text" rows="3">{{ wp.query.reviewer_query_text or '' }}</textarea>
+      </div>
+
+      <div class="fs-field">
+        <label for="assigned_to">Reviewer</label>
+        <input type="text" name="assigned_to" id="assigned_to" value="{{ wp.exception.assigned_to or '' }}">
+      </div>
+
+      <h2>Document / Evidence Requested</h2>
+      <p class="fs-muted">{{ wp.query.required_document or '—' }}</p>
+
+      <h2>Response</h2>
+      <div class="fs-field">
+        <label for="management_response">Client / internal response received</label>
+        <textarea name="management_response" id="management_response" rows="3">{{ wp.response.management_response if wp.response else '' }}</textarea>
+      </div>
+
+      <h2>Evidence</h2>
+      <div class="fs-field">
+        <label for="evidence_description">Evidence description</label>
+        <input type="text" name="evidence_description" id="evidence_description" value="{{ wp.response.evidence_description if wp.response else '' }}">
+      </div>
+      <div class="fs-field">
+        <label for="evidence_reference">Evidence reference (local file name / path / reference number)</label>
+        <input type="text" name="evidence_reference" id="evidence_reference" value="{{ wp.response.evidence_reference if wp.response else '' }}">
+        <p class="fs-muted">A plain local reference only &mdash; FinSight does not upload, store, or manage the file itself.</p>
+      </div>
+
+      <h2>Reviewer Notes</h2>
+      <div class="fs-field">
+        <label for="reviewer_notes">General notes on this finding</label>
+        <textarea name="reviewer_notes" id="reviewer_notes" rows="3">{{ wp.exception.reviewer_notes or '' }}</textarea>
+      </div>
+
+      <h2>Reviewer Conclusion</h2>
+      <div class="fs-field">
+        <label for="status">Conclusion / Status</label>
+        <select name="status" id="status">
+          {% for s in status_values %}
+            <option value="{{ s }}" {% if wp.exception.status == s %}selected{% endif %}>{{ conclusion_labels.get(s, s) }} ({{ s }})</option>
+          {% endfor %}
+        </select>
+        <p class="fs-muted">
+          FinSight's automated result is a Potential Issue / Review Required — never a final professional
+          judgment. The conclusion above is yours, not FinSight's.
+        </p>
+      </div>
+      <div class="fs-field">
+        <label for="status_reason">Reviewer explanation
+          {% if wp.exception.status in statuses_requiring_reason %}<strong>(required for this status)</strong>{% endif %}
+        </label>
+        <textarea name="status_reason" id="status_reason" rows="2">{{ wp.exception.status_reason or '' }}</textarea>
+        <p class="fs-muted">Required whenever the conclusion is set to Cleared or Not Applicable.</p>
+      </div>
+
+      <div class="fs-form-actions">
+        <button type="submit" class="fs-btn fs-btn-primary" data-loading-text="Saving...">Save Working Paper</button>
+      </div>
+    </form>
+
+    {% if wp.audit_trail %}
+      <h2 style="margin-top:1.5rem;">Audit Trail</h2>
+      <div class="fs-table-wrap">
+        <table class="fs-table">
+          <thead><tr><th>When</th><th>Action</th><th>By</th></tr></thead>
+          <tbody>
+            {% for entry in wp.audit_trail | reverse %}
+              <tr>
+                <td class="fs-muted">{{ entry.timestamp }}</td>
+                <td>{{ entry.action | replace('_', ' ') | title }}</td>
+                <td class="fs-muted">{{ entry.performed_by or '—' }}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% endif %}
+  </div>
+{% endblock %}
