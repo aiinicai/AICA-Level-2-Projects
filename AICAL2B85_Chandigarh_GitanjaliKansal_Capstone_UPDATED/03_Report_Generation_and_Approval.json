@@ -1,0 +1,1239 @@
+{
+  "name": "Digital ITR Consultancy — Report Generation & Approval",
+  "nodes": [
+    {
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "file_ids"
+            },
+            {
+              "name": "client_email"
+            },
+            {
+              "name": "itr_type"
+            },
+            {
+              "name": "email_body"
+            },
+            {
+              "name": "client_dob"
+            },
+            {
+              "name": "client_name"
+            },
+            {
+              "name": "pan_number"
+            },
+            {
+              "name": "assessment_year"
+            },
+            {
+              "name": "financial_year"
+            },
+            {
+              "name": "deduction_80c"
+            },
+            {
+              "name": "deduction_80d"
+            },
+            {
+              "name": "deduction_80tta_ttb"
+            },
+            {
+              "name": "hra_amount"
+            },
+            {
+              "name": "home_loan_interest_24b"
+            },
+            {
+              "name": "deduction_80ccd_1b"
+            }
+          ]
+        }
+      },
+      "id": "cf1cf8d2-6d97-4b79-beec-d2703bfddfbc",
+      "name": "Receive Document from Intake Workflow",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -912,
+        496
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "has-file-id",
+              "leftValue": "={{$json.file_ids || $json.file_id || ''}}",
+              "operator": {
+                "operation": "notEmpty",
+                "type": "string"
+              },
+              "rightValue": ""
+            }
+          ],
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          }
+        },
+        "options": {}
+      },
+      "id": "df146313-5737-415f-b3fd-f20e34ee2516",
+      "name": "Has file_id?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -1328,
+        528
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const item = $input.all()[0].json;\nconst body = item.email_body || '';\n\nlet pdfPassword = '';\nconst match = body.match(/password[^\"'\\n]*[\"']([^\"']+)[\"']/i) || body.match(/password\\s*(?:is|:)\\s*([A-Za-z0-9@#$%^&*!]+)/i);\nif (match) pdfPassword = match[1];\n\n// FIX: some sub-workflow calls have delivered this as 'file_id' (singular)\n// instead of the declared 'file_ids' (plural) -- fall back to either so a\n// naming mismatch upstream never silently drops a real submission again.\nconst rawIds = item.file_ids || item.file_id || '';\nconst ids = String(rawIds).split(',').map(s => s.trim()).filter(Boolean);\n\nreturn ids.map(id => ({\n  json: {\n    ...item,\n    file_id: id,\n    client_email: item.client_email,\n    client_name: item.client_name || 'Unknown',\n    itr_type: item.itr_type,\n    client_dob: item.client_dob,\n    pdf_password: pdfPassword\n  }\n}));"
+      },
+      "id": "424f344b-ccfc-424d-8e8c-e51543765481",
+      "name": "Extract Client Info from Filename",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -704,
+        432
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "download",
+        "fileId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{$json.file_id}}"
+        },
+        "options": {}
+      },
+      "id": "2b2084ed-7c98-44ff-92ae-43f833c1c09d",
+      "name": "Download Uploaded Document",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        -544,
+        448
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000,
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "REPLACE_WITH_YOUR_CREDENTIAL_ID",
+          "name": "Google Drive account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const inputItems = $input.all();\nconst output = [];\n\nfor (const inputItem of inputItems) {\n  const item = inputItem.json;\n  const binary = inputItem.binary ? inputItem.binary.data : undefined;\n  let password = item.pdf_password || '';\n\n  const dobDigits = (item.client_dob || '').replace(/[^0-9]/g, '');\n  const dob = dobDigits.length > 0 && dobDigits.length < 8 ? dobDigits.padStart(8, '0') : dobDigits;\n\n  if (!password && item.pan_number && dob.length === 8) {\n    // FIX: prefer the client's actual declared PAN (from the intake form / Form 16)\n    // over guessing from the filename. AIS statement filenames from the income tax\n    // portal often mask the PAN for privacy (e.g. 'XXXPK8880X'), which previously\n    // produced a wrong password guess and made the AIS PDF fail to extract entirely.\n    password = String(item.pan_number).toLowerCase() + dob;\n  }\n\n  if (!password) {\n    const fileName = (binary && binary.fileName) || '';\n    const idMatch = fileName.match(/[A-Z]{5}[0-9]{4}[A-Z]/i);\n    if (idMatch && dob.length === 8 && !/^X+$/i.test(idMatch[0].replace(/[0-9]/g, ''))) {\n      // only trust a filename-derived PAN if it isn't masked with X's\n      password = idMatch[0].toLowerCase() + dob;\n    }\n  }\n\n  output.push({ json: { ...item, pdf_password: password }, binary: inputItem.binary });\n}\n\nreturn output;"
+      },
+      "id": "dff477b3-1435-4d9b-872f-db5e07d5fb34",
+      "name": "Determine PDF Password (Fallback)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -368,
+        224
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "pdf",
+        "options": {
+          "joinPages": true,
+          "password": "={{$json.pdf_password}}"
+        }
+      },
+      "id": "e710685d-63a3-45fd-ad17-148b8a4f8e5c",
+      "name": "Extract PDF Text",
+      "type": "n8n-nodes-base.extractFromFile",
+      "typeVersion": 1.1,
+      "position": [
+        -304,
+        448
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const item = $input.all()[0].json;\n// Raised from 10,000 to 40,000 chars: client uploads often combine Form 16\n// AND an AIS/other-income statement in one PDF, and the smaller cap was\n// silently truncating the AIS pages, which is why \"other income\" was going\n// unseen and tax was coming out understated (or nil). Correctness on the\n// tax figure matters more than the small extra token cost here.\nconst pdfText = (item.text || '').slice(0, 40000);\n\nfunction amt(v) { const n = parseFloat(v); return isNaN(n) ? 0 : n; }\n\nconst declaredLines = [];\nif (item.pan_number) declaredLines.push('PAN: ' + item.pan_number);\nif (item.assessment_year) declaredLines.push('Assessment Year: ' + item.assessment_year);\nif (item.financial_year) declaredLines.push('Financial Year: ' + item.financial_year);\nif (amt(item.deduction_80c) > 0) declaredLines.push('Client-declared Section 80C investment: Rs.' + amt(item.deduction_80c));\nif (amt(item.deduction_80d) > 0) declaredLines.push('Client-declared Section 80D premium: Rs.' + amt(item.deduction_80d));\nif (amt(item.deduction_80tta_ttb) > 0) declaredLines.push('Client-declared Section 80TTA/80TTB interest: Rs.' + amt(item.deduction_80tta_ttb));\nif (amt(item.hra_amount) > 0) declaredLines.push('Client-declared annual HRA received: Rs.' + amt(item.hra_amount));\nif (amt(item.home_loan_interest_24b) > 0) declaredLines.push('Client-declared Section 24(b) home loan interest: Rs.' + amt(item.home_loan_interest_24b));\nif (amt(item.deduction_80ccd_1b) > 0) declaredLines.push('Client-declared Section 80CCD(1B) NPS contribution: Rs.' + amt(item.deduction_80ccd_1b));\n\nconst clientDeclaredBlock = declaredLines.length\n  ? '\\n\\nClient-declared figures from the intake form (cross-check these against the document; if the document shows a different figure, use the document\\'s actual figure and note the discrepancy in \\'flags\\' or \\'disclosure_flags\\'):\\n' + declaredLines.map(l => '- ' + l).join('\\n')\n  : '';\n\nconst kbVerificationInstruction = \"MANDATORY VERIFICATION OF TAX FIGURES -- KNOWLEDGE BASE FIRST, OFFICIAL WEBSITE ONLY AS FALLBACK, NEVER GENERAL WEB RESULTS -- BE EFFICIENT, MINIMIZE TOOL CALLS: You have three tools -- Tax Knowledge Base Tool (Supabase, always checked first), Search Income Tax Website (Tavily), and Cache Tax Info in Knowledge Base. The ONLY two sources you may ever cite a tax figure from are: (a) content already present in the Tax Knowledge Base (populated by earlier searches or manual ingestion), or (b) a live Tavily search whose query is explicitly restricted to site:incometaxindia.gov.in or site:egazette.gov.in. Never cite, rely on, or blend in a figure from any other website, general search result, or your own unverified memory. Do NOT verify figures one at a time. Before writing your final answer: (1) Identify the small list of numeric tax figures this specific case actually depends on (usually just the applicable regime slabs, the deduction sections present in this document/client data, and any relevant rebate/LTCG limit -- normally 1-3 items total, not one per section). (2) Call the Tax Knowledge Base Tool AT MOST ONCE with a single combined query covering all of those items together -- this is checking whether the figure was already fetched by a prior live search or manual ingestion, so you never repeat work someone already did. (3) Only for whichever items that KB call does NOT confirm, call the Tavily search tool AT MOST ONCE with a single combined query covering everything still unconfirmed, with the query text explicitly restricted to site:incometaxindia.gov.in or site:egazette.gov.in -- disregard any result from a domain other than these two, even if it appears relevant. (4) If the live search returns clear, verified content from an official source, call the Cache Tax Info in Knowledge Base tool ONCE to save it (combine multiple confirmed items into one cache call when practical) before finishing -- this is not optional when you used live search successfully, and is what makes the next client's question on the same topic instant instead of needing another web search. (5) If a figure remains unconfirmed after both the knowledge base and an official-site search, do not silently present it as certain -- give your best answer using your own knowledge, but add an entry to the 'flags' (or 'disclosure_flags') array: 'UNVERIFIED: <figure/section> could not be confirmed against the knowledge base or a live official source -- please verify manually before filing.' Well-established constants already listed below under 'Known reference points' do NOT need a separate tool call unless you have specific reason to doubt they still apply for the relevant Assessment Year. Target at most one Knowledge Base call, one Tavily call, and one Cache call per report -- never call the same tool repeatedly for individual figures.\";\n\nconst totalIncomeInstruction = \"CRITICAL -- TOTAL INCOME MUST INCLUDE EVERY SOURCE IN THE DOCUMENT, NOT SALARY ALONE: Carefully scan the ENTIRE extracted document text -- not just the first page -- for every income disclosure. This includes Form 16 salary AND any AIS (Annual Information Statement), Form 26AS, TIS, or interest/dividend certificate content showing savings/FD/RD interest, dividends, rental income, or any other 'Income from Other Sources' receipts. If any such other-income entries are present anywhere in the document, they are NOT optional extras -- you MUST add them to Gross Total Income before computing tax under either regime, because they change the actual tax payable. If, after a careful full-document scan, you find no other-income disclosures beyond salary, explicitly write 'No other income identified beyond salary in the document provided' in the computation rather than silently assuming zero. Never state a conclusion of 'no tax payable', 'nil tax', or similar without first showing the COMPLETE line-by-line computation for BOTH regimes in the tax_computation object described below -- the computation must visibly walk through: Gross Salary -> Less Standard Deduction -> Add Income from Other Sources -> Gross Total Income -> Less Chapter VI-A Deductions (80C/80D/80TTA-TTB/80CCD(1B) etc, Old Regime only unless the document indicates otherwise) -> Net Taxable Income -> Tax as per applicable slab -> Less Section 87A rebate if eligible -> Add Health & Education Cess (4%) -> Total Tax Payable.\";\n\nconst taxSavingScenarioInstruction = \"TAX-SAVING SCENARIOS (MANDATORY WHENEVER A CHAPTER VI-A DEDUCTION LIMIT IS NOT FULLY USED): For every deduction limit the client has not fully utilised (Section 80C up to Rs.1,50,000, Section 80D, Section 80CCD(1B) up to Rs.50,000, Section 80TTA/80TTB, etc, under the Old Regime), add one entry to 'tax_saving_scenarios' showing: the section, a plain-English description of the concrete step (e.g. 'Investing a further Rs.X in ELSS/PPF/EPF/life insurance under Section 80C'), the additional_eligible_amount they could still invest/spend, and an estimated_tax_saved computed as that additional amount multiplied by the client's marginal tax rate under the regime where the deduction applies -- show the arithmetic briefly inside the description so it can be independently rechecked (e.g. 'Rs.1,00,000 x 20% slab + 4% cess = approx Rs.20,800 saved'). Only include scenarios that are actually available to this client's profession/income type.\";\n\nconst futurePlanningInstruction = \"FUTURE TAX PLANNING (MANDATORY, LEGAL METHODS ONLY): Based on this specific client's income profile, list 3 to 6 legally compliant ways they could reduce tax in future years in 'future_tax_planning' -- for example fully using Section 80C via ELSS/PPF/EPF/life insurance, an additional Section 80CCD(1B) NPS contribution, Section 80D health insurance for self/family/parents, re-evaluating Old vs New regime choice each year since the more beneficial one can change, HRA and home-loan-interest planning if applicable, or advance tax planning if other income is likely to recur. Every suggestion must be legitimate tax planning, never evasion or misreporting. End this section by explicitly stating that these limits, rates and rules apply for the relevant Assessment Year only and are SUBJECT TO CHANGE in future Finance Acts, so they must be reconfirmed before being relied on in a later year.\";\n\nconst taxRulesReference = \"Apply Indian Income Tax Act provisions accurately for the relevant Assessment Year based on dates in the document. Ground every figure strictly in the data actually present in the extracted text -- never invent numbers. Where document data is insufficient to compute an exact figure, say so explicitly rather than guessing. Cite the specific Section of the Income Tax Act for every deduction, exemption, or provision mentioned (e.g. Section 80C, Section 54). \" + totalIncomeInstruction + \" \" + kbVerificationInstruction + \" \" + taxSavingScenarioInstruction + \" \" + futurePlanningInstruction + \" Known reference points to apply, but VERIFY against the Finance Act applicable to the relevant Assessment Year and flag in 'flags' or 'disclosure_flags' if you are uncertain whether a rate/slab has since changed: New Regime slabs (recent years): Nil up to Rs.3,00,000; 5% Rs.3,00,001-7,00,000; 10% Rs.7,00,001-10,00,000; 15% Rs.10,00,001-12,00,000; 20% Rs.12,00,001-15,00,000; 30% above Rs.15,00,000; standard deduction Rs.75,000 for salaried/pensioners; Section 87A rebate making tax nil up to Rs.7,00,000 taxable income (marginal relief applies). Old Regime slabs: Nil up to Rs.2,50,000; 5% Rs.2,50,001-5,00,000; 20% Rs.5,00,001-10,00,000; 30% above Rs.10,00,000; Section 87A rebate up to Rs.5,00,000 taxable income. Section 80C limit Rs.1,50,000. Section 80D: Rs.25,000 (self/family, non-senior), Rs.50,000 (senior citizen). Section 80TTA: Rs.10,000 (savings interest, non-senior). Section 80TTB: Rs.50,000 (senior citizen, all interest). Listed equity shares/equity mutual funds: LTCG exemption up to Rs.1,25,000 per year, taxed at 12.5% above that (no indexation); STCG taxed at 20%. Section 54: LTCG exemption on sale of residential house if reinvested in a new residential house within the prescribed period. Section 54F: exemption on LTCG from sale of any asset other than a house, if invested in a residential house. Section 54EC: exemption by investing capital gains (up to Rs.50,00,000) in specified bonds (NHAI/REC/PFC) within 6 months. Always end with a clear, prominent recommendation of which ITR form applies and which tax regime is more beneficial for this specific client, based on the numbers actually computed.\";\n\nconst taxComputationSchema = \"\\\"tax_computation\\\":{\\\"old_regime\\\":{\\\"gross_salary\\\":number,\\\"standard_deduction\\\":number,\\\"income_from_other_sources\\\":number,\\\"gross_total_income\\\":number,\\\"chapter_via_deductions\\\":number,\\\"net_taxable_income\\\":number,\\\"tax_before_cess\\\":number,\\\"rebate_87A\\\":number,\\\"health_education_cess\\\":number,\\\"total_tax_payable\\\":number},\\\"new_regime\\\":{\\\"gross_salary\\\":number,\\\"standard_deduction\\\":number,\\\"income_from_other_sources\\\":number,\\\"gross_total_income\\\":number,\\\"chapter_via_deductions\\\":number,\\\"net_taxable_income\\\":number,\\\"tax_before_cess\\\":number,\\\"rebate_87A\\\":number,\\\"health_education_cess\\\":number,\\\"total_tax_payable\\\":number},\\\"other_income_note\\\":string},\\\"tax_saving_scenarios\\\":[{\\\"section\\\":string,\\\"description\\\":string,\\\"additional_eligible_amount\\\":number,\\\"estimated_tax_saved\\\":number}],\\\"future_tax_planning\\\":[string]\";\n\nconst prompts = {\n  'ITR-1': \"You are a meticulous Chartered Accountant's assistant preparing a tax advisory note for a salaried individual filing ITR-1 in India. \" + taxRulesReference + \" Given the client's Form 16 data, any AIS/other-income details, and bank interest details in the extracted document text, do the following: 1) Compare total tax liability under the Old Regime vs New Regime with the actual computed numbers, showing the full computation in tax_computation as instructed above. 2) Identify unused deductions under 80C, 80D, 80TTA/80TTB, and HRA exemption if applicable, citing sections, and build tax_saving_scenarios for each. 3) Populate future_tax_planning with legal, forward-looking guidance. 4) Flag anything unusual, incomplete, or where you are uncertain about current rates. Respond ONLY with valid JSON, no other text: {\\\"recommended_itr_type\\\":\\\"ITR-1\\\",\\\"old_regime_tax\\\":number,\\\"new_regime_tax\\\":number,\\\"recommended_regime\\\":string,\\\"regime_reasoning\\\":string,\" + taxComputationSchema + \",\\\"deduction_gaps\\\":[{\\\"section\\\":string,\\\"unused_amount\\\":number,\\\"note\\\":string}],\\\"action_items\\\":[string],\\\"flags\\\":[string]}\",\n  'ITR-2': \"You are a meticulous Chartered Accountant's assistant preparing a tax advisory note for an individual filing ITR-2 in India (capital gains / multiple properties / foreign assets, no business income). \" + taxRulesReference + \" Using the extracted document text, including any AIS/other-income details: 1) Compare Old vs New regime with computed numbers and deduction gaps (80C/80D/HRA), citing sections, showing the full computation in tax_computation as instructed above. 2) Calculate STCG and LTCG separately (equity vs non-equity, applying correct rates and the Rs.1,25,000 equity LTCG exemption) with indexation where legally eligible (non-equity assets under Section 48). 3) Check Section 54/54F/54EC exemption eligibility on any property sale, citing conditions. 4) Flag Schedule FA disclosure needs for any foreign assets. 5) Build tax_saving_scenarios and future_tax_planning as instructed above. Respond ONLY with valid JSON, no other text: {\\\"recommended_itr_type\\\":\\\"ITR-2\\\",\\\"old_regime_tax\\\":number,\\\"new_regime_tax\\\":number,\\\"recommended_regime\\\":string,\\\"regime_reasoning\\\":string,\\\"capital_gains\\\":{\\\"stcg\\\":number,\\\"ltcg\\\":number,\\\"indexed_ltcg\\\":number},\" + taxComputationSchema + \",\\\"exemption_opportunities\\\":[{\\\"section\\\":string,\\\"estimated_saving\\\":number,\\\"note\\\":string}],\\\"deduction_gaps\\\":[{\\\"section\\\":string,\\\"unused_amount\\\":number,\\\"note\\\":string}],\\\"disclosure_flags\\\":[string],\\\"action_items\\\":[string]}\",\n  'ITR-3': \"You are a meticulous Chartered Accountant's assistant preparing a tax advisory note for an individual filing ITR-3 in India (business/professional income, regular scheme). \" + taxRulesReference + \" Using the extracted P&L, balance sheet, GST text, and any AIS/other-income details: 1) Review claimed expenses for common missed deductions, citing sections. 2) Check the depreciation schedule under the block-of-assets method (Section 32) for correctness. 3) Compare tax liability to the presumptive scheme (Section 44AD/44ADA) if turnover qualifies, with computed numbers, showing the full computation in tax_computation (use regular_scheme and presumptive_scheme as the two keys instead of old_regime/new_regime, same line items). 4) Flag GST-vs-P&L turnover mismatches. 5) Build tax_saving_scenarios and future_tax_planning as instructed above. Respond ONLY with valid JSON, no other text: {\\\"recommended_itr_type\\\":\\\"ITR-3\\\",\\\"computed_tax_liability\\\":number,\\\"missed_deductions\\\":[{\\\"category\\\":string,\\\"estimated_amount\\\":number,\\\"note\\\":string}],\\\"depreciation_check\\\":string,\\\"presumptive_scheme_comparison\\\":{\\\"eligible\\\":boolean,\\\"estimated_tax_under_44AD\\\":number,\\\"recommendation\\\":string},\" + taxComputationSchema + \",\\\"gst_pl_mismatch_flags\\\":[string],\\\"action_items\\\":[string]}\",\n  'ITR-4': \"You are a meticulous Chartered Accountant's assistant preparing a tax advisory note for an individual filing ITR-4 in India under the presumptive scheme (Section 44AD/44ADA/44AE). \" + taxRulesReference + \" Using the extracted turnover/gross receipts text and any AIS/other-income details: 1) Verify eligibility limits (Rs.2 crore for 44AD, Rs.50 lakh for 44ADA, subject to cash-receipt threshold relaxations). 2) Calculate presumptive income and tax at the applicable rate (6%/8% for 44AD, 50% for 44ADA), showing the full computation in tax_computation (use presumptive_scheme and regular_scheme as the two keys instead of old_regime/new_regime, same line items). 3) Estimate tax under the regular books-based scheme using a reasonable expense-ratio assumption, and state which is more efficient with reasoning. 4) Flag inconsistent past use of the presumptive scheme (5-year lock-out rule under Section 44AD(4)). 5) Build tax_saving_scenarios and future_tax_planning as instructed above. Respond ONLY with valid JSON, no other text: {\\\"recommended_itr_type\\\":\\\"ITR-4\\\",\\\"eligible_for_presumptive\\\":boolean,\\\"presumptive_income\\\":number,\\\"presumptive_tax\\\":number,\\\"regular_scheme_estimated_tax\\\":number,\\\"recommendation\\\":string,\" + taxComputationSchema + \",\\\"eligibility_flags\\\":[string],\\\"action_items\\\":[string]}\"\n};\n\nconst systemPrompt = prompts[item.itr_type] || prompts['ITR-1'];\nconst fullPrompt = systemPrompt + clientDeclaredBlock + '\\n\\nHere is the extracted document text:\\n\\n' + pdfText + '\\n\\nAnalyze it as instructed and return the JSON only, with no markdown code fences.';\n\nreturn [{ json: { ...item, agent_prompt: fullPrompt } }];\n"
+      },
+      "id": "b7f19625-94db-49d4-b9cb-42c0dd515bd1",
+      "name": "Build Agent Prompt",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -112,
+        464
+      ]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{$json.agent_prompt}}",
+        "options": {
+          "systemMessage": "You are a meticulous Chartered Accountant's assistant. Always respond with valid JSON only — no markdown, no commentary, no code fences.",
+          "maxIterations": 6
+        }
+      },
+      "id": "386bf4e6-571b-4988-9bb0-7d329cb3cd5e",
+      "name": "ITR Analysis Agent",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        0,
+        0
+      ],
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 3000
+    },
+    {
+      "parameters": {
+        "jsCode": "const prev = $('Extract Client Info from Filename').first().json;\nconst resp = $input.all()[0].json;\nfunction repairTopLevelJson(text) {\n  const TOP_LEVEL_KEYS = new Set([\n    'recommended_itr_type','old_regime_tax','new_regime_tax','recommended_regime','regime_reasoning',\n    'capital_gains','tax_computation','tax_saving_scenarios','future_tax_planning',\n    'exemption_opportunities','deduction_gaps','disclosure_flags','flags','action_items'\n  ]);\n  let depth = 0;\n  let inStr = false, esc = false;\n  let result = '';\n  for (let i = 0; i < text.length; i++) {\n    const c = text[i];\n    if (inStr) {\n      result += c;\n      if (esc) { esc = false; }\n      else if (c === '\\\\') { esc = true; }\n      else if (c === '\"') { inStr = false; }\n      continue;\n    }\n    if (c === '\"') { inStr = true; result += c; continue; }\n    if (c === ',') {\n      const ahead = text.slice(i + 1).match(/^\\s*\"([a-zA-Z0-9_]+)\"\\s*:/);\n      if (ahead && TOP_LEVEL_KEYS.has(ahead[1]) && depth > 1) {\n        while (depth > 1) { result += '}'; depth--; }\n      }\n      result += c;\n      continue;\n    }\n    if (c === '{' || c === '[') depth++;\n    else if (c === '}' || c === ']') depth--;\n    result += c;\n  }\n  return result;\n}\n\nfunction balanceBrackets(text) {\n  const stack = [];\n  let inStr = false, esc = false;\n  for (let i = 0; i < text.length; i++) {\n    const c = text[i];\n    if (inStr) {\n      if (esc) esc = false;\n      else if (c === '\\\\') esc = true;\n      else if (c === '\"') inStr = false;\n      continue;\n    }\n    if (c === '\"') { inStr = true; continue; }\n    if (c === '{' || c === '[') stack.push(c);\n    else if (c === '}' || c === ']') stack.pop();\n  }\n  let out = text;\n  if (inStr) out += '\"';\n  out = out.replace(/,\\s*$/, '');\n  while (stack.length) {\n    out += (stack.pop() === '{') ? '}' : ']';\n  }\n  return out;\n}\n\nlet parsed = {};\ntry {\n  const rawText = resp.output || '{}';\n  const cleaned = rawText.replace(/```json/g, '').replace(/```/g, '').trim();\n  try {\n    parsed = JSON.parse(cleaned);\n  } catch (firstErr) {\n    // The AI occasionally forgets to close a nested object (e.g. tax_computation)\n    // before continuing with the next top-level key. Attempt a structural repair\n    // before giving up, so a single missing brace doesn't discard the whole report.\n    parsed = JSON.parse(balanceBrackets(repairTopLevelJson(cleaned)));\n  }\n} catch (e) {\n  parsed = { parse_error: true, raw: JSON.stringify(resp).slice(0, 500) };\n}\n\nfunction fmt(key) {\n  return key.replace(/_/g, ' ').replace(/\\b\\w/g, c => c.toUpperCase());\n}\n\nfunction renderValueHtml(val) {\n  if (val === null || val === undefined || val === '') return '-';\n  if (typeof val === 'number') return '₹' + val.toLocaleString('en-IN');\n  if (typeof val === 'boolean') return val ? 'Yes' : 'No';\n  return String(val);\n}\n\nfunction renderValue(val) {\n  if (val === null || val === undefined || val === '') return '-';\n  if (typeof val === 'number') return 'Rs.' + val.toLocaleString('en-IN');\n  if (typeof val === 'boolean') return val ? 'Yes' : 'No';\n  return String(val);\n}\n\nfunction renderCellContent(val) {\n  if (Array.isArray(val)) {\n    if (!val.length) return '<span style=\"color:#888;\">None</span>';\n    if (typeof val[0] === 'object') {\n      const cols = Object.keys(val[0]);\n      let t = '<table style=\"width:100%;border-collapse:collapse;\">';\n      t += '<tr>' + cols.map(c => '<th style=\"text-align:left;padding:4px 8px;border-bottom:1px solid #ccc;font-size:12px;color:#555;\">' + fmt(c) + '</th>').join('') + '</tr>';\n      for (const row of val) {\n        t += '<tr>' + cols.map(c => '<td style=\"padding:4px 8px;border-bottom:1px solid #eee;font-size:13px;\">' + renderValueHtml(row[c]) + '</td>').join('') + '</tr>';\n      }\n      t += '</table>';\n      return t;\n    }\n    return '<ul style=\"margin:0;padding-left:18px;\">' + val.map(v => '<li>' + renderValueHtml(v) + '</li>').join('') + '</ul>';\n  }\n  if (typeof val === 'object' && val !== null) {\n    return Object.entries(val).map(([k, v]) => '<div><b>' + fmt(k) + ':</b> ' + renderValueHtml(v) + '</div>').join('');\n  }\n  return renderValueHtml(val);\n}\n\nconst COMPUTATION_ROW_ORDER = [\n  'gross_salary', 'standard_deduction', 'income_from_other_sources', 'gross_total_income',\n  'chapter_via_deductions', 'net_taxable_income', 'tax_before_cess', 'rebate_87A',\n  'health_education_cess', 'total_tax_payable'\n];\n\nfunction renderTaxComputationHtml(taxComputation) {\n  if (!taxComputation || typeof taxComputation !== 'object') return '';\n  const schemeKeys = Object.keys(taxComputation).filter(k => k !== 'other_income_note' && typeof taxComputation[k] === 'object');\n  if (!schemeKeys.length) return '';\n\n  const rowKeysPresent = COMPUTATION_ROW_ORDER.filter(k => schemeKeys.some(sk => taxComputation[sk] && taxComputation[sk][k] !== undefined));\n  const extraKeys = new Set();\n  for (const sk of schemeKeys) {\n    for (const k of Object.keys(taxComputation[sk] || {})) {\n      if (!COMPUTATION_ROW_ORDER.includes(k)) extraKeys.add(k);\n    }\n  }\n  const rowKeys = rowKeysPresent.concat(Array.from(extraKeys));\n\n  let html = '<h3 style=\"color:#333;margin-top:20px;\">Tax Computation Sheet (for re-checking)</h3>';\n  html += '<table style=\"width:100%;border-collapse:collapse;margin:8px 0 12px 0;\">';\n  html += '<tr><th style=\"text-align:left;padding:6px 10px;border-bottom:2px solid #333;background:#f5f5f5;\">Particulars</th>' +\n    schemeKeys.map(sk => '<th style=\"text-align:right;padding:6px 10px;border-bottom:2px solid #333;background:#f5f5f5;\">' + fmt(sk) + '</th>').join('') + '</tr>';\n  for (const rk of rowKeys) {\n    const isTotal = rk === 'total_tax_payable';\n    const rowStyle = isTotal ? 'background:#eef4ff;font-weight:700;' : '';\n    html += '<tr style=\"' + rowStyle + '\"><td style=\"padding:6px 10px;border-bottom:1px solid #ddd;\">' + fmt(rk) + '</td>' +\n      schemeKeys.map(sk => '<td style=\"padding:6px 10px;border-bottom:1px solid #ddd;text-align:right;\">' + renderValueHtml((taxComputation[sk] || {})[rk]) + '</td>').join('') + '</tr>';\n  }\n  html += '</table>';\n  if (taxComputation.other_income_note) {\n    html += '<p style=\"font-size:13px;color:#555;margin-top:-4px;\"><i>' + taxComputation.other_income_note + '</i></p>';\n  }\n  return html;\n}\n\nfunction renderTaxComputationPlain(taxComputation) {\n  if (!taxComputation || typeof taxComputation !== 'object') return [];\n  const schemeKeys = Object.keys(taxComputation).filter(k => k !== 'other_income_note' && typeof taxComputation[k] === 'object');\n  if (!schemeKeys.length) return [];\n  const rowKeysPresent = COMPUTATION_ROW_ORDER.filter(k => schemeKeys.some(sk => taxComputation[sk] && taxComputation[sk][k] !== undefined));\n  const extraKeys = new Set();\n  for (const sk of schemeKeys) {\n    for (const k of Object.keys(taxComputation[sk] || {})) {\n      if (!COMPUTATION_ROW_ORDER.includes(k)) extraKeys.add(k);\n    }\n  }\n  const rowKeys = rowKeysPresent.concat(Array.from(extraKeys));\n  const lines = [];\n  lines.push('TAX COMPUTATION SHEET (FOR RE-CHECKING)');\n  lines.push('----------------------------------------');\n  lines.push('Particulars'.padEnd(28) + schemeKeys.map(sk => fmt(sk).padStart(20)).join(''));\n  for (const rk of rowKeys) {\n    lines.push(fmt(rk).padEnd(28) + schemeKeys.map(sk => renderValue((taxComputation[sk] || {})[rk]).padStart(20)).join(''));\n  }\n  if (taxComputation.other_income_note) {\n    lines.push('Note: ' + taxComputation.other_income_note);\n  }\n  lines.push('');\n  return lines;\n}\n\nfunction renderTaxSavingScenariosHtml(scenarios) {\n  if (!Array.isArray(scenarios) || !scenarios.length) return '';\n  let html = '<h3 style=\"color:#333;margin-top:20px;\">Tax-Saving Opportunities (With Worked Examples)</h3>';\n  html += '<table style=\"width:100%;border-collapse:collapse;margin:8px 0 12px 0;\">';\n  html += '<tr><th style=\"text-align:left;padding:6px 10px;border-bottom:2px solid #333;background:#f5f5f5;\">Section</th><th style=\"text-align:left;padding:6px 10px;border-bottom:2px solid #333;background:#f5f5f5;\">How</th><th style=\"text-align:right;padding:6px 10px;border-bottom:2px solid #333;background:#f5f5f5;\">You Could Invest</th><th style=\"text-align:right;padding:6px 10px;border-bottom:2px solid #333;background:#f5f5f5;\">Est. Tax Saved</th></tr>';\n  for (const s of scenarios) {\n    html += '<tr><td style=\"padding:6px 10px;border-bottom:1px solid #ddd;font-weight:600;\">' + (s.section || '-') + '</td>' +\n      '<td style=\"padding:6px 10px;border-bottom:1px solid #ddd;\">' + (s.description || '-') + '</td>' +\n      '<td style=\"padding:6px 10px;border-bottom:1px solid #ddd;text-align:right;\">' + renderValueHtml(s.additional_eligible_amount) + '</td>' +\n      '<td style=\"padding:6px 10px;border-bottom:1px solid #ddd;text-align:right;color:#0a7a2a;font-weight:700;\">' + renderValueHtml(s.estimated_tax_saved) + '</td></tr>';\n  }\n  html += '</table>';\n  return html;\n}\n\nfunction renderFuturePlanningHtml(items) {\n  if (!Array.isArray(items) || !items.length) return '';\n  let html = '<h3 style=\"color:#333;margin-top:20px;\">Future Tax Planning (Legal Methods)</h3>';\n  html += '<ul>' + items.map(v => '<li style=\"margin-bottom:6px;\">' + renderValueHtml(v) + '</li>').join('') + '</ul>';\n  html += '<p style=\"font-size:12px;color:#888;\">These limits and rules apply for the relevant Assessment Year only and are subject to change in future Finance Acts — please reconfirm before acting on them in a later year.</p>';\n  return html;\n}\n\nconst recommendedType = parsed.recommended_itr_type || prev.itr_type;\nconst recommendedRegime = parsed.recommended_regime || parsed.recommendation || '';\nconst assessmentYear = prev.assessment_year || '';\nconst panNumber = prev.pan_number || '';\n\nconst FLAG_KEYS = ['flags', 'disclosure_flags', 'eligibility_flags', 'gst_pl_mismatch_flags'];\nconst SPECIAL_KEYS = ['recommended_itr_type', 'recommended_regime', 'tax_computation', 'tax_saving_scenarios', 'future_tax_planning'];\n\nlet caHtml = '<div style=\"font-family:Arial,sans-serif;max-width:720px;\">';\ncaHtml += '<h2 style=\"color:#1a3c6e;border-bottom:2px solid #1a3c6e;padding-bottom:8px;\">Tax Advisory Report — Full Analysis (For Review)</h2>';\ncaHtml += '<table style=\"width:100%;border-collapse:collapse;\">';\ncaHtml += '<tr><td style=\"padding:8px;font-weight:700;background:#eef4ff;width:220px;\">Client</td><td style=\"padding:8px;background:#eef4ff;\">' + (prev.client_name || 'Unknown') + ' (' + prev.client_email + ')</td></tr>';\ncaHtml += '<tr><td style=\"padding:8px;font-weight:700;background:#eef4ff;\">Recommended ITR Form</td><td style=\"padding:8px;background:#eef4ff;font-weight:700;color:#1a3c6e;\">' + recommendedType + '</td></tr>';\nif (assessmentYear) caHtml += '<tr><td style=\"padding:8px;font-weight:700;\">Assessment Year</td><td style=\"padding:8px;\">' + assessmentYear + '</td></tr>';\nif (panNumber) caHtml += '<tr><td style=\"padding:8px;font-weight:700;\">PAN</td><td style=\"padding:8px;\">' + panNumber + '</td></tr>';\nif (recommendedRegime) caHtml += '<tr><td style=\"padding:8px;font-weight:700;\">Recommended Regime</td><td style=\"padding:8px;\">' + recommendedRegime + '</td></tr>';\ncaHtml += '</table>';\n\nif (parsed.parse_error) {\n  caHtml += '<p style=\"color:#b00;margin-top:16px;\">Could not fully parse the AI response. Raw output below for manual review.</p>';\n  caHtml += '<pre style=\"white-space:pre-wrap;background:#f7f7f7;padding:10px;\">' + (parsed.raw || '') + '</pre>';\n} else {\n  caHtml += renderTaxComputationHtml(parsed.tax_computation);\n  caHtml += renderTaxSavingScenariosHtml(parsed.tax_saving_scenarios);\n  caHtml += renderFuturePlanningHtml(parsed.future_tax_planning);\n\n  caHtml += '<h3 style=\"color:#333;margin-top:20px;\">Full Analysis Detail</h3>';\n  caHtml += '<table style=\"width:100%;border-collapse:collapse;margin-top:8px;\">';\n  caHtml += '<tr><th style=\"text-align:left;padding:8px;border-bottom:2px solid #333;background:#f5f5f5;width:220px;\">Field</th><th style=\"text-align:left;padding:8px;border-bottom:2px solid #333;background:#f5f5f5;\">Details</th></tr>';\n  for (const [key, val] of Object.entries(parsed)) {\n    if (SPECIAL_KEYS.includes(key)) continue;\n    const isFlagRow = FLAG_KEYS.includes(key);\n    const rowBg = isFlagRow ? 'background:#fff8e1;' : '';\n    caHtml += '<tr style=\"' + rowBg + '\"><td style=\"padding:8px;border-bottom:1px solid #ddd;font-weight:700;vertical-align:top;' + (isFlagRow ? 'color:#8a6d00;' : '') + '\">' + fmt(key) + '</td><td style=\"padding:8px;border-bottom:1px solid #ddd;\">' + renderCellContent(val) + '</td></tr>';\n  }\n  caHtml += '</table>';\n}\ncaHtml += '<p style=\"margin-top:24px;font-size:12px;color:#888;\">Internal review copy — includes all flags and verification notes. This copy is not for the client.</p>';\ncaHtml += '</div>';\n\nlet clientHtml = '<div style=\"font-family:Arial,sans-serif;max-width:680px;\">';\nclientHtml += '<h2 style=\"color:#1a3c6e;border-bottom:2px solid #1a3c6e;padding-bottom:8px;\">Your Tax Advisory Report</h2>';\nclientHtml += '<table style=\"width:100%;border-collapse:collapse;margin-bottom:20px;background:#eef4ff;\">';\nclientHtml += '<tr><td style=\"padding:10px;font-weight:700;\">Recommended ITR Form</td><td style=\"padding:10px;font-weight:700;color:#1a3c6e;font-size:16px;\">' + recommendedType + '</td></tr>';\nif (assessmentYear) clientHtml += '<tr><td style=\"padding:10px;font-weight:700;\">Assessment Year</td><td style=\"padding:10px;font-weight:700;color:#1a3c6e;\">' + assessmentYear + '</td></tr>';\nif (recommendedRegime) clientHtml += '<tr><td style=\"padding:10px;font-weight:700;\">Recommended Tax Regime</td><td style=\"padding:10px;font-weight:700;color:#1a3c6e;\">' + recommendedRegime + '</td></tr>';\nconst taxFigureKeys = ['old_regime_tax', 'new_regime_tax', 'computed_tax_liability', 'presumptive_tax', 'regular_scheme_estimated_tax'];\nfor (const k of taxFigureKeys) {\n  if (typeof parsed[k] === 'number') {\n    clientHtml += '<tr><td style=\"padding:10px;font-weight:700;\">' + fmt(k) + '</td><td style=\"padding:10px;font-weight:700;color:#1a3c6e;\">' + renderValueHtml(parsed[k]) + '</td></tr>';\n  }\n}\nclientHtml += '</table>';\n\nif (parsed.parse_error) {\n  clientHtml += '<p>Your report is being finalized. Please reach out to us if you do not receive the full details shortly.</p>';\n} else {\n  clientHtml += renderTaxComputationHtml(parsed.tax_computation);\n\n  const actionItems = Array.isArray(parsed.action_items) ? parsed.action_items : [];\n  if (actionItems.length) {\n    clientHtml += '<h3 style=\"color:#333;margin-top:20px;\">What You Can Do</h3>';\n    clientHtml += '<ul>' + actionItems.slice(0, 6).map(v => '<li style=\"margin-bottom:6px;\">' + renderValueHtml(v) + '</li>').join('') + '</ul>';\n  }\n\n  clientHtml += renderTaxSavingScenariosHtml(parsed.tax_saving_scenarios);\n  clientHtml += renderFuturePlanningHtml(parsed.future_tax_planning);\n}\n\nclientHtml += '</div>';\n\nconst plainLines = [];\nplainLines.push('TAX ADVISORY REPORT (FULL — INTERNAL REVIEW COPY)');\nplainLines.push('====================');\nplainLines.push('');\nplainLines.push('Client Email: ' + prev.client_email);\nif (panNumber) plainLines.push('PAN: ' + panNumber);\nif (assessmentYear) plainLines.push('Assessment Year: ' + assessmentYear);\nplainLines.push('Recommended ITR Form: ' + recommendedType);\nif (recommendedRegime) plainLines.push('Recommended Tax Regime: ' + recommendedRegime);\nplainLines.push('');\n\nif (parsed.parse_error) {\n  plainLines.push('NOTE: Could not fully parse the AI response.');\n  plainLines.push(parsed.raw || '');\n} else {\n  plainLines.push(...renderTaxComputationPlain(parsed.tax_computation));\n\n  if (Array.isArray(parsed.tax_saving_scenarios) && parsed.tax_saving_scenarios.length) {\n    plainLines.push('TAX-SAVING OPPORTUNITIES (WITH WORKED EXAMPLES)');\n    plainLines.push('------------------------------------------------');\n    for (const s of parsed.tax_saving_scenarios) {\n      plainLines.push('  * ' + (s.section || '-') + ': ' + (s.description || '-') + ' | Additional Eligible Amount: ' + renderValue(s.additional_eligible_amount) + ' | Est. Tax Saved: ' + renderValue(s.estimated_tax_saved));\n    }\n    plainLines.push('');\n  }\n\n  if (Array.isArray(parsed.future_tax_planning) && parsed.future_tax_planning.length) {\n    plainLines.push('FUTURE TAX PLANNING (LEGAL METHODS)');\n    plainLines.push('-------------------------------------');\n    for (const v of parsed.future_tax_planning) plainLines.push('  - ' + renderValue(v));\n    plainLines.push('  (Subject to change in future Finance Acts -- reconfirm before relying on these in a later year.)');\n    plainLines.push('');\n  }\n\n  for (const [key, val] of Object.entries(parsed)) {\n    if (SPECIAL_KEYS.includes(key)) continue;\n    const heading = fmt(key);\n    plainLines.push(heading.toUpperCase());\n    plainLines.push('-'.repeat(heading.length));\n    if (Array.isArray(val)) {\n      if (val.length && typeof val[0] === 'object') {\n        for (const row of val) {\n          plainLines.push('  * ' + Object.entries(row).map(([k, v]) => fmt(k) + ': ' + renderValue(v)).join('  |  '));\n        }\n      } else {\n        for (const v of val) plainLines.push('  - ' + renderValue(v));\n      }\n    } else if (typeof val === 'object' && val !== null) {\n      for (const [k, v] of Object.entries(val)) plainLines.push('  ' + fmt(k) + ': ' + renderValue(v));\n    } else {\n      plainLines.push('  ' + renderValue(val));\n    }\n    plainLines.push('');\n  }\n}\nplainLines.push('---');\nplainLines.push('This is an AI-assisted advisory report reviewed by a Chartered Accountant before release. Figures are based strictly on the documents and information you supplied and should be verified against the applicable Finance Act for the relevant Assessment Year before filing. This is not a filed return.');\nplainLines.push('Internal review copy — includes all flags and verification notes. Not for the client.');\nconst reportPlain = plainLines.join('\\n');\n\nreturn [{\n  json: {\n    client_email: prev.client_email,\n    client_name: prev.client_name || 'Unknown',\n    itr_type: prev.itr_type,\n    assessment_year: assessmentYear,\n    pan_number: panNumber,\n    recommended_itr_type: recommendedType,\n    parsed_report: parsed,\n    report_html_ca: caHtml,\n    report_html_client: clientHtml,\n    report_plain: reportPlain\n  }\n}];\n"
+      },
+      "id": "e36efb47-f983-4e22-a4f2-74b54866c036",
+      "name": "Parse Agent Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        288,
+        64
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "sendAndWait",
+        "sendTo": "YOUR_EMAIL@example.com",
+        "subject": "=Approve {{$('Parse Agent Response').item.json.itr_type}} report for {{$('Parse Agent Response').item.json.client_email}}",
+        "message": "=Draft report for {{$('Parse Agent Response').item.json.client_email}} ({{$('Parse Agent Response').item.json.itr_type}}):<br><br>{{$('Parse Agent Response').item.json.report_html_ca}}<br><br>Approve to send this to the client?",
+        "approvalOptions": {
+          "values": {
+            "approvalType": "double",
+            "approveLabel": "Approve & Send",
+            "disapproveLabel": "Needs Revision"
+          }
+        },
+        "options": {}
+      },
+      "id": "ed44d9c1-45ba-4de4-86a9-d1d4c8bc5ded",
+      "name": "CA Approval (Send and Wait)",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        496,
+        352
+      ],
+      "webhookId": "506488a5-9a94-4c56-8869-121d5d5877af",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 3000,
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "REPLACE_WITH_YOUR_CREDENTIAL_ID",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "conditions": [
+            {
+              "leftValue": "={{$json.data.approved}}",
+              "operator": {
+                "operation": "equals",
+                "type": "boolean"
+              },
+              "rightValue": true
+            }
+          ],
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 1
+          }
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "c99072ed-011e-4376-889f-0113e5e60c95",
+      "name": "Approved?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        752,
+        448
+      ]
+    },
+    {
+      "parameters": {
+        "sendTo": "={{$(\"Parse Agent Response\").first().json.client_email}}",
+        "subject": "=Your {{$(\"Parse Agent Response\").first().json.itr_type}} Tax Advisory Report",
+        "message": "={{$(\"Parse Agent Response\").first().json.report_html_client}}<p>With Regards,<br>CA Gitanjali Kansal</p>",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "id": "e766dea6-7dc0-4063-8bad-840652af64e5",
+      "name": "Send Final Report to Client",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        944,
+        176
+      ],
+      "webhookId": "1e2613c0-329f-4c6e-9d6d-b4d85c655863",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 3000,
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "REPLACE_WITH_YOUR_CREDENTIAL_ID",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "appendOrUpdate",
+        "documentId": {
+          "__rl": true,
+          "cachedResultName": "ITR Consultancy CRM",
+          "mode": "id",
+          "value": ""
+        },
+        "sheetName": {
+          "__rl": true,
+          "cachedResultName": "INTAKE",
+          "mode": "name",
+          "value": "INTAKE"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "matchingColumns": [
+            "submission_id"
+          ],
+          "schema": [
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "submission_id",
+              "id": "submission_id",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "email",
+              "id": "email",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "report_status",
+              "id": "report_status",
+              "required": false,
+              "type": "string"
+            }
+          ],
+          "value": {
+            "email": "={{ $('Parse Agent Response').first().json.client_email }}",
+            "report_status": "REPORT SENT",
+            "submission_id": "={{ $('Parse Agent Response').first().json.client_submission_id }}"
+          }
+        },
+        "options": {}
+      },
+      "id": "4424d1e0-a5f0-44a5-93ed-d8afce4a4d19",
+      "name": "Log Report Status in CRM",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        1120,
+        112
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 3000,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "REPLACE_WITH_YOUR_CREDENTIAL_ID",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sendTo": "YOUR_EMAIL@example.com",
+        "subject": "=Revision needed: {{$(\"Parse Agent Response\").first().json.itr_type}} for {{$(\"Parse Agent Response\").first().json.client_email}}",
+        "emailType": "text",
+        "message": "You marked this report as needing revision. Please edit and send manually.",
+        "options": {}
+      },
+      "id": "837606d3-04cc-4422-ae95-68c847d02122",
+      "name": "Notify Self — Needs Revision",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        944,
+        640
+      ],
+      "webhookId": "5d4aa600-200b-4fa9-9046-b50a6c9d3668",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 3000,
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "REPLACE_WITH_YOUR_CREDENTIAL_ID",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "appendOrUpdate",
+        "documentId": {
+          "__rl": true,
+          "cachedResultName": "ITR Consultancy CRM",
+          "mode": "id",
+          "value": ""
+        },
+        "sheetName": {
+          "__rl": true,
+          "cachedResultName": "INTAKE",
+          "mode": "name",
+          "value": "INTAKE"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "matchingColumns": [
+            "submission_id"
+          ],
+          "schema": [
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "submission_id",
+              "id": "submission_id",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "email",
+              "id": "email",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "report_status",
+              "id": "report_status",
+              "required": false,
+              "type": "string"
+            }
+          ],
+          "value": {
+            "email": "={{ $('Parse Agent Response').first().json.client_email }}",
+            "report_status": "NEEDS REVISION",
+            "submission_id": "={{ $('Parse Agent Response').first().json.client_submission_id }}"
+          }
+        },
+        "options": {}
+      },
+      "id": "4ed7f3ea-0882-4e90-996b-f36acb1b3620",
+      "name": "Log Revision Status in CRM",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        1152,
+        736
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 3000,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "REPLACE_WITH_YOUR_CREDENTIAL_ID",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "createFromText",
+        "content": "={{$json.report_plain}}",
+        "name": "={{$json.client_name}} - {{$json.itr_type}} - Tax Advisory Report",
+        "driveId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "My Drive"
+        },
+        "folderId": {
+          "__rl": true,
+          "cachedResultName": "ITR Client Uploads",
+          "mode": "id",
+          "value": "REPLACE_WITH_YOUR_PARENT_FOLDER_ID"
+        },
+        "options": {
+          "convertToGoogleDocument": true
+        }
+      },
+      "id": "ec7bbb33-675d-4a94-a536-cd5ad865ba65",
+      "name": "Create Editable Report Doc",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        192,
+        352
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000,
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "REPLACE_WITH_YOUR_CREDENTIAL_ID",
+          "name": "Google Drive account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "download",
+        "fileId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{$json.id}}"
+        },
+        "options": {
+          "binaryPropertyName": "docx_data",
+          "googleFileConversion": {
+            "conversion": {
+              "docsToFormat": "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+            }
+          },
+          "fileName": "={{$('Parse Agent Response').item.json.client_email}}_{{$('Parse Agent Response').item.json.itr_type}}_Report.docx"
+        }
+      },
+      "id": "f171c5db-86a8-466d-a631-13c150e87415",
+      "name": "Export Report as DOCX",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        480,
+        208
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000,
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "REPLACE_WITH_YOUR_CREDENTIAL_ID",
+          "name": "Google Drive account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "download",
+        "fileId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $('Create Editable Report Doc').item.json.id }}"
+        },
+        "options": {
+          "binaryPropertyName": "pdf_data",
+          "googleFileConversion": {
+            "conversion": {
+              "docsToFormat": "application/pdf"
+            }
+          },
+          "fileName": "={{$('Parse Agent Response').item.json.client_email}}_{{$('Parse Agent Response').item.json.itr_type}}_Report.pdf"
+        }
+      },
+      "id": "1de06ca0-6cc3-41f9-9515-11f8cf819f00",
+      "name": "Export Report as PDF",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        480,
+        704
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000,
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "REPLACE_WITH_YOUR_CREDENTIAL_ID",
+          "name": "Google Drive account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineByPosition",
+        "options": {}
+      },
+      "id": "59a2e357-3aff-4d66-a4a0-1e2f786671f4",
+      "name": "Combine Docx and Pdf",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        688,
+        192
+      ]
+    },
+    {
+      "parameters": {
+        "sendTo": "YOUR_EMAIL@example.com",
+        "subject": "=Editable report files: {{$('Parse Agent Response').item.json.itr_type}} for {{$('Parse Agent Response').item.json.client_email}}",
+        "message": "=Editable Word and PDF versions of the draft {{$('Parse Agent Response').item.json.itr_type}} report for {{$('Parse Agent Response').item.json.client_email}} are attached. Feel free to make any changes in the Word file before deciding on the approval request that follows.",
+        "options": {
+          "appendAttribution": false,
+          "attachmentsUi": {
+            "attachmentsBinary": [
+              {
+                "property": "docx_data,pdf_data"
+              }
+            ]
+          }
+        }
+      },
+      "id": "5ffa0ea4-68b3-4ae0-b1f7-3742a18ee3dd",
+      "name": "Send Editable Report to CA",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        944,
+        432
+      ],
+      "webhookId": "41becc0c-cf4d-4e99-86a9-223a023eaaa4",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 3000,
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "REPLACE_WITH_YOUR_CREDENTIAL_ID",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "id": "a1e3b6c2-b13b-42ad-8454-dd240d21c6a0",
+      "name": "Missing file_id — Stop",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        -1104,
+        624
+      ]
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "id": "56347e92-5346-42c4-bfd6-2f8746890bf0",
+      "name": "Tax KB Embeddings",
+      "type": "@n8n/n8n-nodes-langchain.embeddingsOpenAi",
+      "typeVersion": 1.2,
+      "position": [
+        96,
+        800
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 3000
+    },
+    {
+      "parameters": {
+        "mode": "retrieve-as-tool",
+        "toolDescription": "Search verified Indian Income Tax Act sections, current slab rates, deduction limits, and CBDT circulars. Use this before stating any numeric tax figure, rate, or limit to confirm it against the authoritative source rather than relying on memory.",
+        "tableName": {
+          "__rl": true,
+          "mode": "id",
+          "value": "tax_knowledge_base"
+        },
+        "options": {}
+      },
+      "id": "a7e451fa-9573-4011-bd03-2c56c444a345",
+      "name": "Tax Knowledge Base Tool",
+      "type": "@n8n/n8n-nodes-langchain.vectorStoreSupabase",
+      "typeVersion": 1.3,
+      "position": [
+        256,
+        800
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 3000,
+      "credentials": {
+        "supabaseApi": {
+          "id": "REPLACE_WITH_YOUR_CREDENTIAL_ID",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "id": "bd37fde5-4646-4b30-a29a-565734db7514",
+      "name": "Search Income Tax Website (Tavily)",
+      "type": "@n8n/mcp-registry.tavily",
+      "typeVersion": 1.1,
+      "position": [
+        592,
+        880
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 3000,
+      "credentials": {
+        "tavilyMcpOAuth2Api": {
+          "id": "REPLACE_WITH_YOUR_CREDENTIAL_ID",
+          "name": "Tavily account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "description": "Call this immediately after 'Search Income Tax Website (Tavily)' returns content you have used to verify a tax figure from an official source. Saves that verified content permanently into the knowledge base so future questions can be answered instantly without re-searching. Do not call this for content you are unsure about or that did not come from an official government source.",
+        "workflowId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "REPLACE_WITH_WORKFLOW_5_ID_AFTER_IMPORT",
+          "cachedResultName": "Tax Knowledge Base — Live Search Cache Writer"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "content": "={{ $fromAI('content', 'The verified tax law text to cache, in full, exactly as found on the official source', 'string') }}",
+            "section_reference": "={{ $fromAI('section_reference', 'The Income Tax Act section or topic this content relates to, e.g. Section 80D, Slab Rates, Section 87A', 'string') }}",
+            "effective_from": "={{ $fromAI('effective_from', 'The Assessment Year this content applies to, e.g. AY 2026-27', 'string') }}",
+            "document_type": "={{ $fromAI('document_type', 'One of: circular, notification, bare-act-section, slab-rates, faq, live-fetched', 'string') }}",
+            "source_url": "={{ $fromAI('source_url', 'The exact official URL (incometaxindia.gov.in or egazette.gov.in) this content was fetched from', 'string') }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "content",
+              "displayName": "content",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "section_reference",
+              "displayName": "section_reference",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "effective_from",
+              "displayName": "effective_from",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "document_type",
+              "displayName": "document_type",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "source_url",
+              "displayName": "source_url",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        }
+      },
+      "id": "27254d98-2701-40ee-b620-4376f079cd2e",
+      "name": "Cache Tax Info in Knowledge Base",
+      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+      "typeVersion": 2.2,
+      "position": [
+        416,
+        960
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 3000
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\n// FIX (round 2): the built-in 'Extract PDF Text' node completely replaces each\n// item's json with just {numpages, info, text, version} -- it does NOT carry\n// forward client_email/pan_number/deduction_80c/etc from earlier steps, no matter\n// what this node does with 'first'. So pull the client's declared info directly\n// from 'Extract Client Info from Filename' by name (same pattern Parse Agent\n// Response already uses for 'prev'), not from the (stripped) pipeline item.\nconst declaredInfo = $('Extract Client Info from Filename').first().json;\n\nconst sections = items.map((it, idx) => {\n  const label = (it.binary && it.binary.data && it.binary.data.fileName) || ('Document ' + (idx + 1));\n  const text = (it.json.text || '(no text extracted -- possibly unreadable or wrong password)');\n  return '===== DOCUMENT: ' + label + ' =====\\n' + text;\n}).join('\\n\\n');\n\nreturn [{\n  json: {\n    ...declaredInfo,\n    document_count: items.length,\n    combined_text: sections,\n    text: sections\n  }\n}];"
+      },
+      "id": "a628c583-70d6-41bb-993b-9c7bbbfcfc7f",
+      "name": "Combine All Document Texts",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -112,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "cachedResultName": "ITR Consultancy CRM",
+          "mode": "list",
+          "value": ""
+        },
+        "sheetName": {
+          "__rl": true,
+          "cachedResultName": "INTAKE",
+          "mode": "list",
+          "value": ""
+        },
+        "filtersUI": {
+          "values": [
+            {
+              "lookupColumn": "email",
+              "lookupValue": "={{$json.client_email}}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "cc411e6f-7426-4692-bdcf-98650312cb3f",
+      "name": "Lookup Client in CRM",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        -1120,
+        320
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 3000,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "REPLACE_WITH_YOUR_CREDENTIAL_ID",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const matches = $input.all().map(i => i.json);\nif (matches.length === 0) {\n  return [{ json: { no_match: true } }];\n}\nmatches.sort((a, b) => {\n  const aTime = new Date(a.classified_at || 0).getTime();\n  const bTime = new Date(b.classified_at || 0).getTime();\n  return bTime - aTime;\n});\nreturn [{ json: matches[0] }];"
+      },
+      "id": "58cefa59-ca3c-45b9-89ba-9542cd3edda4",
+      "name": "Pick Most Recent CRM Match",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -960,
+        192
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// The trigger payload (client_name etc.) can be stale -- e.g. a manual test\n// re-run, or a future upstream bug -- so treat the CRM sheet (source of truth\n// used by the Intake workflow) as authoritative for client identity and tax\n// figures. Only file_ids/email_body/client_email stay from this specific\n// trigger event; everything else is overwritten from the matching CRM row.\nconst trigger = $('Has file_id?').first().json;\nconst crm = $input.all()[0].json;\n\nif (crm.no_match) {\n  return [{ json: { ...trigger, crm_match: false } }];\n}\n\nreturn [{\n  json: {\n    ...trigger,\n    client_name: crm.name || trigger.client_name || 'Unknown',\n    itr_type: crm.itr_type || trigger.itr_type,\n    client_dob: crm.date_of_birth != null ? String(crm.date_of_birth) : trigger.client_dob,\n    pan_number: crm.pan_number || trigger.pan_number,\n    assessment_year: crm.assessment_year || trigger.assessment_year,\n    financial_year: crm.financial_year || trigger.financial_year,\n    deduction_80c: crm.deduction_80c != null ? String(crm.deduction_80c) : trigger.deduction_80c,\n    deduction_80d: crm.deduction_80d != null ? String(crm.deduction_80d) : trigger.deduction_80d,\n    deduction_80tta_ttb: crm.deduction_80tta_ttb != null ? String(crm.deduction_80tta_ttb) : trigger.deduction_80tta_ttb,\n    hra_amount: crm.hra_amount != null ? String(crm.hra_amount) : trigger.hra_amount,\n    home_loan_interest_24b: crm.home_loan_interest_24b != null ? String(crm.home_loan_interest_24b) : trigger.home_loan_interest_24b,\n    deduction_80ccd_1b: crm.deduction_80ccd_1b != null ? String(crm.deduction_80ccd_1b) : trigger.deduction_80ccd_1b,\n    crm_submission_id: crm.submission_id || null,\n    crm_match: true\n  }\n}];\n"
+      },
+      "id": "f0321367-399c-401f-8cec-c82176de6361",
+      "name": "Reconcile Client Info with CRM",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -816,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "cachedResultName": "Claude Sonnet 5",
+          "mode": "list",
+          "value": "claude-sonnet-5"
+        },
+        "options": {
+          "maxTokensToSample": 12000,
+          "thinkingMode": "adaptive",
+          "effort": "low"
+        }
+      },
+      "id": "f4af38db-4e4c-419c-91b7-4640c934c3fe",
+      "name": "Anthropic Chat Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
+      "typeVersion": 1.6,
+      "position": [
+        64,
+        608
+      ]
+    }
+  ],
+  "connections": {
+    "Receive Document from Intake Workflow": {
+      "main": [
+        [
+          {
+            "node": "Has file_id?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has file_id?": {
+      "main": [
+        [
+          {
+            "node": "Lookup Client in CRM",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Missing file_id — Stop",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Client Info from Filename": {
+      "main": [
+        [
+          {
+            "node": "Download Uploaded Document",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download Uploaded Document": {
+      "main": [
+        [
+          {
+            "node": "Determine PDF Password (Fallback)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Determine PDF Password (Fallback)": {
+      "main": [
+        [
+          {
+            "node": "Extract PDF Text",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Agent Prompt": {
+      "main": [
+        [
+          {
+            "node": "ITR Analysis Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ITR Analysis Agent": {
+      "main": [
+        [
+          {
+            "node": "Parse Agent Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "CA Approval (Send and Wait)": {
+      "main": [
+        [
+          {
+            "node": "Approved?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Approved?": {
+      "main": [
+        [
+          {
+            "node": "Send Final Report to Client",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Notify Self — Needs Revision",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Final Report to Client": {
+      "main": [
+        [
+          {
+            "node": "Log Report Status in CRM",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Notify Self — Needs Revision": {
+      "main": [
+        [
+          {
+            "node": "Log Revision Status in CRM",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Editable Report Doc": {
+      "main": [
+        [
+          {
+            "node": "Export Report as DOCX",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Export Report as PDF",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Export Report as DOCX": {
+      "main": [
+        [
+          {
+            "node": "Combine Docx and Pdf",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Export Report as PDF": {
+      "main": [
+        [
+          {
+            "node": "Combine Docx and Pdf",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Combine Docx and Pdf": {
+      "main": [
+        [
+          {
+            "node": "Send Editable Report to CA",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Editable Report to CA": {
+      "main": [
+        [
+          {
+            "node": "CA Approval (Send and Wait)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Agent Response": {
+      "main": [
+        [
+          {
+            "node": "Create Editable Report Doc",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tax KB Embeddings": {
+      "ai_embedding": [
+        [
+          {
+            "node": "Tax Knowledge Base Tool",
+            "type": "ai_embedding",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tax Knowledge Base Tool": {
+      "ai_tool": [
+        [
+          {
+            "node": "ITR Analysis Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Search Income Tax Website (Tavily)": {
+      "ai_tool": [
+        [
+          {
+            "node": "ITR Analysis Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Cache Tax Info in Knowledge Base": {
+      "ai_tool": [
+        [
+          {
+            "node": "ITR Analysis Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract PDF Text": {
+      "main": [
+        [
+          {
+            "node": "Combine All Document Texts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Combine All Document Texts": {
+      "main": [
+        [
+          {
+            "node": "Build Agent Prompt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Lookup Client in CRM": {
+      "main": [
+        [
+          {
+            "node": "Pick Most Recent CRM Match",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pick Most Recent CRM Match": {
+      "main": [
+        [
+          {
+            "node": "Reconcile Client Info with CRM",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Reconcile Client Info with CRM": {
+      "main": [
+        [
+          {
+            "node": "Extract Client Info from Filename",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Anthropic Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "ITR Analysis Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

@@ -1,0 +1,512 @@
+{
+  "name": "Digital ITR Consultancy — Document Intake via Email",
+  "nodes": [
+    {
+      "parameters": {
+        "pollTimes": {
+          "item": [
+            {
+              "mode": "everyMinute"
+            }
+          ]
+        },
+        "simple": false,
+        "filters": {
+          "q": "has:attachment subject:\"Documents needed\"",
+          "readStatus": "unread"
+        },
+        "options": {
+          "downloadAttachments": true
+        }
+      },
+      "id": "dcca49ad-41dc-49fc-94f2-ef7a07cc731d",
+      "name": "Watch Inbox for Client Documents",
+      "type": "n8n-nodes-base.gmailTrigger",
+      "typeVersion": 1.4,
+      "position": [
+        0,
+        0
+      ],
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "REPLACE_WITH_YOUR_CREDENTIAL_ID",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "markAsRead",
+        "messageId": "={{$json.id}}"
+      },
+      "id": "5109e453-bc95-4751-b031-6d98b497cf0f",
+      "name": "Mark Message as Read",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        144,
+        176
+      ],
+      "webhookId": "a410ce71-b461-450b-9b47-aa669d620734",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 3000,
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "REPLACE_WITH_YOUR_CREDENTIAL_ID",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const item = $('Watch Inbox for Client Documents').first().json;\nlet raw = '';\nif (typeof item.from === 'string') raw = item.from;\nelse if (item.from && item.from.text) raw = item.from.text;\nelse if (item.from && item.from.value && item.from.value[0]) raw = item.from.value[0].address;\nelse raw = JSON.stringify(item.from || item.headers || {});\n\nconst match = raw.match(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}/);\nconst senderEmail = match ? match[0].toLowerCase() : '';\n\nreturn [{ json: { sender_email: senderEmail } }];"
+      },
+      "id": "d1819d57-34db-4eb0-ab6d-589793079a75",
+      "name": "Extract Sender Email",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        256,
+        48
+      ]
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "",
+          "mode": "list",
+          "cachedResultName": "ITR Consultancy CRM"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "",
+          "mode": "list",
+          "cachedResultName": "INTAKE"
+        },
+        "filtersUI": {
+          "values": [
+            {
+              "lookupColumn": "email",
+              "lookupValue": "={{$json.sender_email}}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "e6e86509-aef9-4c2c-b5b1-d13f99893349",
+      "name": "Lookup Client in CRM",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        448,
+        144
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 3000,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "REPLACE_WITH_YOUR_CREDENTIAL_ID",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const matches = $input.all().map(i => i.json);\nif (matches.length === 0) {\n  return [{ json: { no_match: true } }];\n}\nmatches.sort((a, b) => {\n  const aTime = new Date(a.classified_at || 0).getTime();\n  const bTime = new Date(b.classified_at || 0).getTime();\n  return bTime - aTime;\n});\nreturn [{ json: matches[0] }];"
+      },
+      "id": "5dbf00a4-ed40-472c-91e9-c0966fda95c0",
+      "name": "Pick Most Recent Client Match",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        608,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "folder",
+        "name": "={{$json.name}} - {{$json.email}} - Documents",
+        "driveId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "My Drive"
+        },
+        "folderId": {
+          "__rl": true,
+          "value": "REPLACE_WITH_YOUR_PARENT_FOLDER_ID",
+          "mode": "list",
+          "cachedResultName": "ITR Client Uploads"
+        },
+        "options": {}
+      },
+      "id": "c5c137fa-5c7f-4cf7-ad3b-2dd9a725d691",
+      "name": "Create Client Folder",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        752,
+        144
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000,
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "REPLACE_WITH_YOUR_CREDENTIAL_ID",
+          "name": "Google Drive account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const folder = $input.all()[0].json;\nconst crm = $('Pick Most Recent Client Match').first().json;\nconst triggerItem = $('Watch Inbox for Client Documents').first();\n\nconst clientName = crm.name || 'Unknown';\nconst clientEmail = crm.email || '';\nconst itrType = crm.itr_type || 'ITR-1';\nconst clientDob = crm.date_of_birth != null ? String(crm.date_of_birth) : '';\nconst panNumber = crm.pan_number || '';\nconst assessmentYear = crm.assessment_year || '';\nconst financialYear = crm.financial_year || '';\nconst deduction80c = crm.deduction_80c != null ? String(crm.deduction_80c) : '0';\nconst deduction80d = crm.deduction_80d != null ? String(crm.deduction_80d) : '0';\nconst deduction80ttaTtb = crm.deduction_80tta_ttb != null ? String(crm.deduction_80tta_ttb) : '0';\nconst hraAmount = crm.hra_amount != null ? String(crm.hra_amount) : '0';\nconst homeLoanInterest24b = crm.home_loan_interest_24b != null ? String(crm.home_loan_interest_24b) : '0';\nconst deduction80ccd1b = crm.deduction_80ccd_1b != null ? String(crm.deduction_80ccd_1b) : '0';\nconst folderId = folder.id;\n\nconst binaryKeys = Object.keys(triggerItem.binary || {}).filter(k => k.startsWith('attachment_'));\n\nconst output = [];\nfor (const key of binaryKeys) {\n  const bin = triggerItem.binary[key];\n  const originalName = bin.fileName || (key + '.pdf');\n  output.push({\n    json: {\n      client_name: clientName,\n      client_email: clientEmail,\n      itr_type: itrType,\n      client_dob: clientDob,\n      pan_number: panNumber,\n      assessment_year: assessmentYear,\n      financial_year: financialYear,\n      deduction_80c: deduction80c,\n      deduction_80d: deduction80d,\n      deduction_80tta_ttb: deduction80ttaTtb,\n      hra_amount: hraAmount,\n      home_loan_interest_24b: homeLoanInterest24b,\n      deduction_80ccd_1b: deduction80ccd1b,\n      folder_id: folderId,\n      drive_filename: clientEmail + '__' + itrType + '__' + originalName\n    },\n    binary: { data: bin }\n  });\n}\n\nif (output.length === 0) {\n  return [{ json: { skipped: true, reason: 'No attachments found on this message' } }];\n}\n\nreturn output;"
+      },
+      "id": "b9082a91-610d-4c26-af7a-814e1043acab",
+      "name": "Build Attachment Items",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        928,
+        128
+      ]
+    },
+    {
+      "parameters": {
+        "name": "={{$json.drive_filename}}",
+        "driveId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "My Drive"
+        },
+        "folderId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{$json.folder_id}}"
+        },
+        "options": {}
+      },
+      "id": "ff8a24e8-8a32-4834-ac5a-8881e8928981",
+      "name": "Upload Attachment to Client Folder",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        1152,
+        128
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000,
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "REPLACE_WITH_YOUR_CREDENTIAL_ID",
+          "name": "Google Drive account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "cachedResultName": "Digital ITR Consultancy — Report Generation & Approval",
+          "mode": "id",
+          "value": "REPLACE_WITH_WORKFLOW_3_ID_AFTER_IMPORT"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "client_dob": "={{ String($json.client_dob) }}",
+            "client_email": "={{ $json.client_email }}",
+            "client_name": "={{ $json.client_name }}",
+            "email_body": "={{ $('Watch Inbox for Client Documents').first().json.text }}",
+            "file_ids": "={{ $json.file_ids }}",
+            "itr_type": "={{ $json.itr_type }}",
+            "pan_number": "={{ $json.pan_number }}",
+            "assessment_year": "={{ $json.assessment_year }}",
+            "financial_year": "={{ $json.financial_year }}",
+            "deduction_80c": "={{ $json.deduction_80c }}",
+            "deduction_80d": "={{ $json.deduction_80d }}",
+            "deduction_80tta_ttb": "={{ $json.deduction_80tta_ttb }}",
+            "hra_amount": "={{ $json.hra_amount }}",
+            "home_loan_interest_24b": "={{ $json.home_loan_interest_24b }}",
+            "deduction_80ccd_1b": "={{ $json.deduction_80ccd_1b }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "canBeUsedToMatch": false,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "file_ids",
+              "id": "file_ids",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": false,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "client_email",
+              "id": "client_email",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": false,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "itr_type",
+              "id": "itr_type",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": false,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "email_body",
+              "id": "email_body",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": false,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "client_dob",
+              "id": "client_dob",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": false,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "client_name",
+              "id": "client_name",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": false,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "pan_number",
+              "id": "pan_number",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": false,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "assessment_year",
+              "id": "assessment_year",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": false,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "financial_year",
+              "id": "financial_year",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": false,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "deduction_80c",
+              "id": "deduction_80c",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": false,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "deduction_80d",
+              "id": "deduction_80d",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": false,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "deduction_80tta_ttb",
+              "id": "deduction_80tta_ttb",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": false,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "hra_amount",
+              "id": "hra_amount",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": false,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "home_loan_interest_24b",
+              "id": "home_loan_interest_24b",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": false,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "deduction_80ccd_1b",
+              "id": "deduction_80ccd_1b",
+              "required": false,
+              "type": "string"
+            }
+          ],
+          "attemptToConvertTypes": true,
+          "convertFieldsToString": true
+        },
+        "options": {
+          "waitForSubWorkflow": false
+        }
+      },
+      "id": "c5456c6c-c501-45a8-a61b-18458db3c501",
+      "name": "Trigger Report Generation",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        1376,
+        128
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 3000
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\nconst fileIds = items.map(i => i.json.id).filter(Boolean);\nconst first = $('Build Attachment Items').first().json;\nreturn [{\n  json: {\n    client_email: first.client_email,\n    client_name: first.client_name,\n    itr_type: first.itr_type,\n    client_dob: first.client_dob,\n    file_ids: fileIds.join(',')\n  }\n}];"
+      },
+      "id": "66110f06-8f5f-42e5-a82a-3fccb66d1f52",
+      "name": "Aggregate Uploaded File IDs",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1264,
+        0
+      ]
+    }
+  ],
+  "connections": {
+    "Watch Inbox for Client Documents": {
+      "main": [
+        [
+          {
+            "node": "Mark Message as Read",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mark Message as Read": {
+      "main": [
+        [
+          {
+            "node": "Extract Sender Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Sender Email": {
+      "main": [
+        [
+          {
+            "node": "Lookup Client in CRM",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Lookup Client in CRM": {
+      "main": [
+        [
+          {
+            "node": "Pick Most Recent Client Match",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pick Most Recent Client Match": {
+      "main": [
+        [
+          {
+            "node": "Create Client Folder",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Client Folder": {
+      "main": [
+        [
+          {
+            "node": "Build Attachment Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Attachment Items": {
+      "main": [
+        [
+          {
+            "node": "Upload Attachment to Client Folder",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upload Attachment to Client Folder": {
+      "main": [
+        [
+          {
+            "node": "Aggregate Uploaded File IDs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Aggregate Uploaded File IDs": {
+      "main": [
+        [
+          {
+            "node": "Trigger Report Generation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}
