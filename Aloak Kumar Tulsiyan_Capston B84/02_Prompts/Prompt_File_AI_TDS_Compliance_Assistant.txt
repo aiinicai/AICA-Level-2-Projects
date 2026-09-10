@@ -1,0 +1,73 @@
+AI TDS COMPLIANCE ASSISTANT — CONSOLIDATED DEVELOPMENT PROMPT LOG
+
+Participant: CA Alok Kumar Tulsiyan
+Membership No.: 094644
+ICAI AI Level 2 Batch: B 84 — Gurugram
+
+PROJECT OBJECTIVE
+Build a professional TDS Compliance Assistant for a practising Chartered Accountant. The application should accept invoices and invoice data, extract relevant fields, maintain a vendor-wise TDS register, calculate applicable TDS based on configured rules and cumulative thresholds, detect duplicates, and provide summaries/export facilities.
+
+1. CORE APPLICATION PROMPT
+Create a web application named "AI TDS Compliance Assistant" with the following modules:
+- Dashboard
+- Upload Documents
+- TDS Register
+- Summaries
+- TDS Rules
+- Settings
+
+The application should support upload of a single invoice PDF, multiple invoices, and invoice data from Excel. Extract and store vendor name, invoice number, invoice date, PAN/GSTIN where available, nature of payment, taxable/TDS base, GST components, gross amount, TDS category, applicable section, rate, threshold status, TDS amount and cumulative vendor position.
+
+2. CUMULATIVE TDS REQUIREMENT
+Maintain the data of all invoices for the financial year. If an earlier invoice is below the applicable threshold but a later invoice causes the vendor-wise threshold to be crossed, the system must consider the historical invoices and apply the configured TDS rule correctly. Cumulative calculations must use all prior valid invoices of the same vendor in the relevant financial year, not only the invoices uploaded in the current batch.
+
+3. FAST INVOICE PROCESSING / MINIMUM AI USE
+For digitally generated PDFs, first extract selectable text using normal PDF text extraction. Use deterministic parsing, labels, vendor history and TDS Rules before any AI call. AI should be a fallback for scanned or genuinely ambiguous documents, not the normal processing path.
+
+Normal flow:
+Upload -> PDF text extraction -> rule-based field extraction -> database save -> TDS calculation -> register display.
+
+4. TDS BASE EXTRACTION
+Do not expect the invoice to contain the words "TDS Base". Derive the TDS base from labels such as taxable value, professional fees, consultancy fees, service charges, rent/hire charges, basic amount, subtotal or amount before tax. If gross and separately identified GST are available, derive:
+TDS Base = Gross Amount - CGST - SGST - IGST.
+
+Never treat GST rates, quantities, serial numbers, episode numbers, bank account numbers, phone numbers, invoice numbers, HSN/SAC codes or dates as monetary values.
+
+5. AMOUNT VALIDATION
+Use arithmetic validation. Example:
+Professional Fees = 25,000
+CGST = 2,000
+SGST = 2,000
+Grand Total = 29,000
+Expected TDS Base = 25,000; GST = 4,000; Gross = 29,000.
+
+If CGST 9% and SGST 9% are shown, 9 is a tax rate and must never become an invoice amount.
+
+6. VENDOR MEMORY
+Use PAN/GSTIN and confirmed vendor information to reuse vendor classification. Once a vendor is confirmed as a particular payment category/TDS rule, future invoices should use the saved vendor profile unless the user changes it.
+
+7. DUPLICATE HANDLING
+Do not delete duplicate invoices. Keep the first invoice as the effective/original invoice. Keep subsequent identical or duplicate invoices visible in the TDS Register with status "DUPLICATE". The duplicate row should have zero impact on cumulative amount, catch-up TDS and current TDS.
+
+8. REGISTER SEARCH AND FILTERS
+Provide a Search By dropdown in the TDS Register with options such as All Fields, Vendor, Invoice No., Category, Section, TDS Status and Review Status. Provide a value dropdown based on the chosen field, retain free-text search, and allow filtering for all documents, pending review and duplicates.
+
+9. BULK UPLOAD
+Process multiple invoices independently. One difficult invoice must not block the others. Show upload progress and insert successful invoices as processing completes. After a folder/batch finishes, recalculate the register consistently using all stored historical invoices.
+
+10. OUTPUT / REPORTING
+The TDS Register should show at least:
+Date, Vendor, Invoice No., Category, Section, Base, Previous Cumulative, New Cumulative, Rate, Catch-up, TDS Now, TDS Status and Review Status.
+Provide Excel export and summary screens.
+
+11. ERROR HANDLING
+An invoice should not disappear simply because a field is uncertain. Save it and mark it as Needs Review where appropriate. Do not generate fake vendor invoice numbers. An internal database UUID may be used but must not be displayed as the vendor's invoice number.
+
+12. TEST CASES USED
+A. Moving Visuals invoice no. 040726 — Professional fees 20,000 — expected base 20,000.
+B. Moving Visuals invoice no. 030726 — description contains EP 9,10,11 & 12; actual amount 66,666 — episode numbers must not be treated as money.
+C. SAM Editing Studio invoice 2026-27_09 — rent/hire 9,000, CGST 810, SGST 810, gross 10,620 — expected base 9,000.
+D. Same SAM invoice 2026-27_30 uploaded twice — keep both rows, mark one duplicate, duplicate financial effect zero.
+
+13. FINAL DESIGN PRINCIPLE
+Use deterministic program logic for routine invoice processing and use AI only for exceptions. Preserve an audit-friendly TDS register and make all calculations reviewable by the Chartered Accountant.
