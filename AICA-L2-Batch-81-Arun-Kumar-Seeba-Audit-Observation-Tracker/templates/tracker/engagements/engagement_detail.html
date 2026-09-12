@@ -1,0 +1,116 @@
+{% extends "tracker/base.html" %}
+{% load tracker_tags %}
+{% block title %}{{ engagement.engagement_code }} - Detail{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <div class="d-flex align-items-center gap-2"><h4 class="fw-bold mb-0">{{ engagement.engagement_code }}</h4>{{ engagement.status|status_badge }}</div>
+        <p class="text-muted small mb-0">{{ engagement.client.client_name }} | {{ engagement.financial_year }} | {{ engagement.audit_type }}</p>
+    </div>
+    <div class="d-flex gap-2">
+        {% if can_assign %}<a href="{% url 'engagement_edit' engagement.id %}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-pencil-square me-1"></i> Edit Engagement</a>{% endif %}
+        {% if can_create_q and engagement.status != 'Memo Issued' %}<a href="{% url 'query_create_with_eng' engagement.id %}" class="btn btn-primary btn-sm"><i class="bi bi-plus-lg me-1"></i> Raise Query</a>{% endif %}
+        {% if can_memo %}<a href="{% url 'memo_hub' engagement.id %}" class="btn btn-success btn-sm"><i class="bi bi-file-earmark-word-fill me-1"></i> Summary Memo Hub</a>{% endif %}
+        {% if not is_client and engagement.status != 'Memo Issued' %}<a href="{% url 'exception_request' engagement.id %}" class="btn btn-outline-danger btn-sm"><i class="bi bi-shield-exclamation me-1"></i> Request Exception</a>{% endif %}
+    </div>
+</div>
+
+{% if lead_partner_missing %}
+    <div class="alert alert-danger d-flex align-items-center mb-4">
+        <i class="bi bi-exclamation-triangle-fill fs-4 me-3"></i>
+        <div><strong>Mandatory Control Rule (Section 5.5):</strong> Exactly one active Audit Partner is mandatory before this engagement can be activated or signed off. {% if can_assign %}<a href="{% url 'team_assign' engagement.id %}" class="btn btn-sm btn-danger ms-3"><i class="bi bi-person-plus-fill me-1"></i> Assign Partner</a>{% endif %}</div>
+    </div>
+{% endif %}
+
+<div class="row g-4 mb-4">
+    <div class="col-md-7">
+        <div class="card shadow-sm h-100">
+            <div class="card-header bg-white d-flex justify-content-between align-items-center"><span class="fw-semibold"><i class="bi bi-info-circle me-1"></i> Engagement Overview</span>{% if can_assign %}<a href="{% url 'engagement_edit' engagement.id %}" class="btn btn-sm btn-outline-secondary py-0" style="font-size: 0.8rem;"><i class="bi bi-pencil me-1"></i> Edit</a>{% endif %}</div>
+            <div class="card-body">
+                <div class="row g-3 small">
+                    <div class="col-sm-6"><span class="text-muted">Client Organization:</span><br><strong>{{ engagement.client.client_name }}</strong> ({{ engagement.client.client_code }})</div>
+                    <div class="col-sm-6"><span class="text-muted">Constitution & Industry:</span><br>{{ engagement.client.constitution }} | {{ engagement.client.industry }}</div>
+                    <div class="col-sm-6"><span class="text-muted">Period Under Audit:</span><br>{{ engagement.period_from|date:"d-M-Y" }} to {{ engagement.period_to|date:"d-M-Y" }}</div>
+                    <div class="col-sm-6"><span class="text-muted">Planned Dates:</span><br>{{ engagement.planned_start|date:"d-M-Y" }} to {{ engagement.target_completion|date:"d-M-Y" }}</div>
+                    <div class="col-sm-6"><span class="text-muted">Coordinator Review Gate:</span><br>{% if engagement.client_coordinator_review_enabled %}<span class="badge bg-primary-subtle text-primary">Enabled</span>{% else %}<span class="text-muted">Direct Submission</span>{% endif %}</div>
+                    <div class="col-sm-6"><span class="text-muted">Total Queries:</span><br><strong>{{ queries.count }}</strong> queries ({{ open_queries_count }} open)</div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-5">
+        <div class="card shadow-sm h-100">
+            <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                <span class="fw-semibold"><i class="bi bi-people-fill me-1"></i> Engagement Team</span>
+                {% if can_assign and engagement.status != 'Memo Issued' %}<a href="{% url 'team_assign' engagement.id %}" class="btn btn-sm btn-primary"><i class="bi bi-person-plus-fill me-1"></i> Assign Member</a>{% endif %}
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-sm align-middle mb-0">
+                        <tbody>
+                            {% for tm in team_members %}
+                                <tr class="{% if not tm.is_active %}opacity-50 bg-light{% endif %}">
+                                    <td class="ps-3">
+                                        <strong>{{ tm.staff.full_name }}</strong>
+                                        {% if not tm.is_active %}<span class="badge bg-secondary ms-1">Released</span>{% endif %}
+                                        <br><small class="text-muted">{{ tm.staff.email }}</small>
+                                    </td>
+                                    <td>
+                                        {% if tm.role_on_engagement == 'Partner' %}<span class="badge bg-danger">Partner {% if tm.is_reviewer %}(EQCR){% endif %}</span>
+                                        {% elif tm.role_on_engagement == 'Manager' %}<span class="badge bg-primary">Manager</span>
+                                        {% elif tm.role_on_engagement == 'Senior' %}<span class="badge bg-info text-dark">Senior</span>
+                                        {% else %}<span class="badge bg-warning text-dark">Article</span>{% endif %}
+                                    </td>
+                                    <td>{% if tm.independence_declared %}<span class="badge bg-success-subtle text-success"><i class="bi bi-check2-circle"></i> Independent</span>{% else %}<span class="badge bg-warning-subtle text-warning">Pending</span>{% endif %}</td>
+                                    <td class="text-end pe-3">
+                                        {% if can_assign and engagement.status != 'Memo Issued' %}
+                                            <div class="btn-group btn-group-sm">
+                                                <a href="{% url 'team_edit' tm.id %}" class="btn btn-outline-primary py-0 px-2" style="font-size: 0.75rem;" title="Edit Role"><i class="bi bi-pencil"></i></a>
+                                                {% if tm.is_active %}
+                                                    <a href="{% url 'team_release' tm.id %}" class="btn btn-outline-danger py-0 px-2" style="font-size: 0.75rem;" title="Release Staff" onclick="return confirm('Release {{ tm.staff.full_name }} from engagement team?');"><i class="bi bi-person-dash"></i></a>
+                                                {% endif %}
+                                            </div>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                            {% empty %}<tr><td colspan="4" class="text-center text-muted py-3">No team assigned yet. Click "Assign Member" to add partners, managers, and articles.</td></tr>{% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card shadow-sm mb-4">
+    <div class="card-header bg-white d-flex justify-content-between align-items-center py-3">
+        <h6 class="fw-bold mb-0"><i class="bi bi-chat-left-text-fill me-1"></i> Audit Observation & Query Register</h6>
+        <div class="d-flex gap-2">
+            <a href="{% url 'query_export_excel' %}?engagement={{ engagement.id }}" class="btn btn-sm btn-outline-success"><i class="bi bi-file-earmark-excel me-1"></i> Export Excel</a>
+            {% if can_create_q and engagement.status != 'Memo Issued' %}<a href="{% url 'query_create_with_eng' engagement.id %}" class="btn btn-sm btn-primary"><i class="bi bi-plus-lg me-1"></i> Raise Query</a>{% endif %}
+        </div>
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead class="table-light"><tr><th>Query No</th><th>Area</th><th>Type</th><th>Title / Finding</th><th>Priority</th><th>Risk</th><th>Status</th><th>Ageing</th><th>Action</th></tr></thead>
+                <tbody>
+                    {% for q in queries %}
+                        <tr>
+                            <td><strong>{{ q.query_no|default:"Draft Query" }}</strong></td>
+                            <td><span class="badge bg-light text-dark border">{{ q.area }}</span></td>
+                            <td><small class="text-muted">{{ q.query_type }}</small></td>
+                            <td><strong>{{ q.title }}</strong>{% if q.is_repeat_observation %}<span class="badge bg-danger ms-1">Repeat Finding</span>{% endif %}</td>
+                            <td>{{ q.priority|priority_badge }}</td>
+                            <td>{{ q.risk_rating|risk_badge }}</td>
+                            <td>{{ q.status|status_badge }}</td>
+                            <td>{{ q|ageing_badge }}</td>
+                            <td><a href="{% url 'query_detail' q.id %}" class="btn btn-sm btn-outline-primary">Open</a></td>
+                        </tr>
+                    {% empty %}<tr><td colspan="9" class="text-center text-muted py-4">No audit queries raised yet.</td></tr>{% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

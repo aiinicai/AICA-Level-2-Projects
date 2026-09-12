@@ -1,0 +1,95 @@
+{% extends "tracker/base.html" %}
+{% load tracker_tags %}
+
+{% block title %}Client Portal - Audit Queries{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h4 class="fw-bold mb-1">Client Audit Collaboration Portal</h4>
+        <p class="text-muted small mb-0">Organization: <strong>{{ client.client_name }}</strong> | Logged in as: {{ contact.contact_name }} ({{ contact.designation }})</p>
+    </div>
+    <div>
+        <a href="{% url 'query_export_excel' %}" class="btn btn-outline-success btn-sm">
+            <i class="bi bi-file-earmark-excel me-1"></i> Download Query Register
+        </a>
+    </div>
+</div>
+
+<!-- Client Summary Cards -->
+<div class="row g-3 mb-4">
+    <div class="col-md-3">
+        <div class="card p-3 border-start border-warning border-4">
+            <div class="text-muted small text-uppercase fw-semibold">Pending Response</div>
+            <div class="fs-4 fw-bold mt-1 text-warning-emphasis">{{ pending_response_count }}</div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card p-3 border-start border-danger border-4">
+            <div class="text-muted small text-uppercase fw-semibold">Overdue Queries</div>
+            <div class="fs-4 fw-bold mt-1 text-danger">{{ overdue_count }}</div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card p-3 border-start border-info border-4">
+            <div class="text-muted small text-uppercase fw-semibold">Responses Submitted</div>
+            <div class="fs-4 fw-bold mt-1 text-info-emphasis">{{ responded_count }}</div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card p-3 border-start border-success border-4">
+            <div class="text-muted small text-uppercase fw-semibold">Closed by Auditors</div>
+            <div class="fs-4 fw-bold mt-1 text-success">{{ closed_count }}</div>
+        </div>
+    </div>
+</div>
+
+<!-- Actionable Queries for Client -->
+<div class="card shadow-sm mb-4">
+    <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+        <span class="fw-semibold"><i class="bi bi-exclamation-circle me-1"></i> Audit Queries Awaiting Your Response</span>
+        <span class="badge bg-light text-primary">{{ pending_response_count }} Pending</span>
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>Query Number</th>
+                        <th>Audit Area</th>
+                        <th>Subject / Observation</th>
+                        <th>Due Date</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for q in actionable_queries %}
+                        <tr class="{% if q.is_overdue %}table-danger{% endif %}">
+                            <td><strong>{{ q.query_no }}</strong></td>
+                            <td><span class="badge bg-light text-dark border">{{ q.area }}</span></td>
+                            <td>
+                                <strong>{{ q.title }}</strong><br>
+                                <small class="text-muted">{{ q.description|truncatechars:75 }}</small>
+                            </td>
+                            <td>
+                                {% if q.is_overdue %}
+                                    <span class="badge bg-danger">{{ q.due_date|date:"d-M-Y" }} (Overdue)</span>
+                                {% else %}
+                                    <span class="badge bg-warning text-dark">{{ q.due_date|date:"d-M-Y" }}</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <a href="{% url 'query_detail' q.id %}" class="btn btn-sm btn-primary">
+                                    <i class="bi bi-reply-fill me-1"></i> Respond
+                                </a>
+                            </td>
+                        </tr>
+                    {% empty %}
+                        <tr><td colspan="5" class="text-center text-muted py-4">No pending queries awaiting your response. Good job!</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

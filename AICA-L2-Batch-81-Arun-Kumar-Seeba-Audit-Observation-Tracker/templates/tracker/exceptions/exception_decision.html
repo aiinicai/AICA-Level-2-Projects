@@ -1,0 +1,66 @@
+{% extends "tracker/base.html" %}
+
+{% block title %}Authorize Exception {{ exc.reference_no }}{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center my-4">
+    <div class="col-md-8">
+        <div class="card shadow-sm border-0">
+            <div class="card-header bg-dark text-white py-3">
+                <h5 class="fw-bold mb-0"><i class="bi bi-shield-lock-fill text-warning me-2"></i> Partner Exception Authorization ({{ exc.reference_no }})</h5>
+            </div>
+            <div class="card-body p-4">
+                <div class="bg-light p-3 rounded border mb-4">
+                    <div class="row g-2 small">
+                        <div class="col-sm-6"><span class="text-muted">Engagement:</span> <strong>{{ exc.engagement.engagement_code }}</strong></div>
+                        <div class="col-sm-6"><span class="text-muted">Client:</span> <strong>{{ exc.engagement.client.client_name }}</strong></div>
+                        <div class="col-12"><span class="text-muted">Exception Type:</span> <strong>{{ exc.get_exception_type_display }}</strong></div>
+                        {% if exc.query %}
+                            <div class="col-12"><span class="text-muted">Linked Query:</span> <strong>{{ exc.query.query_no }}: {{ exc.query.title }}</strong></div>
+                        {% endif %}
+                        <div class="col-sm-6"><span class="text-muted">Requested By:</span> <strong>{{ exc.requested_by.full_name }}</strong></div>
+                        <div class="col-sm-6"><span class="text-muted">Requested On:</span> {{ exc.requested_on|date:"d-M-Y H:i" }}</div>
+                        <div class="col-12 mt-2 pt-2 border-top">
+                            <span class="text-muted d-block">Submitted Justification:</span>
+                            <p class="mb-0 text-dark">{{ exc.justification }}</p>
+                        </div>
+                    </div>
+                </div>
+
+                <form method="post">
+                    {% csrf_token %}
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Select Decision <span class="text-danger">*</span></label>
+                        <div class="d-flex gap-4">
+                            {% for radio in form.decision %}
+                                <div class="form-check">
+                                    {{ radio.tag }}
+                                    <label class="form-check-label fw-semibold" for="{{ radio.id_for_label }}">{{ radio.choice_label }}</label>
+                                </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-medium">{{ form.partner_remarks.label }} <span class="text-danger">*</span></label>
+                        {{ form.partner_remarks }}
+                        {% if form.partner_remarks.errors %}<div class="text-danger small">{{ form.partner_remarks.errors.0 }}</div>{% endif %}
+                    </div>
+
+                    <div class="p-3 bg-warning-subtle border border-warning rounded mb-3">
+                        <label class="form-label fw-bold text-dark"><i class="bi bi-key-fill me-1"></i> {{ form.password.label }} <span class="text-danger">*</span></label>
+                        {{ form.password }}
+                        <small class="text-muted d-block mt-1">{{ form.password.help_text }}</small>
+                        {% if form.password.errors %}<div class="text-danger small mt-1">{{ form.password.errors.0 }}</div>{% endif %}
+                    </div>
+
+                    <div class="d-flex justify-content-between mt-4">
+                        <a href="{% url 'exception_queue' %}" class="btn btn-outline-secondary">Back to Queue</a>
+                        <button type="submit" class="btn btn-danger px-4 fw-semibold">Authorize & Apply Decision</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

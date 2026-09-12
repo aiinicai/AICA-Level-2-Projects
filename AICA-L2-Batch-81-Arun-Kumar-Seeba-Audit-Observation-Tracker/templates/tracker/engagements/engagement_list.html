@@ -1,0 +1,44 @@
+{% extends "tracker/base.html" %}
+{% load tracker_tags %}
+{% block title %}Audit Engagements{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div><h4 class="fw-bold mb-1">Audit Engagements Master</h4><p class="text-muted small mb-0">Scoping queries, FY periods, team allocations, and summary memo generation</p></div>
+    {% if is_admin or is_partner or is_manager %}<a href="{% url 'engagement_create' %}" class="btn btn-primary"><i class="bi bi-plus-lg me-1"></i> New Engagement</a>{% endif %}
+</div>
+<div class="card shadow-sm">
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead class="table-light"><tr><th>Engagement Code</th><th>Client</th><th>Financial Year</th><th>Audit Type</th><th>Period</th><th>Status</th><th>Lead Partner</th><th>Action</th></tr></thead>
+                <tbody>
+                    {% for e in engagements %}
+                        <tr>
+                            <td><strong>{{ e.engagement_code }}</strong></td>
+                            <td>{{ e.client.client_name }}</td>
+                            <td><span class="badge bg-light text-dark border">{{ e.financial_year }}</span></td>
+                            <td>{{ e.audit_type }}</td>
+                            <td class="small">{{ e.period_from|date:"d-M-Y" }} to {{ e.period_to|date:"d-M-Y" }}</td>
+                            <td>{{ e.status|status_badge }}</td>
+                            <td>
+                                {% with partner=e.get_lead_partner %}
+                                    {% if partner %}<span class="badge bg-danger">{{ partner.full_name }}</span>
+                                    {% else %}<span class="badge bg-warning text-dark"><i class="bi bi-exclamation-triangle me-1"></i> Unassigned</span>{% endif %}
+                                {% endwith %}
+                            </td>
+                            <td>
+                                <div class="btn-group btn-group-sm">
+                                    <a href="{% url 'engagement_detail' e.id %}" class="btn btn-outline-primary"><i class="bi bi-folder2-open me-1"></i> View</a>
+                                    {% if is_admin or is_partner or is_manager %}
+                                        <a href="{% url 'engagement_edit' e.id %}" class="btn btn-outline-secondary" title="Edit Engagement"><i class="bi bi-pencil"></i></a>
+                                    {% endif %}
+                                </div>
+                            </td>
+                        </tr>
+                    {% empty %}<tr><td colspan="8" class="text-center text-muted py-4">No audit engagements found.</td></tr>{% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,221 @@
+{% extends "tracker/base.html" %}
+{% load tracker_tags %}
+
+{% block title %}Partner Portfolio Dashboard{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h4 class="fw-bold mb-1">Engagement Partner Portfolio Dashboard</h4>
+        <p class="text-muted small mb-0">High-level oversight of live audits, pending exceptions, overdue items, and memo readiness</p>
+    </div>
+    <div class="d-flex gap-2">
+        {% if pending_exceptions_count > 0 %}
+            <a href="{% url 'exception_queue' %}" class="btn btn-danger position-relative">
+                <i class="bi bi-shield-exclamation me-1"></i> Partner Approvals Queue
+                <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-warning text-dark">
+                    {{ pending_exceptions_count }}
+                </span>
+            </a>
+        {% endif %}
+        <a href="{% url 'engagement_create' %}" class="btn btn-outline-primary"><i class="bi bi-plus-lg me-1"></i> New Engagement</a>
+    </div>
+</div>
+
+<!-- KPI Cards -->
+<div class="row g-3 mb-4">
+    <div class="col-md-3">
+        <div class="card p-3 border-start border-primary border-4">
+            <div class="text-muted small text-uppercase fw-semibold">Portfolio Engagements</div>
+            <div class="d-flex align-items-baseline justify-content-between mt-2">
+                <span class="fs-3 fw-bold">{{ total_engagements }}</span>
+                <span class="badge bg-primary-subtle text-primary">{{ active_engagements }} Live In-Progress</span>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card p-3 border-start border-warning border-4">
+            <div class="text-muted small text-uppercase fw-semibold">Open Queries</div>
+            <div class="d-flex align-items-baseline justify-content-between mt-2">
+                <span class="fs-3 fw-bold text-warning-emphasis">{{ open_queries }}</span>
+                <span class="text-muted small">of {{ total_queries }} total</span>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card p-3 border-start border-danger border-4">
+            <div class="text-muted small text-uppercase fw-semibold">Overdue Queries</div>
+            <div class="d-flex align-items-baseline justify-content-between mt-2">
+                <span class="fs-3 fw-bold text-danger">{{ overdue_count }}</span>
+                <span class="badge bg-danger">Critical Follow-up</span>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card p-3 border-start border-success border-4">
+            <div class="text-muted small text-uppercase fw-semibold">Ready for Summary Memo</div>
+            <div class="d-flex align-items-baseline justify-content-between mt-2">
+                <span class="fs-3 fw-bold text-success">{{ memo_ready_count }}</span>
+                <span class="badge bg-success-subtle text-success">All Items Resolved</span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Charts Row -->
+<div class="row g-3 mb-4">
+    <div class="col-md-5">
+        <div class="card h-100">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span><i class="bi bi-pie-chart me-2"></i> Query Status Breakdown</span>
+            </div>
+            <div class="card-body d-flex align-items-center justify-content-center p-3">
+                <div style="height: 250px; width: 100%;">
+                    <canvas id="statusPieChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-7">
+        <div class="card h-100">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span><i class="bi bi-bar-chart me-2"></i> Queries by Audit Area</span>
+            </div>
+            <div class="card-body p-3">
+                <div style="height: 250px; width: 100%;">
+                    <canvas id="areaBarChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Tables Row -->
+<div class="row g-3">
+    <!-- Pending Exceptions -->
+    <div class="col-md-6">
+        <div class="card h-100">
+            <div class="card-header d-flex justify-content-between align-items-center bg-light">
+                <span class="fw-semibold text-danger"><i class="bi bi-shield-exclamation me-1"></i> Pending Partner Exceptions</span>
+                <a href="{% url 'exception_queue' %}" class="small text-decoration-none">View All Queue</a>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead>
+                            <tr>
+                                <th>Ref / Type</th>
+                                <th>Engagement</th>
+                                <th>Requested By</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for exc in pending_exceptions %}
+                                <tr>
+                                    <td>
+                                        <strong>{{ exc.reference_no }}</strong><br>
+                                        <small class="text-muted">{{ exc.exception_type }}</small>
+                                    </td>
+                                    <td>{{ exc.engagement.engagement_code }}</td>
+                                    <td>{{ exc.requested_by.full_name }}</td>
+                                    <td>
+                                        <a href="{% url 'exception_decision' exc.id %}" class="btn btn-sm btn-outline-danger">Review</a>
+                                    </td>
+                                </tr>
+                            {% empty %}
+                                <tr><td colspan="4" class="text-center text-muted py-3">No pending exceptions requiring partner approval.</td></tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Overdue Queries -->
+    <div class="col-md-6">
+        <div class="card h-100">
+            <div class="card-header d-flex justify-content-between align-items-center bg-light">
+                <span class="fw-semibold text-danger"><i class="bi bi-clock-history me-1"></i> Critical Overdue Queries</span>
+                <a href="{% url 'query_list' %}?overdue=1" class="small text-decoration-none">View All Overdue</a>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead>
+                            <tr>
+                                <th>Query / Client</th>
+                                <th>Area</th>
+                                <th>Due Date</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for q in overdue_queries %}
+                                <tr>
+                                    <td>
+                                        <strong>{{ q.query_no }}</strong><br>
+                                        <small class="text-muted">{{ q.engagement.client.client_name|truncatechars:20 }}</small>
+                                    </td>
+                                    <td><span class="badge bg-light text-dark border">{{ q.area }}</span></td>
+                                    <td><span class="badge bg-danger">{{ q.due_date|date:"d-M-Y" }}</span></td>
+                                    <td><a href="{% url 'query_detail' q.id %}" class="btn btn-sm btn-outline-primary">Open</a></td>
+                                </tr>
+                            {% empty %}
+                                <tr><td colspan="4" class="text-center text-muted py-3">No overdue queries in your portfolio.</td></tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    const statusData = JSON.parse('{{ status_dict_json|safe }}');
+    const statusLabels = Object.keys(statusData);
+    const statusValues = Object.values(statusData);
+
+    new Chart(document.getElementById('statusPieChart'), {
+        type: 'doughnut',
+        data: {
+            labels: statusLabels,
+            datasets: [{
+                data: statusValues,
+                backgroundColor: ['#64748b', '#f59e0b', '#3b82f6', '#06b6d4', '#10b981', '#1e293b', '#ef4444']
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 } } } }
+        }
+    });
+
+    const areaLabels = JSON.parse('{{ area_labels_json|safe }}');
+    const areaData = JSON.parse('{{ area_data_json|safe }}');
+
+    new Chart(document.getElementById('areaBarChart'), {
+        type: 'bar',
+        data: {
+            labels: areaLabels,
+            datasets: [{
+                label: 'Number of Queries',
+                data: areaData,
+                backgroundColor: '#3b82f6',
+                borderRadius: 4
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } },
+            plugins: { legend: { display: false } }
+        }
+    });
+</script>
+{% endblock %}

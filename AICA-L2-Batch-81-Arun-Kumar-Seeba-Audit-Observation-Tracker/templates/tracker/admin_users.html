@@ -1,0 +1,76 @@
+{% extends "tracker/base.html" %}
+
+{% block title %}User Management & Lockout Controls{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h4 class="fw-bold mb-1">User Management & Security Controls</h4>
+        <p class="text-muted small mb-0">System user accounts, authentication states, and account lockout management (FR-1)</p>
+    </div>
+</div>
+
+<div class="card shadow-sm">
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>User / Full Name</th>
+                        <th>User Type</th>
+                        <th>Status</th>
+                        <th>Failed Attempts</th>
+                        <th>Force Pwd Change</th>
+                        <th>Created On</th>
+                        <th>Security Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for u in users %}
+                        <tr>
+                            <td>
+                                <strong>{{ u.full_name }}</strong><br>
+                                <span class="text-muted small">{{ u.email }}</span>
+                            </td>
+                            <td><span class="badge bg-secondary">{{ u.get_user_type_display }}</span></td>
+                            <td>
+                                {% if u.is_locked %}
+                                    <span class="badge bg-danger"><i class="bi bi-lock-fill"></i> LOCKED</span>
+                                {% elif not u.is_active %}
+                                    <span class="badge bg-dark">Inactive</span>
+                                {% else %}
+                                    <span class="badge bg-success">Active</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if u.failed_login_attempts > 0 %}
+                                    <span class="badge bg-warning text-dark">{{ u.failed_login_attempts }} / 5</span>
+                                {% else %}
+                                    <span class="text-muted">0</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if u.must_change_password %}
+                                    <span class="badge bg-warning text-dark">Yes (Pending)</span>
+                                {% else %}
+                                    <span class="text-muted">No</span>
+                                {% endif %}
+                            </td>
+                            <td class="small">{{ u.created_at|date:"d-M-Y" }}</td>
+                            <td>
+                                {% if u.is_locked %}
+                                    <a href="{% url 'admin_unlock_user' u.id %}" class="btn btn-sm btn-outline-danger" onclick="return confirm('Unlock user account {{ u.email }}?');">
+                                        <i class="bi bi-unlock-fill me-1"></i> Unlock Account
+                                    </a>
+                                {% else %}
+                                    <span class="text-muted small">Normal</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
