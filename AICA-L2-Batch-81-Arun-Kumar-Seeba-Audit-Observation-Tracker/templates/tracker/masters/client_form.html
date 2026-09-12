@@ -1,0 +1,68 @@
+{% extends "tracker/base.html" %}
+{% block title %}{{ title }}{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div><h4 class="fw-bold mb-1">{{ title }}</h4><p class="text-muted small mb-0">Client master record details and associated contacts</p></div>
+    <a href="{% url 'client_list' %}" class="btn btn-outline-secondary"><i class="bi bi-arrow-left me-1"></i> Back to Clients</a>
+</div>
+<div class="row g-4">
+    <div class="col-lg-8">
+        <div class="card shadow-sm">
+            <div class="card-header bg-white"><span class="fw-semibold">Client Company Profile</span></div>
+            <div class="card-body p-4">
+                <form method="post">
+                    {% csrf_token %}
+                    <div class="row g-3">
+                        <div class="col-md-4"><label class="form-label fw-medium">{{ form.client_code.label }} <span class="text-danger">*</span></label>{{ form.client_code }}{% if form.client_code.errors %}<div class="text-danger small">{{ form.client_code.errors.0 }}</div>{% endif %}</div>
+                        <div class="col-md-8"><label class="form-label fw-medium">{{ form.client_name.label }} <span class="text-danger">*</span></label>{{ form.client_name }}{% if form.client_name.errors %}<div class="text-danger small">{{ form.client_name.errors.0 }}</div>{% endif %}</div>
+                        <div class="col-md-6"><label class="form-label fw-medium">{{ form.group_name.label }}</label>{{ form.group_name }}</div>
+                        <div class="col-md-6"><label class="form-label fw-medium">{{ form.constitution.label }}</label>{{ form.constitution }}</div>
+                        <div class="col-md-6"><label class="form-label fw-medium">{{ form.industry.label }}</label>{{ form.industry }}</div>
+                        <div class="col-md-6"><label class="form-label fw-medium">{{ form.financial_year_end.label }}</label>{{ form.financial_year_end }}</div>
+                        <div class="col-12"><label class="form-label fw-medium">{{ form.registered_address.label }}</label>{{ form.registered_address }}</div>
+                        <div class="col-md-6"><label class="form-label fw-medium">{{ form.city.label }}</label>{{ form.city }}</div>
+                        <div class="col-md-6"><label class="form-label fw-medium">{{ form.state.label }}</label>{{ form.state }}</div>
+                        <div class="col-md-4"><label class="form-label fw-medium">{{ form.risk_category.label }}</label>{{ form.risk_category }}</div>
+                        <div class="col-md-4"><label class="form-label fw-medium">{{ form.client_since.label }}</label>{{ form.client_since }}</div>
+                        <div class="col-md-4"><label class="form-label fw-medium">{{ form.status.label }}</label>{{ form.status }}</div>
+                        <div class="col-12"><div class="form-check mt-2">{{ form.listed_status }}<label class="form-check-label fw-medium" for="{{ form.listed_status.id_for_label }}">Is Public Listed Entity (Subject to SEBI LODR Regulations)</label></div></div>
+                        <div class="col-12"><label class="form-label fw-medium">{{ form.remarks.label }}</label>{{ form.remarks }}</div>
+                    </div>
+                    <div class="mt-4 text-end"><button type="submit" class="btn btn-primary px-4"><i class="bi bi-save me-1"></i> Save Client Record</button></div>
+                </form>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-4">
+        <div class="card shadow-sm h-100">
+            <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                <span class="fw-semibold">Client Contacts</span>
+                {% if client %}<a href="{% url 'contact_create' client.id %}" class="btn btn-sm btn-outline-primary"><i class="bi bi-plus-lg"></i> Add</a>{% endif %}
+            </div>
+            <div class="card-body p-3">
+                {% if client %}
+                    {% for c in contacts %}
+                        <div class="p-3 mb-2 bg-light rounded border">
+                            <div class="d-flex justify-content-between align-items-start">
+                                <div>
+                                    <strong>{{ c.contact_name }}</strong>
+                                    {% if c.is_primary_coordinator %}<span class="badge bg-primary ms-1">Coordinator</span>{% endif %}
+                                    {% if c.status == 'Inactive' %}<span class="badge bg-secondary ms-1">Inactive</span>{% endif %}
+                                </div>
+                                <div class="btn-group btn-group-sm">
+                                    <a href="{% url 'contact_edit' c.id %}" class="btn btn-outline-primary py-0 px-2" title="Edit Contact"><i class="bi bi-pencil"></i></a>
+                                    <a href="{% url 'contact_delete' c.id %}" class="btn btn-outline-danger py-0 px-2" title="Delete Contact" onclick="return confirm('Remove contact {{ c.contact_name }}?');"><i class="bi bi-trash"></i></a>
+                                </div>
+                            </div>
+                            <div class="small text-muted">{{ c.designation }}</div>
+                            <div class="small mt-1"><i class="bi bi-envelope me-1"></i> {{ c.email }}</div>
+                            <div class="small"><i class="bi bi-telephone me-1"></i> {{ c.mobile }}</div>
+                            {% if c.user %}<div class="mt-2"><span class="badge bg-success-subtle text-success"><i class="bi bi-check-circle me-1"></i> Portal User Linked</span></div>{% endif %}
+                        </div>
+                    {% empty %}<div class="text-center text-muted py-4">No contacts added yet.</div>{% endfor %}
+                {% else %}<div class="text-center text-muted py-4">Save client details first to add contact persons.</div>{% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

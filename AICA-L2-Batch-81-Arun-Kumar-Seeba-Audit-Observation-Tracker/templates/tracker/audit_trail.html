@@ -1,0 +1,82 @@
+{% extends "tracker/base.html" %}
+
+{% block title %}System Audit Trail{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h4 class="fw-bold mb-1">Immutable Firm Audit Trail</h4>
+        <p class="text-muted small mb-0">Append-only write-only security log covering status changes, master updates, and authentications (FR-8 & Section 10)</p>
+    </div>
+</div>
+
+<div class="card p-3 mb-4 bg-light border-0 shadow-sm">
+    <form method="get" class="row g-2 align-items-center">
+        <div class="col-md-4">
+            <input type="text" name="q" class="form-control form-control-sm" placeholder="Search by entity, user, value..." value="{{ request.GET.q }}">
+        </div>
+        <div class="col-md-3">
+            <select name="action" class="form-select form-select-sm">
+                <option value="">-- All Actions --</option>
+                {% for code, label in actions %}
+                    <option value="{{ code }}" {% if request.GET.action == code %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-md-3">
+            <select name="entity_type" class="form-select form-select-sm">
+                <option value="">-- All Entity Types --</option>
+                {% for ent in entity_types %}
+                    <option value="{{ ent }}" {% if request.GET.entity_type == ent %}selected{% endif %}>{{ ent }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-md-2 d-flex gap-1">
+            <button type="submit" class="btn btn-secondary btn-sm flex-grow-1"><i class="bi bi-funnel me-1"></i> Filter</button>
+            <a href="{% url 'audit_trail' %}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-counterclockwise"></i></a>
+        </div>
+    </form>
+</div>
+
+<div class="card shadow-sm">
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0" style="font-size: 0.88rem;">
+                <thead class="table-light">
+                    <tr>
+                        <th>Timestamp (IST)</th>
+                        <th>Action</th>
+                        <th>Entity</th>
+                        <th>Field</th>
+                        <th>Old Value &rarr; New Value</th>
+                        <th>Performed By</th>
+                        <th>IP Address</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for log in logs %}
+                        <tr>
+                            <td class="small">{{ log.performed_on|date:"d-M-Y H:i:s" }}</td>
+                            <td><span class="badge bg-secondary">{{ log.action }}</span></td>
+                            <td><strong>{{ log.entity_type }}</strong> <small class="text-muted">({{ log.entity_id }})</small></td>
+                            <td>{{ log.field_changed|default:"―" }}</td>
+                            <td>
+                                {% if log.old_value or log.new_value %}
+                                    <span class="text-danger small">{{ log.old_value|truncatechars:25 }}</span> &rarr;
+                                    <span class="text-success small">{{ log.new_value|truncatechars:25 }}</span>
+                                {% else %}
+                                    <span class="text-muted">―</span>
+                                {% endif %}
+                            </td>
+                            <td>{{ log.performed_by_name }}</td>
+                            <td class="small text-muted">{{ log.ip_address|default:"127.0.0.1" }}</td>
+                        </tr>
+                    {% empty %}
+                        <tr><td colspan="7" class="text-center text-muted py-4">No audit logs found.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

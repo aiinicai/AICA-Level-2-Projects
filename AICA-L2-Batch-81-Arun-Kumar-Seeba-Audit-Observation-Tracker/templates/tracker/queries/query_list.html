@@ -1,0 +1,136 @@
+{% extends "tracker/base.html" %}
+{% load tracker_tags %}
+
+{% block title %}Audit Queries & Observations{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h4 class="fw-bold mb-1">Audit Queries & Observations</h4>
+        <p class="text-muted small mb-0">Role-aware tracking of information requests, control deficiencies, and audit observations</p>
+    </div>
+    <div class="d-flex gap-2">
+        <a href="{% url 'query_export_excel' %}{% if request.GET.engagement %}?engagement={{ request.GET.engagement }}{% endif %}" class="btn btn-outline-success btn-sm">
+            <i class="bi bi-file-earmark-excel me-1"></i> Export Excel
+        </a>
+        {% if not is_client %}
+            <a href="{% url 'query_create' %}" class="btn btn-primary btn-sm">
+                <i class="bi bi-plus-lg me-1"></i> Raise Query
+            </a>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Filters Bar -->
+<div class="card p-3 mb-4 bg-light border-0 shadow-sm">
+    <form method="get" class="row g-2 align-items-center">
+        <div class="col-md-3">
+            <input type="text" name="q" class="form-control form-control-sm" placeholder="Search title, query #, keyword..." value="{{ request.GET.q }}">
+        </div>
+        <div class="col-md-3">
+            <select name="engagement" class="form-select form-select-sm">
+                <option value="">-- All Engagements --</option>
+                {% for eng in engagements_filter %}
+                    <option value="{{ eng.id }}" {% if request.GET.engagement == eng.id|stringformat:"i" %}selected{% endif %}>
+                        {{ eng.engagement_code }} ({{ eng.client.client_name|truncatechars:20 }})
+                    </option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-md-2">
+            <select name="status" class="form-select form-select-sm">
+                <option value="">-- Status --</option>
+                {% for code, label in statuses %}
+                    <option value="{{ code }}" {% if request.GET.status == code %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-md-2">
+            <select name="area" class="form-select form-select-sm">
+                <option value="">-- Audit Area --</option>
+                {% for code, label in areas %}
+                    <option value="{{ code }}" {% if request.GET.area == code %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-md-2 d-flex gap-1">
+            <button type="submit" class="btn btn-secondary btn-sm flex-grow-1"><i class="bi bi-funnel-fill me-1"></i> Filter</button>
+            <a href="{% url 'query_list' %}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-counterclockwise"></i></a>
+        </div>
+    </form>
+    <div class="d-flex gap-3 mt-2 pt-2 border-top small text-muted">
+        <span>Quick toggles:</span>
+        <a href="?overdue=1" class="text-danger text-decoration-none"><i class="bi bi-clock-history"></i> Overdue Only</a>
+        <a href="?repeat=1" class="text-danger text-decoration-none"><i class="bi bi-arrow-repeat"></i> Repeat Observations</a>
+        <a href="?status=Issued" class="text-primary text-decoration-none">Issued to Client</a>
+        <a href="?status=Responded" class="text-info text-dark text-decoration-none">Responded by Client</a>
+    </div>
+</div>
+
+<!-- Table -->
+<div class="card shadow-sm">
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>Query No</th>
+                        <th>Engagement</th>
+                        <th>Area</th>
+                        <th>Type</th>
+                        <th>Title / Subject</th>
+                        <th>Amount Involved</th>
+                        <th>Priority / Risk</th>
+                        <th>Status</th>
+                        <th>Ageing / Due Date</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for q in queries %}
+                        <tr class="{% if q.is_overdue %}table-danger-subtle{% endif %}">
+                            <td>
+                                <strong>{{ q.query_no|default:"[Draft]" }}</strong>
+                            </td>
+                            <td><small class="text-muted">{{ q.engagement.engagement_code }}</small></td>
+                            <td><span class="badge bg-light text-dark border">{{ q.area }}</span></td>
+                            <td><small>{{ q.query_type }}</small></td>
+                            <td>
+                                <strong>{{ q.title }}</strong>
+                                {% if q.is_repeat_observation %}
+                                    <span class="badge bg-danger ms-1" style="font-size: 0.65rem;">Repeat</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if q.amount_involved %}
+                                    <span class="fw-medium text-dark">{{ q.amount_involved|inr }}</span>
+                                {% else %}
+                                    <span class="text-muted">―</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {{ q.priority|priority_badge }}<br>
+                                <small class="text-muted">{{ q.risk_rating|risk_badge }}</small>
+                            </td>
+                            <td>{{ q.status|status_badge }}</td>
+                            <td>
+                                {{ q|ageing_badge }}<br>
+                                <small class="{% if q.is_overdue %}text-danger fw-bold{% else %}text-muted{% endif %}">
+                                    Due: {{ q.due_date|date:"d-M-Y" }}
+                                </small>
+                            </td>
+                            <td>
+                                <a href="{% url 'query_detail' q.id %}" class="btn btn-sm btn-outline-primary">
+                                    <i class="bi bi-eye-fill me-1"></i> View
+                                </a>
+                            </td>
+                        </tr>
+                    {% empty %}
+                        <tr><td colspan="10" class="text-center text-muted py-5">No queries match your criteria.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

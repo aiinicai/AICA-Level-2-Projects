@@ -1,0 +1,312 @@
+{% extends "tracker/base.html" %}
+{% load tracker_tags %}
+
+{% block title %}{{ query.query_no|default:"Draft" }} - {{ query.title }}{% endblock %}
+
+{% block content %}
+<!-- Query Header Bar -->
+<div class="d-flex justify-content-between align-items-start mb-4">
+    <div>
+        <div class="d-flex align-items-center gap-2 mb-1">
+            <h4 class="fw-bold mb-0">{{ query.query_no|default:"[Draft Query]" }}</h4>
+            {{ query.status|status_badge }}
+            {{ query.priority|priority_badge }}
+            {{ query.risk_rating|risk_badge }}
+            {% if query.is_repeat_observation %}
+                <span class="badge bg-danger">Repeat Observation</span>
+            {% endif %}
+        </div>
+        <h5 class="text-secondary fw-semibold mb-1">{{ query.title }}</h5>
+        <div class="small text-muted">
+            <span>Engagement: <strong>{{ query.engagement.engagement_code }}</strong> ({{ query.engagement.client.client_name }})</span> | 
+            <span>Area: <strong>{{ query.get_area_display }}</strong></span> | 
+            <span>Raised by: <strong>{{ query.raised_by.full_name }}</strong> on {{ query.raised_on|date:"d-M-Y H:i" }}</span>
+        </div>
+    </div>
+    
+    <!-- Action Controls (RBAC Enforced) -->
+    <div class="d-flex gap-2">
+        {% if can_edit %}
+            <a href="{% url 'query_edit' query.id %}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-pencil me-1"></i> Edit Query</a>
+        {% endif %}
+        
+        <!-- Workflow State Action Buttons -->
+        {% if query.status == 'Draft' %}
+            <form method="post" action="{% url 'query_transition' query.id 'Pending Internal Review' %}" class="d-inline">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-warning text-dark btn-sm"><i class="bi bi-arrow-up-right-circle me-1"></i> Submit for Internal Review</button>
+            </form>
+            {% if can_issue %}
+                <form method="post" action="{% url 'query_transition' query.id 'Issued' %}" class="d-inline">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-primary btn-sm"><i class="bi bi-send-fill me-1"></i> Issue to Client</button>
+                </form>
+            {% endif %}
+
+        {% elif query.status == 'Pending Internal Review' %}
+            {% if can_issue %}
+                <form method="post" action="{% url 'query_transition' query.id 'Issued' %}" class="d-inline">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-success btn-sm"><i class="bi bi-check-circle me-1"></i> Approve & Issue to Client</button>
+                </form>
+                <button type="button" class="btn btn-outline-danger btn-sm" data-bs-toggle="modal" data-bs-target="#rejectModal">
+                    <i class="bi bi-x-circle me-1"></i> Return / Reject to Draft
+                </button>
+            {% else %}
+                <span class="badge bg-warning text-dark p-2"><i class="bi bi-hourglass-split me-1"></i> Pending Senior/Manager Review</span>
+            {% endif %}
+
+        {% elif query.status == 'Responded' or query.status == 'Issued' or query.status == 'Info Awaited' %}
+            {% if can_close %}
+                <button type="button" class="btn btn-success btn-sm" data-bs-toggle="modal" data-bs-target="#closeModal">
+                    <i class="bi bi-check-all me-1"></i> Close Query
+                </button>
+                <button type="button" class="btn btn-warning text-dark btn-sm" data-bs-toggle="modal" data-bs-target="#infoAwaitedModal">
+                    <i class="bi bi-arrow-repeat me-1"></i> Request Further Info
+                </button>
+            {% endif %}
+        {% endif %}
+
+        <!-- Partner Exception Route -->
+        {% if not is_client and not query.is_terminal %}
+            <a href="{% url 'exception_request' query.engagement.id %}?query_id={{ query.id }}" class="btn btn-outline-danger btn-sm">
+                <i class="bi bi-shield-exclamation me-1"></i> Partner Exception
+            </a>
+        {% endif %}
+    </div>
+</div>
+
+<div class="row g-4">
+    <!-- Left Column: Findings Details, 5 Elements, Response Thread -->
+    <div class="col-lg-8">
+        <!-- Finding & Scope Card -->
+        <div class="card shadow-sm mb-4">
+            <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                <span class="fw-semibold"><i class="bi bi-card-text me-1"></i> Audit Finding Description</span>
+                {% if query.amount_involved %}
+                    <span class="badge bg-danger-subtle text-danger fw-bold">Amount: {{ query.amount_involved|inr }}</span>
+                {% endif %}
+            </div>
+            <div class="card-body">
+                <p class="mb-3">{{ query.description|linebreaksbr }}</p>
+
+                {% if query.document_requested %}
+                    <div class="p-3 bg-light rounded border mb-3">
+                        <strong class="text-secondary small text-uppercase">Documents / Information Requested:</strong>
+                        <div class="mt-1 small">{{ query.document_requested|linebreaksbr }}</div>
+                    </div>
+                {% endif %}
+
+                <!-- 5 Structured Finding Elements (if Observation or Control Deficiency) -->
+                {% if query.is_structured %}
+                    <div class="accordion mt-3" id="structuredAccordion">
+                        <div class="accordion-item">
+                            <h2 class="accordion-header">
+                                <button class="accordion-button py-2 bg-light fw-semibold text-primary" type="button" data-bs-toggle="collapse" data-bs-target="#collapseFiveElements">
+                                    <i class="bi bi-list-check me-2"></i> 5-Element Observation Details (Standard Audit Finding Format)
+                                </button>
+                            </h2>
+                            <div id="collapseFiveElements" class="accordion-collapse collapse show">
+                                <div class="accordion-body small">
+                                    <div class="mb-2"><strong>1. Condition (What was observed):</strong><br><span class="text-muted">{{ query.condition|default:query.description }}</span></div>
+                                    <div class="mb-2"><strong>2. Criteria (Standard / Policy):</strong><br><span class="text-muted">{{ query.criteria|default:"Prescribed Accounting / Internal Control Standard" }}</span></div>
+                                    <div class="mb-2"><strong>3. Cause (Root Cause Analysis):</strong><br><span class="text-muted">{{ query.cause|default:"Operational variance" }}</span></div>
+                                    <div class="mb-2"><strong>4. Effect / Risk Exposure:</strong><br><span class="text-muted">{{ query.effect_risk|default:"Potential financial / regulatory exposure" }}</span></div>
+                                    <div class="mb-0"><strong>5. Audit Recommendation:</strong><br><span class="text-muted">{{ query.recommendation|default:"Remediate control breakdown." }}</span></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Responses & Discussion Thread (Append-Only) -->
+        <div class="card shadow-sm mb-4">
+            <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                <span class="fw-semibold"><i class="bi bi-chat-dots me-1"></i> Responses & Management Comments (Append-Only Thread)</span>
+                <span class="badge bg-secondary">{{ responses.count }} Entries</span>
+            </div>
+            <div class="card-body p-4">
+                {% for resp in responses %}
+                    <div class="p-3 mb-3 rounded border {% if resp.is_client_submission %}bg-primary-subtle border-primary-subtle{% else %}bg-light border-secondary-subtle{% endif %}">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <div>
+                                <span class="badge {% if resp.is_client_submission %}bg-primary{% else %}bg-secondary{% endif %} me-1">
+                                    {{ resp.responded_by_type }}
+                                </span>
+                                <strong>{{ resp.responded_by_user.full_name }}</strong>
+                            </div>
+                            <small class="text-muted">{{ resp.responded_on|date:"d-M-Y H:i" }} (#{{ resp.sequence_no }})</small>
+                        </div>
+                        <p class="mb-2" style="white-space: pre-line;">{{ resp.response_text }}</p>
+
+                        <!-- Attachments linked to this response -->
+                        {% with atts=resp.attachments.all %}
+                            {% if atts %}
+                                <div class="mt-2 pt-2 border-top">
+                                    <small class="text-muted d-block mb-1">Attached Files:</small>
+                                    {% for att in atts %}
+                                        <a href="{{ att.file.url }}" target="_blank" class="btn btn-sm btn-outline-dark py-0 me-1 mb-1">
+                                            <i class="bi bi-paperclip me-1"></i> {{ att.file_name }} ({{ att.file_size|filesizeformat }})
+                                        </a>
+                                    {% endfor %}
+                                </div>
+                            {% endif %}
+                        {% endwith %}
+                    </div>
+                {% empty %}
+                    <div class="text-center text-muted py-4">No responses recorded yet in this thread.</div>
+                {% endfor %}
+
+                <!-- Post Response Form -->
+                {% if can_respond %}
+                    <div class="mt-4 pt-3 border-top">
+                        <h6 class="fw-bold mb-3"><i class="bi bi-reply-fill me-1"></i> Post {% if is_client %}Management Response{% else %}Audit Follow-up Comment{% endif %}</h6>
+                        <form method="post" action="{% url 'query_post_response' query.id %}" enctype="multipart/form-data">
+                            {% csrf_token %}
+                            <div class="mb-3">
+                                {{ response_form.response_text }}
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label small fw-medium text-muted">{{ response_form.attachment.label }}</label>
+                                {{ response_form.attachment }}
+                            </div>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="bi bi-send me-1"></i> Submit Response
+                            </button>
+                        </form>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Right Column: Metadata, Due Date, Ageing, Vertical Status History -->
+    <div class="col-lg-4">
+        <!-- Status & Ageing Meta Card -->
+        <div class="card shadow-sm mb-4">
+            <div class="card-header bg-white"><span class="fw-semibold">Query Parameters</span></div>
+            <div class="card-body small">
+                <div class="mb-2 d-flex justify-content-between">
+                    <span class="text-muted">Due Date:</span>
+                    <strong>{{ query.due_date|date:"d-M-Y" }}</strong>
+                </div>
+                <div class="mb-2 d-flex justify-content-between">
+                    <span class="text-muted">Days Open:</span>
+                    <strong>{{ query.days_open }} days</strong>
+                </div>
+                <div class="mb-2 d-flex justify-content-between">
+                    <span class="text-muted">Ageing Bucket:</span>
+                    {{ query|ageing_badge }}
+                </div>
+                <div class="mb-2 d-flex justify-content-between">
+                    <span class="text-muted">Assigned Client Contact:</span>
+                    <strong>{{ query.assigned_to_client_contact.contact_name|default:"Unassigned" }}</strong>
+                </div>
+                {% if query.closed_by %}
+                    <div class="mt-3 pt-2 border-top">
+                        <span class="text-success fw-bold d-block"><i class="bi bi-check-circle me-1"></i> Closed By: {{ query.closed_by.full_name }}</span>
+                        <small class="text-muted d-block">Closed On: {{ query.closed_on|date:"d-M-Y H:i" }}</small>
+                        <small class="text-muted d-block">Remarks: {{ query.closure_remarks }}</small>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Vertical Status Audit Timeline (FR-8 Visual Demonstration) -->
+        <div class="card shadow-sm mb-4">
+            <div class="card-header bg-white"><span class="fw-semibold"><i class="bi bi-clock-history me-1"></i> Status Audit Timeline</span></div>
+            <div class="card-body">
+                <div class="timeline">
+                    {% for h in history %}
+                        <div class="timeline-item">
+                            <strong class="d-block small">{{ h.action }} ({{ h.new_value|default:h.action }})</strong>
+                            <small class="text-muted d-block">{{ h.performed_by_name }}</small>
+                            <small class="text-muted" style="font-size: 0.72rem;">{{ h.performed_on|date:"d-M-Y H:i:s" }}</small>
+                        </div>
+                    {% empty %}
+                        <div class="text-muted small">No audit history recorded.</div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal: Return/Reject Draft -->
+<div class="modal fade" id="rejectModal" tabindex="-1">
+    <div class="modal-dialog">
+        <form method="post" action="{% url 'query_transition' query.id 'Draft' %}" class="modal-content">
+            {% csrf_token %}
+            <div class="modal-header">
+                <h5 class="modal-title fw-bold">Return Query to Draft</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p class="text-muted small">Specify the feedback or changes required before this query can be issued to the client.</p>
+                <div class="mb-3">
+                    <label class="form-label fw-medium">Rejection Remarks (Mandatory) <span class="text-danger">*</span></label>
+                    <textarea name="remarks" class="form-control" rows="3" required placeholder="Explain why the draft is being returned..."></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="submit" class="btn btn-danger">Return to Draft</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Modal: Close Query -->
+<div class="modal fade" id="closeModal" tabindex="-1">
+    <div class="modal-dialog">
+        <form method="post" action="{% url 'query_transition' query.id 'Closed' %}" class="modal-content">
+            {% csrf_token %}
+            <div class="modal-header">
+                <h5 class="modal-title fw-bold">Close Query / Observation</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p class="text-muted small">Confirm closure of this query after verifying management explanation and supporting documents.</p>
+                <div class="mb-3">
+                    <label class="form-label fw-medium">Closure Remarks (Mandatory) <span class="text-danger">*</span></label>
+                    <textarea name="remarks" class="form-control" rows="3" required placeholder="State basis of satisfaction / verification summary..."></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="submit" class="btn btn-success">Close Query</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Modal: Request Further Information (Info Awaited) -->
+<div class="modal fade" id="infoAwaitedModal" tabindex="-1">
+    <div class="modal-dialog">
+        <form method="post" action="{% url 'query_transition' query.id 'Info Awaited' %}" class="modal-content">
+            {% csrf_token %}
+            <div class="modal-header">
+                <h5 class="modal-title fw-bold">Request Further Information</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p class="text-muted small">Reissue query to client for additional documentation or clarification.</p>
+                <div class="mb-3">
+                    <label class="form-label fw-medium">New Revised Due Date <span class="text-danger">*</span></label>
+                    <input type="date" name="new_due_date" class="form-control" required>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label fw-medium">Clarification Notes <span class="text-danger">*</span></label>
+                    <textarea name="remarks" class="form-control" rows="3" required placeholder="Specify what additional information is required..."></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="submit" class="btn btn-warning text-dark">Reissue as Info Awaited</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
