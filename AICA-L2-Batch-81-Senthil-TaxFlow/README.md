@@ -1,8 +1,9 @@
 # TaxFlow — Indirect Tax Compliance Management Platform
 
 **AICA Level 2 Capstone Project**  
+**Batch**: Batch 81  
 **Author**: Senthil (`senrocks`)  
-**Project Folder**: `Senthil-TaxFlow`
+**Project Folder**: `AICA-L2-Batch-81-Senthil-TaxFlow`
 
 ---
 
@@ -68,7 +69,7 @@ TaxFlow centralizes and automates the entire indirect tax compliance lifecycle:
 ## 4. Project Structure
 
 ```text
-Senthil-TaxFlow/
+AICA-L2-Batch-81-Senthil-TaxFlow/
 ├── docs/                   # Functional specs, architecture notes & design blueprints
 ├── prisma/
 │   └── schema.prisma       # Database schema definition
@@ -105,14 +106,14 @@ Senthil-TaxFlow/
 ```bash
 # Clone the repository
 git clone https://github.com/aiinicai/AICA-Level-2-Projects.git
-cd AICA-Level-2-Projects/Senthil-TaxFlow
+cd AICA-Level-2-Projects/AICA-L2-Batch-81-Senthil-TaxFlow
 
 # Install dependencies
 npm install
 ```
 
 ### Environment Configuration
-Create a `.env` file in the `Senthil-TaxFlow` root directory:
+Create a `.env` file in the `AICA-L2-Batch-81-Senthil-TaxFlow` root directory:
 ```env
 DATABASE_URL="postgresql://postgres:password@localhost:5432/taxflow"
 NEXT_PUBLIC_SUPABASE_URL="https://your-project.supabase.co"
