@@ -1,0 +1,1635 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>OfficeFlow — Prime Accounting</title>
+<style>
+  :root {
+    --bg:#f6f7f9; --surface:#fff; --line:#e2e8f0; --text:#0f172a; --muted:#64748b;
+    --primary:#1e40af; --urgent:#e11d48; --high:#d97706; --ok:#059669; --teal:#0d9488; --violet:#7c3aed;
+    --side:#0f172a; --side-ink:#cbd5e1;
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; font:14px/1.5 -apple-system,"Segoe UI",Roboto,sans-serif; background:var(--bg); color:var(--text); }
+  .hidden { display:none !important; }
+  button { font:inherit; cursor:pointer; border-radius:8px; border:1px solid transparent; padding:8px 14px; }
+  .primary { background:var(--primary); color:#fff; font-weight:600; }
+  .primary:disabled { opacity:.5; cursor:not-allowed; }
+  .ghost { background:transparent; border-color:var(--line); color:var(--text); }
+  .danger { background:transparent; border-color:#fecaca; color:var(--urgent); }
+  input, select, textarea { font:inherit; width:100%; padding:9px 11px; border:1px solid var(--line);
+                            border-radius:8px; background:#fff; color:var(--text); }
+  label { display:block; font-size:12px; font-weight:600; color:var(--muted); margin:10px 0 4px; }
+  h2 { font-size:17px; margin:0 0 4px; }
+  a { color:var(--primary); }
+
+  #signin { min-height:100vh; display:grid; place-items:center; padding:20px; }
+  .card { background:var(--surface); border:1px solid var(--line); border-radius:14px; padding:20px; }
+  #signin .card { width:100%; max-width:380px; }
+  .brand { text-align:center; margin-bottom:18px; }
+  .brand h1 { margin:6px 0 2px; font-size:20px; }
+  .brand p { margin:0; color:var(--muted); font-size:12px; }
+  .error { background:#fef2f2; border:1px solid #fecaca; color:var(--urgent); padding:9px 11px;
+           border-radius:8px; font-size:12px; margin-top:12px; }
+  .note { background:#fffbeb; border:1px solid #fde68a; color:#92400e; padding:12px 14px;
+          border-radius:10px; font-size:12px; margin-bottom:14px; }
+
+  /* Shell: sidebar + content */
+  #shell { display:grid; grid-template-columns:230px 1fr; min-height:100vh; }
+  aside { background:var(--side); color:var(--side-ink); padding:16px 12px; }
+  aside .logo { display:flex; align-items:center; gap:10px; padding:4px 8px 16px; }
+  aside .logo b { color:#fff; font-size:15px; }
+  aside .logo span { display:block; font-size:10px; color:#64748b; }
+  .nav-item { display:flex; align-items:center; gap:10px; padding:9px 10px; border-radius:8px;
+              cursor:pointer; font-size:13px; font-weight:500; color:var(--side-ink); }
+  .nav-item:hover { background:#1e293b; color:#fff; }
+  .nav-item.active { background:var(--primary); color:#fff; font-weight:600; }
+  .nav-badge { margin-left:auto; background:#334155; color:#fff; font-size:10px; font-weight:700;
+               border-radius:999px; padding:1px 7px; }
+  .nav-item.active .nav-badge { background:rgba(255,255,255,.25); }
+
+  .content { display:flex; flex-direction:column; min-width:0; }
+  header { background:var(--surface); border-bottom:1px solid var(--line); padding:12px 20px;
+           display:flex; align-items:center; justify-content:space-between; gap:12px; }
+  .page-title { font-size:18px; font-weight:700; margin:0; }
+  .page-sub { font-size:11px; color:var(--muted); }
+  .who { display:flex; align-items:center; gap:10px; }
+  .avatar { width:34px; height:34px; border-radius:50%; display:grid; place-items:center; color:#fff; font-weight:700; }
+  .pill { font-size:10px; font-weight:700; padding:2px 7px; border-radius:999px; background:#eef2ff;
+          color:var(--primary); text-transform:uppercase; letter-spacing:.03em; }
+  main { padding:20px; overflow:auto; }
+
+  .row { display:flex; align-items:center; justify-content:space-between; gap:12px; }
+  .kpi-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:12px; margin-bottom:20px; }
+  .kpi { background:var(--surface); border:1px solid var(--line); border-radius:12px; padding:14px 16px; cursor:pointer; }
+  .kpi:hover { border-color:var(--primary); }
+  .kpi b { display:block; font-size:26px; line-height:1.1; }
+  .kpi span { color:var(--muted); font-size:11px; text-transform:uppercase; letter-spacing:.04em; }
+  .kpi.blue b { color:var(--primary); } .kpi.amber b { color:var(--high); }
+  .kpi.purple b { color:var(--violet); } .kpi.green b { color:var(--ok); }
+
+  .panel { background:var(--surface); border:1px solid var(--line); border-radius:12px; margin-bottom:18px; }
+  .panel-head { padding:13px 16px; border-bottom:1px solid var(--line); font-weight:700; font-size:14px;
+                display:flex; align-items:center; justify-content:space-between; gap:10px; }
+  .panel-body { padding:16px; }
+  .quick { display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:10px; }
+  .quick button { justify-content:flex-start; text-align:left; padding:13px 14px; }
+
+  .task, .proj, .notice, .portal { background:var(--surface); border:1px solid var(--line);
+                                   border-radius:12px; padding:14px; margin-bottom:10px; }
+  .task { border-left-width:4px; }
+  .task h3, .proj h3, .notice h3, .portal h3 { margin:0 0 4px; font-size:15px; }
+  .meta { color:var(--muted); font-size:12px; }
+  .bar { height:6px; background:#eef2f7; border-radius:999px; overflow:hidden; margin:10px 0 6px; }
+  .bar > i { display:block; height:100%; background:var(--primary); }
+  .tag { font-size:10px; font-weight:700; padding:2px 7px; border-radius:999px; background:#f1f5f9; color:var(--muted); }
+  .empty { text-align:center; color:var(--muted); padding:34px 0; }
+  .grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(300px,1fr)); gap:12px; }
+
+  dialog { border:none; border-radius:14px; padding:0; width:min(560px,94vw); }
+  dialog::backdrop { background:rgba(15,23,42,.45); }
+  dialog .card { border:none; }
+  dialog footer { display:flex; justify-content:flex-end; gap:8px; margin-top:16px; }
+  .grid2 { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  table { width:100%; border-collapse:collapse; background:var(--surface); border:1px solid var(--line);
+          border-radius:12px; overflow:hidden; }
+  th, td { text-align:left; padding:10px 12px; border-bottom:1px solid var(--line); font-size:13px; }
+  th { background:#f8fafc; color:var(--muted); font-size:11px; text-transform:uppercase; letter-spacing:.04em; }
+  tr:last-child td { border-bottom:none; }
+
+  .cal { display:grid; grid-template-columns:repeat(7,1fr); gap:6px; }
+  .cal .dow { font-size:10px; font-weight:700; color:var(--muted); text-align:center; padding:4px 0; text-transform:uppercase; }
+  .cal .day { background:var(--surface); border:1px solid var(--line); border-radius:8px; min-height:78px; padding:6px; }
+  .cal .day.dim { background:transparent; border-color:transparent; }
+  .cal .day.today { border-color:var(--primary); box-shadow:inset 0 0 0 1px var(--primary); }
+  .cal .day b { font-size:11px; color:var(--muted); }
+  .chip { display:block; font-size:10px; padding:2px 5px; border-radius:5px; margin-top:3px;
+          background:#eef2ff; color:var(--primary); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .chip.due { background:#fef2f2; color:var(--urgent); }
+  .chip.tax { background:#fffbeb; color:#92400e; }
+  .chip.stat { background:#ecfdf5; color:#065f46; font-weight:600; }
+  @media (max-width: 800px) { #shell { grid-template-columns:1fr; } aside { display:none; } }
+</style>
+</head>
+<body>
+
+<section id="signin">
+  <div class="card">
+    <div class="brand">
+      <div class="avatar" style="background:#1e40af;margin:0 auto;width:46px;height:46px;font-size:18px">OF</div>
+      <h1>OfficeFlow</h1>
+      <p>Prime Accounting — Practice Management</p>
+    </div>
+    <form id="signinForm">
+      <label for="email">Email address</label>
+      <input id="email" type="email" autocomplete="username" required placeholder="you@primeaccounting.in" />
+      <label for="password">Password</label>
+      <input id="password" type="password" autocomplete="current-password" required />
+      <div id="signinError" class="error hidden"></div>
+      <button class="primary" style="width:100%;margin-top:16px" id="signinBtn" type="submit">Sign in</button>
+    </form>
+    <!-- Shown when the session is valid but the profile could not be loaded, so the user can
+         try again without re-entering their password. -->
+    <button class="ghost hidden" style="width:100%;margin-top:8px" id="retryLoad" type="button">Retry</button>
+    <p style="color:var(--muted);font-size:11px;text-align:center;margin:14px 0 0">
+      Need an account? Ask your administrator to add you.
+    </p>
+  </div>
+</section>
+
+<div id="shell" class="hidden">
+  <aside>
+    <div class="logo">
+      <div class="avatar" style="background:var(--primary);width:32px;height:32px;font-size:13px">OF</div>
+      <div><b>OfficeFlow</b><span>Prime Accounting</span></div>
+    </div>
+    <nav id="nav">
+      <div class="nav-item active" data-tab="dashboard">Dashboard</div>
+      <div class="nav-item" data-tab="compliance">Monthly Compliance <span class="nav-badge" id="badgeCompliance">0</span></div>
+      <div class="nav-item" data-tab="tasks">Tasks <span class="nav-badge" id="badgeTasks">0</span></div>
+      <div class="nav-item" data-tab="projects">Projects</div>
+      <div class="nav-item" data-tab="calendar">Calendar</div>
+      <div class="nav-item" data-tab="tax">Tax Alerts <span class="nav-badge" id="badgeTax">0</span></div>
+      <div class="nav-item" data-tab="team" id="navTeam">Team Workload</div>
+      <div class="nav-item" data-tab="portals" id="navPortals">Portals Sync</div>
+      <div class="nav-item" data-tab="download">Mobile Access &amp; APK</div>
+    </nav>
+  </aside>
+
+  <div class="content">
+    <header>
+      <div>
+        <h1 class="page-title" id="pageTitle">Enterprise Dashboard</h1>
+        <div class="page-sub" id="pageSub">Practice overview</div>
+      </div>
+      <div class="who">
+        <div class="avatar" id="meAvatar">?</div>
+        <div>
+          <div style="font-weight:700" id="meName">—</div>
+          <div style="font-size:11px;color:var(--muted)"><span id="meRole">—</span> · <span id="meDept">—</span></div>
+        </div>
+        <span class="pill" id="meBadge">—</span>
+        <button class="ghost" id="signoutBtn">Sign out</button>
+      </div>
+    </header>
+
+    <main>
+      <div id="syncBanner" class="note hidden"></div>
+
+      <!-- Dashboard -->
+      <section id="tab-dashboard">
+        <div class="kpi-grid">
+          <div class="kpi blue"   data-go="tasks"><b id="kpiPending">0</b><span>Pending Operations</span></div>
+          <div class="kpi amber"  data-go="tax"><b id="kpiTax">0</b><span>Due Tax Notices</span></div>
+          <div class="kpi purple" data-go="projects"><b id="kpiProjects">0</b><span>Active Client Projects</span></div>
+          <div class="kpi green"  data-go="team"><b id="kpiTeam">0</b><span>Active Team Capacity</span></div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-head">
+            <span id="dashTasksHeader">My Assigned Tasks &amp; Compliance Checklist</span>
+            <button class="ghost" data-go="tasks" style="padding:6px 12px;font-size:12px">View all in Tasks →</button>
+          </div>
+          <div class="panel-body"><div id="dashTasks" class="grid"></div></div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-head">
+            <span>Statutory deadlines approaching</span>
+            <button class="ghost" data-go="tax" style="padding:6px 12px;font-size:12px">See all →</button>
+          </div>
+          <div class="panel-body"><div id="dashStatutory"></div></div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-head">Quick Actions</div>
+          <div class="panel-body">
+            <div class="quick">
+              <button class="ghost" data-go="tax">Review Tax Circulars</button>
+              <button class="ghost" id="quickNewTask">Create New Task</button>
+              <button class="ghost" data-go="calendar">Deadlines Calendar</button>
+              <button class="ghost" data-go="portals">Sync Govt Portals</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-head">Project Progress</div>
+          <div class="panel-body"><div id="dashProjects" class="grid"></div></div>
+        </div>
+      </section>
+
+      <!-- Monthly compliance tracker -->
+      <section id="tab-compliance" class="hidden">
+        <div class="kpi-grid" id="compKpis"></div>
+
+        <div class="row" style="margin-bottom:12px;flex-wrap:wrap;gap:8px">
+          <span style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+            <strong>Period</strong>
+            <input id="compPeriod" type="month" style="width:auto" />
+            <select id="compAssignee" style="width:auto"><option value="">Everyone</option></select>
+            <select id="compState" style="width:auto">
+              <option value="">All clients</option>
+              <option value="pending">Has pending work</option>
+              <option value="done">Fully complete</option>
+            </select>
+            <input id="compSearch" placeholder="Search client or GSTN" style="width:220px" />
+          </span>
+          <span style="display:flex;gap:8px">
+            <button class="ghost hidden" id="compImportBtn">Import from Excel</button>
+            <button class="ghost" id="compExportBtn">Export CSV</button>
+            <button class="primary hidden" id="compAddBtn">+ Add client</button>
+          </span>
+        </div>
+
+        <div style="overflow-x:auto">
+          <table id="compTable">
+            <thead>
+              <tr>
+                <th style="min-width:230px">Client</th><th>Lead</th><th>Assigned</th>
+                <th title="TDS payment — 7th">TDS<br><span class="meta">7th</span></th>
+                <th title="GSTR-1 / IFF — 13th">GSTR-1<br><span class="meta">13th</span></th>
+                <th title="GSTR-3B — 20th">GSTR-3B<br><span class="meta">20th</span></th>
+                <th title="Books closed — month end">Accounting<br><span class="meta">month end</span></th>
+                <th title="Professional Tax — 20th">PT<br><span class="meta">20th</span></th>
+                <th title="EPF ECR — 15th">PF<br><span class="meta">15th</span></th>
+                <th title="ESI contribution — 15th">ESI<br><span class="meta">15th</span></th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="compBody"></tbody>
+          </table>
+        </div>
+        <p class="meta" style="margin-top:10px">
+          Click a cell to cycle it: pending → done → not applicable. Changes save immediately and
+          everyone sees them. Each month starts fresh, so last month's ticks are kept as history.
+        </p>
+      </section>
+
+      <!-- Tasks -->
+      <section id="tab-tasks" class="hidden">
+        <div class="row" style="margin-bottom:12px">
+          <strong id="tasksHeading">My tasks</strong>
+          <button class="primary hidden" id="newTaskBtn">+ Assign task</button>
+        </div>
+        <div id="taskList"></div>
+      </section>
+
+      <!-- Projects -->
+      <section id="tab-projects" class="hidden">
+        <div class="row" style="margin-bottom:12px">
+          <strong>Projects &amp; milestones</strong>
+          <button class="primary hidden" id="newProjectBtn">+ New project</button>
+        </div>
+        <div id="projectList" class="grid"></div>
+      </section>
+
+      <!-- Calendar -->
+      <section id="tab-calendar" class="hidden">
+        <div class="row" style="margin-bottom:12px">
+          <strong id="calTitle">Calendar</strong>
+          <span>
+            <button class="ghost" id="calPrev">‹</button>
+            <button class="ghost" id="calToday">Today</button>
+            <button class="ghost" id="calNext">›</button>
+          </span>
+        </div>
+        <div class="cal" id="calGrid"></div>
+      </section>
+
+      <!-- Tax alerts -->
+      <section id="tab-tax" class="hidden">
+        <div class="panel">
+          <div class="panel-head">
+            <span>Statutory due dates</span>
+            <span>
+              <select id="statAuthority" style="width:auto;padding:5px 9px;font-size:12px">
+                <option value="">All authorities</option>
+                <option>GST</option><option>Income Tax</option><option>ROC / MCA</option>
+                <option>PF</option><option>ESI</option><option>RBI / FEMA</option><option>Professional Tax</option>
+              </select>
+            </span>
+          </div>
+          <div class="panel-body">
+            <table>
+              <thead><tr><th>Due</th><th>Authority</th><th>Form</th><th>Obligation</th><th>Frequency</th></tr></thead>
+              <tbody id="statBody"></tbody>
+            </table>
+            <p class="meta" style="margin:12px 0 0">
+              Recurring statutory deadlines under the CGST Act, Income-tax Act, Companies Act, EPF &amp;
+              ESI Acts and FEMA. Verify against the latest notification before relying on a date —
+              extensions are issued frequently.
+            </p>
+          </div>
+        </div>
+
+        <div class="row" style="margin:18px 0 12px">
+          <strong>Circulars &amp; notices recorded by your team</strong>
+          <button class="primary hidden" id="newNoticeBtn">+ Add circular</button>
+        </div>
+        <div id="taxList"></div>
+      </section>
+
+      <!-- Team -->
+      <section id="tab-team" class="hidden">
+        <div class="row" style="margin-bottom:12px">
+          <strong>Team &amp; workload</strong>
+          <button class="primary hidden" id="addMemberBtn">+ Add team member</button>
+        </div>
+        <table>
+          <thead><tr><th>Member</th><th>Role</th><th>Department</th><th>Assigned</th><th>Open</th><th>Done</th><th></th></tr></thead>
+          <tbody id="teamBody"></tbody>
+        </table>
+      </section>
+
+      <!-- Portals -->
+      <section id="tab-portals" class="hidden">
+        <div class="row" style="margin-bottom:12px">
+          <strong>Government portals &amp; integrations</strong>
+          <button class="primary hidden" id="newPortalBtn">+ Add portal</button>
+        </div>
+        <div id="portalList" class="grid"></div>
+      </section>
+
+      <!-- Mobile access -->
+      <section id="tab-download" class="hidden">
+        <div class="panel">
+          <div class="panel-head">Mobile access</div>
+          <div class="panel-body">
+            <p>The Android app signs in with the same account and shows the same live data as this
+               screen — assign a task here and it appears on the phone straight away.</p>
+            <p class="meta">Install the APK your administrator provides. On first launch Android will
+               ask you to allow installation from this source.</p>
+            <p class="meta" style="margin-top:14px">
+              Signed in as <strong id="dlWho">—</strong>. Use the same email and password on the phone.
+            </p>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+</div>
+
+<!-- Assign task -->
+<dialog id="taskDialog">
+  <form method="dialog" class="card" id="taskForm">
+    <h2>Assign a task</h2>
+    <p class="meta">The assignee sees this immediately, on every device.</p>
+    <label for="tTitle">Title *</label>
+    <input id="tTitle" required />
+    <label for="tDesc">Description</label>
+    <textarea id="tDesc" rows="2"></textarea>
+    <div class="grid2">
+      <div><label for="tAssignee">Assign to *</label><select id="tAssignee" required></select></div>
+      <div><label for="tProject">Project</label><select id="tProject"></select></div>
+    </div>
+    <div class="grid2">
+      <div><label for="tPriority">Priority</label>
+        <select id="tPriority"><option>LOW</option><option selected>MEDIUM</option><option>HIGH</option><option>URGENT</option></select></div>
+      <div><label for="tDue">Due date</label><input id="tDue" type="date" /></div>
+    </div>
+    <label for="tCategory">Category</label>
+    <select id="tCategory">
+      <option>GST_COMPLIANCE</option><option>INCOME_TAX</option><option>INTERNAL_AUDIT</option>
+      <option>PAYROLL</option><option selected>CLIENT_PROJECT</option><option>OPERATIONS</option><option>LEGAL_SECRETARIAL</option>
+    </select>
+    <div id="taskError" class="error hidden"></div>
+    <footer>
+      <button class="ghost" value="cancel" type="submit" formnovalidate>Cancel</button>
+      <button class="primary" value="save" type="submit">Assign</button>
+    </footer>
+  </form>
+</dialog>
+
+<!-- Progress -->
+<dialog id="progressDialog">
+  <form method="dialog" class="card" id="progressForm">
+    <h2>Update progress</h2>
+    <p class="meta" id="progressTaskName">—</p>
+    <label for="pPercent">Progress: <span id="pPercentLabel">0</span>%</label>
+    <input id="pPercent" type="range" min="0" max="100" step="5" style="padding:0" />
+    <label for="pStatus">Status</label>
+    <select id="pStatus"><option>TODO</option><option>IN_PROGRESS</option><option>IN_REVIEW</option><option>COMPLETED</option></select>
+    <label for="pRemark">Remark</label>
+    <input id="pRemark" placeholder="What changed?" />
+    <div id="progressError" class="error hidden"></div>
+    <footer>
+      <button class="ghost" value="cancel" type="submit" formnovalidate>Cancel</button>
+      <button class="primary" value="save" type="submit">Save</button>
+    </footer>
+  </form>
+</dialog>
+
+<!-- New project -->
+<dialog id="projectDialog">
+  <form method="dialog" class="card" id="projectForm">
+    <h2>New project</h2>
+    <div class="grid2">
+      <div><label for="prName">Name *</label><input id="prName" required /></div>
+      <div><label for="prCode">Code</label><input id="prCode" placeholder="PRJ-GST-01" /></div>
+    </div>
+    <label for="prClient">Client</label><input id="prClient" />
+    <label for="prDesc">Description</label><textarea id="prDesc" rows="2"></textarea>
+    <div class="grid2">
+      <div><label for="prLead">Lead</label><select id="prLead"></select></div>
+      <div><label for="prTarget">Target date</label><input id="prTarget" type="date" /></div>
+    </div>
+    <div id="projectError" class="error hidden"></div>
+    <footer>
+      <button class="ghost" value="cancel" type="submit" formnovalidate>Cancel</button>
+      <button class="primary" value="save" type="submit">Create</button>
+    </footer>
+  </form>
+</dialog>
+
+<!-- Add team member -->
+<dialog id="memberDialog">
+  <form method="dialog" class="card" id="memberForm">
+    <h2>Add a team member</h2>
+    <p class="meta">Creates their sign-in account and roster entry together. You stay signed in.</p>
+    <div class="grid2">
+      <div><label for="mName">Full name *</label><input id="mName" required placeholder="Rakshitha" /></div>
+      <div><label for="mDesignation">Designation *</label><input id="mDesignation" required placeholder="Manager" /></div>
+    </div>
+    <div class="grid2">
+      <div><label for="mRole">Access role *</label>
+        <select id="mRole">
+          <option value="TEAM_MEMBER" selected>Team Member — own tasks only</option>
+          <option value="MANAGER">Manager — assign work, team workload</option>
+          <option value="PARTNER">Partner — full access</option>
+          <option value="ADMIN">Admin — full access</option>
+        </select></div>
+      <div><label for="mDept">Department</label>
+        <select id="mDept">
+          <option>Accounts</option><option>Audit &amp; Assurance</option>
+          <option>Executive &amp; Practice Leadership</option><option>Compliance &amp; Payroll</option>
+        </select></div>
+    </div>
+    <label for="mEmail">Work email (their login) *</label>
+    <input id="mEmail" type="email" required placeholder="name@primeaccounting.in" />
+    <div class="grid2">
+      <div><label for="mPhone">Phone</label><input id="mPhone" /></div>
+      <div><label for="mPass">Initial password *</label><input id="mPass" required minlength="6" value="office123" /></div>
+    </div>
+    <p class="meta" style="margin-top:8px">Share it with them and ask them to change it after first sign-in.</p>
+    <div id="memberError" class="error hidden"></div>
+    <footer>
+      <button class="ghost" value="cancel" type="submit" formnovalidate>Cancel</button>
+      <button class="primary" value="save" type="submit" id="memberSave">Create account</button>
+    </footer>
+  </form>
+</dialog>
+
+<!-- Add circular -->
+<dialog id="noticeDialog">
+  <form method="dialog" class="card" id="noticeForm">
+    <h2>Add a statutory circular</h2>
+    <label for="nTitle">Title *</label><input id="nTitle" required />
+    <div class="grid2">
+      <div><label for="nDept">Department</label>
+        <select id="nDept"><option value="GST">GST</option><option value="INCOME_TAX">Income Tax</option></select></div>
+      <div><label for="nNumber">Circular / notification no.</label><input id="nNumber" /></div>
+    </div>
+    <label for="nSummary">Summary</label><textarea id="nSummary" rows="2"></textarea>
+    <label for="nActions">Key action items</label><textarea id="nActions" rows="2"></textarea>
+    <div class="grid2">
+      <div><label for="nSeverity">Severity</label>
+        <select id="nSeverity"><option>NORMAL</option><option selected>IMPORTANT</option><option>CRITICAL_ACTION_REQUIRED</option></select></div>
+      <div><label for="nDeadline">Deadline</label><input id="nDeadline" type="date" /></div>
+    </div>
+    <label for="nSource">Source authority</label><input id="nSource" value="CBIC / CBDT" />
+    <div id="noticeError" class="error hidden"></div>
+    <footer>
+      <button class="ghost" value="cancel" type="submit" formnovalidate>Cancel</button>
+      <button class="primary" value="save" type="submit">Add</button>
+    </footer>
+  </form>
+</dialog>
+
+<!-- Add / edit client -->
+<dialog id="clientDialog">
+  <form method="dialog" class="card" id="clientForm">
+    <h2 id="clientDialogTitle">Add a client</h2>
+    <p class="meta">Appears in the monthly compliance tracker from the current period onwards.</p>
+    <div class="grid2">
+      <div><label for="cName">Client name *</label><input id="cName" required /></div>
+      <div><label for="cGstn">GSTN</label><input id="cGstn" placeholder="29AAFCI1882C1ZL" /></div>
+    </div>
+    <div class="grid2">
+      <div><label for="cLead">Lead</label><select id="cLead"></select></div>
+      <div><label for="cAssigned">Assigned to</label><select id="cAssigned"></select></div>
+    </div>
+    <label for="cComments">Comments</label>
+    <input id="cComments" placeholder="e.g. Nil return, Only monthly TDS payment" />
+    <label>Applicable compliances</label>
+    <div id="cApplicable" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:6px"></div>
+    <div id="clientError" class="error hidden"></div>
+    <footer>
+      <button class="danger hidden" value="delete" type="button" id="cDelete">Remove client</button>
+      <button class="ghost" value="cancel" type="submit" formnovalidate>Cancel</button>
+      <button class="primary" value="save" type="submit">Save</button>
+    </footer>
+  </form>
+</dialog>
+
+<!-- Import clients -->
+<dialog id="importDialog">
+  <form method="dialog" class="card" id="importForm">
+    <h2>Import clients from Excel</h2>
+    <p class="meta">Reads .xlsx, .xls or .csv. It needs a <strong>Client</strong> column; GSTN, Lead,
+       Assigned and Comments are picked up when present. Existing clients are matched on GSTN
+       (or name) and updated rather than duplicated.</p>
+    <label for="importFile">Spreadsheet</label>
+    <input id="importFile" type="file" accept=".xlsx,.xls,.csv" />
+    <div id="importPreview" class="meta" style="margin-top:12px"></div>
+    <div id="importError" class="error hidden"></div>
+    <footer>
+      <button class="ghost" value="cancel" type="submit" formnovalidate>Cancel</button>
+      <button class="primary" value="save" type="submit" id="importSave" disabled>Import</button>
+    </footer>
+  </form>
+</dialog>
+
+<!-- Add portal -->
+<dialog id="portalDialog">
+  <form method="dialog" class="card" id="portalForm">
+    <h2>Add a portal integration</h2>
+    <div class="grid2">
+      <div><label for="poName">Name *</label><input id="poName" required placeholder="GST Portal" /></div>
+      <div><label for="poType">Type</label>
+        <select id="poType">
+          <option value="GST">GST Portal</option><option value="INCOME_TAX">Income Tax e-Filing</option>
+          <option value="MCA">MCA21 / Corporate</option><option value="EWAY_BILL">e-Way Bill</option>
+          <option value="EPFO">EPFO / ESIC</option><option value="CUSTOM_WEBHOOK">Custom Webhook</option>
+        </select></div>
+    </div>
+    <label for="poUrl">Portal URL *</label><input id="poUrl" required placeholder="https://www.gst.gov.in" />
+    <label for="poDesc">Description</label><input id="poDesc" />
+    <div id="portalError" class="error hidden"></div>
+    <footer>
+      <button class="ghost" value="cancel" type="submit" formnovalidate>Cancel</button>
+      <button class="primary" value="save" type="submit">Add</button>
+    </footer>
+  </form>
+</dialog>
+
+<script type="module">
+import { initializeApp, deleteApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
+import {
+  getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged,
+  setPersistence, browserSessionPersistence
+} from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
+import {
+  initializeFirestore, persistentLocalCache, persistentMultipleTabManager,
+  collection, doc, getDoc, getDocFromCache, setDoc, deleteDoc, onSnapshot, query, where
+} from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
+
+// Same project as the Android app, so both clients share one workspace. This apiKey is a
+// public client identifier, not a secret — access is governed by the Firestore rules.
+const firebaseConfig = {
+  apiKey: 'AIzaSyBQxMe57oSTZkYFS_EyEbVTBe296yR0-cg',
+  authDomain: 'office-flow-integration.firebaseapp.com',
+  projectId: 'office-flow-integration',
+  storageBucket: 'office-flow-integration.firebasestorage.app',
+  messagingSenderId: '272282085767'
+};
+const app  = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+
+// Persistent cache, not the default in-memory one: it survives a page refresh, so a reload
+// paints from cache immediately instead of waiting on the network — and a reload while offline
+// still works. The multi-tab manager keeps two open windows from fighting over the same cache.
+const db = initializeFirestore(app, {
+  localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() })
+});
+
+const PRIMARY_ADMIN_EMAIL = 'mahesh@primeaccounting.in';
+const ELEVATED   = ['ADMIN','PARTNER'];
+const CAN_ASSIGN = ['ADMIN','PARTNER','MANAGER'];
+const PALETTE = ['#1E40AF','#0D9488','#D97706','#7C3AED','#059669','#E11D48','#475569','#0284C7'];
+const TITLES = {
+  dashboard:['Enterprise Dashboard','Practice overview'],
+  compliance:['Monthly Compliance','GST, TDS and accounting tracker by client'],
+  tasks:['Task Assignments','Work allocated across the practice'],
+  projects:['Projects & Milestones','Client engagements'],
+  calendar:['Team Calendar','Deadlines and target dates'],
+  tax:['Statutory Tax Desk','GST & Income Tax circulars'],
+  team:['Team Workload','Roster and capacity'],
+  portals:['Portals Sync','Government portal integrations'],
+  download:['Mobile Access & APK','Use OfficeFlow on your phone']
+};
+
+const $ = (id) => document.getElementById(id);
+const state = { me:null, tasks:[], members:[], projects:[], notices:[], portals:[],
+                clients:[], compliance:[], unsub:[], calOffset:0 };
+
+// The seven monthly obligations tracked per client, matching the practice's existing sheet.
+const COMPLIANCES = [
+  { k:'tds',        label:'TDS',        due:'7th' },
+  { k:'gstr1',      label:'GSTR-1',     due:'13th' },
+  { k:'gstr3b',     label:'GSTR-3B',    due:'20th' },
+  { k:'accounting', label:'Accounting', due:'month end' },
+  { k:'pt',         label:'PT',         due:'20th' },
+  { k:'pf',         label:'PF',         due:'15th' },
+  { k:'esi',        label:'ESI',        due:'15th' }
+];
+// pending -> done -> not applicable -> pending
+const NEXT_STATE = { PENDING:'DONE', DONE:'NA', NA:'PENDING' };
+const STATE_CELL = {
+  PENDING:{ t:'•', bg:'#fff7ed', fg:'#c2410c', title:'Pending' },
+  DONE:   { t:'✓', bg:'#ecfdf5', fg:'#047857', title:'Done' },
+  NA:     { t:'–', bg:'#f8fafc', fg:'#94a3b8', title:'Not applicable' }
+};
+const periodKey = (d) => d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0');
+
+// ── Indian statutory compliance calendar ─────────────────────────────────
+// Held in code rather than Firestore on purpose: these are legal deadlines, identical for every
+// firm, so there is nothing to sync, edit or seed, and they work offline.
+//   monthly    day, optionally skipping months handled by a separate annual entry
+//   quarterly  months are the DUE months (1 = January)
+//   annual     one month + day
+// Verify against the current notification before acting — extensions are common.
+const STATUTORY = [
+  // --- GST ---
+  { a:'GST', f:'GSTR-7',    t:'TDS deducted under GST',                       r:{k:'monthly', d:10} },
+  { a:'GST', f:'GSTR-8',    t:'TCS collected by e-commerce operators',        r:{k:'monthly', d:10} },
+  { a:'GST', f:'GSTR-1',    t:'Outward supplies — monthly filers',            r:{k:'monthly', d:11} },
+  { a:'GST', f:'GSTR-6',    t:'Input Service Distributor return',             r:{k:'monthly', d:13} },
+  { a:'GST', f:'IFF',       t:'Invoice Furnishing Facility — QRMP filers',    r:{k:'monthly', d:13} },
+  { a:'GST', f:'GSTR-5',    t:'Non-resident taxable person',                  r:{k:'monthly', d:13} },
+  { a:'GST', f:'GSTR-3B',   t:'Summary return & tax payment — monthly',       r:{k:'monthly', d:20} },
+  { a:'GST', f:'PMT-06',    t:'Monthly tax payment — QRMP filers',            r:{k:'monthly', d:25} },
+  { a:'GST', f:'CMP-08',    t:'Composition dealer quarterly statement',       r:{k:'quarterly', m:[4,7,10,1], d:18} },
+  { a:'GST', f:'GSTR-3B',   t:'Quarterly return — QRMP filers',               r:{k:'quarterly', m:[4,7,10,1], d:22} },
+  { a:'GST', f:'ITC-04',    t:'Goods sent to job worker — half-yearly',       r:{k:'quarterly', m:[4,10], d:25} },
+  { a:'GST', f:'GSTR-4',    t:'Composition dealer annual return',             r:{k:'annual', m:6,  d:30} },
+  { a:'GST', f:'GSTR-9/9C', t:'Annual return & reconciliation statement',     r:{k:'annual', m:12, d:31} },
+
+  // --- Income Tax ---
+  { a:'Income Tax', f:'Challan ITNS-281', t:'TDS / TCS deposit for the month', r:{k:'monthly', d:7} },
+  { a:'Income Tax', f:'Form 27EQ',  t:'Quarterly TCS return',                  r:{k:'quarterly', m:[7,10,1,5], d:15} },
+  { a:'Income Tax', f:'24Q/26Q/27Q',t:'Quarterly TDS returns',                 r:{k:'quarterly', m:[7,10,1,5], d:31} },
+  { a:'Income Tax', f:'Advance tax',t:'Instalments — 15%, 45%, 75%, 100%',     r:{k:'quarterly', m:[6,9,12,3], d:15} },
+  { a:'Income Tax', f:'Form 61A',   t:'Statement of Financial Transactions',   r:{k:'annual', m:5,  d:31} },
+  { a:'Income Tax', f:'Form 16',    t:'TDS certificate to employees',          r:{k:'annual', m:6,  d:15} },
+  { a:'Income Tax', f:'ITR',        t:'Return — non-audit assessees',          r:{k:'annual', m:7,  d:31} },
+  { a:'Income Tax', f:'Form 3CD',   t:'Tax audit report',                      r:{k:'annual', m:9,  d:30} },
+  { a:'Income Tax', f:'ITR',        t:'Return — audit cases',                  r:{k:'annual', m:10, d:31} },
+  { a:'Income Tax', f:'Form 3CEB',  t:'Transfer pricing report',               r:{k:'annual', m:10, d:31} },
+  { a:'Income Tax', f:'ITR',        t:'Return — transfer pricing cases',       r:{k:'annual', m:11, d:30} },
+
+  // --- ROC / MCA ---
+  { a:'ROC / MCA', f:'MSME-1',   t:'Dues to micro & small enterprises — half-yearly', r:{k:'quarterly', m:[4,10], d:30} },
+  { a:'ROC / MCA', f:'PAS-6',    t:'Reconciliation of share capital — half-yearly',   r:{k:'quarterly', m:[5,11], d:30} },
+  { a:'ROC / MCA', f:'DPT-3',    t:'Return of deposits',                              r:{k:'annual', m:6,  d:30} },
+  { a:'ROC / MCA', f:'DIR-3 KYC',t:'Director KYC',                                    r:{k:'annual', m:9,  d:30} },
+  { a:'ROC / MCA', f:'AGM',      t:'Annual General Meeting — last date',              r:{k:'annual', m:9,  d:30} },
+  { a:'ROC / MCA', f:'ADT-1',    t:'Auditor appointment intimation',                  r:{k:'annual', m:10, d:14} },
+  { a:'ROC / MCA', f:'AOC-4',    t:'Financial statements filing',                     r:{k:'annual', m:10, d:29} },
+  { a:'ROC / MCA', f:'MGT-7/7A', t:'Annual return',                                   r:{k:'annual', m:11, d:28} },
+
+  // --- PF / ESI / PT ---
+  { a:'PF',  f:'ECR',        t:'EPF contribution payment & return',      r:{k:'monthly', d:15} },
+  { a:'ESI', f:'ESI challan',t:'ESI contribution payment',               r:{k:'monthly', d:15} },
+  { a:'Professional Tax', f:'PT return', t:'Monthly professional tax (Karnataka)', r:{k:'monthly', d:20} },
+
+  // --- RBI / FEMA ---
+  { a:'RBI / FEMA', f:'ECB-2',   t:'External commercial borrowing return',        r:{k:'monthly', d:7} },
+  { a:'RBI / FEMA', f:'FLA',     t:'Foreign Liabilities & Assets annual return',  r:{k:'annual', m:7,  d:15} },
+  { a:'RBI / FEMA', f:'APR',     t:'Annual Performance Report — overseas investment', r:{k:'annual', m:12, d:31} }
+];
+
+const FREQ_LABEL = { monthly:'Monthly', quarterly:'Periodic', annual:'Annual' };
+
+// Next occurrence of an obligation strictly on or after `from`.
+function nextDue(rule, from) {
+  const d0 = new Date(from); d0.setHours(0,0,0,0);
+  const mk = (y, m, day) => {
+    const last = new Date(y, m, 0).getDate();          // clamp 31 -> 30/28 where needed
+    return new Date(y, m - 1, Math.min(day, last));
+  };
+  if (rule.k === 'monthly') {
+    let y = d0.getFullYear(), m = d0.getMonth() + 1;
+    let due = mk(y, m, rule.d);
+    if (due < d0) { m++; if (m > 12) { m = 1; y++; } due = mk(y, m, rule.d); }
+    return due;
+  }
+  const months = rule.k === 'annual' ? [rule.m] : rule.m;
+  let best = null;
+  for (const yr of [d0.getFullYear(), d0.getFullYear() + 1]) {
+    for (const m of months) {
+      const due = mk(yr, m, rule.d);
+      if (due >= d0 && (!best || due < best)) best = due;
+    }
+  }
+  return best;
+}
+
+function upcomingStatutory(authority, limit) {
+  const now = Date.now();
+  return STATUTORY
+    .filter(s => !authority || s.a === authority)
+    .map(s => ({ ...s, due: nextDue(s.r, now) }))
+    .sort((x, y) => x.due - y.due)
+    .slice(0, limit || 40);
+}
+
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const priorityColour = (p) => p==='URGENT'?'var(--urgent)':p==='HIGH'?'var(--high)':p==='MEDIUM'?'var(--teal)':'var(--muted)';
+const fmtDate = (ms) => ms ? new Date(Number(ms)).toLocaleDateString(undefined,{day:'numeric',month:'short',year:'numeric'}) : 'No date';
+const dayStart = (d) => { const x=new Date(d); x.setHours(0,0,0,0); return x.getTime(); };
+const showError = (el,m) => { el.textContent=m; el.classList.remove('hidden'); };
+const clearError = (el) => el.classList.add('hidden');
+const banner = (m) => { if(!m){$('syncBanner').classList.add('hidden');return;} $('syncBanner').textContent=m; $('syncBanner').classList.remove('hidden'); };
+
+function describeAuthError(code) {
+  switch (code) {
+    case 'auth/invalid-credential':
+    case 'auth/wrong-password':         return 'Incorrect email or password.';
+    case 'auth/user-not-found':         return 'No account exists for that email. Ask your administrator to add you.';
+    case 'auth/invalid-email':          return 'That does not look like a valid email address.';
+    case 'auth/email-already-in-use':   return 'An account already exists for that email address.';
+    case 'auth/weak-password':          return 'Password must be at least 6 characters.';
+    case 'auth/too-many-requests':      return 'Too many attempts. Wait a moment and try again.';
+    case 'auth/network-request-failed': return 'No connection. Check your network and try again.';
+    default: return 'Authentication failed (' + code + ').';
+  }
+}
+const writeError = (err) =>
+  (err && err.code === 'permission-denied') ? 'The database rules do not allow you to do that.'
+  : ((err && err.message) || 'Something went wrong.');
+
+// The SDK reports a missing database as "client is offline", which sends you chasing a network
+// fault that isn't there. One REST call tells them apart before anyone tries to sign in.
+async function preflight() {
+  try {
+    const res = await fetch('https://firestore.googleapis.com/v1/projects/' + firebaseConfig.projectId +
+                            '/databases/(default)/documents/teamMembers?pageSize=1');
+    if (res.status === 404) {
+      showError($('signinError'), 'No Firestore database exists for project ' + firebaseConfig.projectId +
+        '. In the Firebase console open Build > Firestore Database > Create database (Native mode).');
+      $('signinBtn').disabled = true;
+    }
+  } catch (_) {}
+}
+preflight();
+$('compPeriod').value = periodKey(new Date());   // tracker opens on the current month
+
+// ── auth ─────────────────────────────────────────────────────────────────
+$('signinForm').addEventListener('submit', async (e) => {
+  e.preventDefault(); clearError($('signinError')); $('signinBtn').disabled = true;
+  try {
+    await authReady;   // persistence must be set before the sign-in, or it is stored locally
+    await signInWithEmailAndPassword(auth, $('email').value.trim().toLowerCase(), $('password').value); }
+  catch (err) { showError($('signinError'), describeAuthError(err.code || '')); }
+  finally { $('signinBtn').disabled = false; }
+});
+$('signoutBtn').addEventListener('click', () => signOut(auth));
+
+// Session-scoped, not the Firebase default of local persistence: the sign-in lives in
+// sessionStorage, so it survives a page refresh but is gone once the window is closed. Opening
+// OfficeFlow again therefore asks for the password — which matters on a shared office laptop.
+// (inMemory would also clear on refresh, which we deliberately do not want.)
+const authReady = setPersistence(auth, browserSessionPersistence).catch(() => {});
+
+// Persistence alone is not quite enough to guarantee "asks every time it is opened": switching
+// persistence migrates an already-signed-in session across once, and Chrome's tab restore can
+// bring sessionStorage back. So the FIRST auth event in a new window is treated as suspect —
+// if it arrives already signed in, that session was carried over and is discarded. Later events
+// (the user actually typing their password) are untouched, and a refresh is not a new window.
+let freshWindow = !sessionStorage.getItem('officeflow-window');
+sessionStorage.setItem('officeflow-window', '1');
+
+authReady.then(() => {
+  onAuthStateChanged(auth, async (user) => {
+    if (freshWindow) {
+      freshWindow = false;
+      if (user) { try { await signOut(auth); } catch (_) {} return; }
+    }
+    detachAll();
+    if (!user) {
+      state.me = null;
+      $('shell').classList.add('hidden'); $('signin').classList.remove('hidden'); $('password').value='';
+      $('retryLoad').classList.add('hidden');
+      return;
+    }
+    startSession(user);
+  });
+});
+
+// Kept separate so the Retry button can re-run it without a fresh sign-in.
+async function startSession(user) {
+  clearError($('signinError'));
+  $('retryLoad').classList.add('hidden');
+  const outcome = await loadOrProvisionProfile(user);
+
+  if (outcome.state === 'ok') {
+    state.me = outcome.member;
+    $('signin').classList.add('hidden'); $('shell').classList.remove('hidden');
+    renderIdentity(); subscribe();
+    return;
+  }
+
+  $('shell').classList.add('hidden'); $('signin').classList.remove('hidden');
+  if (outcome.state === 'no-profile') {
+    // A definite answer: this account is genuinely not on the roster, so end the session.
+    showError($('signinError'), outcome.message);
+    await signOut(auth);
+  } else {
+    // Could not read — almost always Firestore still connecting right after a page load.
+    // Do NOT sign out for this: it would throw the user out on every refresh.
+    showError($('signinError'), outcome.message);
+    $('retryLoad').classList.remove('hidden');
+  }
+}
+
+$('retryLoad').addEventListener('click', () => {
+  if (auth.currentUser) startSession(auth.currentUser);
+});
+
+const wait = (ms) => new Promise(r => setTimeout(r, ms));
+
+/**
+ * Returns {state:'ok'|'no-profile'|'unreachable'}.
+ *
+ * On a page refresh Auth restores the session before Firestore has connected, so the first
+ * read often fails with "client is offline". That is transient and must be distinguished from
+ * the account genuinely having no profile — otherwise every refresh signs the user out.
+ */
+async function loadOrProvisionProfile(user) {
+  const ref = doc(db,'teamMembers',user.uid);
+  const email = (user.email || '').toLowerCase();
+  let lastErr = null;
+
+  for (let attempt = 0; attempt < 4; attempt++) {
+    try {
+      const snap = await getDoc(ref);
+      if (snap.exists()) return { state:'ok', member:{ id:snap.id, ...snap.data() } };
+
+      // Definitive: the document is absent. Only the primary admin may self-provision.
+      if (email !== PRIMARY_ADMIN_EMAIL) {
+        return { state:'no-profile',
+          message: email + ' signed in, but has no profile in this workspace. Ask an administrator to add you.' };
+      }
+      const admin = { id:user.uid, name:'Mahesh', role:'Managing Partner & Administrator', userRole:'ADMIN',
+        department:'Executive & Practice Leadership', email, phone:'', avatarColorHex:'#1E40AF',
+        isPrimaryAdmin:true, createdDateMillis:Date.now() };
+      await setDoc(ref, admin);
+      return { state:'ok', member:admin };
+    } catch (err) {
+      lastErr = err;
+      if (err && err.code === 'permission-denied') {
+        return { state:'unreachable',
+          message:'Signed in, but the database rules refused to load your profile. Check the Firestore rules for this project.' };
+      }
+      // A cached copy from a previous session gets us going immediately when offline.
+      try {
+        const cached = await getDocFromCache(ref);
+        if (cached.exists()) return { state:'ok', member:{ id:cached.id, ...cached.data() } };
+      } catch (_) { /* nothing cached yet */ }
+      await wait(300 * Math.pow(2, attempt));
+    }
+  }
+  return { state:'unreachable',
+    message:'Signed in as ' + email + ', but could not reach the workspace. Check your connection, then retry — you are still signed in.' };
+}
+
+function renderIdentity() {
+  const me = state.me;
+  $('meName').textContent=me.name||me.email; $('meRole').textContent=me.role||'—';
+  $('meDept').textContent=me.department||'—'; $('meBadge').textContent=me.userRole;
+  $('meAvatar').textContent=(me.name||'U').charAt(0).toUpperCase();
+  $('meAvatar').style.background = me.avatarColorHex || '#1e40af';
+  $('dlWho').textContent = (me.name||'') + ' <' + (me.email||'') + '>';
+
+  const canAssign = CAN_ASSIGN.includes(me.userRole);
+  const elevated  = ELEVATED.includes(me.userRole);
+  ['newTaskBtn','quickNewTask','newProjectBtn','newNoticeBtn'].forEach(id => $(id).classList.toggle('hidden', !canAssign));
+  $('addMemberBtn').classList.toggle('hidden', !elevated);   // only Admin/Partner may onboard
+  $('newPortalBtn').classList.toggle('hidden', !elevated);
+  $('navTeam').classList.toggle('hidden', !canAssign);       // Team Members get no workload view
+  $('navPortals').classList.toggle('hidden', !elevated);
+  $('tasksHeading').textContent = $('dashTasksHeader').textContent =
+    elevated ? 'All tasks' : me.userRole === 'MANAGER' ? 'Tasks assigned to or by me' : 'My assigned tasks';
+}
+
+// ── live data ────────────────────────────────────────────────────────────
+function detachAll() { state.unsub.forEach(f => { try { f(); } catch(_){} }); state.unsub = []; }
+function readError(what, err) {
+  if (err && err.code === 'permission-denied')
+    return 'Not allowed to read ' + what + '. Check the Firestore security rules for this project.';
+  return 'Could not load ' + what + ': ' + ((err && err.message) || 'unknown error');
+}
+
+function subscribe() {
+  const me = state.me;
+  // Firestore rejects a list query outright if it could return a document the caller may not
+  // read — it does not filter. A Team Member may only read their own tasks, so their query
+  // must carry the matching filter or the whole listener fails.
+  const tasksQuery = me.userRole === 'TEAM_MEMBER'
+    ? query(collection(db,'tasks'), where('assignedMemberId','==',me.id))
+    : collection(db,'tasks');
+
+  const watch = (q, key, label) => state.unsub.push(onSnapshot(q,
+    s => { state[key] = s.docs.map(d => ({ id:d.id, ...d.data() })); banner(null); renderAll(); },
+    e => banner(readError(label, e))));
+
+  watch(tasksQuery, 'tasks', 'tasks');
+  watch(collection(db,'teamMembers'), 'members', 'the team roster');
+  watch(collection(db,'projects'), 'projects', 'projects');
+  watch(collection(db,'taxNotifications'), 'notices', 'tax circulars');
+  watch(collection(db,'clients'), 'clients', 'the client list');
+  watch(collection(db,'complianceStatus'), 'compliance', 'compliance status');
+  if (ELEVATED.includes(me.userRole)) watch(collection(db,'portalIntegrations'), 'portals', 'portal integrations');
+}
+
+// A Manager's own list is narrowed here, matching the mobile app.
+function visibleTasks() {
+  const me = state.me;
+  if (!me) return [];
+  if (ELEVATED.includes(me.userRole)) return state.tasks;
+  if (me.userRole === 'MANAGER')
+    return state.tasks.filter(t => t.assignedMemberId === me.id || t.assignedByMemberId === me.id);
+  return state.tasks.filter(t => t.assignedMemberId === me.id);
+}
+
+function renderAll() {
+  renderDashboard(); renderTasks(); renderProjects(); renderCalendar();
+  renderStatutory(); renderTax(); renderTeam(); renderPortals();
+  renderCompliance(); fillPickers();
+}
+
+// ── monthly compliance tracker ───────────────────────────────────────────
+const statusDocId = (clientId, period) => clientId + '_' + period;
+
+function statusFor(clientId, period) {
+  const found = state.compliance.find(c => c.id === statusDocId(clientId, period));
+  return (found && found.statuses) || {};
+}
+
+// A client's default for an obligation: whatever they marked applicable, else pending.
+function cellState(client, period, key) {
+  const s = statusFor(client.id, period)[key];
+  if (s) return s;
+  const applicable = client.applicable || {};
+  return applicable[key] === false ? 'NA' : 'PENDING';
+}
+
+function visibleClients() {
+  const q = ($('compSearch').value || '').trim().toLowerCase();
+  const who = $('compAssignee').value;
+  const st = $('compState').value;
+  const period = $('compPeriod').value || periodKey(new Date());
+  return state.clients
+    .filter(c => !who || c.assignedMemberId === who)
+    .filter(c => !q || (c.name || '').toLowerCase().includes(q) || (c.gstn || '').toLowerCase().includes(q))
+    .filter(c => {
+      if (!st) return true;
+      const pending = COMPLIANCES.some(x => cellState(c, period, x.k) === 'PENDING');
+      return st === 'pending' ? pending : !pending;
+    })
+    .sort((a,b) => (a.name||'').localeCompare(b.name||''));
+}
+
+function renderCompliance() {
+  if (!state.me) return;
+  const period = $('compPeriod').value || periodKey(new Date());
+  const rows = visibleClients();
+  const canEditMaster = CAN_ASSIGN.includes(state.me.userRole);
+  $('compAddBtn').classList.toggle('hidden', !canEditMaster);
+  $('compImportBtn').classList.toggle('hidden', !canEditMaster);
+
+  // KPI tiles: one per obligation, plus overall
+  let totalDue = 0, totalDone = 0;
+  const tiles = COMPLIANCES.map(x => {
+    const cells = state.clients.map(c => cellState(c, period, x.k)).filter(s => s !== 'NA');
+    const done = cells.filter(s => s === 'DONE').length;
+    totalDue += cells.length; totalDone += done;
+    const pct = cells.length ? Math.round(done / cells.length * 100) : 100;
+    return `<div class="kpi ${pct===100?'green':pct>=50?'blue':'amber'}" data-comp="${x.k}">
+      <b>${done}/${cells.length}</b><span>${esc(x.label)} · ${esc(x.due)}</span>
+      <div class="bar" style="margin:8px 0 0"><i style="width:${pct}%"></i></div></div>`;
+  }).join('');
+  const overall = totalDue ? Math.round(totalDone / totalDue * 100) : 100;
+  $('compKpis').innerHTML =
+    `<div class="kpi purple"><b>${overall}%</b><span>Overall this month</span>
+      <div class="bar" style="margin:8px 0 0"><i style="width:${overall}%"></i></div></div>` + tiles;
+  $('badgeCompliance').textContent = totalDue - totalDone;
+
+  $('compBody').innerHTML = rows.length ? rows.map(c => {
+    const cells = COMPLIANCES.map(x => {
+      const s = cellState(c, period, x.k);
+      const v = STATE_CELL[s];
+      return `<td style="text-align:center;padding:4px">
+        <button data-cell="${esc(c.id)}|${x.k}" title="${v.title} — click to change"
+          style="width:34px;height:30px;border-radius:7px;border:1px solid var(--line);
+                 background:${v.bg};color:${v.fg};font-weight:700;padding:0">${v.t}</button></td>`;
+    }).join('');
+    return `<tr>
+      <td><strong>${esc(c.name)}</strong>${c.gstn?`<br><span class="meta">${esc(c.gstn)}</span>`:''}
+          ${c.comments?`<br><span class="meta" style="color:var(--high)">${esc(c.comments)}</span>`:''}</td>
+      <td class="meta">${esc(c.leadName || '—')}</td>
+      <td class="meta">${esc(c.assignedMemberName || '—')}</td>
+      ${cells}
+      <td>${canEditMaster ? `<button class="ghost" data-editclient="${esc(c.id)}" style="padding:4px 9px;font-size:11px">Edit</button>` : ''}</td>
+    </tr>`;
+  }).join('') : `<tr><td colspan="11" class="empty">No clients yet.${canEditMaster ? ' Use Import from Excel to load your tracker.' : ''}</td></tr>`;
+
+  $('compBody').querySelectorAll('[data-cell]').forEach(b =>
+    b.addEventListener('click', () => toggleCell(b.getAttribute('data-cell'))));
+  $('compBody').querySelectorAll('[data-editclient]').forEach(b =>
+    b.addEventListener('click', () => openClientDialog(b.getAttribute('data-editclient'))));
+}
+
+async function toggleCell(ref) {
+  const [clientId, key] = ref.split('|');
+  const period = $('compPeriod').value || periodKey(new Date());
+  const client = state.clients.find(c => c.id === clientId);
+  if (!client) return;
+  const next = NEXT_STATE[cellState(client, period, key)];
+  const id = statusDocId(clientId, period);
+  const existing = statusFor(clientId, period);
+  try {
+    await setDoc(doc(db,'complianceStatus',id), {
+      id, clientId, period,
+      statuses: { ...existing, [key]: next },
+      updatedMillis: Date.now(), updatedBy: state.me.name, updatedById: state.me.id
+    });
+  } catch (err) { banner(writeError(err)); }
+}
+
+['compPeriod','compAssignee','compState','compSearch'].forEach(id =>
+  $(id).addEventListener('input', renderCompliance));
+
+// ── client master ────────────────────────────────────────────────────────
+let editingClientId = null;
+
+function openClientDialog(id) {
+  editingClientId = id || null;
+  const c = id ? state.clients.find(x => x.id === id) : null;
+  clearError($('clientError'));
+  $('clientDialogTitle').textContent = c ? 'Edit client' : 'Add a client';
+  $('cName').value = c ? (c.name||'') : '';
+  $('cGstn').value = c ? (c.gstn||'') : '';
+  $('cComments').value = c ? (c.comments||'') : '';
+  const people = state.members.map(m => `<option value="${esc(m.id)}">${esc(m.name)}</option>`).join('');
+  $('cLead').innerHTML = '<option value="">—</option>' + people;
+  $('cAssigned').innerHTML = '<option value="">—</option>' + people;
+  if (c) { $('cLead').value = c.leadMemberId || ''; $('cAssigned').value = c.assignedMemberId || ''; }
+  const app = (c && c.applicable) || {};
+  $('cApplicable').innerHTML = COMPLIANCES.map(x =>
+    `<label style="display:flex;align-items:center;gap:6px;font-weight:500;margin:0">
+       <input type="checkbox" data-app="${x.k}" style="width:auto" ${app[x.k] === false ? '' : 'checked'} />
+       ${esc(x.label)}</label>`).join('');
+  $('cDelete').classList.toggle('hidden', !c || !ELEVATED.includes(state.me.userRole));
+  $('clientDialog').showModal();
+}
+$('compAddBtn').addEventListener('click', () => openClientDialog(null));
+
+$('cDelete').addEventListener('click', async () => {
+  if (!editingClientId) return;
+  const c = state.clients.find(x => x.id === editingClientId);
+  if (!confirm('Remove ' + (c ? c.name : 'this client') + ' from the tracker?')) return;
+  try { await deleteDoc(doc(db,'clients',editingClientId)); $('clientDialog').close(); }
+  catch (err) { showError($('clientError'), writeError(err)); }
+});
+
+$('clientForm').addEventListener('submit', async (e) => {
+  if (e.submitter && e.submitter.value !== 'save') return;
+  e.preventDefault(); clearError($('clientError'));
+  const applicable = {};
+  $('cApplicable').querySelectorAll('[data-app]').forEach(cb => { applicable[cb.getAttribute('data-app')] = cb.checked; });
+  const lead = state.members.find(m => m.id === $('cLead').value);
+  const assignee = state.members.find(m => m.id === $('cAssigned').value);
+  const ref = editingClientId ? doc(db,'clients',editingClientId) : doc(collection(db,'clients'));
+  try {
+    await setDoc(ref, {
+      id: ref.id, name: $('cName').value.trim(), gstn: $('cGstn').value.trim().toUpperCase(),
+      leadMemberId: lead ? lead.id : '', leadName: lead ? lead.name : '',
+      assignedMemberId: assignee ? assignee.id : '', assignedMemberName: assignee ? assignee.name : '',
+      comments: $('cComments').value.trim(), applicable,
+      createdMillis: editingClientId ? undefined : Date.now()
+    }, { merge: true });
+    $('clientDialog').close();
+  } catch (err) { showError($('clientError'), writeError(err)); }
+});
+
+// ── spreadsheet import ───────────────────────────────────────────────────
+let pendingImport = [];
+
+$('compImportBtn').addEventListener('click', () => {
+  clearError($('importError')); $('importForm').reset();
+  $('importPreview').textContent = ''; $('importSave').disabled = true;
+  pendingImport = [];
+  $('importDialog').showModal();
+});
+
+// Column headings vary between practices, so match on a normalised name rather than position.
+const COL = {
+  name:     ['client','client name','name','party','trade name'],
+  gstn:     ['gstn','gstin','gst no','gst number','gst'],
+  lead:     ['lead','partner','lead partner'],
+  assigned: ['assigned','assigned to','staff','associate','preparer'],
+  comments: ['comments','comment','remarks','notes','remark']
+};
+const norm = (s) => String(s ?? '').trim().toLowerCase().replace(/\s+/g,' ');
+
+function mapRows(rows) {
+  if (!rows.length) return [];
+  const headers = rows[0].map(norm);
+  const idx = {};
+  for (const [field, names] of Object.entries(COL)) {
+    idx[field] = headers.findIndex(h => names.includes(h));
+  }
+  if (idx.name < 0) throw new Error('No "Client" column found. The first row must be the headings.');
+  return rows.slice(1)
+    .map(r => ({
+      name: String(r[idx.name] ?? '').trim(),
+      gstn: idx.gstn >= 0 ? String(r[idx.gstn] ?? '').trim().toUpperCase() : '',
+      lead: idx.lead >= 0 ? String(r[idx.lead] ?? '').trim() : '',
+      assigned: idx.assigned >= 0 ? String(r[idx.assigned] ?? '').trim() : '',
+      comments: idx.comments >= 0 ? String(r[idx.comments] ?? '').trim() : ''
+    }))
+    .filter(r => r.name && norm(r.name) !== 'client');
+}
+
+function parseCsv(text) {
+  // Handles quoted fields containing commas, which client names frequently do.
+  const rows = []; let row = [], cell = '', inQuotes = false;
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (inQuotes) {
+      if (ch === '"' && text[i+1] === '"') { cell += '"'; i++; }
+      else if (ch === '"') inQuotes = false;
+      else cell += ch;
+    } else if (ch === '"') inQuotes = true;
+    else if (ch === ',') { row.push(cell); cell = ''; }
+    else if (ch === '\n') { row.push(cell); rows.push(row); row = []; cell = ''; }
+    else if (ch !== '\r') cell += ch;
+  }
+  if (cell || row.length) { row.push(cell); rows.push(row); }
+  return rows;
+}
+
+async function readSheet(file) {
+  if (/\.csv$/i.test(file.name)) return parseCsv(await file.text());
+  // SheetJS is only fetched when an actual .xlsx is chosen, so CSV import works offline.
+  if (!window.XLSX) {
+    await new Promise((res, rej) => {
+      const s = document.createElement('script');
+      s.src = 'https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js';
+      s.onload = res; s.onerror = () => rej(new Error('Could not load the Excel reader. Check your connection, or save the sheet as .csv and import that.'));
+      document.head.appendChild(s);
+    });
+  }
+  const wb = window.XLSX.read(await file.arrayBuffer(), { type:'array' });
+  const sheet = wb.Sheets[wb.SheetNames[0]];
+  return window.XLSX.utils.sheet_to_json(sheet, { header:1, blankrows:false, defval:'' });
+}
+
+$('importFile').addEventListener('change', async () => {
+  clearError($('importError'));
+  $('importSave').disabled = true; pendingImport = [];
+  const file = $('importFile').files[0];
+  if (!file) return;
+  $('importPreview').textContent = 'Reading ' + file.name + '…';
+  try {
+    pendingImport = mapRows(await readSheet(file));
+    if (!pendingImport.length) throw new Error('No client rows found in that file.');
+    const known = new Set(state.clients.map(c => (c.gstn || norm(c.name))));
+    const fresh = pendingImport.filter(r => !known.has(r.gstn || norm(r.name))).length;
+    $('importPreview').innerHTML =
+      `<strong>${pendingImport.length}</strong> rows read — ${fresh} new, ${pendingImport.length - fresh} already on the tracker (these will be updated).` +
+      `<br>First: ${esc(pendingImport[0].name)}${pendingImport[0].gstn ? ' · ' + esc(pendingImport[0].gstn) : ''}`;
+    $('importSave').disabled = false;
+  } catch (err) {
+    $('importPreview').textContent = '';
+    showError($('importError'), err.message || String(err));
+  }
+});
+
+$('importForm').addEventListener('submit', async (e) => {
+  if (e.submitter && e.submitter.value !== 'save') return;
+  e.preventDefault(); clearError($('importError'));
+  $('importSave').disabled = true;
+  // Names in the sheet are matched to the roster so the tracker links to real accounts.
+  const byName = (n) => state.members.find(m => norm(m.name) === norm(n) ||
+                                                norm(m.name).split(' ')[0] === norm(n));
+  let added = 0, updated = 0, failed = 0;
+  for (const r of pendingImport) {
+    const existing = state.clients.find(c =>
+      (r.gstn && c.gstn && c.gstn === r.gstn) || norm(c.name) === norm(r.name));
+    const lead = byName(r.lead), assignee = byName(r.assigned);
+    const ref = existing ? doc(db,'clients',existing.id) : doc(collection(db,'clients'));
+    try {
+      await setDoc(ref, {
+        id: ref.id, name: r.name, gstn: r.gstn,
+        leadMemberId: lead ? lead.id : (existing ? existing.leadMemberId : ''),
+        leadName: lead ? lead.name : (r.lead || (existing ? existing.leadName : '')),
+        assignedMemberId: assignee ? assignee.id : (existing ? existing.assignedMemberId : ''),
+        assignedMemberName: assignee ? assignee.name : (r.assigned || (existing ? existing.assignedMemberName : '')),
+        comments: r.comments, createdMillis: existing ? existing.createdMillis : Date.now()
+      }, { merge: true });
+      existing ? updated++ : added++;
+    } catch (_) { failed++; }
+  }
+  $('importDialog').close();
+  banner(`Import finished — ${added} added, ${updated} updated${failed ? ', ' + failed + ' failed' : ''}.`);
+  setTimeout(() => banner(null), 6000);
+});
+
+$('compExportBtn').addEventListener('click', () => {
+  const period = $('compPeriod').value || periodKey(new Date());
+  const head = ['Client','GSTN','Lead','Assigned','Comments', ...COMPLIANCES.map(x => x.label + ' (' + x.due + ')')];
+  const q = (v) => '"' + String(v ?? '').replace(/"/g,'""') + '"';
+  const lines = [head.map(q).join(',')].concat(visibleClients().map(c =>
+    [c.name, c.gstn, c.leadName, c.assignedMemberName, c.comments]
+      .concat(COMPLIANCES.map(x => STATE_CELL[cellState(c, period, x.k)].title))
+      .map(q).join(',')));
+  const blob = new Blob([lines.join('\n')], { type:'text/csv;charset=utf-8' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'compliance-' + period + '.csv';
+  a.click();
+  URL.revokeObjectURL(a.href);
+});
+
+// ── statutory due dates ──────────────────────────────────────────────────
+function renderStatutory() {
+  const rows = upcomingStatutory($('statAuthority').value, 40);
+  const today = dayStart(Date.now());
+  $('statBody').innerHTML = rows.map(s => {
+    const days = Math.round((dayStart(s.due) - today) / 864e5);
+    const urgent = days <= 7;
+    const when = days === 0 ? 'today' : days === 1 ? 'tomorrow' : 'in ' + days + ' days';
+    return `<tr>
+      <td style="white-space:nowrap"><strong style="color:${urgent?'var(--urgent)':'inherit'}">${fmtDate(s.due.getTime())}</strong>
+          <br><span class="meta">${when}</span></td>
+      <td><span class="tag">${esc(s.a)}</span></td>
+      <td><strong>${esc(s.f)}</strong></td>
+      <td>${esc(s.t)}</td>
+      <td class="meta">${FREQ_LABEL[s.r.k]}</td>
+    </tr>`;
+  }).join('');
+}
+$('statAuthority').addEventListener('change', renderStatutory);
+
+// ── dashboard ────────────────────────────────────────────────────────────
+function renderDashboard() {
+  const list = visibleTasks();
+  const today = dayStart(Date.now());
+  const open = list.filter(t => t.status !== 'COMPLETED');
+  $('kpiPending').textContent  = open.length;
+  $('kpiTax').textContent      = state.notices.filter(n => Number(n.deadlineDateMillis||0) >= today).length;
+  $('kpiProjects').textContent = state.projects.length;
+  $('kpiTeam').textContent     = state.members.length;
+  $('badgeTasks').textContent  = open.length;
+  $('badgeTax').textContent    = state.notices.length;
+
+  const upcoming = open.slice().sort((a,b)=>(a.dueDateMillis||0)-(b.dueDateMillis||0)).slice(0,6);
+  $('dashTasks').innerHTML = upcoming.length ? upcoming.map(taskCard).join('') : '<div class="empty">Nothing outstanding.</div>';
+  wireProgress($('dashTasks'));
+
+  $('dashStatutory').innerHTML = upcomingStatutory('', 6).map(s => {
+    const days = Math.round((dayStart(s.due) - today) / 864e5);
+    const urgent = days <= 7;
+    return `<div class="row" style="padding:7px 0;border-bottom:1px solid var(--line)">
+      <div><strong>${esc(s.f)}</strong> <span class="tag">${esc(s.a)}</span>
+           <div class="meta">${esc(s.t)}</div></div>
+      <div style="text-align:right;white-space:nowrap">
+        <strong style="color:${urgent?'var(--urgent)':'inherit'}">${fmtDate(s.due.getTime())}</strong>
+        <div class="meta">${days === 0 ? 'today' : days === 1 ? 'tomorrow' : 'in ' + days + ' days'}</div>
+      </div></div>`;
+  }).join('');
+  $('dashProjects').innerHTML = state.projects.length ? state.projects.map(projectCard).join('') : '<div class="empty">No projects yet.</div>';
+}
+
+// ── tasks ────────────────────────────────────────────────────────────────
+function taskCard(t) {
+  const pct = Number(t.progressPercentage||0);
+  const canUpdate = t.assignedMemberId === state.me.id || CAN_ASSIGN.includes(state.me.userRole);
+  return `<div class="task" style="border-left-color:${priorityColour(t.priority)}">
+    <div class="row"><div style="min-width:0">
+      <h3>${esc(t.title)}</h3>
+      <div class="meta">${esc(t.assignedMemberName||'Unassigned')} · ${esc(t.projectName||'General Office')} · due ${fmtDate(t.dueDateMillis)}</div>
+    </div><span class="tag" style="color:${priorityColour(t.priority)}">${esc(t.priority||'MEDIUM')}</span></div>
+    <div class="bar"><i style="width:${pct}%"></i></div>
+    <div class="row"><div class="meta">${pct}% · ${esc((t.status||'TODO').replace(/_/g,' '))}${t.lastProgressRemark?' · '+esc(t.lastProgressRemark):''}</div>
+    ${canUpdate?`<button class="ghost" data-progress="${esc(t.id)}">Update</button>`:''}</div></div>`;
+}
+const wireProgress = (host) => host.querySelectorAll('[data-progress]').forEach(b =>
+  b.addEventListener('click', () => openProgress(b.getAttribute('data-progress'))));
+function renderTasks() {
+  const list = visibleTasks().slice().sort((a,b)=>(a.dueDateMillis||0)-(b.dueDateMillis||0));
+  $('taskList').innerHTML = list.length ? list.map(taskCard).join('') : '<div class="empty">No tasks yet.</div>';
+  wireProgress($('taskList'));
+}
+
+// ── projects ─────────────────────────────────────────────────────────────
+function projectCard(p) {
+  const pct = Number(p.progressPercentage||0);
+  return `<div class="proj" style="border-top:3px solid ${esc(p.colorHex||'#1e40af')}">
+    <h3>${esc(p.name)}</h3>
+    <div class="meta">${esc(p.clientName||'—')}${p.code?' · '+esc(p.code):''}</div>
+    <div class="bar"><i style="width:${pct}%;background:${esc(p.colorHex||'#1e40af')}"></i></div>
+    <div class="meta">${pct}% · lead ${esc(p.leadMemberName||'—')} · target ${fmtDate(p.targetDateMillis)}</div></div>`;
+}
+const renderProjects = () => $('projectList').innerHTML =
+  state.projects.length ? state.projects.map(projectCard).join('') : '<div class="empty">No projects yet.</div>';
+
+// ── tax circulars ────────────────────────────────────────────────────────
+function renderTax() {
+  const list = state.notices.slice().sort((a,b)=>(a.deadlineDateMillis||0)-(b.deadlineDateMillis||0));
+  $('taxList').innerHTML = list.length ? list.map(n => {
+    const critical = n.severity === 'CRITICAL_ACTION_REQUIRED';
+    return `<div class="notice" style="border-left:4px solid ${critical?'var(--urgent)':'var(--high)'}">
+      <div class="row"><div style="min-width:0">
+        <h3>${esc(n.title)}</h3>
+        <div class="meta">${esc(n.department||'')} · ${esc(n.circularOrNotificationNo||'')} · ${esc(n.sourceAuthority||'')}</div>
+      </div><span class="tag" style="color:${critical?'var(--urgent)':'var(--high)'}">${esc((n.severity||'').replace(/_/g,' '))}</span></div>
+      ${n.summary?`<p class="meta" style="margin:8px 0 0">${esc(n.summary)}</p>`:''}
+      ${n.keyActionItems?`<p class="meta" style="margin:6px 0 0;white-space:pre-line">${esc(n.keyActionItems)}</p>`:''}
+      <div class="meta" style="margin-top:8px">Deadline ${fmtDate(n.deadlineDateMillis)}</div></div>`;
+  }).join('') : '<div class="empty">No circulars recorded yet.</div>';
+}
+
+// ── team ─────────────────────────────────────────────────────────────────
+function renderTeam() {
+  if (!state.me || !CAN_ASSIGN.includes(state.me.userRole)) return;
+  const elevated = ELEVATED.includes(state.me.userRole);
+  $('teamBody').innerHTML = state.members.length ? state.members.map(m => {
+    const mine = state.tasks.filter(t => t.assignedMemberId === m.id);
+    return `<tr>
+      <td><strong>${esc(m.name)}</strong><br><span class="meta">${esc(m.email)}</span></td>
+      <td>${esc(m.userRole)}</td><td>${esc(m.department||'—')}</td>
+      <td>${mine.length}</td><td>${mine.filter(t=>t.status!=='COMPLETED').length}</td>
+      <td>${mine.filter(t=>t.status==='COMPLETED').length}</td>
+      <td>${elevated && !m.isPrimaryAdmin && m.id!==state.me.id
+          ? `<button class="danger" data-remove="${esc(m.id)}">Remove</button>`:''}</td></tr>`;
+  }).join('') : '<tr><td colspan="7" class="empty">No team members yet.</td></tr>';
+  $('teamBody').querySelectorAll('[data-remove]').forEach(b =>
+    b.addEventListener('click', () => removeMember(b.getAttribute('data-remove'))));
+}
+async function removeMember(id) {
+  const m = state.members.find(x => x.id === id);
+  if (!m) return;
+  // Deleting the roster entry revokes access. Their Firebase Auth login must be removed in the
+  // console, because a client SDK cannot delete another user's account.
+  if (!confirm('Remove ' + m.name + ' from the roster?\n\nThey lose access immediately. Delete their login separately in Firebase console > Authentication > Users.')) return;
+  try { await deleteDoc(doc(db,'teamMembers',id)); } catch (err) { alert(writeError(err)); }
+}
+
+// ── portals ──────────────────────────────────────────────────────────────
+function renderPortals() {
+  if (!state.me || !ELEVATED.includes(state.me.userRole)) return;
+  $('portalList').innerHTML = state.portals.length ? state.portals.map(p => `
+    <div class="portal">
+      <h3>${esc(p.name)}</h3>
+      <div class="meta">${esc(p.type||'')}${p.description?' · '+esc(p.description):''}</div>
+      <div class="meta" style="margin-top:6px"><a href="${esc(p.portalUrl)}" target="_blank" rel="noopener">${esc(p.portalUrl)}</a></div>
+      <div class="meta" style="margin-top:6px">${esc(p.statusText||'Connected')}</div>
+    </div>`).join('') : '<div class="empty">No portals configured yet.</div>';
+}
+
+function fillPickers() {
+  // Keep the compliance assignee filter in step with the roster without losing the selection.
+  const keep = $('compAssignee').value;
+  $('compAssignee').innerHTML = '<option value="">Everyone</option>' +
+    state.members.map(m => `<option value="${esc(m.id)}">${esc(m.name)}</option>`).join('');
+  $('compAssignee').value = keep;
+
+  $('tAssignee').innerHTML = state.members.map(m => `<option value="${esc(m.id)}">${esc(m.name)} — ${esc(m.role||m.userRole)}</option>`).join('');
+  $('prLead').innerHTML = state.members.map(m => `<option value="${esc(m.name)}">${esc(m.name)}</option>`).join('');
+  $('tProject').innerHTML = '<option value="">General Office</option>' +
+    state.projects.map(p => `<option value="${esc(p.id)}">${esc(p.name)}</option>`).join('');
+}
+
+// ── calendar ─────────────────────────────────────────────────────────────
+function renderCalendar() {
+  const base = new Date(); base.setDate(1); base.setMonth(base.getMonth()+state.calOffset);
+  const year = base.getFullYear(), month = base.getMonth();
+  $('calTitle').textContent = base.toLocaleDateString(undefined,{month:'long',year:'numeric'});
+  const firstDow = new Date(year,month,1).getDay();
+  const days = new Date(year,month+1,0).getDate();
+  const today = dayStart(Date.now());
+  const list = visibleTasks();
+
+  let html = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map(d=>`<div class="dow">${d}</div>`).join('');
+  for (let i=0;i<firstDow;i++) html += '<div class="day dim"></div>';
+  for (let d=1; d<=days; d++) {
+    const start = dayStart(new Date(year,month,d)), end = start+864e5;
+    const inDay = (ms) => Number(ms||0) >= start && Number(ms||0) < end;
+    // Statutory deadlines land on the calendar alongside the firm's own work.
+    const statToday = STATUTORY
+      .map(s => ({ s, due: nextDue(s.r, start) }))
+      .filter(x => dayStart(x.due) === start);
+
+    html += `<div class="day${start===today?' today':''}"><b>${d}</b>` +
+      list.filter(t=>inDay(t.dueDateMillis)).map(t=>`<span class="chip due" title="${esc(t.title)}">${esc(t.title)}</span>`).join('') +
+      statToday.map(x=>`<span class="chip stat" title="${esc(x.s.a)} — ${esc(x.s.f)}: ${esc(x.s.t)}">${esc(x.s.f)}</span>`).join('') +
+      state.notices.filter(n=>inDay(n.deadlineDateMillis)).map(n=>`<span class="chip tax" title="${esc(n.title)}">${esc(n.title)}</span>`).join('') +
+      state.projects.filter(p=>inDay(p.targetDateMillis)).map(p=>`<span class="chip" title="${esc(p.name)}">${esc(p.name)}</span>`).join('') +
+      '</div>';
+  }
+  $('calGrid').innerHTML = html;
+}
+$('calPrev').addEventListener('click', () => { state.calOffset--; renderCalendar(); });
+$('calNext').addEventListener('click', () => { state.calOffset++; renderCalendar(); });
+$('calToday').addEventListener('click', () => { state.calOffset=0; renderCalendar(); });
+
+// ── navigation ───────────────────────────────────────────────────────────
+function go(tab) {
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.toggle('active', n.getAttribute('data-tab')===tab));
+  Object.keys(TITLES).forEach(t => { const el = $('tab-'+t); if (el) el.classList.toggle('hidden', t !== tab); });
+  $('pageTitle').textContent = TITLES[tab][0];
+  $('pageSub').textContent = TITLES[tab][1];
+}
+document.querySelectorAll('.nav-item').forEach(n => n.addEventListener('click', () => go(n.getAttribute('data-tab'))));
+document.querySelectorAll('[data-go]').forEach(el => el.addEventListener('click', () => go(el.getAttribute('data-go'))));
+
+// ── assign task ──────────────────────────────────────────────────────────
+function openTaskDialog() {
+  clearError($('taskError')); $('taskForm').reset();
+  $('tDue').value = new Date(Date.now()+3*864e5).toISOString().slice(0,10);
+  fillPickers(); $('taskDialog').showModal();
+}
+$('newTaskBtn').addEventListener('click', openTaskDialog);
+$('quickNewTask').addEventListener('click', openTaskDialog);
+
+$('taskForm').addEventListener('submit', async (e) => {
+  if (e.submitter && e.submitter.value !== 'save') return;
+  e.preventDefault(); clearError($('taskError'));
+  const member = state.members.find(m => m.id === $('tAssignee').value);
+  const project = state.projects.find(p => p.id === $('tProject').value) || null;
+  if (!member) { showError($('taskError'),'Choose who this is for.'); return; }
+  const ref = doc(collection(db,'tasks')), now = Date.now();
+  // Field-for-field identical to the Kotlin model, or the two clients disagree.
+  try {
+    await setDoc(ref, {
+      id:ref.id, title:$('tTitle').value.trim(), description:$('tDesc').value.trim(),
+      assignedMemberId:member.id, assignedMemberName:member.name, assignedMemberRole:member.role||'',
+      assignedBy:state.me.name, assignedByMemberId:state.me.id,
+      projectId:project?project.id:'', projectName:project?project.name:'General Office',
+      priority:$('tPriority').value, status:'TODO', progressPercentage:0,
+      dueDateMillis:$('tDue').value ? new Date($('tDue').value).getTime() : now,
+      category:$('tCategory').value, monthlyRepetitiveCategory:'NONE', tags:'', checklistItems:'',
+      completedChecklistCount:0, totalChecklistCount:0,
+      lastProgressRemark:'Task assigned by ' + state.me.name, createdMillis:now, updatedMillis:now
+    });
+    $('taskDialog').close();
+  } catch (err) { showError($('taskError'), writeError(err)); }
+});
+
+// ── progress ─────────────────────────────────────────────────────────────
+let progressTaskId = null;
+$('pPercent').addEventListener('input', () => { $('pPercentLabel').textContent = $('pPercent').value; });
+function openProgress(id) {
+  const t = state.tasks.find(x => x.id === id); if (!t) return;
+  progressTaskId = id; clearError($('progressError'));
+  $('progressTaskName').textContent = t.title;
+  $('pPercent').value = Number(t.progressPercentage||0);
+  $('pPercentLabel').textContent = $('pPercent').value;
+  $('pStatus').value = t.status || 'TODO'; $('pRemark').value = '';
+  $('progressDialog').showModal();
+}
+$('progressForm').addEventListener('submit', async (e) => {
+  if (e.submitter && e.submitter.value !== 'save') return;
+  e.preventDefault(); clearError($('progressError'));
+  const t = state.tasks.find(x => x.id === progressTaskId); if (!t) return;
+  const pct = Number($('pPercent').value);
+  try {
+    await setDoc(doc(db,'tasks',t.id), { ...t, progressPercentage:pct,
+      // Matches the mobile app: 100% completes the task regardless of the dropdown.
+      status: pct >= 100 ? 'COMPLETED' : $('pStatus').value,
+      lastProgressRemark: $('pRemark').value.trim() || t.lastProgressRemark || '',
+      updatedMillis: Date.now() });
+    $('progressDialog').close();
+  } catch (err) { showError($('progressError'), writeError(err)); }
+});
+
+// ── new project ──────────────────────────────────────────────────────────
+$('newProjectBtn').addEventListener('click', () => {
+  clearError($('projectError')); $('projectForm').reset();
+  $('prTarget').value = new Date(Date.now()+30*864e5).toISOString().slice(0,10);
+  fillPickers(); $('projectDialog').showModal();
+});
+$('projectForm').addEventListener('submit', async (e) => {
+  if (e.submitter && e.submitter.value !== 'save') return;
+  e.preventDefault(); clearError($('projectError'));
+  const ref = doc(collection(db,'projects')), now = Date.now();
+  try {
+    await setDoc(ref, { id:ref.id, name:$('prName').value.trim(), code:$('prCode').value.trim(),
+      clientName:$('prClient').value.trim(), description:$('prDesc').value.trim(),
+      leadMemberName:$('prLead').value || state.me.name, startDateMillis:now,
+      targetDateMillis:$('prTarget').value ? new Date($('prTarget').value).getTime() : now+30*864e5,
+      status:'ACTIVE', progressPercentage:0, category:'Tax & Audit',
+      colorHex:PALETTE[state.projects.length % PALETTE.length],
+      lastUpdateRemark:'Project created and initiated' });
+    $('projectDialog').close();
+  } catch (err) { showError($('projectError'), writeError(err)); }
+});
+
+// ── tax circular ─────────────────────────────────────────────────────────
+$('newNoticeBtn').addEventListener('click', () => {
+  clearError($('noticeError')); $('noticeForm').reset();
+  $('nSource').value = 'CBIC / CBDT';
+  $('nDeadline').value = new Date(Date.now()+14*864e5).toISOString().slice(0,10);
+  $('noticeDialog').showModal();
+});
+$('noticeForm').addEventListener('submit', async (e) => {
+  if (e.submitter && e.submitter.value !== 'save') return;
+  e.preventDefault(); clearError($('noticeError'));
+  const ref = doc(collection(db,'taxNotifications')), now = Date.now();
+  try {
+    await setDoc(ref, { id:ref.id, title:$('nTitle').value.trim(), department:$('nDept').value,
+      circularOrNotificationNo:$('nNumber').value.trim(), issueDateFormatted:'Today',
+      effectiveDateFormatted:'Immediate', summary:$('nSummary').value.trim(),
+      keyActionItems:$('nActions').value.trim(),
+      deadlineDateMillis:$('nDeadline').value ? new Date($('nDeadline').value).getTime() : now,
+      severity:$('nSeverity').value, isRead:false, isPushedToTasks:false,
+      sourceAuthority:$('nSource').value.trim(), createdTimestamp:now });
+    $('noticeDialog').close();
+  } catch (err) { showError($('noticeError'), writeError(err)); }
+});
+
+// ── portal ───────────────────────────────────────────────────────────────
+$('newPortalBtn').addEventListener('click', () => {
+  clearError($('portalError')); $('portalForm').reset(); $('portalDialog').showModal();
+});
+$('portalForm').addEventListener('submit', async (e) => {
+  if (e.submitter && e.submitter.value !== 'save') return;
+  e.preventDefault(); clearError($('portalError'));
+  const ref = doc(collection(db,'portalIntegrations'));
+  try {
+    await setDoc(ref, { id:ref.id, name:$('poName').value.trim(), type:$('poType').value,
+      portalUrl:$('poUrl').value.trim(), webhookUrl:'', apiKeyOrClientId:'', isEnabled:true,
+      statusText:'Connected', lastSyncMillis:Date.now(), description:$('poDesc').value.trim() });
+    $('portalDialog').close();
+  } catch (err) { showError($('portalError'), writeError(err)); }
+});
+
+// ── add team member ──────────────────────────────────────────────────────
+$('addMemberBtn').addEventListener('click', () => {
+  clearError($('memberError')); $('memberForm').reset(); $('mPass').value='office123';
+  $('memberDialog').showModal();
+});
+$('memberForm').addEventListener('submit', async (e) => {
+  if (e.submitter && e.submitter.value !== 'save') return;
+  e.preventDefault(); clearError($('memberError')); $('memberSave').disabled = true;
+  const email = $('mEmail').value.trim().toLowerCase();
+  let secondary = null;
+  try {
+    // Creating the login and the roster entry are two separate writes that cannot be made
+    // atomic from a client. If the second one fails we roll the first one back, otherwise the
+    // login is stranded: it exists, has no profile, and every retry fails with
+    // "email already in use" with no way out of the UI.
+    //
+    // createUserWithEmailAndPassword also signs the new account in on whichever app it runs
+    // against, so it runs on a throwaway secondary app and the admin's session is untouched.
+    secondary = initializeApp(firebaseConfig, 'onboarding-' + Date.now());
+    const secondaryAuth = getAuth(secondary);
+
+    let cred, weCreatedIt = false;
+    try {
+      cred = await createUserWithEmailAndPassword(secondaryAuth, email, $('mPass').value);
+      weCreatedIt = true;
+    } catch (err) {
+      if (err.code !== 'auth/email-already-in-use') throw err;
+      // Adopt an existing login that has no profile — repairs exactly the stranded case above.
+      try {
+        cred = await signInWithEmailAndPassword(secondaryAuth, email, $('mPass').value);
+      } catch (_) {
+        throw new Error('A sign-in already exists for ' + email + ' but it has no profile here, ' +
+          'and the password you typed does not match it. Enter the password originally used for ' +
+          'that account, or delete it in Firebase console > Authentication > Users and try again.');
+      }
+      const existing = await getDoc(doc(db,'teamMembers',cred.user.uid));
+      if (existing.exists()) throw new Error(email + ' is already on the team.');
+    }
+
+    const uid = cred.user.uid;
+    try {
+      await setDoc(doc(db,'teamMembers',uid), {
+        id:uid, name:$('mName').value.trim(), role:$('mDesignation').value.trim(),
+        userRole:$('mRole').value, department:$('mDept').value, email, phone:$('mPhone').value.trim(),
+        avatarColorHex:PALETTE[state.members.length % PALETTE.length],
+        isPrimaryAdmin: email === PRIMARY_ADMIN_EMAIL, createdDateMillis:Date.now()
+      });
+    } catch (err) {
+      // Roll the login back so the address stays free to try again.
+      if (weCreatedIt) { try { await cred.user.delete(); } catch (_) {} }
+      throw err;
+    }
+    await signOut(secondaryAuth);
+    $('memberDialog').close();
+  } catch (err) {
+    showError($('memberError'), err.code ? describeAuthError(err.code) : writeError(err));
+  } finally {
+    if (secondary) { try { await deleteApp(secondary); } catch(_){} }
+    $('memberSave').disabled = false;
+  }
+});
+</script>
+</body>
+</html>

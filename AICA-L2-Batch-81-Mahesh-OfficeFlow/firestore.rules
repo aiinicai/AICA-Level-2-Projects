@@ -1,0 +1,155 @@
+rules_version = '2';
+
+// OfficeFlow Firestore Security Rules — READY TO DEPLOY
+//
+// The app now signs in with Firebase Authentication and every teamMembers document is keyed
+// by that user's Auth UID, which is what these rules rely on to resolve a caller's role.
+// Passwords are held by Firebase Auth and are never stored in Firestore.
+//
+// Deploy by pasting into: Firebase Console > Firestore Database > Rules > Publish
+// (or `firebase deploy --only firestore:rules` if you use the CLI)
+//
+// These replace firestore.interim.rules, which allowed open access and expires 6 Oct 2026.
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function profilePath() {
+      return /databases/$(database)/documents/teamMembers/$(request.auth.uid);
+    }
+
+    // Guarded with exists(): a get() on a missing document raises an error, and an error in a
+    // rule DENIES the request rather than evaluating to false. Without this guard the primary
+    // admin could never create their own profile on first sign-in — the check meant to permit
+    // it would blow up on the very document it is about to create.
+    function role() {
+      return signedIn() && exists(profilePath()) ? get(profilePath()).data.userRole : '';
+    }
+
+    // Admin and Partner have identical, unrestricted access.
+    function isAdminOrPartner() {
+      return role() == 'ADMIN' || role() == 'PARTNER';
+    }
+
+    function isManager() {
+      return role() == 'MANAGER';
+    }
+
+    // First sign-in bootstrap: the primary admin creates their own profile, keyed to their
+    // Auth UID, with the email proven by their Auth token. Nobody else can use this path.
+    function isPrimaryAdminBootstrap(memberId) {
+      return signedIn()
+             && request.auth.uid == memberId
+             && request.auth.token.email == 'mahesh@primeaccounting.in'
+             && request.resource.data.email == 'mahesh@primeaccounting.in';
+    }
+
+    // Anyone who may create and assign work: Admin, Partner, Manager (never a Team Member).
+    function canAssign() {
+      return isAdminOrPartner() || isManager();
+    }
+
+    // --- Team roster ---
+    match /teamMembers/{memberId} {
+      // Every signed-in user can read the roster: it populates assignment dropdowns and
+      // shows who owns a task. No credentials are stored here.
+      allow read: if signedIn();
+
+      // Onboarding writes the new employee's profile (id == their Auth UID) from the admin's
+      // session, so creation is otherwise restricted to Admin and Partner.
+      //
+      // Order matters: || short-circuits, so the bootstrap check runs first and the role
+      // lookup is never reached on the very first write, when no profile exists yet.
+      allow create: if isPrimaryAdminBootstrap(memberId) || isAdminOrPartner();
+
+      allow delete: if isAdminOrPartner();
+
+      // A user may edit their own contact details, but never their own role or admin flag.
+      allow update: if isAdminOrPartner()
+                    || (signedIn() && request.auth.uid == memberId
+                        && request.resource.data.userRole == resource.data.userRole
+                        && request.resource.data.isPrimaryAdmin == resource.data.isPrimaryAdmin);
+    }
+
+    // --- Tasks ---
+    match /tasks/{taskId} {
+      // A Team Member can only ever read their own tasks. Admin, Partner and Manager can read
+      // the collection, because the Team Workload view counts work assigned to other people —
+      // a Manager's own task LIST is still narrowed to assigned-to/by them in the app.
+      //
+      // Read scope and query shape must agree: Firestore rejects a list query outright if it
+      // could return a document the caller cannot read, rather than filtering it. The app
+      // subscribes Team Members with a matching assignedMemberId filter for this reason.
+      allow read: if canAssign()
+                  || (signedIn() && resource.data.assignedMemberId == request.auth.uid);
+
+      allow create: if canAssign();
+
+      // The assignee can push progress on their own task; assigners and admins can edit any.
+      allow update: if canAssign()
+                    || (signedIn() && resource.data.assignedMemberId == request.auth.uid);
+
+      allow delete: if isAdminOrPartner();
+    }
+
+    // --- Projects ---
+    match /projects/{projectId} {
+      allow read: if signedIn();
+      allow create, update: if canAssign();
+      allow delete: if isAdminOrPartner();
+    }
+
+    // --- Statutory tax circulars ---
+    // Firm-wide reference data: everyone reads, only those who can assign work may publish
+    // or amend a circular.
+    match /taxNotifications/{noticeId} {
+      allow read: if signedIn();
+      allow create, update: if canAssign();
+      allow delete: if isAdminOrPartner();
+    }
+
+    // --- Government portal integrations ---
+    // Holds portal URLs and webhook endpoints, so only Admin and Partner may change them.
+    match /portalIntegrations/{portalId} {
+      allow read: if signedIn();
+      allow create, update, delete: if isAdminOrPartner();
+    }
+
+    // --- Client master for the monthly compliance tracker ---
+    // The whole firm needs to see the client list; only those who run work may change it.
+    match /clients/{clientId} {
+      allow read: if signedIn();
+      allow create, update: if canAssign();
+      allow delete: if isAdminOrPartner();
+    }
+
+    // --- Per-client, per-month compliance status ---
+    // Any signed-in staff member may tick off work they have completed — this is the shared
+    // operational tracker, and the person doing the filing is usually not a manager.
+    match /complianceStatus/{statusId} {
+      allow read: if signedIn();
+      allow create, update: if signedIn();
+      allow delete: if isAdminOrPartner();
+    }
+
+    // Nothing else in the database is reachable.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------------------
+// A DELIBERATE TRADE-OFF WORTH KNOWING ABOUT
+// ---------------------------------------------------------------------------------------
+// A Manager's task LIST is narrowed to "assigned to or by me" in the app, but at the database
+// level they can still read the team's tasks. That is not an oversight: the Team Workload view
+// has to count work assigned to other people, and a role cannot display what it may not read.
+//
+// If you would rather Managers be truly unable to read colleagues' tasks, say so — the cost is
+// the Team Workload view, which would then only be able to show work they assigned themselves.
+// Team Members are genuinely isolated either way: they can only read their own tasks.
