@@ -1,0 +1,46 @@
+rules_version = '2';
+
+// OfficeFlow — INTERIM Firestore rules. Use these ONLY until Firebase Authentication
+// (Email/Password) is enabled and the app has been converted to use it.
+//
+// What these do:
+//   - Restrict access to the three collections the app actually uses, so nothing else in
+//     the project is reachable.
+//   - Carry a hard expiry date, so this temporary state cannot be silently forgotten.
+//
+// What these DO NOT do:
+//   - They cannot enforce roles. The app currently signs in by reading a member document
+//     and checking a password hash on the device, so there is no request.auth for rules to
+//     key on. Anyone holding the API key (which ships inside every APK) can read and write
+//     these collections.
+//
+// Therefore: safe for internal testing with demo data. NOT safe for real client data and
+// NOT safe to hand to employees off-site. Replace with firestore.rules once Auth is on.
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Hard stop. After this date the app stops working, which is the intended prompt to
+    // finish the Auth migration rather than drift along unprotected.
+    function beforeCutoff() {
+      return request.time < timestamp.date(2026, 10, 6);
+    }
+
+    match /teamMembers/{memberId} {
+      allow read, write: if beforeCutoff();
+    }
+
+    match /tasks/{taskId} {
+      allow read, write: if beforeCutoff();
+    }
+
+    match /projects/{projectId} {
+      allow read, write: if beforeCutoff();
+    }
+
+    // Everything else in the database stays unreachable.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
