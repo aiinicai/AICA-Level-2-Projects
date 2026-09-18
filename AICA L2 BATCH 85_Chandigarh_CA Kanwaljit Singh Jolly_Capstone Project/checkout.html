@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Checkout - Task Checker</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@400;500;600;700&family=Hanken+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="static/css/app.css">
+</head>
+<body class="checkout-page">
+    <header class="auth-navbar">
+        <div class="container auth-navbar-inner">
+            <a class="auth-logo" href="/">Task Checker</a>
+            <nav class="auth-nav-links">
+                <a href="/">Login</a>
+                <a href="/pricing">Pricing</a>
+            </nav>
+        </div>
+    </header>
+
+    <main class="checkout-main">
+        <div class="checkout-shell">
+            <section class="checkout-summary">
+                <p class="eyebrow">Checkout</p>
+                <h1>Complete your signup</h1>
+                <p>We will get back to you within 24 hours with next steps and access details.</p>
+                <div class="plan-summary">
+                    <h3>Selected Plan</h3>
+                    <div id="plan-name" class="plan-name"></div>
+                    <div id="plan-price" class="plan-price"></div>
+                </div>
+                <div class="pricing-note">
+                    Want to discuss onboarding or team setup? Email admin@infinitysolutions.app.
+                </div>
+            </section>
+
+            <section class="checkout-card">
+                <div id="success-message" class="success-message"></div>
+                <div id="error-message" class="error-message"></div>
+
+                <form id="checkout-form">
+                    <div class="form-group">
+                        <label for="full-name">Full Name *</label>
+                        <input type="text" id="full-name" name="fullName" required placeholder="John Doe">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="email">Email Address *</label>
+                        <input type="email" id="email" name="email" required placeholder="john@company.com">
+                        <small>We will send your login credentials to this email</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="company">Company Name *</label>
+                        <input type="text" id="company" name="company" required placeholder="Acme Inc.">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="phone">Phone Number</label>
+                        <input type="tel" id="phone" name="phone" placeholder="+1 (555) 123-4567">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="notes">Additional Notes</label>
+                        <textarea id="notes" name="notes" placeholder="Tell us about your use case or any specific requirements..."></textarea>
+                    </div>
+
+                    <button type="submit" class="submit-btn" id="submit-btn">
+                        Submit Request
+                    </button>
+                </form>
+
+            </section>
+        </div>
+    </main>
+
+    <script>
+        // Load selected plan from localStorage
+        const selectedPlan = JSON.parse(localStorage.getItem('selectedPlan') || '{}');
+
+        if (!selectedPlan.name) {
+            window.location.href = '/pricing';
+        }
+
+        // Display plan details
+        document.getElementById('plan-name').textContent = selectedPlan.name.charAt(0).toUpperCase() + selectedPlan.name.slice(1) + ' Plan';
+        if (selectedPlan.price === 'custom') {
+            document.getElementById('plan-price').textContent = 'Custom Pricing';
+        } else if (selectedPlan.price === 0) {
+            document.getElementById('plan-price').textContent = 'Free';
+        } else {
+            document.getElementById('plan-price').textContent = '$' + selectedPlan.price + '/month';
+        }
+
+        // Handle form submission
+        document.getElementById('checkout-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const submitBtn = document.getElementById('submit-btn');
+            const successMsg = document.getElementById('success-message');
+            const errorMsg = document.getElementById('error-message');
+
+            // Hide previous messages
+            successMsg.style.display = 'none';
+            errorMsg.style.display = 'none';
+
+            // Disable button
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Submitting...';
+
+            // Gather form data
+            const formData = {
+                fullName: document.getElementById('full-name').value,
+                email: document.getElementById('email').value,
+                company: document.getElementById('company').value,
+                phone: document.getElementById('phone').value,
+                notes: document.getElementById('notes').value,
+                plan: selectedPlan.name,
+                price: selectedPlan.price
+            };
+
+            try {
+                // Send to backend
+                const response = await fetch('http://localhost:5000/api/checkout/notify', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(formData)
+                });
+
+                const result = await response.json();
+
+                if (response.ok) {
+                    successMsg.textContent = 'Thank you! Your request has been submitted. We will send your login credentials to ' + formData.email + ' within 24 hours.';
+                    successMsg.style.display = 'block';
+
+                    // Clear form
+                    document.getElementById('checkout-form').reset();
+
+                    // Clear localStorage
+                    localStorage.removeItem('selectedPlan');
+
+                    // Redirect to login after 5 seconds
+                    setTimeout(() => {
+                        window.location.href = '/';
+                    }, 5000);
+                } else {
+                    throw new Error(result.error || 'Failed to submit request');
+                }
+            } catch (error) {
+                console.error('Checkout error:', error);
+                errorMsg.textContent = 'Failed to submit request. Please try again or contact admin@infinitysolutions.app';
+                errorMsg.style.display = 'block';
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Submit Request';
+            }
+        });
+    </script>
+</body>
+</html>

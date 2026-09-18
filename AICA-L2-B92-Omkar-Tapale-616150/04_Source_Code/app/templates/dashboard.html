@@ -1,0 +1,96 @@
+{% extends "base.html" %}
+{% block title %}Dashboard{% endblock %}
+{% block content %}
+<h1 class="text-2xl font-bold mb-4">Welcome, {{ user.name.split(' ')[0] }}</h1>
+
+<div id="prompt-bar" class="card mb-6">
+  <label class="block text-sm font-medium mb-2">Type your update... (e.g. "Add task: submit report by Friday, high priority")</label>
+  <div class="flex gap-2">
+    <input id="promptInput" class="flex-1 border rounded px-3 py-2" placeholder="Type your update...">
+    <button onclick="submitPrompt()" class="bg-slate-900 text-white px-4 py-2 rounded hover:bg-slate-800">Send</button>
+  </div>
+  <div id="promptResult" class="text-sm mt-2"></div>
+  <div id="confirmCard" class="hidden mt-2 bg-amber-50 border border-amber-200 rounded p-3 text-sm"></div>
+</div>
+
+<div class="grid md:grid-cols-3 gap-4 mb-6">
+  <div class="card">
+    <div class="text-3xl font-bold">{{ my_tasks_open }}</div>
+    <div class="text-slate-500 text-sm">My open tasks / pending actions</div>
+  </div>
+  <div class="card">
+    <div class="text-3xl font-bold">{{ today_attendance.status if today_attendance else "Not marked" }}</div>
+    <div class="text-slate-500 text-sm">Today's status ({{ today }})</div>
+  </div>
+  <div class="card">
+    <div class="text-3xl font-bold">{{ upcoming_meetings|length }}</div>
+    <div class="text-slate-500 text-sm">Upcoming meetings</div>
+  </div>
+</div>
+
+{% if kpis %}
+<div class="grid md:grid-cols-4 gap-4 mb-6">
+  <div class="card"><div class="text-2xl font-bold">{{ kpis.headcount }}</div><div class="text-slate-500 text-sm">Headcount in scope</div></div>
+  <div class="card"><div class="text-2xl font-bold">{{ kpis.on_notice }}</div><div class="text-slate-500 text-sm">On notice period</div></div>
+  <div class="card"><div class="text-2xl font-bold">{{ kpis.attendance_marked_pct }}%</div><div class="text-slate-500 text-sm">Marked attendance today</div></div>
+  <div class="card"><div class="text-2xl font-bold">{{ kpis.pending_leaves }}</div><div class="text-slate-500 text-sm">Pending leave approvals</div></div>
+</div>
+{% endif %}
+
+{% if team_status %}
+<div class="card mb-6">
+  <h2 class="font-semibold mb-3">Team attendance snapshot (today)</h2>
+  <div class="grid sm:grid-cols-2 md:grid-cols-3 gap-2">
+    {% for row in team_status %}
+    <div class="flex justify-between border rounded px-3 py-2 text-sm">
+      <span>{{ row.user.name }}</span>
+      <span class="badge badge-{{ row.status|lower|replace(' ','')|replace('_','') }}">{{ row.status }}</span>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
+<div class="card">
+  <h2 class="font-semibold mb-3">Upcoming meetings</h2>
+  {% if upcoming_meetings %}
+  <ul class="divide-y">
+    {% for m in upcoming_meetings %}
+    <li class="py-2 flex justify-between text-sm"><span>{{ m.title }}</span><span class="text-slate-500">{{ m.start_date }} {{ m.start_time or "" }}</span></li>
+    {% endfor %}
+  </ul>
+  {% else %}
+  <p class="text-slate-500 text-sm">No upcoming meetings.</p>
+  {% endif %}
+</div>
+
+<script>
+let pendingConfirm = null;
+async function submitPrompt(confirm=false) {
+  const input = document.getElementById('promptInput');
+  const text = confirm ? pendingConfirm : input.value.trim();
+  if (!text) return;
+  const body = new URLSearchParams({text: text, confirm: confirm});
+  const res = await fetch('/calendar/prompt', {method: 'POST', body});
+  const data = await res.json();
+  const resultEl = document.getElementById('promptResult');
+  const confirmEl = document.getElementById('confirmCard');
+  if (data.needs_confirmation) {
+    pendingConfirm = text;
+    const p = data.parsed;
+    confirmEl.classList.remove('hidden');
+    confirmEl.innerHTML = `Did you mean: <b>${p.intent}</b> - ${JSON.stringify(p.fields)}? ` +
+      `<button class="ml-2 bg-slate-900 text-white px-2 py-1 rounded" onclick="submitPrompt(true)">Confirm</button> ` +
+      `<button class="ml-1 bg-slate-200 px-2 py-1 rounded" onclick="document.getElementById('confirmCard').classList.add('hidden')">Edit</button>`;
+    resultEl.textContent = '';
+  } else {
+    confirmEl.classList.add('hidden');
+    resultEl.textContent = data.message;
+    resultEl.className = 'text-sm mt-2 ' + (data.ok ? 'text-green-700' : 'text-red-700');
+    if (data.ok) input.value = '';
+    if (data.redirect) window.location = data.redirect;
+  }
+}
+document.getElementById('promptInput').addEventListener('keydown', e => { if (e.key === 'Enter') submitPrompt(); });
+</script>
+{% endblock %}

@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>CA DocuFlow AI — Team Portal</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  :root { color-scheme: light; }
+  * { box-sizing: border-box; }
+  body { font-family: -apple-system, Segoe UI, Roboto, Arial, sans-serif; margin: 0; background: #f5f6f8; color: #1c1f26; }
+  header { background: #1f2b3d; color: white; padding: 14px 24px; font-weight: 700; font-size: 16px; display: flex; justify-content: space-between; align-items: center; }
+  header .user-info { font-size: 12px; font-weight: 400; color: #cbd5e1; }
+  main { max-width: 1000px; margin: 24px auto; padding: 0 16px; }
+  .card { background: white; border: 1px solid #dde1e7; border-radius: 8px; padding: 20px; margin-bottom: 20px; }
+  h2 { margin-top: 0; font-size: 15px; }
+  input, select { padding: 8px; border: 1px solid #ccd2db; border-radius: 4px; font-size: 13px; }
+  button { background: #2f6fed; color: white; border: none; border-radius: 5px; padding: 8px 14px; font-weight: 600; cursor: pointer; font-size: 13px; }
+  button:hover { background: #255bcc; }
+  button.secondary { background: #e5e9f0; color: #1c1f26; }
+  button.danger { background: #d64545; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid #eef1f5; }
+  th { background: #eef1f5; }
+  .status-pill { padding: 2px 10px; border-radius: 12px; font-size: 11px; font-weight: 700; color: white; background: #6b7280; }
+  .status-Draft { background: #6b7280; }
+  .status-Prepared, .status-InReview { background: #2f6fed; }
+  .status-Approved, .status-Signed, .status-Verified, .status-Released { background: #1f9d55; }
+  .status-Rejected, .status-Cancelled { background: #d64545; }
+  .status-ChangesRequested { background: #b58105; }
+  #login-screen { max-width: 380px; margin: 80px auto; }
+  .error { color: #d64545; font-size: 12px; margin-top: 8px; }
+  .action-btn { margin: 2px; font-size: 11px; padding: 5px 8px; }
+  .hint { color: #6b7280; font-size: 11px; }
+</style>
+</head>
+<body>
+
+<div id="login-screen" class="card">
+  <h2>CA DocuFlow AI — Team Portal</h2>
+  <p class="hint">Sign in with an account created by your Administrator (no public self-registration).</p>
+  <div style="display:flex; flex-direction:column; gap:10px;">
+    <input id="login-username" placeholder="Username">
+    <input id="login-password" type="password" placeholder="Password">
+    <button onclick="login()">Sign In</button>
+    <div id="login-error" class="error"></div>
+  </div>
+</div>
+
+<div id="app-screen" style="display:none;">
+  <header>
+    <span>CA DocuFlow AI — Team Portal</span>
+    <span class="user-info" id="user-info"></span>
+  </header>
+  <main>
+    <div class="card">
+      <h2>Upload New Document</h2>
+      <div style="display:flex; gap:8px; flex-wrap:wrap;">
+        <input id="new-title" placeholder="Document title">
+        <input id="new-client" placeholder="Client name (optional)">
+        <input id="new-file" type="file">
+        <button onclick="uploadDocument()">Upload</button>
+      </div>
+      <div id="upload-error" class="error"></div>
+    </div>
+
+    <div class="card">
+      <h2>Documents <button class="secondary" onclick="loadDocuments()" style="float:right;">Refresh</button></h2>
+      <table>
+        <thead><tr><th>Title</th><th>Client</th><th>Status</th><th>Version</th><th>Actions</th></tr></thead>
+        <tbody id="documents-body"></tbody>
+      </table>
+    </div>
+  </main>
+</div>
+
+<script>
+const API = window.location.origin;
+let token = localStorage.getItem("docuflow_token") || "";
+let currentUser = null;
+
+async function api(path, options = {}) {
+  const headers = options.headers || {};
+  if (token) headers["Authorization"] = "Bearer " + token;
+  if (options.json) {
+    headers["Content-Type"] = "application/json";
+    options.body = JSON.stringify(options.json);
+  }
+  const resp = await fetch(API + path, { ...options, headers });
+  if (resp.status === 401) { logout(); throw new Error("Session expired"); }
+  const data = await resp.json().catch(() => ({}));
+  if (!resp.ok) throw new Error(data.detail || "Request failed");
+  return data;
+}
+
+async function login() {
+  const username = document.getElementById("login-username").value;
+  const password = document.getElementById("login-password").value;
+  document.getElementById("login-error").textContent = "";
+  try {
+    const data = await api("/auth/login", { method: "POST", json: { username, password } });
+    token = data.access_token;
+    localStorage.setItem("docuflow_token", token);
+    await showApp();
+  } catch (e) {
+    document.getElementById("login-error").textContent = e.message;
+  }
+}
+
+function logout() {
+  token = "";
+  localStorage.removeItem("docuflow_token");
+  document.getElementById("login-screen").style.display = "block";
+  document.getElementById("app-screen").style.display = "none";
+}
+
+async function showApp() {
+  currentUser = await api("/users/me");
+  document.getElementById("user-info").textContent = currentUser.username + " (" + currentUser.role + ")";
+  document.getElementById("login-screen").style.display = "none";
+  document.getElementById("app-screen").style.display = "block";
+  await loadDocuments();
+}
+
+async function uploadDocument() {
+  const title = document.getElementById("new-title").value;
+  const fileInput = document.getElementById("new-file");
+  document.getElementById("upload-error").textContent = "";
+  if (!title || !fileInput.files.length) {
+    document.getElementById("upload-error").textContent = "Title and a file are required.";
+    return;
+  }
+  const client = document.getElementById("new-client").value;
+  const form = new FormData();
+  form.append("file", fileInput.files[0]);
+  try {
+    await api(`/documents?title=${encodeURIComponent(title)}&client_name=${encodeURIComponent(client)}`, { method: "POST", body: form });
+    document.getElementById("new-title").value = "";
+    document.getElementById("new-client").value = "";
+    fileInput.value = "";
+    await loadDocuments();
+  } catch (e) {
+    document.getElementById("upload-error").textContent = e.message;
+  }
+}
+
+// Every possible action; the server is the source of truth on what's allowed
+// for the current status/role -- the UI just offers buttons and shows the
+// server's error if a click isn't actually permitted.
+const ALL_ACTIONS = [
+  "submit_for_review", "send_to_checker", "approve", "reject", "request_changes",
+  "resubmit", "start_signing", "confirm_signed", "verify", "release", "archive", "cancel",
+];
+
+async function loadDocuments() {
+  const docs = await api("/documents");
+  const body = document.getElementById("documents-body");
+  body.innerHTML = "";
+  for (const doc of docs) {
+    const tr = document.createElement("tr");
+    const statusClass = "status-" + doc.status.replace(/\s+/g, "");
+    const latestVersion = doc.versions.length ? doc.versions[doc.versions.length - 1].version_number : "-";
+    tr.innerHTML = `
+      <td>${escapeHtml(doc.title)}</td>
+      <td>${escapeHtml(doc.client_name || "-")}</td>
+      <td><span class="status-pill ${statusClass}">${doc.status}</span></td>
+      <td>v${latestVersion}</td>
+      <td id="actions-${doc.id}"></td>
+    `;
+    body.appendChild(tr);
+    const cell = tr.querySelector(`#actions-${doc.id}`);
+    for (const action of ALL_ACTIONS) {
+      const btn = document.createElement("button");
+      btn.textContent = action.replace(/_/g, " ");
+      btn.className = "secondary action-btn";
+      btn.onclick = () => performAction(doc.id, action);
+      cell.appendChild(btn);
+    }
+  }
+}
+
+async function performAction(documentId, action) {
+  try {
+    await api(`/documents/${documentId}/actions`, { method: "POST", json: { action } });
+    await loadDocuments();
+  } catch (e) {
+    alert("Action failed: " + e.message);
+  }
+}
+
+function escapeHtml(s) {
+  const div = document.createElement("div");
+  div.textContent = s;
+  return div.innerHTML;
+}
+
+if (token) { showApp().catch(() => logout()); }
+</script>
+</body>
+</html>

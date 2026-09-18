@@ -1,0 +1,88 @@
+{% extends "tracker/base.html" %}
+{% load tracker_tags %}
+
+{% block title %}Firm Exception Register{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h4 class="fw-bold mb-1">Firm-Wide Partner Exception Register</h4>
+        <p class="text-muted small mb-0">Immutable record of all formal Partner overrides (EX-01 through EX-07) with justification trail</p>
+    </div>
+    {% if is_partner %}
+        <a href="{% url 'exception_queue' %}" class="btn btn-danger btn-sm">
+            <i class="bi bi-inbox me-1"></i> Partner Approvals Queue
+        </a>
+    {% endif %}
+</div>
+
+<div class="card p-3 mb-4 bg-light border-0 shadow-sm">
+    <form method="get" class="row g-2 align-items-center">
+        <div class="col-md-5">
+            <select name="type" class="form-select form-select-sm">
+                <option value="">-- All Exception Types --</option>
+                {% for code, label in types %}
+                    <option value="{{ code }}" {% if request.GET.type == code %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-md-4">
+            <select name="status" class="form-select form-select-sm">
+                <option value="">-- All Decisions --</option>
+                {% for code, label in statuses %}
+                    <option value="{{ code }}" {% if request.GET.status == code %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-md-3 d-flex gap-1">
+            <button type="submit" class="btn btn-secondary btn-sm flex-grow-1"><i class="bi bi-funnel me-1"></i> Filter</button>
+            <a href="{% url 'exception_list' %}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-counterclockwise"></i></a>
+        </div>
+    </form>
+</div>
+
+<div class="card shadow-sm">
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>Ref Number</th>
+                        <th>Engagement / Query</th>
+                        <th>Exception Type</th>
+                        <th>Justification</th>
+                        <th>Requested By</th>
+                        <th>Decision / Date</th>
+                        <th>Approving Partner</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for exc in exceptions %}
+                        <tr>
+                            <td><strong>{{ exc.reference_no }}</strong></td>
+                            <td>
+                                <strong>{{ exc.engagement.engagement_code }}</strong><br>
+                                {% if exc.query %}<small class="text-muted">{{ exc.query.query_no }}</small>{% endif %}
+                            </td>
+                            <td><span class="badge bg-secondary">{{ exc.exception_type }}</span></td>
+                            <td class="small">{{ exc.justification|truncatechars:70 }}</td>
+                            <td class="small">{{ exc.requested_by.full_name }}</td>
+                            <td>{{ exc.decision|status_badge }}<br><small class="text-muted">{{ exc.approved_on|date:"d-M-Y"|default:"Pending" }}</small></td>
+                            <td class="small">
+                                {% if exc.approved_by %}
+                                    {{ exc.approved_by.full_name }}
+                                    {% if exc.is_self_approved %}<span class="badge bg-warning text-dark">Self-Approved</span>{% endif %}
+                                {% else %}
+                                    <span class="text-muted">―</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                    {% empty %}
+                        <tr><td colspan="7" class="text-center text-muted py-4">No exception records found.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

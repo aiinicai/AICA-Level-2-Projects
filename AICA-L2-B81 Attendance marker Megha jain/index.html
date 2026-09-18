@@ -1,0 +1,755 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Attendance & Salary Calculator | CA Firm Management System</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        ca: {
+                            50: '#f0f4f8',
+                            100: '#d9e2ec',
+                            500: '#334e68',
+                            600: '#243b53',
+                            700: '#102a43',
+                            800: '#0b1d30',
+                            900: '#06101e',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body class="bg-slate-50 text-slate-800 antialiased min-h-screen flex flex-col font-['Plus_Jakarta_Sans',sans-serif]">
+
+    <!-- Top Navigation / Brand Header -->
+    <header class="bg-ca-900 text-white shadow-lg sticky top-0 z-40 border-b border-ca-700">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3.5 flex flex-wrap items-center justify-between gap-4">
+            <div class="flex items-center space-x-3">
+                <div class="w-10 h-10 rounded-lg bg-white flex items-center justify-center font-bold text-ca-900 shadow-md text-lg tracking-wider border-2 border-amber-500">
+                    CA
+                </div>
+                <div>
+                    <div class="flex items-center space-x-2">
+                        <h1 class="text-lg font-bold tracking-tight text-white">M/s J Megha & Co.</h1>
+                        <span class="text-xs bg-amber-500/20 text-amber-300 font-semibold px-2 py-0.5 rounded border border-amber-500/30">Chartered Accountants</span>
+                    </div>
+                    <p class="text-xs text-slate-400">Attendance Cum Salary Calculator System &bull; Multi-Employee Management</p>
+                </div>
+            </div>
+
+            <!-- Employee Selector in Header -->
+            <div class="flex items-center flex-wrap gap-2">
+                <div class="flex items-center space-x-2 bg-ca-800 px-3 py-1 rounded-xl border border-ca-700">
+                    <i class="fa-solid fa-user-tie text-amber-400 text-xs"></i>
+                    <select id="selectEmployee" class="bg-transparent text-white text-xs font-semibold focus:outline-none cursor-pointer pr-2" onchange="switchEmployee(this.value)">
+                        <!-- Populated by JS -->
+                    </select>
+                </div>
+                
+                <button onclick="openEmployeeModal(true)" class="px-2.5 py-1.5 text-xs font-bold rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white flex items-center space-x-1 transition shadow-sm" title="Add New Employee">
+                    <i class="fa-solid fa-user-plus"></i>
+                    <span class="hidden sm:inline">New Employee</span>
+                </button>
+                <button onclick="openEmployeeModal(false)" class="px-2.5 py-1.5 text-xs font-semibold rounded-lg bg-ca-700 hover:bg-ca-600 text-slate-200 flex items-center space-x-1 transition" title="Edit Employee Profile">
+                    <i class="fa-solid fa-user-pen"></i>
+                    <span class="hidden sm:inline">Edit Profile</span>
+                </button>
+                <button onclick="openPolicyModal()" class="px-2.5 py-1.5 text-xs font-semibold rounded-lg bg-ca-700 hover:bg-ca-600 text-slate-200 flex items-center space-x-1 transition">
+                    <i class="fa-solid fa-file-contract text-amber-400"></i>
+                    <span class="hidden md:inline">Offer Letter Rules</span>
+                </button>
+                <button onclick="exportDataJSON()" class="px-2.5 py-1.5 text-xs font-semibold rounded-lg bg-ca-700 hover:bg-ca-600 text-slate-200 flex items-center space-x-1 transition" title="Backup All Data">
+                    <i class="fa-solid fa-download"></i>
+                    <span class="hidden lg:inline">Backup</span>
+                </button>
+                <label class="px-2.5 py-1.5 text-xs font-semibold rounded-lg bg-ca-700 hover:bg-ca-600 text-slate-200 flex items-center space-x-1 cursor-pointer transition" title="Restore Data">
+                    <i class="fa-solid fa-upload"></i>
+                    <span class="hidden lg:inline">Restore</span>
+                    <input type="file" id="importJsonInput" accept=".json" class="hidden" onchange="importDataJSON(event)">
+                </label>
+                <button onclick="generatePayslipModal()" class="px-3 py-1.5 text-xs font-bold rounded-lg bg-amber-500 hover:bg-amber-600 text-slate-900 flex items-center space-x-1.5 shadow-md transition transform hover:-translate-y-0.5">
+                    <i class="fa-solid fa-receipt"></i>
+                    <span>Payslip</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex-1 w-full space-y-6">
+
+        <!-- Selected Employee Summary & Retainership Banner -->
+        <div class="bg-white rounded-2xl p-5 shadow-sm border border-slate-200/80">
+            <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+                <div class="flex items-start space-x-4">
+                    <div id="empAvatar" class="w-14 h-14 rounded-xl bg-gradient-to-br from-ca-700 to-ca-900 text-white flex items-center justify-center text-xl font-bold shadow-inner">
+                        EE
+                    </div>
+                    <div>
+                        <div class="flex flex-wrap items-center gap-2">
+                            <h2 class="text-xl font-bold text-slate-900" id="empName">Employee Name</h2>
+                            <span class="text-xs font-semibold px-2.5 py-0.5 bg-blue-50 text-blue-700 rounded-full border border-blue-200" id="empDesignation">Accounts Executive</span>
+                            <span class="text-xs font-semibold px-2.5 py-0.5 bg-emerald-50 text-emerald-700 rounded-full border border-emerald-200" id="empStatus">Active</span>
+                            <button onclick="deleteCurrentEmployee()" class="text-xs text-rose-500 hover:text-rose-700 ml-2 hover:underline" title="Delete current employee">
+                                <i class="fa-regular fa-trash-can mr-1"></i>Delete
+                            </button>
+                        </div>
+                        <div class="mt-1 flex flex-wrap items-center gap-y-1 gap-x-4 text-xs text-slate-500">
+                            <span><i class="fa-solid fa-calendar-check text-slate-400 mr-1"></i>Joining Date: <strong id="empJoiningDateText">13-Apr-2026</strong></span>
+                            <span><i class="fa-solid fa-clock text-slate-400 mr-1"></i>Shift: <strong>9:30 AM – 7:00 PM</strong> (50h/wk)</span>
+                            <span><i class="fa-solid fa-id-card text-slate-400 mr-1"></i>PAN: <strong id="empPanText">—</strong></span>
+                            <span><i class="fa-solid fa-building-columns text-slate-400 mr-1"></i>Bank: <strong id="empBankText">—</strong></span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Retainership Bonus Progress Tracker -->
+                <div class="bg-gradient-to-br from-amber-50 to-orange-50/70 border border-amber-200/80 rounded-xl p-3.5 min-w-[280px]">
+                    <div class="flex items-center justify-between text-xs mb-1.5">
+                        <span class="font-bold text-amber-900 flex items-center">
+                            <i class="fa-solid fa-award text-amber-500 mr-1.5 text-sm"></i>
+                            Retainership Bonus Tracker
+                        </span>
+                        <span class="font-extrabold text-amber-900" id="empBonusAmountText">₹60,000</span>
+                    </div>
+                    <div class="w-full bg-amber-200/60 h-2.5 rounded-full overflow-hidden">
+                        <div id="bonusProgressBar" class="bg-gradient-to-r from-amber-500 to-orange-500 h-full rounded-full transition-all duration-500" style="width: 0%"></div>
+                    </div>
+                    <div class="flex items-center justify-between text-[11px] text-amber-800/90 mt-1.5">
+                        <span id="bonusProgressText">0% Completed</span>
+                        <span class="text-slate-500" id="empBonusTargetText">Target: 31st Dec 2027</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Month Selector & Payroll Config Bar -->
+        <div class="bg-white rounded-2xl p-5 shadow-sm border border-slate-200/80 space-y-4">
+            <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 pb-4 border-b border-slate-100">
+                <div class="flex flex-wrap items-center gap-3">
+                    <label class="text-xs font-bold uppercase tracking-wider text-slate-500">Payroll Period:</label>
+                    <div class="flex items-center space-x-2">
+                        <select id="selectMonth" class="bg-slate-50 border border-slate-300 rounded-lg px-3 py-1.5 text-sm font-semibold text-slate-800 focus:ring-2 focus:ring-ca-600 focus:outline-none">
+                            <option value="0">January</option>
+                            <option value="1">February</option>
+                            <option value="2">March</option>
+                            <option value="3" selected>April</option>
+                            <option value="4">May</option>
+                            <option value="5">June</option>
+                            <option value="6">July</option>
+                            <option value="7">August</option>
+                            <option value="8">September</option>
+                            <option value="9">October</option>
+                            <option value="10">November</option>
+                            <option value="11">December</option>
+                        </select>
+                        <select id="selectYear" class="bg-slate-50 border border-slate-300 rounded-lg px-3 py-1.5 text-sm font-semibold text-slate-800 focus:ring-2 focus:ring-ca-600 focus:outline-none">
+                            <option value="2025">2025</option>
+                            <option value="2026" selected>2026</option>
+                            <option value="2027">2027</option>
+                            <option value="2028">2028</option>
+                        </select>
+                    </div>
+
+                    <span id="proRataBadge" class="hidden text-xs bg-indigo-50 text-indigo-700 font-semibold px-2.5 py-1 rounded-md border border-indigo-200">
+                        <i class="fa-solid fa-sparkles mr-1"></i>Joining Month Pro-Rata Active
+                    </span>
+                </div>
+
+                <div class="flex flex-wrap items-center gap-2">
+                    <button onclick="applyPresetSchedule('standard_5_5')" class="px-3 py-1.5 text-xs font-medium bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg transition" title="Mon-Fri Full Day, Sat Half Day, Sun Off">
+                        <i class="fa-solid fa-calendar-days text-slate-500 mr-1"></i>Auto Fill 5.5 Day Week
+                    </button>
+                    <button onclick="applyPresetSchedule('all_present')" class="px-3 py-1.5 text-xs font-medium bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg transition">
+                        <i class="fa-solid fa-check-double text-emerald-600 mr-1"></i>Fill All Present
+                    </button>
+                    <button onclick="exportMonthCSV()" class="px-3 py-1.5 text-xs font-medium bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg transition">
+                        <i class="fa-solid fa-file-excel text-emerald-600 mr-1"></i>Export CSV
+                    </button>
+                    <button onclick="resetMonthAttendance()" class="px-3 py-1.5 text-xs font-medium bg-rose-50 hover:bg-rose-100 text-rose-600 rounded-lg transition">
+                        <i class="fa-solid fa-rotate-left mr-1"></i>Reset
+                    </button>
+                </div>
+            </div>
+
+            <!-- Parameters Grid -->
+            <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3.5 text-xs">
+                <div class="bg-slate-50 p-3 rounded-xl border border-slate-200">
+                    <label class="block text-slate-500 font-medium mb-1">Monthly Basic Pay</label>
+                    <div class="flex items-center">
+                        <span class="text-slate-400 font-bold mr-1">₹</span>
+                        <input type="number" id="inputBasicSalary" value="20000" class="w-full bg-white border border-slate-300 rounded px-2 py-1 font-bold text-slate-800 focus:outline-none focus:ring-1 focus:ring-ca-600" onchange="recalculatePayroll()">
+                    </div>
+                </div>
+
+                <div class="bg-slate-50 p-3 rounded-xl border border-slate-200">
+                    <label class="block text-slate-500 font-medium mb-1">Calculation Basis</label>
+                    <select id="selectCalcBasis" class="w-full bg-white border border-slate-300 rounded px-2 py-1 font-semibold text-slate-800 focus:outline-none focus:ring-1 focus:ring-ca-600" onchange="recalculatePayroll()">
+                        <option value="calendar_days" selected>Calendar Days (30/31)</option>
+                        <option value="standard_26">Standard 26 Days</option>
+                    </select>
+                </div>
+
+                <div class="bg-slate-50 p-3 rounded-xl border border-slate-200">
+                    <label class="block text-slate-500 font-medium mb-1">Opening Leaves Balance</label>
+                    <input type="number" step="0.5" id="inputOpeningLeaves" value="0.0" class="w-full bg-white border border-slate-300 rounded px-2 py-1 font-bold text-slate-800 focus:outline-none focus:ring-1 focus:ring-ca-600" onchange="recalculatePayroll()">
+                </div>
+
+                <div class="bg-slate-50 p-3 rounded-xl border border-slate-200">
+                    <label class="block text-slate-500 font-medium mb-1">Official Reimbursements</label>
+                    <div class="flex items-center">
+                        <span class="text-slate-400 font-bold mr-1">₹</span>
+                        <input type="number" id="inputReimbursements" value="0" class="w-full bg-white border border-slate-300 rounded px-2 py-1 font-bold text-slate-800 focus:outline-none focus:ring-1 focus:ring-ca-600" onchange="recalculatePayroll()">
+                    </div>
+                </div>
+
+                <div class="bg-slate-50 p-3 rounded-xl border border-slate-200">
+                    <label class="block text-slate-500 font-medium mb-1">TDS / Statutory Tax</label>
+                    <div class="flex items-center">
+                        <span class="text-slate-400 font-bold mr-1">₹</span>
+                        <input type="number" id="inputTDS" value="0" class="w-full bg-white border border-slate-300 rounded px-2 py-1 font-bold text-slate-800 focus:outline-none focus:ring-1 focus:ring-ca-600" onchange="recalculatePayroll()">
+                    </div>
+                </div>
+
+                <div class="bg-slate-50 p-3 rounded-xl border border-slate-200">
+                    <label class="block text-slate-500 font-medium mb-1">Other Deductions</label>
+                    <div class="flex items-center">
+                        <span class="text-slate-400 font-bold mr-1">₹</span>
+                        <input type="number" id="inputOtherDeductions" value="0" class="w-full bg-white border border-slate-300 rounded px-2 py-1 font-bold text-slate-800 focus:outline-none focus:ring-1 focus:ring-ca-600" onchange="recalculatePayroll()">
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Metric KPI Cards -->
+        <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
+            
+            <!-- Net Take Home Salary -->
+            <div class="col-span-2 sm:col-span-2 lg:col-span-1 bg-gradient-to-br from-ca-800 to-ca-900 rounded-2xl p-4 text-white shadow-sm flex flex-col justify-between">
+                <div>
+                    <span class="text-[11px] font-bold uppercase tracking-wider text-amber-400">Net Payable Salary</span>
+                    <div class="text-2xl font-extrabold mt-1" id="kpiNetSalary">₹0</div>
+                    <p class="text-[11px] text-slate-300 mt-0.5" id="kpiGrossSub">Gross: ₹0</p>
+                </div>
+                <div class="mt-3 pt-2 border-t border-ca-700/60 flex items-center justify-between text-[11px]">
+                    <span class="text-slate-300">Daily Rate:</span>
+                    <span class="font-bold text-amber-300" id="kpiDailyRate">₹0.00</span>
+                </div>
+            </div>
+
+            <!-- Attendance & Work Hours -->
+            <div class="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-sm flex flex-col justify-between">
+                <div>
+                    <div class="flex items-center justify-between">
+                        <span class="text-xs font-semibold text-slate-500">Days Logged</span>
+                        <i class="fa-solid fa-user-check text-blue-500"></i>
+                    </div>
+                    <div class="text-2xl font-bold text-slate-900 mt-1" id="kpiWorkedDays">0 <span class="text-xs font-normal text-slate-500">/ 0 days</span></div>
+                </div>
+                <div class="mt-2 text-[11px] text-slate-500 flex items-center justify-between">
+                    <span>Hours Logged:</span>
+                    <span class="font-bold text-slate-800" id="kpiTotalHours">0h</span>
+                </div>
+            </div>
+
+            <!-- Late Arrivals Counter & Penalty Rule Alert -->
+            <div class="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-sm flex flex-col justify-between" id="lateKpiCard">
+                <div>
+                    <div class="flex items-center justify-between">
+                        <span class="text-xs font-semibold text-slate-500">Late In (Clause 6)</span>
+                        <i class="fa-solid fa-clock-rotate-left text-amber-500"></i>
+                    </div>
+                    <div class="text-2xl font-bold text-slate-900 mt-1" id="kpiLateCount">0 <span class="text-xs font-normal text-slate-500">times</span></div>
+                </div>
+                <div class="mt-2 text-[11px] flex items-center justify-between" id="lateWarningText">
+                    <span class="text-slate-500">After 10:00 AM:</span>
+                    <span class="font-bold text-rose-600" id="kpiLate10Count">0 times</span>
+                </div>
+            </div>
+
+            <!-- Leave Ledger Card -->
+            <div class="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-sm flex flex-col justify-between">
+                <div>
+                    <div class="flex items-center justify-between">
+                        <span class="text-xs font-semibold text-slate-500">Leaves Taken / Earned</span>
+                        <i class="fa-solid fa-umbrella-beach text-teal-500"></i>
+                    </div>
+                    <div class="text-2xl font-bold text-slate-900 mt-1" id="kpiLeavesTaken">0 <span class="text-xs font-normal text-slate-500">/ +1 earned</span></div>
+                </div>
+                <div class="mt-2 text-[11px] text-slate-500 flex items-center justify-between">
+                    <span>Closing Leave Bal:</span>
+                    <span class="font-bold text-emerald-600" id="kpiClosingLeaves">0.0 days</span>
+                </div>
+            </div>
+
+            <!-- Total Deductions -->
+            <div class="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-sm flex flex-col justify-between">
+                <div>
+                    <div class="flex items-center justify-between">
+                        <span class="text-xs font-semibold text-slate-500">Total Deductions</span>
+                        <i class="fa-solid fa-hand-holding-dollar text-rose-500"></i>
+                    </div>
+                    <div class="text-2xl font-bold text-rose-600 mt-1" id="kpiTotalDeductions">₹0</div>
+                </div>
+                <div class="mt-2 text-[11px] text-slate-500 flex items-center justify-between">
+                    <span>LOP + Late Penalties:</span>
+                    <span class="font-semibold text-rose-600" id="kpiLopPenaltySum">₹0</span>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Attendance Register Table Card -->
+        <div class="bg-white rounded-2xl shadow-sm border border-slate-200/80 overflow-hidden">
+            <div class="p-4 sm:p-5 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 bg-slate-50/50">
+                <div>
+                    <h3 class="text-base font-bold text-slate-900 flex items-center">
+                        <i class="fa-solid fa-clipboard-user text-ca-600 mr-2"></i>
+                        Daily Attendance & Working Hours Register
+                    </h3>
+                    <p class="text-xs text-slate-500">Standard Shift: 9:30 AM – 7:00 PM (30m lunch break). Arrivals past 10:00 AM or >2 late arrivals attract deductions as per Clause 6.</p>
+                </div>
+                <div class="flex items-center space-x-2 text-xs">
+                    <span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium bg-emerald-100 text-emerald-800">P = Present</span>
+                    <span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium bg-amber-100 text-amber-800">HD = Half Day</span>
+                    <span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium bg-blue-100 text-blue-800">WFH = Work from Home</span>
+                    <span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium bg-indigo-100 text-indigo-800">PL/ML/EL = Leaves</span>
+                </div>
+            </div>
+
+            <!-- Table -->
+            <div class="overflow-x-auto max-h-[560px] overflow-y-auto">
+                <table class="w-full text-left border-collapse text-xs">
+                    <thead class="bg-slate-100/80 text-slate-700 uppercase tracking-wider font-semibold sticky top-0 z-20 border-b border-slate-200 text-[11px]">
+                        <tr>
+                            <th class="py-3 px-3 w-12 text-center">Day</th>
+                            <th class="py-3 px-3 w-28">Date & Day</th>
+                            <th class="py-3 px-3 w-40">Attendance Status</th>
+                            <th class="py-3 px-3 w-28">In Time</th>
+                            <th class="py-3 px-3 w-28">Out Time</th>
+                            <th class="py-3 px-3 w-24 text-center">Net Hours</th>
+                            <th class="py-3 px-3 w-36">Punctuality Flag</th>
+                            <th class="py-3 px-3 w-40">Special Flags / Cert</th>
+                            <th class="py-3 px-3">Daily Note / Assignment</th>
+                        </tr>
+                    </thead>
+                    <tbody id="attendanceTableBody" class="divide-y divide-slate-100">
+                        <!-- Populated by JavaScript -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Payroll Breakdown & Statutory Summary -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            
+            <!-- Earnings & Additions -->
+            <div class="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-sm space-y-4">
+                <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+                    <h4 class="font-bold text-slate-900 flex items-center text-sm">
+                        <i class="fa-solid fa-circle-plus text-emerald-600 mr-2"></i>
+                        Earnings & Additions
+                    </h4>
+                    <span class="text-xs font-semibold px-2 py-0.5 rounded bg-emerald-50 text-emerald-700">Credits</span>
+                </div>
+                <div class="space-y-2.5 text-xs">
+                    <div class="flex justify-between items-center py-1">
+                        <span class="text-slate-600">Standard Monthly Basic:</span>
+                        <span class="font-bold text-slate-900" id="summaryStandardBasic">₹20,000.00</span>
+                    </div>
+                    <div class="flex justify-between items-center py-1">
+                        <span class="text-slate-600">Pro-Rata Effective Basic:</span>
+                        <span class="font-bold text-slate-900" id="summaryProRataBasic">₹20,000.00</span>
+                    </div>
+                    <div class="flex justify-between items-center py-1">
+                        <span class="text-slate-600">Paid Leave Credit Availed:</span>
+                        <span class="font-semibold text-emerald-600" id="summaryPaidLeaveVal">₹0.00 (0 days)</span>
+                    </div>
+                    <div class="flex justify-between items-center py-1">
+                        <span class="text-slate-600">Reimbursements (Client/Office):</span>
+                        <span class="font-bold text-emerald-600" id="summaryReimbursement">₹0.00</span>
+                    </div>
+                    <div class="pt-2 border-t border-slate-100 flex justify-between items-center font-bold text-slate-900 text-sm">
+                        <span>Gross Earnings:</span>
+                        <span class="text-emerald-700" id="summaryGross">₹20,000.00</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Deductions Breakdown -->
+            <div class="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-sm space-y-4">
+                <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+                    <h4 class="font-bold text-slate-900 flex items-center text-sm">
+                        <i class="fa-solid fa-circle-minus text-rose-600 mr-2"></i>
+                        Deductions & Penalties (Clause 6)
+                    </h4>
+                    <span class="text-xs font-semibold px-2 py-0.5 rounded bg-rose-50 text-rose-700">Debits</span>
+                </div>
+                <div class="space-y-2.5 text-xs">
+                    <div class="flex justify-between items-center py-1">
+                        <span class="text-slate-600">Loss of Pay (Unpaid Leaves):</span>
+                        <span class="font-bold text-rose-600" id="summaryLopVal">₹0.00 (0 days)</span>
+                    </div>
+                    <div class="flex justify-between items-center py-1">
+                        <span class="text-slate-600">Late Penalties (>10 AM / Repeated):</span>
+                        <span class="font-bold text-rose-600" id="summaryLateVal">₹0.00</span>
+                    </div>
+                    <div class="flex justify-between items-center py-1">
+                        <span class="text-slate-600">TDS / Income Tax Deduction:</span>
+                        <span class="font-bold text-slate-700" id="summaryTdsVal">₹0.00</span>
+                    </div>
+                    <div class="flex justify-between items-center py-1">
+                        <span class="text-slate-600">Other Deductions / Advances:</span>
+                        <span class="font-bold text-slate-700" id="summaryOtherVal">₹0.00</span>
+                    </div>
+                    <div class="pt-2 border-t border-slate-100 flex justify-between items-center font-bold text-slate-900 text-sm">
+                        <span>Total Deductions:</span>
+                        <span class="text-rose-600" id="summaryTotalDed">₹0.00</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Net Payout & Leave Encashment Status -->
+            <div class="bg-gradient-to-br from-ca-900 to-ca-800 text-white rounded-2xl p-5 shadow-sm space-y-4 flex flex-col justify-between">
+                <div>
+                    <div class="flex items-center justify-between pb-3 border-b border-ca-700">
+                        <h4 class="font-bold text-white flex items-center text-sm">
+                            <i class="fa-solid fa-wallet text-amber-400 mr-2"></i>
+                            Net Payout Summary
+                        </h4>
+                        <span class="text-[11px] font-semibold px-2 py-0.5 rounded bg-amber-400/20 text-amber-300 border border-amber-400/30">Due by 5th Working Day</span>
+                    </div>
+                    <div class="mt-4 text-center">
+                        <span class="text-xs text-slate-300 font-medium">Net Amount Payable to Bank</span>
+                        <div class="text-3xl font-extrabold text-amber-400 mt-1" id="summaryNetPayable">₹0.00</div>
+                        <p class="text-[11px] text-slate-300 mt-1" id="summaryBankDesc">Direct Bank Transfer</p>
+                    </div>
+                </div>
+
+                <div class="bg-ca-800/80 rounded-xl p-3 border border-ca-700 text-xs space-y-1.5">
+                    <div class="flex justify-between">
+                        <span class="text-slate-300">Accumulated Leave Balance:</span>
+                        <span class="font-bold text-emerald-400" id="summaryAccLeave">0.0 Days</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-slate-300">Leave Encashment Value:</span>
+                        <span class="font-bold text-amber-300" id="summaryEncashVal">₹0.00</span>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+    </main>
+
+    <!-- Add / Edit Employee Profile Modal -->
+    <div id="employeeModal" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm hidden flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl shadow-2xl max-w-xl w-full max-h-[90vh] flex flex-col overflow-hidden animate-fade-in border border-slate-200">
+            <div class="px-6 py-4 bg-ca-900 text-white flex items-center justify-between">
+                <div class="flex items-center space-x-2">
+                    <i class="fa-solid fa-user-gear text-amber-400"></i>
+                    <h3 class="font-bold text-base" id="employeeModalTitle">Employee Profile</h3>
+                </div>
+                <button onclick="closeEmployeeModal()" class="text-slate-400 hover:text-white text-lg">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+            <form onsubmit="saveEmployeeProfile(event)" class="p-6 overflow-y-auto space-y-4 text-xs">
+                <input type="hidden" id="modalEmpId">
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block font-bold text-slate-700 mb-1">Employee Full Name *</label>
+                        <input type="text" id="modalEmpName" required placeholder="e.g. Rahul Sharma" class="w-full bg-slate-50 border border-slate-300 rounded-lg p-2 text-slate-800 font-semibold focus:outline-none focus:ring-2 focus:ring-ca-600">
+                    </div>
+                    <div>
+                        <label class="block font-bold text-slate-700 mb-1">Designation *</label>
+                        <input type="text" id="modalEmpDesignation" required placeholder="e.g. Accounts Executive" class="w-full bg-slate-50 border border-slate-300 rounded-lg p-2 text-slate-800 font-semibold focus:outline-none focus:ring-2 focus:ring-ca-600">
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block font-bold text-slate-700 mb-1">Joining Date *</label>
+                        <input type="date" id="modalEmpJoiningDate" required class="w-full bg-slate-50 border border-slate-300 rounded-lg p-2 text-slate-800 font-semibold focus:outline-none focus:ring-2 focus:ring-ca-600">
+                    </div>
+                    <div>
+                        <label class="block font-bold text-slate-700 mb-1">Monthly Basic Pay (₹) *</label>
+                        <input type="number" id="modalEmpBasicSalary" required value="20000" class="w-full bg-slate-50 border border-slate-300 rounded-lg p-2 text-slate-800 font-bold focus:outline-none focus:ring-2 focus:ring-ca-600">
+                    </div>
+                </div>
+
+                <div class="p-3 bg-amber-50/70 border border-amber-200 rounded-xl space-y-3">
+                    <h5 class="font-bold text-amber-900 text-xs flex items-center">
+                        <i class="fa-solid fa-award mr-1.5 text-amber-600"></i> Retainership Bonus Target (Clause 5)
+                    </h5>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                            <label class="block font-medium text-slate-700 mb-1">Bonus Amount (₹)</label>
+                            <input type="number" id="modalEmpBonusAmount" value="60000" class="w-full bg-white border border-slate-300 rounded-lg p-1.5 font-semibold text-slate-800 focus:outline-none focus:ring-1 focus:ring-amber-500">
+                        </div>
+                        <div>
+                            <label class="block font-medium text-slate-700 mb-1">Target Completion Date</label>
+                            <input type="date" id="modalEmpBonusTargetDate" value="2027-12-31" class="w-full bg-white border border-slate-300 rounded-lg p-1.5 font-semibold text-slate-800 focus:outline-none focus:ring-1 focus:ring-amber-500">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-3">
+                    <h5 class="font-bold text-slate-800 text-xs flex items-center">
+                        <i class="fa-solid fa-building-columns mr-1.5 text-ca-600"></i> Banking & Statutory Details (Optional)
+                    </h5>
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                        <div>
+                            <label class="block text-slate-600 mb-1">Bank Name</label>
+                            <input type="text" id="modalEmpBankName" placeholder="e.g. HDFC / SBI" class="w-full bg-white border border-slate-300 rounded p-1.5 text-slate-800">
+                        </div>
+                        <div>
+                            <label class="block text-slate-600 mb-1">Account Number</label>
+                            <input type="text" id="modalEmpBankAccount" placeholder="A/c No." class="w-full bg-white border border-slate-300 rounded p-1.5 text-slate-800">
+                        </div>
+                        <div>
+                            <label class="block text-slate-600 mb-1">IFSC Code</label>
+                            <input type="text" id="modalEmpIfsc" placeholder="IFSC" class="w-full bg-white border border-slate-300 rounded p-1.5 text-slate-800">
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-slate-600 mb-1">PAN Number</label>
+                            <input type="text" id="modalEmpPan" placeholder="PAN Number" class="w-full bg-white border border-slate-300 rounded p-1.5 text-slate-800 uppercase">
+                        </div>
+                        <div>
+                            <label class="block text-slate-600 mb-1">Aadhaar / ID No.</label>
+                            <input type="text" id="modalEmpAadhar" placeholder="Aadhaar Number" class="w-full bg-white border border-slate-300 rounded p-1.5 text-slate-800">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="pt-3 flex justify-end space-x-2 border-t border-slate-200">
+                    <button type="button" onclick="closeEmployeeModal()" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-lg transition">Cancel</button>
+                    <button type="submit" class="px-5 py-2 bg-ca-900 hover:bg-ca-800 text-white font-bold rounded-lg transition shadow">Save Employee</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Payslip Preview Modal -->
+    <div id="payslipModal" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm hidden flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl shadow-2xl max-w-3xl w-full max-h-[90vh] flex flex-col overflow-hidden animate-fade-in border border-slate-200">
+            <!-- Modal Header -->
+            <div class="px-6 py-4 bg-ca-900 text-white flex items-center justify-between no-print">
+                <div class="flex items-center space-x-2">
+                    <i class="fa-solid fa-file-invoice text-amber-400"></i>
+                    <h3 class="font-bold text-base">Monthly Salary Slip Preview</h3>
+                </div>
+                <div class="flex items-center space-x-2">
+                    <button onclick="window.print()" class="px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-slate-900 font-bold rounded-lg text-xs flex items-center space-x-1 transition">
+                        <i class="fa-solid fa-print"></i>
+                        <span>Print / Save as PDF</span>
+                    </button>
+                    <button onclick="closePayslipModal()" class="text-slate-400 hover:text-white text-lg px-2">
+                        <i class="fa-solid fa-xmark"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Modal Body (Printable Payslip) -->
+            <div class="p-8 overflow-y-auto printable-area bg-white text-slate-800 space-y-6" id="printablePayslip">
+                <!-- CA Firm Letterhead Header -->
+                <div class="border-b-2 border-ca-900 pb-4 flex justify-between items-start">
+                    <div>
+                        <div class="flex items-center space-x-2">
+                            <span class="text-2xl font-black text-ca-900 tracking-tight">M/s J Megha & Co.</span>
+                        </div>
+                        <p class="text-xs font-bold text-amber-700 uppercase tracking-wider mt-0.5">{ Chartered Accountants }</p>
+                        <p class="text-[11px] text-slate-500 mt-1 max-w-md">
+                            # O-0023, Tranquil, Brigade Cornerstone Utopia, Varthur Road, Bengaluru 560087 Karnataka<br>
+                            Phone: +91 93533 96842 &bull; Email: ca.meghajain@outlook.com &bull; FRN: 018836S
+                        </p>
+                    </div>
+                    <div class="text-right">
+                        <div class="inline-block bg-ca-900 text-white font-bold text-xs uppercase tracking-widest px-3 py-1 rounded">
+                            PAYSLIP
+                        </div>
+                        <p class="text-xs font-bold text-slate-800 mt-2" id="payslipMonthHeader">Month: April 2026</p>
+                        <p class="text-[11px] text-slate-500">Pay Date: On or before 5th</p>
+                    </div>
+                </div>
+
+                <!-- Employee & Bank Info Grid -->
+                <div class="grid grid-cols-2 gap-4 bg-slate-50 p-4 rounded-xl border border-slate-200 text-xs">
+                    <div class="space-y-1.5">
+                        <p><span class="text-slate-500">Employee Name:</span> <strong class="text-slate-900" id="psEmpName">Employee Name</strong></p>
+                        <p><span class="text-slate-500">Designation:</span> <strong class="text-slate-900" id="psEmpDesignation">Accounts Executive</strong></p>
+                        <p><span class="text-slate-500">Joining Date:</span> <strong id="psEmpJoiningDate">13th April 2026</strong></p>
+                        <p><span class="text-slate-500">PAN:</span> <strong id="psEmpPan">—</strong> | Aadhaar: <strong id="psEmpAadhar">—</strong></p>
+                    </div>
+                    <div class="space-y-1.5">
+                        <p><span class="text-slate-500">Bank Name:</span> <strong id="psBankName">—</strong></p>
+                        <p><span class="text-slate-500">Bank Account No:</span> <strong id="psBankAccount">—</strong></p>
+                        <p><span class="text-slate-500">IFSC Code:</span> <strong id="psBankIfsc">—</strong></p>
+                        <p><span class="text-slate-500">Working Days in Month:</span> <strong id="payslipWorkingDays">30 Days</strong></p>
+                    </div>
+                </div>
+
+                <!-- Attendance Summary Line -->
+                <div class="grid grid-cols-4 gap-2 text-center text-xs bg-slate-100 p-2.5 rounded-lg font-medium">
+                    <div>Days Present: <strong class="text-blue-700" id="psPresentDays">0</strong></div>
+                    <div>Paid Leaves Availed: <strong class="text-emerald-700" id="psPaidLeaves">0</strong></div>
+                    <div>Unpaid Leaves (LOP): <strong class="text-rose-700" id="psUnpaidLeaves">0</strong></div>
+                    <div>Closing Leave Balance: <strong class="text-purple-700" id="psClosingLeave">0</strong></div>
+                </div>
+
+                <!-- Earnings & Deductions Table -->
+                <div class="border border-slate-200 rounded-xl overflow-hidden">
+                    <table class="w-full text-xs text-left">
+                        <thead class="bg-ca-900 text-white uppercase text-[11px]">
+                            <tr>
+                                <th class="p-2.5 w-1/2">Earnings</th>
+                                <th class="p-2.5 w-1/4 text-right">Amount (₹)</th>
+                                <th class="p-2.5 w-1/2 border-l border-ca-700">Deductions</th>
+                                <th class="p-2.5 w-1/4 text-right">Amount (₹)</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-200 text-slate-700">
+                            <tr>
+                                <td class="p-2.5">Basic Salary (Monthly)</td>
+                                <td class="p-2.5 text-right font-medium" id="psBaseSalary">20,000.00</td>
+                                <td class="p-2.5 border-l border-slate-200">Loss of Pay (LOP)</td>
+                                <td class="p-2.5 text-right text-rose-600 font-medium" id="psLop">0.00</td>
+                            </tr>
+                            <tr>
+                                <td class="p-2.5">Pro-Rata Basic Payable</td>
+                                <td class="p-2.5 text-right font-bold text-slate-900" id="psProRataBasic">20,000.00</td>
+                                <td class="p-2.5 border-l border-slate-200">Late Penalty Deductions (Clause 6)</td>
+                                <td class="p-2.5 text-right text-rose-600 font-medium" id="psLatePenalty">0.00</td>
+                            </tr>
+                            <tr>
+                                <td class="p-2.5">Reimbursements (Bills Submitted)</td>
+                                <td class="p-2.5 text-right font-medium text-emerald-600" id="psReimbursements">0.00</td>
+                                <td class="p-2.5 border-l border-slate-200">TDS / Income Tax</td>
+                                <td class="p-2.5 text-right font-medium" id="psTds">0.00</td>
+                            </tr>
+                            <tr>
+                                <td class="p-2.5">Retainership Accrual Tracker</td>
+                                <td class="p-2.5 text-right text-amber-600 text-[11px]" id="psRetainershipNote">Retainership Target</td>
+                                <td class="p-2.5 border-l border-slate-200">Other Statutory / Deductions</td>
+                                <td class="p-2.5 text-right font-medium" id="psOtherDed">0.00</td>
+                            </tr>
+                            <tr class="bg-slate-50 font-bold border-t-2 border-slate-300 text-slate-900">
+                                <td class="p-2.5">Total Gross Earnings</td>
+                                <td class="p-2.5 text-right text-emerald-700" id="psGrossEarnings">₹20,000.00</td>
+                                <td class="p-2.5 border-l border-slate-200">Total Deductions</td>
+                                <td class="p-2.5 text-right text-rose-600" id="psTotalDeductions">₹0.00</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Net Amount & Signature Section -->
+                <div class="bg-slate-50 border border-slate-300 rounded-xl p-4 flex flex-col sm:flex-row justify-between items-center gap-4">
+                    <div>
+                        <span class="text-xs text-slate-500 uppercase tracking-wider font-semibold">Net Payable (In Figures):</span>
+                        <div class="text-2xl font-black text-slate-900" id="psNetPayableFigures">₹20,000.00</div>
+                        <p class="text-[11px] text-slate-600 mt-0.5" id="psNetPayableWords">Rupees Twenty Thousand Only</p>
+                    </div>
+                    <div class="text-center sm:text-right text-xs">
+                        <div class="w-44 border-b border-slate-400 mb-1 mx-auto sm:ml-auto"></div>
+                        <p class="font-bold text-slate-900">CA Megha Jain</p>
+                        <p class="text-[11px] text-slate-500">M/s J Megha & Co. (FRN: 018836S)</p>
+                    </div>
+                </div>
+
+                <!-- Footer disclaimer -->
+                <p class="text-[10px] text-slate-400 text-center">
+                    This is a computer-generated salary slip in compliance with the CA Firm Employment Terms & Rules.
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Offer Letter Policy Rules Modal -->
+    <div id="policyModal" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm hidden flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[85vh] flex flex-col overflow-hidden animate-fade-in border border-slate-200">
+            <div class="px-6 py-4 bg-ca-900 text-white flex items-center justify-between">
+                <div class="flex items-center space-x-2">
+                    <i class="fa-solid fa-scale-balanced text-amber-400"></i>
+                    <h3 class="font-bold text-base">Key Offer Letter Clauses & Calculation Rules</h3>
+                </div>
+                <button onclick="closePolicyModal()" class="text-slate-400 hover:text-white text-lg">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+            <div class="p-6 overflow-y-auto space-y-4 text-xs text-slate-700 leading-relaxed">
+                
+                <div class="p-3.5 bg-blue-50/70 border border-blue-200 rounded-xl space-y-1">
+                    <h5 class="font-bold text-blue-900 text-sm flex items-center">
+                        <i class="fa-solid fa-briefcase text-blue-600 mr-2"></i>Clause 4: Working Days & Hours
+                    </h5>
+                    <ul class="list-disc list-inside space-y-1 text-slate-700">
+                        <li><strong>50 working hours</strong> or <strong>5 and ½ days</strong> per week.</li>
+                        <li>Working hours defined as <strong>9:30 AM to 7:00 PM</strong> (with half an hour lunch break).</li>
+                        <li>Weekly day off need not necessarily be on Sundays.</li>
+                    </ul>
+                </div>
+
+                <div class="p-3.5 bg-amber-50/70 border border-amber-200 rounded-xl space-y-1">
+                    <h5 class="font-bold text-amber-900 text-sm flex items-center">
+                        <i class="fa-solid fa-coins text-amber-600 mr-2"></i>Clause 5: Remuneration & Retainership Bonus
+                    </h5>
+                    <ul class="list-disc list-inside space-y-1 text-slate-700">
+                        <li><strong>₹20,000/- Basic Pay</strong> per month (configurable per employee).</li>
+                        <li>Additional <strong>₹60,000/- Retainership Bonus</strong> eligible if employee completes service till the designated target date (e.g. 31st December 2027).</li>
+                    </ul>
+                </div>
+
+                <div class="p-3.5 bg-rose-50/70 border border-rose-200 rounded-xl space-y-1">
+                    <h5 class="font-bold text-rose-900 text-sm flex items-center">
+                        <i class="fa-solid fa-user-xmark text-rose-600 mr-2"></i>Clause 6: Absence from Work & Late Penalties
+                    </h5>
+                    <ul class="list-disc list-inside space-y-1 text-slate-700">
+                        <li><strong>1 paid holiday per month</strong> with prior information.</li>
+                        <li>Un-availed holidays <strong>accumulate</strong> and can be availed anytime or <strong>encashed at exit/retirement</strong>.</li>
+                        <li><strong>Late Reporting > 10:00 AM:</strong> May be treated as <strong>half-day leave</strong>.</li>
+                        <li><strong>Repeated Delays:</strong> Delays more than twice a month attract proportionate salary deduction.</li>
+                        <li><strong>Work From Home (WFH):</strong> Must maintain expected productivity; otherwise treated as leave.</li>
+                        <li><strong>Medical Leaves > 2 days:</strong> Requires written intimation along with medical certificate.</li>
+                        <li><strong>Exam Leaves:</strong> Not allowed for more than 10 days in every 6 months.</li>
+                    </ul>
+                </div>
+
+                <div class="p-3.5 bg-emerald-50/70 border border-emerald-200 rounded-xl space-y-1">
+                    <h5 class="font-bold text-emerald-900 text-sm flex items-center">
+                        <i class="fa-solid fa-receipt text-emerald-600 mr-2"></i>Clause 7: Payment & Reimbursements
+                    </h5>
+                    <ul class="list-disc list-inside space-y-1 text-slate-700">
+                        <li>Salary paid on or before the <strong>5th working day</strong> of every month.</li>
+                        <li>Official expenses made on behalf of the firm will be reimbursed upon submission of bills.</li>
+                    </ul>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="bg-white border-t border-slate-200/80 py-4 text-center text-xs text-slate-400 no-print">
+        <p>M/s J Megha & Co. {Chartered Accountant} &bull; Attendance Cum Salary Calculator Engine &bull; Multi-Employee</p>
+    </footer>
+
+    <script src="app.js"></script>
+</body>
+</html>

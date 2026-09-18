@@ -1,0 +1,86 @@
+{% extends "tracker/base.html" %}
+{% block title %}Client Master{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h4 class="fw-bold mb-1">Client Master Register</h4>
+        <p class="text-muted small mb-0">Manage audited client entities, risk ratings, and contacts</p>
+    </div>
+    {% if is_admin %}
+        <a href="{% url 'client_create' %}" class="btn btn-primary"><i class="bi bi-plus-lg me-1"></i> Add Client</a>
+    {% endif %}
+</div>
+<div class="card p-3 mb-4 bg-light border-0 shadow-sm">
+    <form method="get" class="row g-2 align-items-center">
+        <div class="col-md-4">
+            <input type="text" name="q" class="form-control" placeholder="Search by name, code, city..." value="{{ request.GET.q }}">
+        </div>
+        <div class="col-md-3">
+            <select name="risk" class="form-select">
+                <option value="">-- All Risk Categories --</option>
+                <option value="High" {% if request.GET.risk == 'High' %}selected{% endif %}>High Risk</option>
+                <option value="Medium" {% if request.GET.risk == 'Medium' %}selected{% endif %}>Medium Risk</option>
+                <option value="Low" {% if request.GET.risk == 'Low' %}selected{% endif %}>Low Risk</option>
+            </select>
+        </div>
+        <div class="col-md-3">
+            <select name="status" class="form-select">
+                <option value="">-- All Statuses --</option>
+                <option value="Active" {% if request.GET.status == 'Active' %}selected{% endif %}>Active</option>
+                <option value="Inactive" {% if request.GET.status == 'Inactive' %}selected{% endif %}>Inactive</option>
+            </select>
+        </div>
+        <div class="col-md-2 d-flex gap-2">
+            <button type="submit" class="btn btn-secondary w-100"><i class="bi bi-search"></i> Filter</button>
+            <a href="{% url 'client_list' %}" class="btn btn-outline-secondary"><i class="bi bi-arrow-counterclockwise"></i></a>
+        </div>
+    </form>
+</div>
+<div class="card shadow-sm">
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead class="table-light">
+                    <tr><th>Code</th><th>Client Name</th><th>Primary Contact</th><th>City / State</th><th>Risk Category</th><th>Listed</th><th>Status</th><th>Actions</th></tr>
+                </thead>
+                <tbody>
+                    {% for c in clients %}
+                        <tr>
+                            <td><strong>{{ c.client_code }}</strong></td>
+                            <td><strong>{{ c.client_name }}</strong>{% if c.group_name %}<br><small class="text-muted">Group: {{ c.group_name }}</small>{% endif %}</td>
+                            <td>
+                                {% with primary=c.contacts.first %}
+                                    {% if primary %}
+                                        <strong>{{ primary.contact_name }}</strong><br>
+                                        <small class="text-muted">{{ primary.email }} | {{ primary.mobile }}</small>
+                                    {% else %}
+                                        <span class="text-muted small">No contact added</span>
+                                    {% endif %}
+                                {% endwith %}
+                            </td>
+                            <td>{{ c.city }}, {{ c.state }}</td>
+                            <td>
+                                {% if c.risk_category == 'High' %}<span class="badge bg-danger">High Risk</span>
+                                {% elif c.risk_category == 'Medium' %}<span class="badge bg-warning text-dark">Medium Risk</span>
+                                {% else %}<span class="badge bg-success">Low Risk</span>{% endif %}
+                            </td>
+                            <td>{% if c.listed_status %}<span class="badge bg-primary">Yes</span>{% else %}<span class="text-muted">No</span>{% endif %}</td>
+                            <td>{% if c.status == 'Active' %}<span class="badge bg-success">Active</span>{% else %}<span class="badge bg-secondary">Inactive</span>{% endif %}</td>
+                            <td>
+                                {% if is_admin %}
+                                    <div class="btn-group btn-group-sm">
+                                        <a href="{% url 'client_edit' c.id %}" class="btn btn-outline-primary" title="Edit Client & Contacts"><i class="bi bi-pencil-square me-1"></i> Edit</a>
+                                        <a href="{% url 'contact_create' c.id %}" class="btn btn-outline-secondary" title="Add Contact"><i class="bi bi-person-plus"></i></a>
+                                    </div>
+                                {% else %}
+                                    <span class="text-muted small">View Only</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                    {% empty %}<tr><td colspan="8" class="text-center text-muted py-4">No clients match filter criteria.</td></tr>{% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

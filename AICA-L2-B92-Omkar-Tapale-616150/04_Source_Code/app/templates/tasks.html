@@ -1,0 +1,106 @@
+{% extends "base.html" %}
+{% block title %}Tasks{% endblock %}
+
+{% macro status_badge(s) -%}
+<span class="badge badge-{{ s|lower|replace('_','') }}">{{ s.replace('_',' ') }}</span>
+{%- endmacro %}
+
+{% macro task_card(t, comments_by_event, user) %}
+<div class="border rounded p-3 mb-3">
+  <div class="flex justify-between items-start gap-2">
+    <div>
+      <div class="font-medium">{{ t.title }}</div>
+      <div class="text-xs text-slate-500 mt-0.5">
+        Due {{ t.start_date }}
+        {% if t.assigned_by %} &middot; assigned by {{ t.assigned_by.name }}{% endif %}
+        {% if t.owner_id != user.id %} &middot; assignee: {{ t.owner.name }}{% endif %}
+      </div>
+      {% if t.description %}<div class="text-sm text-slate-600 mt-1">{{ t.description }}</div>{% endif %}
+    </div>
+    <div class="flex flex-col items-end gap-1">
+      <span class="badge badge-{{ t.priority|lower }}">{{ t.priority }}</span>
+      {{ status_badge(t.status) }}
+    </div>
+  </div>
+
+  {% set my_comments = comments_by_event.get(t.id, []) %}
+  {% if my_comments %}
+  <div class="mt-2 border-t pt-2 space-y-1">
+    {% for c in my_comments %}
+    <div class="text-xs {% if c.comment_type == 'QUERY' %}bg-amber-50 border border-amber-200 rounded px-2 py-1{% endif %}">
+      <span class="font-medium">{{ c.author.name }}</span>
+      {% if c.comment_type == 'QUERY' %}<span class="badge badge-pending ml-1">Query</span>{% endif %}
+      <span class="text-slate-400">&middot; {{ c.created_at.strftime('%d %b %H:%M') }}</span>
+      <div>{{ c.message }}</div>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  <div class="mt-2 flex flex-wrap items-center gap-2 border-t pt-2">
+    {% if t.status != "IN_PROGRESS" and t.status != "DONE" %}
+    <form method="post" action="/tasks/{{ t.id }}/status"><input type="hidden" name="status" value="IN_PROGRESS"><button class="text-xs bg-indigo-100 text-indigo-800 px-2 py-1 rounded">Start</button></form>
+    {% endif %}
+    {% if t.status != "DONE" %}
+    <form method="post" action="/tasks/{{ t.id }}/status"><input type="hidden" name="status" value="DONE"><button class="text-xs bg-green-100 text-green-800 px-2 py-1 rounded">Mark Complete</button></form>
+    {% endif %}
+    {% if t.status == "DONE" %}
+    <form method="post" action="/tasks/{{ t.id }}/status"><input type="hidden" name="status" value="OPEN"><button class="text-xs bg-slate-200 px-2 py-1 rounded">Reopen</button></form>
+    {% endif %}
+
+    <form method="post" action="/tasks/{{ t.id }}/comment" class="flex gap-1 flex-1 min-w-[220px]">
+      <input name="message" placeholder="Add a comment or raise a query..." class="flex-1 border rounded px-2 py-1 text-xs" required>
+      <button name="comment_type" value="COMMENT" class="text-xs bg-slate-200 px-2 py-1 rounded">Comment</button>
+      <button name="comment_type" value="QUERY" class="text-xs bg-amber-100 text-amber-800 px-2 py-1 rounded">Raise Query</button>
+    </form>
+  </div>
+</div>
+{% endmacro %}
+
+{% block content %}
+<h1 class="text-2xl font-bold mb-4">Tasks</h1>
+
+{% if assignable %}
+<div class="card mb-6">
+  <h2 class="font-semibold mb-3">Assign a task</h2>
+  <form method="post" action="/tasks/assign" class="grid md:grid-cols-4 gap-2 text-sm">
+    <select name="assignee_id" required class="border rounded px-2 py-1">
+      <option value="">Assign to...</option>
+      {% for a in assignable %}<option value="{{ a.id }}">{{ a.name }} ({{ a.employee_code }})</option>{% endfor %}
+    </select>
+    <input name="title" placeholder="Task title" required class="border rounded px-2 py-1 md:col-span-2">
+    <input name="due_date" type="date" required class="border rounded px-2 py-1">
+    <select name="priority" class="border rounded px-2 py-1">
+      <option>LOW</option><option selected>MEDIUM</option><option>HIGH</option><option>URGENT</option>
+    </select>
+    <input name="description" placeholder="Description (optional)" class="border rounded px-2 py-1 md:col-span-3">
+    <button class="bg-slate-900 text-white px-3 py-1.5 rounded md:col-span-4">Assign Task</button>
+  </form>
+</div>
+{% endif %}
+
+<div class="grid md:grid-cols-2 gap-4">
+  <div class="card">
+    <h2 class="font-semibold mb-3">Assigned to me ({{ assigned_to_me|length }})</h2>
+    {% if assigned_to_me %}
+      {% for t in assigned_to_me %}{{ task_card(t, comments_by_event, user) }}{% endfor %}
+    {% else %}<p class="text-slate-500 text-sm">Nothing assigned to you right now.</p>{% endif %}
+  </div>
+
+  <div class="card">
+    <h2 class="font-semibold mb-3">My own tasks ({{ my_own_tasks|length }})</h2>
+    {% if my_own_tasks %}
+      {% for t in my_own_tasks %}{{ task_card(t, comments_by_event, user) }}{% endfor %}
+    {% else %}<p class="text-slate-500 text-sm">No self-created tasks. Use the prompt bar on your Dashboard.</p>{% endif %}
+  </div>
+</div>
+
+{% if assigned_by_me %}
+<div class="card mt-4">
+  <h2 class="font-semibold mb-3">Tasks I assigned to others ({{ assigned_by_me|length }})</h2>
+  <div class="grid md:grid-cols-2 gap-3">
+    {% for t in assigned_by_me %}{{ task_card(t, comments_by_event, user) }}{% endfor %}
+  </div>
+</div>
+{% endif %}
+{% endblock %}

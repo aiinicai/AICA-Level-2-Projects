@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% block title %}Admin{% endblock %}
+{% block content %}
+<h1 class="text-2xl font-bold mb-4">Admin Panel</h1>
+
+<div class="card mb-6">
+  <h2 class="font-semibold mb-3">Add User</h2>
+  <form method="post" action="/admin/users/create" class="grid md:grid-cols-3 gap-2 text-sm">
+    <input name="name" placeholder="Full name" required class="border rounded px-2 py-1">
+    <input name="email" placeholder="Email (optional)" class="border rounded px-2 py-1">
+    <select name="role" class="border rounded px-2 py-1">
+      {% for r in roles %}
+        {% if is_ceo or r not in ("CEO", "DEPT_ADMIN") %}
+        <option value="{{ r }}">{{ r.replace('_',' ') }}</option>
+        {% endif %}
+      {% endfor %}
+    </select>
+    <select name="department_id" class="border rounded px-2 py-1">
+      {% for d in departments %}<option value="{{ d.id }}">{{ d.name }}</option>{% endfor %}
+    </select>
+    <input name="designation" placeholder="Designation" class="border rounded px-2 py-1">
+    <select name="manager_id" class="border rounded px-2 py-1">
+      <option value="">No manager</option>
+      {% for u in users %}<option value="{{ u.id }}">{{ u.name }}</option>{% endfor %}
+    </select>
+    <input name="date_of_joining" type="date" required class="border rounded px-2 py-1">
+    <button class="bg-slate-900 text-white px-3 py-1.5 rounded md:col-span-3">Create User (default password Welcome@123)</button>
+  </form>
+</div>
+
+<div class="card">
+  <h2 class="font-semibold mb-3">Users in scope</h2>
+  <table class="w-full text-sm">
+    <thead><tr class="text-left text-slate-500 border-b"><th class="py-1">Code</th><th>Name</th><th>Role</th><th>Dept</th><th>Status</th><th>Active</th><th></th></tr></thead>
+    <tbody>
+    {% for u in users %}
+      <tr class="border-b">
+        <td class="py-1">{{ u.employee_code }}</td>
+        <td>{{ u.name }}</td>
+        <td>{{ u.role.replace('_',' ') }}</td>
+        <td>{{ u.department.name if u.department else "" }}</td>
+        <td>{{ u.employment_status }}</td>
+        <td>{{ "Yes" if u.is_active else "No" }}</td>
+        <td class="flex gap-1 py-1">
+          <form method="post" action="/admin/users/{{ u.id }}/reset-password"><button class="text-xs bg-slate-200 px-2 py-1 rounded">Reset PW</button></form>
+          <form method="post" action="/admin/users/{{ u.id }}/deactivate"><button class="text-xs bg-red-100 text-red-800 px-2 py-1 rounded">{{ "Deactivate" if u.is_active else "Reactivate" }}</button></form>
+        </td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+{% if is_ceo %}
+<div class="card mt-4">
+  <h2 class="font-semibold mb-2">Full Data Backup</h2>
+  <p class="text-sm text-slate-500 mb-3">Creates a timestamped copy of the entire database in the /backups folder.</p>
+  <form method="post" action="/admin/backup"><button class="bg-slate-900 text-white px-4 py-2 rounded">Run Full Backup Now</button></form>
+</div>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,75 @@
+# CA DocuFlow AI - runtime dependencies
+# Python 3.12+ on Windows 10/11.
+
+# GUI
+PySide6>=6.7,<7.0
+
+# PDF processing
+PyMuPDF>=1.24,<2.0          # imported as `fitz`
+pikepdf>=9.0,<10.0          # low-level PDF repair / page manipulation utilities
+
+# Imaging
+Pillow>=10.3,<11.0
+numpy>=1.26,<3.0            # used for fast signature autocrop (whitespace trimming)
+
+# OCR (optional module -- requires the Tesseract OCR binary to be installed
+# separately, same pattern as Word/LibreOffice below; see README)
+pytesseract>=0.3.10,<1.0
+
+# AI Assistant: structured-extraction schema validation + secure API key storage.
+# Provider calls (Anthropic/OpenAI/Gemini/Ollama) use plain HTTP via `requests`
+# rather than each vendor's SDK -- see core/ai_provider.py.
+pydantic>=2.6,<3.0
+keyring>=25.0,<26.0         # OS credential store (Windows Credential Manager)
+requests>=2.31,<3.0
+
+# QR integrity stamping (core/integrity_engine.py) -- pure Python, MIT licensed.
+qrcode>=7.4,<8.0
+
+# Word document inspection (used for lightweight metadata reads, not conversion)
+python-docx>=1.1,<2.0
+
+# Windows Word COM automation (high-fidelity DOCX/DOC -> PDF conversion)
+# pywin32 is Windows-only; guard installation on non-Windows dev machines.
+pywin32>=306; sys_platform == "win32"
+
+# Certificate-based cryptographic PDF signing (optional module)
+pyHanko[pkcs11]>=0.25,<1.0
+cryptography>=42.0,<43.0
+
+# --- Team Deployment (webapi/) -----------------------------------------
+# Separate FastAPI service for the multi-user maker-checker web platform.
+# Not bundled into the desktop .exe -- run independently via
+# `uvicorn webapi.app:app`. See README.md "Team Deployment".
+fastapi>=0.141,<1.0
+uvicorn[standard]>=0.52,<1.0
+sqlalchemy>=2.0,<3.0
+pyjwt>=2.14,<3.0
+bcrypt>=5.0,<6.0
+python-multipart>=0.0.32,<1.0   # required by FastAPI for UploadFile/form parsing
+email-validator>=2.3,<3.0       # required by Pydantic's EmailStr field type
+httpx>=0.28,<1.0                # used by FastAPI's TestClient in the test suite
+
+# Hardware DSC token signing (PKCS#11), used by core/pkcs11_engine.py.
+# Only exercised in tests against a fake/mocked PKCS#11 module -- see that
+# module's docstring for exactly what is and isn't verified. Install a real
+# token driver (e.g. eToken/ProxKey PKCS#11 .dll) separately for live use.
+python-pkcs11>=0.9,<1.0
+
+# NOTE on packages evaluated but NOT used, deliberately left out of this file:
+# `msal`, `google-auth`, `google-auth-oauthlib`, and `google-api-python-client`
+# were installed during development while exploring the Outlook/Gmail/OneDrive/
+# Drive integrations, but core/ms_graph_integration.py and
+# core/google_integration.py end up talking to the Graph/Gmail/Drive REST APIs
+# directly via `requests` (see their module docstrings for why -- mainly
+# testability). Similarly `watchdog` was evaluated for core/folder_watcher_engine.py
+# but that module is deliberately polling-based, not event-based, for the same
+# testability reason. None of these four packages are imported by any shipped
+# module, so they are not listed as dependencies -- add them back here only if
+# a future version actually switches to using them.
+
+# Testing
+pytest>=8.0,<9.0
+
+# Packaging
+pyinstaller>=6.6,<7.0

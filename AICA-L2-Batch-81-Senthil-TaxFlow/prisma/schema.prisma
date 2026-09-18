@@ -1,0 +1,546 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Role {
+  ADMINISTRATOR
+  MANAGER
+  PREPARER
+  APPROVER
+}
+
+enum ComplianceStatus {
+    DRAFT
+    PENDING_ADMIN_APPROVAL
+    PENDING_REVIEW
+    PENDING_PREPARATION
+    PREPARED
+    PENDING_APPROVAL
+    APPROVED
+    REJECTED
+    FILED
+    PAID
+    CLOSED
+  }
+
+enum Priority {
+  NORMAL
+  HIGH
+  CRITICAL
+}
+
+enum Frequency {
+  WEEKLY
+  MONTHLY
+  BI_MONTHLY
+  QUARTERLY
+  HALF_YEARLY
+  ANNUAL
+  AD_HOC
+}
+
+enum TaxType {
+  GST
+  VAT
+  SALES_TAX
+  WHT
+  CORPORATE_TAX
+  STATUTORY
+}
+
+enum EntityStatus {
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+}
+
+enum ComplianceTemplateStatus {
+  DRAFT
+  PENDING_ADMIN_APPROVAL
+  PENDING_REVIEW
+  APPROVED
+  REJECTED
+}
+
+model ComplianceTemplate {
+  id                  String   @id @default(cuid())
+  orgId               String
+  org                 Organization @relation(fields: [orgId], references: [id])
+  templateNumber      String?  @unique
+  version             Int      @default(0)
+  status              String   @default("DRAFT")
+  isActive            Boolean  @default(true)
+
+  taxType             String?
+  complianceTypeId    String?
+  complianceType      ComplianceType? @relation(fields: [complianceTypeId], references: [id])
+  formId              String?
+  form                FormMaster?     @relation(fields: [formId], references: [id])
+  countryId           String
+  country             Country         @relation(fields: [countryId], references: [id])
+  filingEntityId      String?
+  frequency           Frequency
+  dueDaysAfterPeriodEnd Int?
+  periodEndDate       DateTime?
+  paymentDueDaysAfterPeriodEnd Int?
+  priority            Priority @default(NORMAL)
+  approvalFlow        String   @default("ONE_LEVEL")
+  isRecurring         Boolean  @default(true)
+  recurringEndDate    DateTime?
+  notes               String?
+
+  preparerId          String?
+  preparer            User?    @relation("TemplatePreparer", fields: [preparerId], references: [id])
+  approverId          String?
+  approver            User?    @relation("TemplateApprover", fields: [approverId], references: [id])
+
+  submittedAt         DateTime?
+  submittedById       String?
+  submittedBy         User?    @relation("TemplateSubmittedBy", fields: [submittedById], references: [id])
+  adminApprovedAt     DateTime?
+  adminApprovedById   String?
+  adminApprovedBy     User?    @relation("TemplateAdminApprovedBy", fields: [adminApprovedById], references: [id])
+  reviewerId          String?
+  reviewer            User?    @relation("TemplateReviewer", fields: [reviewerId], references: [id])
+  reviewerActionAt    DateTime?
+  reviewerComments    String?
+  adminComments       String?
+  approvedAt          DateTime?
+  approvedById        String?
+  approvedBy          User?    @relation("TemplateApprovedBy", fields: [approvedById], references: [id])
+  rejectedAt          DateTime?
+  rejectedById        String?
+  rejectedBy          User?    @relation("TemplateRejectedBy", fields: [rejectedById], references: [id])
+
+  createdById         String
+  createdBy           User     @relation("TemplateCreatedBy", fields: [createdById], references: [id])
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  entities            ComplianceTemplateEntity[]
+  versions            ComplianceTemplateVersion[]
+  generatedCompliances ComplianceSchedule[]
+
+  @@map("compliance_templates")
+}
+
+model ComplianceTemplateEntity {
+  id         String             @id @default(cuid())
+  templateId String
+  template   ComplianceTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  entityId   String
+  entity     LegalEntity        @relation(fields: [entityId], references: [id])
+  createdAt  DateTime           @default(now())
+
+  @@unique([templateId, entityId])
+  @@map("compliance_template_entities")
+}
+
+model ComplianceTemplateVersion {
+  id           String             @id @default(cuid())
+  templateId   String
+  template     ComplianceTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  version      Int
+  snapshot     Json
+  fieldDiffs   Json?
+  changeReason String?
+  changedById  String
+  changedBy    User               @relation("TemplateVersionChangedBy", fields: [changedById], references: [id])
+  changedAt    DateTime           @default(now())
+
+  @@unique([templateId, version])
+  @@map("compliance_template_versions")
+}
+
+model Organization {
+  id        String   @id @default(cuid())
+  name      String
+  slug      String   @unique
+  createdById String
+  createdBy User     @relation("CreatedOrganizations", fields: [createdById], references: [id])
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  members   OrganizationMember[]
+  entities  LegalEntity[]
+  complianceTypes ComplianceType[]
+  forms     FormMaster[]
+  schedules ComplianceSchedule[]
+  currencies Currency[]
+  templates ComplianceTemplate[]
+
+  @@map("organizations")
+}
+
+model OrganizationMember {
+  id        String   @id @default(cuid())
+  orgId     String
+  org       Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  roles     String[]
+  createdById String?
+  createdBy User?    @relation("CreatedBy", fields: [createdById], references: [id])
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([orgId, userId])
+  @@map("organization_members")
+}
+
+model User {
+  id            String          @id @default(cuid())
+  email         String          @unique
+  username      String          @unique
+  password      String
+  name          String?
+  role          String          @default("PREPARER")
+  roles         String[]
+  department    String?
+  image         String?
+  isActive      Boolean         @default(true)
+  employeeId    String?         @unique
+  managerId     String?
+  manager       User?           @relation("ManagerEmployee", fields: [managerId], references: [id])
+  subordinates  User[]          @relation("ManagerEmployee")
+  countryId     String?
+  country       Country?        @relation(fields: [countryId], references: [id])
+  emailVerified DateTime?
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+
+  createdOrganizations Organization[]  @relation("CreatedOrganizations")
+  createdOrganizationMembers OrganizationMember[] @relation("CreatedBy")
+  orgMemberships       OrganizationMember[]
+  assignedCompliances    ComplianceAssignment[]
+  approvalCompliances    ComplianceApproval[]
+  notifications         Notification[]
+  auditTrails           AuditTrail[]
+  comments              Comment[]
+  attachments           Attachment[]
+    activities            Activity[]
+    createdCompliances    ComplianceSchedule[] @relation("ComplianceCreatedBy")
+    reviewedCompliances   ComplianceSchedule[] @relation("ComplianceReviewer")
+    templatesPreparer         ComplianceTemplate[] @relation("TemplatePreparer")
+    templatesApprover         ComplianceTemplate[] @relation("TemplateApprover")
+    templatesSubmittedBy      ComplianceTemplate[] @relation("TemplateSubmittedBy")
+    templatesAdminApprovedBy  ComplianceTemplate[] @relation("TemplateAdminApprovedBy")
+    templatesReviewer         ComplianceTemplate[] @relation("TemplateReviewer")
+    templatesApprovedBy       ComplianceTemplate[] @relation("TemplateApprovedBy")
+    templatesRejectedBy       ComplianceTemplate[] @relation("TemplateRejectedBy")
+    templatesCreatedBy        ComplianceTemplate[] @relation("TemplateCreatedBy")
+    templateVersionsChangedBy ComplianceTemplateVersion[] @relation("TemplateVersionChangedBy")
+
+    @@map("users")
+  }
+
+model Country {
+  id              String           @id @default(cuid())
+  name            String           @unique
+  code            String           @unique
+  region          String?
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  legalEntities   LegalEntity[]
+  complianceTypes ComplianceType[]
+  forms           FormMaster[]
+  employees       User[]
+  holidays        Holiday[]
+  schedules       ComplianceSchedule[]
+  templates       ComplianceTemplate[]
+
+  @@map("countries")
+}
+
+model Currency {
+  id        String   @id @default(cuid())
+  orgId     String
+  org       Organization @relation(fields: [orgId], references: [id])
+  code      String
+  name      String
+  symbol    String?
+  decimals  Int      @default(2)
+  isBase    Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([orgId, code])
+  @@map("currencies")
+}
+
+model Holiday {
+  id        String   @id @default(cuid())
+  countryId String
+  country   Country  @relation(fields: [countryId], references: [id])
+  date      DateTime
+  name      String
+  createdAt DateTime @default(now())
+
+  @@unique([countryId, date])
+  @@map("holidays")
+}
+
+model LegalEntity {
+  id                  String       @id @default(cuid())
+  orgId               String
+  org                 Organization @relation(fields: [orgId], references: [id])
+  entityNumber        String
+  entityName          String
+  countryId           String
+  country             Country      @relation(fields: [countryId], references: [id])
+  businessUnit        String?
+  status              EntityStatus @default(ACTIVE)
+  taxRegistrationNumber String?
+  currency            String       @default("USD")
+  createdAt           DateTime     @default(now())
+  updatedAt           DateTime     @updatedAt
+
+  schedules           ComplianceSchedule[]
+  complianceEntities  ComplianceEntity[]
+  templateEntities    ComplianceTemplateEntity[]
+
+  @@unique([orgId, entityNumber])
+  @@map("legal_entities")
+}
+
+model ComplianceType {
+  id                    String       @id @default(cuid())
+  orgId                 String
+  org                   Organization @relation(fields: [orgId], references: [id])
+  name                  String
+  taxType               TaxType?
+  frequency             Frequency?
+  dueDateRule           String?
+  description           String?
+  defaultPreparationDays Int         @default(5)
+  defaultApprovalDays   Int          @default(3)
+  countryId             String?
+  country               Country?     @relation(fields: [countryId], references: [id])
+  createdAt             DateTime     @default(now())
+  updatedAt             DateTime     @updatedAt
+
+  forms                 FormMaster[]
+  schedules             ComplianceSchedule[]
+  templates             ComplianceTemplate[]
+
+  @@unique([orgId, name])
+  @@map("compliance_types")
+}
+
+model FormMaster {
+  id               String         @id @default(cuid())
+  orgId            String
+  org              Organization   @relation(fields: [orgId], references: [id])
+  formNumber       String
+  formName         String
+  complianceTypeId String?
+  complianceType   ComplianceType? @relation(fields: [complianceTypeId], references: [id])
+  countryId        String?
+  country          Country?       @relation(fields: [countryId], references: [id])
+  taxType          TaxType?
+  description      String?
+  approvalFlow     String         @default("ONE_LEVEL")
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+
+  schedules        ComplianceSchedule[]
+  templates        ComplianceTemplate[]
+
+  @@unique([orgId, formNumber, countryId])
+  @@map("form_master")
+}
+
+model ComplianceSchedule {
+    id               String           @id @default(cuid())
+    orgId            String
+    org              Organization     @relation(fields: [orgId], references: [id])
+    complianceId     String           @unique
+    entityId         String?
+    entity           LegalEntity?     @relation(fields: [entityId], references: [id])
+    countryId        String
+    country          Country          @relation(fields: [countryId], references: [id])
+    complianceTypeId String?
+    complianceType   ComplianceType?  @relation(fields: [complianceTypeId], references: [id])
+    taxType          TaxType?
+    formId           String?
+    form             FormMaster?       @relation(fields: [formId], references: [id])
+    templateId       String?
+    template         ComplianceTemplate? @relation(fields: [templateId], references: [id])
+    templateVersion  Int?
+    taxPeriod        String
+    taxPeriodStart   DateTime?
+    taxPeriodEnd     DateTime?
+    filingMonth      String?
+    frequency        Frequency
+    dueDate          DateTime
+    priority         Priority         @default(NORMAL)
+    status           ComplianceStatus @default(DRAFT)
+    isRecurring      Boolean          @default(true)
+    notes            String?
+    submittedAt      DateTime?
+    filedAt          DateTime?
+    createdAt        DateTime         @default(now())
+    updatedAt        DateTime         @updatedAt
+
+    createdBy        User?             @relation("ComplianceCreatedBy", fields: [createdById], references: [id])
+    createdById      String?
+    reviewer         User?             @relation("ComplianceReviewer", fields: [reviewerId], references: [id])
+    reviewerId       String?
+    reviewerActionAt DateTime?
+    reviewerComments String?
+    adminActionAt    DateTime?
+    adminComments    String?
+    paidAt           DateTime?
+    paymentDate      DateTime?
+    paymentAmount    Decimal?
+    paymentReference String?
+    paymentMethod    String?
+    refundAmount     Decimal?
+    refundReference  String?
+    paymentNotes     String?
+
+    assignments      ComplianceAssignment[]
+    approvals        ComplianceApproval[]
+    attachments      Attachment[]
+    comments         Comment[]
+    activities       Activity[]
+    entities         ComplianceEntity[]
+
+    @@map("compliance_schedules")
+  }
+
+model ComplianceEntity {
+  id           String             @id @default(cuid())
+  complianceId String
+  compliance   ComplianceSchedule @relation(fields: [complianceId], references: [id])
+  entityId     String
+  entity       LegalEntity        @relation(fields: [entityId], references: [id])
+  createdAt    DateTime           @default(now())
+
+  @@unique([complianceId, entityId])
+  @@map("compliance_entities")
+}
+
+model ComplianceAssignment {
+  id             String             @id @default(cuid())
+  complianceId   String
+  compliance     ComplianceSchedule @relation(fields: [complianceId], references: [id])
+  preparerId     String
+  preparer       User               @relation(fields: [preparerId], references: [id])
+  startedAt      DateTime?
+  completedAt    DateTime?
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+
+  @@unique([complianceId, preparerId])
+  @@map("compliance_assignments")
+}
+
+model ComplianceApproval {
+  id             String             @id @default(cuid())
+  complianceId   String
+  compliance     ComplianceSchedule @relation(fields: [complianceId], references: [id])
+  approverId     String
+  approver       User               @relation(fields: [approverId], references: [id])
+  status         ComplianceStatus   @default(PENDING_APPROVAL)
+  comments       String?
+  actionAt       DateTime?
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+
+  @@unique([complianceId, approverId])
+  @@map("compliance_approvals")
+}
+
+model Attachment {
+    id             String             @id @default(cuid())
+    complianceId   String
+    compliance     ComplianceSchedule @relation(fields: [complianceId], references: [id])
+    userId         String
+    user           User               @relation(fields: [userId], references: [id])
+    fileName       String
+    originalName   String
+    fileType       String
+    fileSize       Int
+    filePath       String
+    version        Int                @default(1)
+    stage          String?
+    createdAt      DateTime           @default(now())
+
+    @@map("attachments")
+  }
+
+model Comment {
+  id             String             @id @default(cuid())
+  complianceId   String
+  compliance     ComplianceSchedule @relation(fields: [complianceId], references: [id])
+  userId         String
+  user           User               @relation(fields: [userId], references: [id])
+  content        String
+  createdAt      DateTime           @default(now())
+
+  @@map("comments")
+}
+
+model AuditTrail {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  action    String
+  entity    String?
+  entityId  String?
+  oldValue  String?
+  newValue  String?
+  ipAddress String?
+  comments  String?
+  createdAt DateTime @default(now())
+
+  @@map("audit_trails")
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  title     String
+  message   String
+  type      String   @default("INFO")
+  read      Boolean  @default(false)
+  link      String?
+  createdAt DateTime @default(now())
+
+  @@map("notifications")
+}
+
+model ExchangeRate {
+  id           String   @id @default(cuid())
+  fromCurrency String
+  toCurrency   String   @default("USD")
+  rate         Decimal  @db.Decimal(18, 6)
+  date         DateTime @db.Date
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@unique([fromCurrency, date])
+  @@map("exchange_rates")
+}
+
+model Activity {
+  id           String             @id @default(cuid())
+  complianceId String
+  compliance   ComplianceSchedule @relation(fields: [complianceId], references: [id])
+  userId       String
+  user         User               @relation(fields: [userId], references: [id])
+  action       String
+  fromStatus   ComplianceStatus?
+  toStatus     ComplianceStatus?
+  comments     String?
+  createdAt    DateTime           @default(now())
+
+  @@map("activities")
+}

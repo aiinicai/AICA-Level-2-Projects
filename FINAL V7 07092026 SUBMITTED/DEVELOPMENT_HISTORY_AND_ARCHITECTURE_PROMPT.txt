@@ -1,0 +1,478 @@
+FAMILY INVESTMENT MATRIX V7
+DEVELOPMENT HISTORY, ARCHITECTURE REFERENCE & REUSABLE MASTER PROMPT
+====================================================================
+
+PROJECT NAME
+------------
+FAMILY INVESTMENT MATRIX
+
+CURRENT SUBMISSION VERSION
+--------------------------
+V7
+
+PURPOSE
+-------
+Create a secure, local, low-cost family investment consolidation and tracking
+application using Python and Streamlit.
+
+The system must combine investments belonging to multiple family members,
+across multiple brokers/platforms, into one consolidated dashboard while
+retaining a complete transaction ledger and member-wise/broker-wise drill-down.
+
+The system is a portfolio tracker and valuation/research dashboard. It should
+not place trading orders unless a future version explicitly introduces a
+separate, reviewed trading subsystem.
+
+====================================================================
+CURRENT ARCHITECTURE
+====================================================================
+
+USER / BROWSER
+      |
+      v
+STREAMLIT UI
+- Login
+- Forced first password change
+- Dashboard
+- Member View
+- Upload Investments
+- All Transactions
+- Query Explorer
+- News
+- Add Family Member
+- Instrument Master
+- Settings
+      |
+      v
+BUSINESS LOGIC
+- validation
+- duplicate detection
+- holdings engine
+- realised/unrealised calculations
+- identifier normalization
+- provider selection
+- price refresh
+- news refresh
+- import processing
+      |
+      v
+SQLITE DATABASE
+- members
+- users
+- brokers
+- transactions
+- price_cache
+- news_cache
+- instrument/provider mappings
+- app settings
+      |
+      +-----------------------+
+      | MARKET DATA PROVIDERS |
+      +-----------------------+
+       HDFC Securities
+       ICICI Direct Breeze
+       Zerodha Kite Connect
+       Upstox
+       Yahoo/yfinance fallback
+       Manual override
+
+====================================================================
+CORE TECHNOLOGIES
+====================================================================
+
+Python
+  Main application language.
+
+Streamlit
+  Local browser-based user interface and forms.
+
+SQLite
+  Local relational database. No separate database server.
+
+Pandas
+  Transaction processing, grouping, imports and calculations.
+
+Plotly Express
+  Interactive dashboard charts.
+
+Requests
+  REST API calls.
+
+yfinance
+  Best-effort Yahoo price fallback.
+
+OpenPyXL
+  Excel template and workbook support.
+
+pdfplumber
+  PDF table extraction assistance.
+
+feedparser
+  RSS/news support.
+
+hashlib / password hashing
+  Local authentication security.
+
+====================================================================
+CORE DATABASE DESIGN
+====================================================================
+
+MEMBERS
+- family member master
+- member identity/relationship fields
+
+USERS
+- login identifier
+- password hash
+- salt
+- role
+- first-login state
+
+BROKERS
+- broker/platform master
+
+TRANSACTIONS
+Authoritative investment ledger:
+- family member
+- broker
+- asset type
+- instrument
+- identifier
+- transaction type
+- date
+- quantity
+- price
+- amount
+- charges
+- folio/reference
+- remarks
+- source
+
+PRICE CACHE
+- identifier
+- current/last price
+- price date
+- update timestamp
+
+NEWS CACHE
+- instrument
+- title
+- source
+- link
+- published
+- summary
+- fetched time
+
+INSTRUMENT MASTER / PROVIDER MAPPING
+- common portfolio identifier
+- company/instrument name
+- exchange
+- segment
+- ISIN
+- HDFC token/code
+- ICICI Breeze stock code
+- Zerodha symbol/mapping
+- Upstox instrument key
+- Yahoo symbol
+
+APPLICATION SETTINGS
+- preferred market-data provider
+- other non-secret local settings
+
+====================================================================
+HOLDINGS ENGINE
+====================================================================
+
+The transaction ledger is the source of truth.
+
+BUY / SIP
+- increase quantity
+- increase invested cost including supported charges
+
+SELL
+- calculate average cost
+- remove proportionate cost
+- reduce quantity
+- calculate realised result
+
+DIVIDEND
+- record dividend income
+
+BONUS / SPLIT
+- adjust quantity according to implemented transaction rules
+
+Open holdings calculate:
+- net quantity
+- invested amount
+- average cost
+- realised gain
+- dividend income
+
+Valuation layer adds:
+- current price
+- current value
+- unrealised gain
+- unrealised gain percentage
+
+====================================================================
+MAJOR DEVELOPMENT HISTORY
+====================================================================
+
+INITIAL VERSION
+- family tracker
+- SQLite database
+- login
+- transactions
+- holdings
+- Excel/PDF import
+- charts
+- news
+
+STARTUP RECTIFICATION
+Problem:
+Ordinary Python execution caused Streamlit runtime issues and onboarding prompt.
+
+Solution:
+- dependency check
+- Streamlit-runtime detection
+- relaunch using python -m streamlit run
+- first-run Streamlit configuration
+- SQLite WAL and timeout
+
+V2
+Problem:
+StreamlitValueAssignmentNotAllowedError due to widget/form/session-state key collision.
+
+Solution:
+Separated form/widget keys from session state, including must_change_password.
+
+V3
+Problem:
+Plotly wide-form mixed data-type error.
+
+Solution:
+- numeric coercion
+- long-form chart dataframe
+- safer chart helper
+
+V4
+Problems:
+- poor dark-theme visibility
+- manual amount arithmetic
+- unreliable price fallback
+
+Solutions:
+- controlled light CSS
+- explicit Plotly styling
+- automatic Quantity x Price
+- improved market-price candidate/fallback logic
+
+V5
+Problem:
+Pandas merge failed because identifiers were float64 on one side and strings
+on the other.
+
+Solution:
+Canonical identifier normalization:
+- 125497.0 -> 125497
+- reliance -> RELIANCE
+- NaN/None -> blank
+and normalize both holdings and price-cache keys before merge.
+
+V6
+Added:
+- Zerodha official LTP
+- Upstox official LTP
+- Yahoo fallback
+- mutual-fund NAV function
+- manual override
+- session/environment-variable credentials
+- connection diagnostics
+
+V7
+Renamed project to FAMILY INVESTMENT MATRIX.
+
+Added:
+- HDFC Securities market-data integration path
+- ICICI Direct Breeze market-data integration path
+- Instrument Master
+- preferred provider setting
+- seamless provider order/fallback architecture
+
+====================================================================
+V7 PRICE PROVIDER ARCHITECTURE
+====================================================================
+
+Standard order:
+
+HDFC
+  ->
+ICICI
+  ->
+ZERODHA
+  ->
+UPSTOX
+  ->
+YAHOO
+
+Manual override remains available when all automatic methods fail.
+
+If the user selects a preferred provider in Settings, attempt it first, then
+continue through the remaining standard providers.
+
+For mutual funds, use the mutual-fund NAV path rather than equity LTP logic.
+
+Important:
+Provider authentication rules and tokens can change. Never hard-code secrets
+into the distributable source. Keep credentials in session/environment/secure
+storage.
+
+====================================================================
+SECURITY PRINCIPLES
+====================================================================
+
+- local storage by default
+- password hashes, not plaintext passwords
+- broker/API secrets should not be embedded in source
+- API credentials should be session/environment based
+- regular database backups
+- no order placement in V7
+- avoid public internet exposure without deployment hardening
+- review provider terms before redistribution of market data
+
+====================================================================
+TESTING PRINCIPLES
+====================================================================
+
+Minimum tests after every change:
+
+1. Python compile
+2. AST/source parse
+3. Streamlit widget-key collision scan
+4. database initialization
+5. login/password tests
+6. BUY calculation
+7. partial SELL
+8. DIVIDEND
+9. BONUS/SPLIT
+10. duplicate detection
+11. numeric mutual-fund identifier
+12. blank/NaN identifier
+13. price-cache merge
+14. provider order
+15. API 200 response
+16. API auth failure
+17. timeout
+18. invalid symbol
+19. manual price override
+20. Excel import
+21. browser page-load smoke test
+
+====================================================================
+MASTER PROMPT FOR FUTURE DEVELOPMENT
+====================================================================
+
+You are a senior Python/Streamlit developer maintaining a critical personal
+finance project called "FAMILY INVESTMENT MATRIX".
+
+The current stable baseline is V7.
+
+Do not rewrite working modules unnecessarily. Preserve the transaction-ledger
+architecture, SQLite data, backward compatibility and local-first privacy.
+
+Before changing code:
+
+1. inspect the complete current source;
+2. identify all functions affected by the requested change;
+3. identify database migrations needed;
+4. preserve existing user data;
+5. preserve login and session-state behaviour;
+6. preserve identifier normalization;
+7. preserve manual price fallback;
+8. do not hard-code API secrets;
+9. keep market APIs read-only unless explicitly requested otherwise;
+10. verify broker/provider integration against current official documentation
+    when implementing provider-specific changes.
+
+After changing code:
+
+1. run py_compile;
+2. run AST parse;
+3. scan Streamlit explicit widget keys for collisions;
+4. run synthetic holdings tests;
+5. test database migration on a copy;
+6. test Excel import;
+7. test provider selection;
+8. test live provider connection when valid credentials are available;
+9. ensure errors are displayed inside the UI instead of silently crashing;
+10. provide a new versioned file and an updated changelog.
+
+CURRENT FUNCTIONAL REQUIREMENTS
+-------------------------------
+
+Family / authentication:
+- administrator login
+- mandatory password change on first login
+- family member master
+- future support for read-only family roles
+
+Portfolio:
+- multiple family members
+- multiple brokers/platforms
+- equity and mutual funds
+- transaction types including BUY, SELL, SIP, DIVIDEND, BONUS, SPLIT
+- duplicate detection
+- member/family views
+- realised/unrealised values
+
+Input:
+- manual transaction entry
+- automatic Quantity x Price
+- Excel bulk import
+- PDF extraction assistant
+
+Market data:
+- HDFC Securities
+- ICICI Direct Breeze
+- Zerodha
+- Upstox
+- Yahoo fallback
+- mutual-fund NAV
+- manual override
+- preferred provider
+- Instrument Master
+
+Analytics:
+- family dashboard
+- member view
+- charts
+- broker/platform analysis
+- query explorer
+- news
+
+MAINTENANCE PRIORITIES
+----------------------
+
+Highest priority:
+- automatic backup/restore
+- price source/time/freshness
+- XIRR/CAGR
+- dividend reporting
+- report export
+- broker statement adapters
+- corporate actions
+- capital gains/tax working
+- role-based access
+- audit log
+
+LONG-TERM GOAL
+--------------
+
+Develop FAMILY INVESTMENT MATRIX into a complete, low-cost, private family
+wealth management platform covering securities, mutual funds, fixed income,
+retirement products, goals, tax reports, documents, alerts and optional
+private-cloud/LAN access without sacrificing auditability and local data control.
+
+====================================================================
+END OF DEVELOPMENT HISTORY & ARCHITECTURE PROMPT
+====================================================================
