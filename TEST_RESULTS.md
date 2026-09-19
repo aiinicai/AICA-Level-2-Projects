@@ -1,0 +1,49 @@
+# Test result report — Tkinter desktop edition
+
+**Core/controller results: 37/37 PASS.**
+
+Scope: actual Excel/core tests and mocked controller checks. Live Tkinter widgets, native file dialogs and Windows EXE execution were NOT RUN.
+Tests 1 and 9 exercise the same open/export functions used by the UI, not GUI clicks. Tests 34–37 use mocks, not actual widgets.
+Tkinter runtime unavailable: libtk8.6.so: cannot open shared object file: No such file or directory
+
+Environment: Python 3.12.14, Pandas 3.0.5, OpenPyXL 3.1.5.
+
+| Test No. | Test Scenario | Expected Result | Actual Result | Status – PASS/FAIL |
+| --- | --- | --- | --- | --- |
+| 1 | Upload valid Excel file (handler) | Trial Balance loads successfully with 24 ledgers. | 24 ledgers parsed successfully by the upload handler; native Open dialog not exercised. | PASS |
+| 2 | Required Credit column missing | Clear validation error; handler rejects safely. | Missing required columns: Credit | PASS |
+| 3 | Mismatched debit and credit totals | TB difference of +896,010.00 identified. | Debit 2,449,084.00; Credit 1,553,074.00; Difference +896,010.00; TB-level flag generated. | PASS |
+| 4 | Negative closing balance | Cash in Hand flagged under Negative Balance. | Identified Cash in Hand: Negative Balance; 1 matching report row(s). | PASS |
+| 5 | Duplicate ledger names | Both Office Supplies rows identified. | Both Office Supplies source rows identified (2 flags). | PASS |
+| 6 | Materiality 500,000; closing 750,000 | Plant and Machinery flagged High Value. | Identified Plant and Machinery: High Value; 1 matching report row(s). | PASS |
+| 7 | Round-figure debit or credit total | Rent Expense flagged for aggregate review. | Identified Rent Expense: Round Figure Transaction – Review Required; 1 matching report row(s). | PASS |
+| 8 | Expense with credit closing balance | Travel Expense flagged as Unusual Balance. | Identified Travel Expense: Unusual Balance – Review Required; 1 matching report row(s). | PASS |
+| 9 | Export exception report (generation/round trip) | Excel bytes contain the exact report data; native Save dialog requires local verification. | Valid XLSX bytes produced and all 27 report rows round-tripped exactly. Native Save dialog not exercised. | PASS |
+| 10 | Empty Excel workbook | Understandable empty worksheet error. | The first worksheet is empty. Put the required headers in row 1. | PASS |
+| 11 | Headers with no data rows | No ledger rows error. | No ledger rows found. Add ledger data below the headers. | PASS |
+| 12 | Zero-byte file | Empty file error. | The uploaded file is empty. Upload a populated .xlsx workbook. | PASS |
+| 13 | Blank / NaN amount | Row and column-specific error; no silent zero fill. | Excel row 2, Closing Balance: blank values are not allowed; enter 0 for zero amounts. | PASS |
+| 14 | Non-numeric amount | Numeric conversion error with row and column. | Excel row 2, Debit: Use a numeric amount without currency symbols or commas. | PASS |
+| 15 | Transactions with zero closing | Clearing Account flagged; dormant account excluded. | Identified Clearing Account: Zero Closing Balance; 1 matching report row(s). | PASS |
+| 16 | Zero movement and zero closing | Dormant account not flagged. | Dormant Account has no exceptions; zeros are excluded from multiples and movement checks. | PASS |
+| 17 | Strict absolute threshold boundary | Only absolute amounts greater than threshold flagged. | Exactly 500,000 excluded; +/-500,000.01 included. | PASS |
+| 18 | Decimal precision and configurable multiple | No float mismatch; decimal multiples work. | 0.10 + 0.20 exactly equals 0.30 using paise; 0.10 multiples detected. | PASS |
+| 19 | Configurable accounting rules | User-selected nature and Ignore respected. | Ignore suppresses expense checks; Debit for liabilities flags Bank Loan; unmapped groups ignored. | PASS |
+| 20 | Both filters and filtered export | Type/group filters combine; exported rows match. | AND filters produce Plant and Machinery; blank filters retain all; filtered export verified. | PASS |
+| 21 | Negative period debit | Debit must be non-negative. | Excel row 2, Debit: period Debit/Credit must be non-negative. | PASS |
+| 22 | Too many decimal places | Reject rather than silently round. | Excel row 2, Debit: Use no more than two decimal places. | PASS |
+| 23 | Invalid/corrupted workbook | Understandable invalid Excel error. | Cannot read this Excel file. Upload a valid, unencrypted .xlsx workbook. | PASS |
+| 24 | Duplicate required header | Reject ambiguous columns. | Required column headers must not be duplicated. | PASS |
+| 25 | Formula input | Require pasted values instead of cached formulas. | Formula cells are not supported. Paste values before uploading. | PASS |
+| 26 | Formula-like text export | Text remains text in generated Excel. | Formula-like ledger name exported as literal string, not executable Excel formula. | PASS |
+| 27 | No exceptions | Empty report exports with headers; zero count. | Empty exception result retains all five headers and exports successfully. | PASS |
+| 28 | Normalized duplicate names | Both case/whitespace variants flagged. | Case, outer spaces and repeated internal spaces ignored for duplicate matching. | PASS |
+| 29 | Syntax and available imports | Python sources compile without syntax errors. | Both Python sources compile. Pandas/OpenPyXL imports verified; live Tkinter window not tested here. | PASS |
+| 30 | Invalid review settings | Clear settings errors. | Negative materiality, non-positive multiple and invalid expected nature rejected. | PASS |
+| 31 | Blank ledger name | Reject whitespace-only name. | Excel row 2, Ledger Name: blank values are not allowed; enter 0 for zero amounts. | PASS |
+| 32 | Infinite amount | Reject non-finite numeric input. | Excel row 2, Debit: Use a numeric amount without currency symbols or commas. | PASS |
+| 33 | Desktop report with all export sheets | Filtered/full rows, summary, rules and settings agree. | Five workbook sheets verified, filtered/full rows and settings agree; full sample export saved. | PASS |
+| 34 | Changed settings / stale export guard (mock) | Export disabled until recalculated. | Mocked controller disables export when settings change; stale export blocked. | PASS |
+| 35 | Invalid replacement workbook (mock dialog) | Clear error; previous valid data preserved. | Actual invalid workbook rejected; mocked error dialog called and prior data preserved. | PASS |
+| 36 | Cancel Save dialog (mock) | No file generation and no error. | Cancelled mocked save dialog does not generate or write a file. | PASS |
+| 37 | Save failure (mock) | File write failure reported without crashing callback. | Simulated save permission error caught and understandable error dialog requested. | PASS |
