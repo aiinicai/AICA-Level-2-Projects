@@ -1,0 +1,586 @@
+/* ==========================================================================
+   DPDP Readiness Assessor — interface styles
+
+   Vernacular: the audit working paper. Ruled columns, index references,
+   marked-up margins. Borders carry information; nothing is boxed merely
+   because it is a group.
+
+   The only red in this system is `struck`. It means one thing: a claim was
+   made and could not be evidenced. Never reuse it.
+   ========================================================================== */
+
+/* -- Vendored type. There is no network at a client site. ---------------- */
+@font-face {
+  font-family: 'IBM Plex Sans';
+  src: url('fonts/ibm-plex-sans-latin-400-normal.woff2') format('woff2');
+  font-weight: 400; font-style: normal; font-display: swap;
+}
+@font-face {
+  font-family: 'IBM Plex Sans';
+  src: url('fonts/ibm-plex-sans-latin-400-italic.woff2') format('woff2');
+  font-weight: 400; font-style: italic; font-display: swap;
+}
+@font-face {
+  font-family: 'IBM Plex Sans';
+  src: url('fonts/ibm-plex-sans-latin-500-normal.woff2') format('woff2');
+  font-weight: 500; font-style: normal; font-display: swap;
+}
+@font-face {
+  font-family: 'IBM Plex Sans';
+  src: url('fonts/ibm-plex-sans-latin-600-normal.woff2') format('woff2');
+  font-weight: 600; font-style: normal; font-display: swap;
+}
+@font-face {
+  font-family: 'IBM Plex Sans';
+  src: url('fonts/ibm-plex-sans-latin-700-normal.woff2') format('woff2');
+  font-weight: 700; font-style: normal; font-display: swap;
+}
+
+:root {
+  --ink:     #16202E;
+  --paper:   #FBFAF7;
+  --rule:    #DAD8D1;
+  --wash:    #EFEDE7;
+  --struck:  #9E2A2B;
+  --pending: #8A6A1F;
+
+  /* Derived. Tints of ink only — no new hue enters the system. */
+  --ink-70:  #4A5462;   /* 7.0:1 on paper */
+  --ink-50:  #6B7480;   /* 4.6:1 on paper — the floor, used for labels only */
+  --rule-hi: #BFBCB3;   /* the heavier hairline */
+  --struck-wash: #F7ECEA;
+  --struck-wash-hi: #F1DEDB;
+
+  /* A real scale, not browser defaults. */
+  --t-xs:   0.6875rem;  /* 11   — margin refs, weights */
+  --t-sm:   0.78125rem; /* 12.5 — secondary lines, table cells */
+  --t-base: 0.90625rem; /* 14.5 — body */
+  --t-md:   1rem;       /* 16   — control titles */
+  --t-lg:   1.1875rem;  /* 19   — rule titles */
+  --t-xl:   1.5rem;     /* 24   — screen titles */
+  --t-2xl:  1.875rem;   /* 30   — the score */
+
+  --lead: 1.55;
+  --measure: 72ch;      /* body text stays under 80 characters */
+
+  --s1: 0.25rem;  --s2: 0.5rem;   --s3: 0.75rem;  --s4: 1rem;
+  --s5: 1.5rem;   --s6: 2rem;     --s7: 3rem;     --s8: 4rem;
+
+  /* z-index scale, declared once */
+  --z-sticky: 10;  --z-topbar: 20;  --z-toast: 50;
+
+  --tx: 160ms ease;     /* micro-interactions only */
+  --topbar-h: 2.75rem;
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+
+/* An author `display` rule outranks the UA stylesheet's [hidden] regardless of
+   specificity, so panes and guidance blocks would render open. Settle it once. */
+[hidden] { display: none !important; }
+
+html { font-size: 16px; }
+
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: 'IBM Plex Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  font-size: var(--t-base);
+  line-height: var(--lead);
+  /* Tabular figures everywhere: control refs, weights and scores must align
+     down a column the way they would on a ruled sheet. No monospace needed. */
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum' 1;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1, h2, h3, h4 { font-weight: 600; margin: 0; line-height: 1.25; }
+p { margin: 0 0 var(--s3); max-width: var(--measure); }
+a { color: inherit; }
+button { cursor: pointer; }
+
+/* Focus must be unmistakable — this is a keyboard-first tool.
+   Outline is never removed anywhere in this sheet without a replacement. */
+:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+.ldg-row:focus-visible { outline-offset: -2px; }
+
+.skip {
+  position: absolute; left: var(--s4); top: -3rem; z-index: 60;
+  background: var(--ink); color: var(--paper);
+  padding: var(--s2) var(--s4); font-size: var(--t-sm);
+}
+.skip:focus { top: var(--s2); }
+
+/* Screen-reader-only, used for the autosave live region. */
+.sr-only {
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ==========================================================================
+   Shell
+   ========================================================================== */
+
+.shell { min-height: 100vh; display: flex; flex-direction: column; }
+
+.topbar {
+  display: flex; align-items: baseline; gap: var(--s5);
+  padding: var(--s3) var(--s6);
+  border-bottom: 1px solid var(--rule-hi);
+  background: var(--paper);
+  position: sticky; top: 0; z-index: var(--z-topbar);
+  min-height: var(--topbar-h);
+}
+
+.wordmark {
+  font-size: var(--t-sm); font-weight: 600; letter-spacing: 0.01em;
+  white-space: nowrap; background: none; border: 0; padding: 0;
+  font-family: inherit; color: inherit;
+}
+.wordmark:hover { text-decoration: underline; text-underline-offset: 3px; }
+
+.topbar-client { display: flex; align-items: baseline; gap: var(--s3); min-width: 0; }
+.topbar-client .name {
+  font-size: var(--t-sm); font-weight: 500;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.topbar-spacer { flex: 1; }
+
+/* The running score. Persistent, small, never a hero — it moves constantly
+   and must not demand attention each time it does. */
+.running-score {
+  display: flex; align-items: baseline; gap: var(--s2);
+  font-size: var(--t-sm); color: var(--ink-70);
+  border-left: 1px solid var(--rule); padding-left: var(--s4);
+  white-space: nowrap;
+}
+.running-score b { font-size: var(--t-base); font-weight: 600; color: var(--ink); }
+
+.layout { display: flex; flex: 1; align-items: stretch; }
+
+/* The rail reads as a file index, not a nav bar. */
+.rail {
+  width: 13.5rem; flex: none;
+  border-right: 1px solid var(--rule);
+  padding: var(--s5) 0 var(--s6);
+  position: sticky; top: var(--topbar-h); align-self: flex-start;
+  max-height: calc(100vh - var(--topbar-h)); overflow-y: auto;
+}
+.rail-head { font-size: var(--t-xs); color: var(--ink-50); padding: 0 var(--s5) var(--s2); }
+.rail a {
+  display: flex; gap: var(--s3); align-items: baseline;
+  padding: var(--s2) var(--s5);
+  text-decoration: none; color: var(--ink-70);
+  border-left: 2px solid transparent; font-size: var(--t-base);
+  transition: background var(--tx), color var(--tx);
+}
+.rail a .ref { font-size: var(--t-xs); color: var(--ink-50); width: 1.4rem; flex: none; }
+.rail a:hover { background: var(--wash); color: var(--ink); }
+.rail a[aria-current="page"] {
+  border-left-color: var(--ink); color: var(--ink); font-weight: 600; background: var(--wash);
+}
+.rail a[aria-current="page"] .ref { color: var(--ink-70); }
+.rail-note {
+  padding: var(--s4) var(--s5) 0; margin-top: var(--s4);
+  border-top: 1px solid var(--rule);
+  font-size: var(--t-xs); color: var(--ink-50); line-height: 1.5;
+}
+.rail-note b { color: var(--ink-70); font-weight: 600; }
+
+.main { flex: 1; min-width: 0; padding: var(--s6) var(--s6) var(--s8); }
+
+.screen-head { margin-bottom: var(--s5); }
+.screen-head h1 { font-size: var(--t-xl); font-weight: 600; letter-spacing: -0.01em; }
+.screen-head .sub { color: var(--ink-70); font-size: var(--t-sm); margin: var(--s1) 0 0; }
+
+
+/* ==========================================================================
+   Primitives
+   ========================================================================== */
+
+.btn {
+  font: inherit; font-size: var(--t-sm); font-weight: 500;
+  padding: 0.4rem 0.9rem;
+  background: var(--paper); color: var(--ink);
+  border: 1px solid var(--ink); border-radius: 0;
+  transition: background var(--tx), color var(--tx);
+}
+.btn:hover { background: var(--ink); color: var(--paper); }
+.btn-primary { background: var(--ink); color: var(--paper); }
+.btn-primary:hover { background: var(--paper); color: var(--ink); }
+.btn-quiet { border-color: var(--rule-hi); color: var(--ink-70); }
+.btn-quiet:hover { background: var(--wash); color: var(--ink); border-color: var(--ink); }
+.btn:disabled { opacity: 0.45; cursor: not-allowed; }
+.btn:disabled:hover { background: var(--paper); color: var(--ink); }
+.btn-primary:disabled:hover { background: var(--ink); color: var(--paper); }
+
+.row-actions { display: flex; gap: var(--s3); align-items: center; flex-wrap: wrap; }
+
+.field { display: block; margin-bottom: var(--s4); max-width: 34rem; }
+.field > span { display: block; font-size: var(--t-sm); color: var(--ink-70); margin-bottom: var(--s1); }
+.field > span .req { color: var(--ink-50); }
+
+input[type="text"], input[type="date"], input[type="number"], select, textarea {
+  font: inherit; font-size: var(--t-base);
+  width: 100%; padding: 0.35rem 0.5rem;
+  background: var(--paper); color: var(--ink);
+  border: 1px solid var(--rule-hi); border-radius: 0;
+}
+input:focus, select:focus, textarea:focus { border-color: var(--ink); }
+/* A field that needs attention is marked in ink, by weight: the struck colour
+   means an unevidenced claim and nothing else, so it never marks a form error. */
+input[aria-invalid="true"], textarea[aria-invalid="true"],
+select[aria-invalid="true"], fieldset[aria-invalid="true"] { border-color: var(--ink); border-width: 2px; }
+textarea { resize: vertical; min-height: 4.5rem; line-height: 1.5; }
+select { cursor: pointer; }
+
+/* Checkbox shares its hit target with the label. */
+label.check {
+  display: flex; gap: var(--s2); align-items: flex-start;
+  font-size: var(--t-base); max-width: var(--measure);
+  padding: var(--s1) 0; cursor: pointer;
+}
+label.check input { margin-top: 0.32rem; flex: none; accent-color: var(--ink); }
+
+/* Validation errors: ink, weight and a margin rule, as a reviewer marks a
+   working paper. Never the struck colour (UI_BRIEF: unevidenced claims only). */
+.err {
+  color: var(--ink); font-weight: 600; font-size: var(--t-sm);
+  border-left: 2px solid var(--ink); padding-left: var(--s2); margin-top: var(--s1);
+}
+
+.ref { font-variant-numeric: tabular-nums; }
+.muted { color: var(--ink-70); }
+.faint { color: var(--ink-50); }
+.small { font-size: var(--t-sm); }
+.xs { font-size: var(--t-xs); }
+.prose { max-width: var(--measure); }
+.stack > * + * { margin-top: var(--s4); }
+
+/* Empty states are an invitation, not an apology. */
+.empty {
+  border: 1px solid var(--rule); border-left-width: 2px; border-left-color: var(--ink-50);
+  padding: var(--s4) var(--s5); background: var(--wash);
+  max-width: var(--measure); font-size: var(--t-base);
+}
+.empty p:last-child { margin-bottom: 0; }
+
+.notice {
+  border-left: 2px solid var(--pending); background: var(--wash);
+  padding: var(--s3) var(--s4); font-size: var(--t-sm);
+  max-width: var(--measure); margin-bottom: var(--s5);
+}
+.notice p:last-child { margin-bottom: 0; }
+.notice-struck { border-left-color: var(--struck); background: var(--struck-wash); }
+
+.toast {
+  position: fixed; bottom: var(--s5); left: 50%; transform: translateX(-50%);
+  background: var(--ink); color: var(--paper);
+  padding: var(--s2) var(--s5); font-size: var(--t-sm);
+  z-index: var(--z-toast); max-width: 32rem;
+}
+.toast[data-kind="struck"] { background: var(--struck); }
+
+/* ==========================================================================
+   Files — the opening screen. An index, the way an audit file index reads.
+   ========================================================================== */
+
+.files { max-width: 58rem; }
+.files-head {
+  display: flex; align-items: flex-end; justify-content: space-between;
+  gap: var(--s5); padding-bottom: var(--s3);
+  border-bottom: 2px solid var(--ink); margin-bottom: 0;
+}
+
+.file-row {
+  display: block; width: 100%; text-align: left;
+  font: inherit; color: inherit; background: none;
+  border: 0; border-bottom: 1px solid var(--rule);
+  border-left: 2px solid transparent;
+  padding: var(--s4) var(--s2) var(--s4) var(--s3);
+  transition: background var(--tx), border-color var(--tx);
+}
+.file-row:hover { background: var(--wash); border-left-color: var(--ink); }
+.file-line { display: flex; align-items: baseline; gap: var(--s4); }
+.file-name {
+  font-size: var(--t-md); font-weight: 600; flex: 1; min-width: 0;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.file-meta { font-size: var(--t-sm); color: var(--ink-70); white-space: nowrap; }
+.file-line-2 { display: flex; align-items: center; gap: var(--s4); margin-top: var(--s2); flex-wrap: wrap; }
+.file-stat { font-size: var(--t-sm); color: var(--ink-70); white-space: nowrap; }
+.file-stat b { font-weight: 600; color: var(--ink); }
+
+/* One cell per applicable control, filled when assessed. Progress and scope
+   size in a single object — a Processor engagement is visibly shorter. */
+.strip { display: flex; gap: 1px; flex: none; }
+.strip i { width: 7px; height: 15px; background: transparent; box-shadow: inset 0 0 0 1px var(--rule-hi); }
+.strip i[data-on="1"] { background: var(--ink); box-shadow: none; }
+.strip i[data-on="struck"] { background: var(--struck); box-shadow: none; }
+
+.band { font-size: var(--t-sm); font-weight: 600; }
+.band[data-band="Critical"] { color: var(--struck); }
+
+/* ==========================================================================
+   New assessment — three steps
+   ========================================================================== */
+
+.steps {
+  display: flex; gap: var(--s5); border-bottom: 1px solid var(--rule);
+  padding-bottom: var(--s2); margin-bottom: var(--s5); max-width: 44rem;
+  list-style: none; padding-left: 0; margin-top: 0;
+}
+.steps li { font-size: var(--t-sm); color: var(--ink-50); }
+.steps li .n { font-weight: 600; }
+.steps li[data-done="1"] { color: var(--ink-70); }
+.steps li[aria-current="step"] { color: var(--ink); font-weight: 600; }
+
+.qrow {
+  display: grid; grid-template-columns: 1fr auto; gap: var(--s5);
+  align-items: start; padding: var(--s4) 0;
+  border-bottom: 1px solid var(--rule); max-width: 48rem;
+}
+.qrow p { margin: 0; }
+.qref { font-size: var(--t-xs); color: var(--ink-50); display: block; margin-bottom: var(--s1); }
+
+.yesno { display: flex; border: 1px solid var(--rule-hi); }
+.yesno button {
+  font: inherit; font-size: var(--t-sm); padding: 0.3rem 1.1rem;
+  background: var(--paper); color: var(--ink-70); border: 0;
+  transition: background var(--tx), color var(--tx);
+}
+.yesno button + button { border-left: 1px solid var(--rule-hi); }
+.yesno button:hover { background: var(--wash); color: var(--ink); }
+.yesno button[aria-pressed="true"] { background: var(--ink); color: var(--paper); font-weight: 600; }
+
+/* The role reasoning is report prose. It is displayed as prose, not a badge. */
+.determination {
+  border-top: 2px solid var(--ink); border-bottom: 1px solid var(--rule);
+  padding: var(--s5) 0; max-width: var(--measure); margin-bottom: var(--s5);
+}
+.determination .role-label { font-size: var(--t-xs); color: var(--ink-50); margin-bottom: var(--s1); }
+.determination .role { font-size: var(--t-xl); font-weight: 600; margin-bottom: var(--s4); letter-spacing: -0.01em; }
+.determination .reasoning { font-size: var(--t-base); line-height: 1.68; }
+
+/* ==========================================================================
+   The ledger — where 90% of the time is spent
+   ========================================================================== */
+
+.ledger { max-width: 62rem; }
+
+.ledger-bar {
+  display: flex; align-items: center; gap: var(--s4) var(--s5);
+  border-bottom: 1px solid var(--rule); padding-bottom: var(--s3);
+  margin-bottom: var(--s5); flex-wrap: wrap;
+}
+.ledger-bar .f { display: flex; align-items: center; gap: var(--s2); font-size: var(--t-sm); }
+.ledger-bar input[type="text"] { width: 14rem; }
+.ledger-bar select { width: auto; }
+
+/* Shortcuts shown once, unobtrusively. Never a modal. */
+.keys { font-size: var(--t-xs); color: var(--ink-50); display: flex; gap: var(--s3); flex-wrap: wrap; align-items: center; }
+.keys kbd {
+  font: inherit; font-size: var(--t-xs); font-weight: 600;
+  border: 1px solid var(--rule-hi); padding: 0 0.25rem; color: var(--ink-70);
+  background: var(--paper);
+}
+
+/* A heavier rule separates Rules. A hairline separates controls within one. */
+.rule-group { margin-bottom: var(--s6); }
+.rule-head {
+  border-top: 2px solid var(--ink); border-bottom: 1px solid var(--rule);
+  background: var(--wash); padding: var(--s3) var(--s4);
+  display: flex; align-items: baseline; gap: var(--s4); flex-wrap: wrap;
+  position: sticky; top: var(--topbar-h); z-index: var(--z-sticky);
+}
+.rule-head .rid { font-size: var(--t-sm); font-weight: 700; width: 2.4rem; flex: none; }
+.rule-head .rtitle { font-size: var(--t-lg); font-weight: 600; flex: 1; letter-spacing: -0.01em; min-width: 12rem; }
+.rule-head .rcount { font-size: var(--t-sm); color: var(--ink-70); white-space: nowrap; }
+.rule-head .rref {
+  flex-basis: 100%; font-size: var(--t-xs); color: var(--ink-70);
+  margin-top: var(--s1); padding-left: 2.4rem;
+}
+
+.ldg-row {
+  display: grid; grid-template-columns: 3.1rem 1fr; gap: 0 var(--s3);
+  padding: var(--s4) var(--s4) var(--s4) var(--s3);
+  border-bottom: 1px solid var(--rule);
+  border-left: 3px solid transparent;
+  transition: background var(--tx), border-color var(--tx);
+}
+.ldg-row:last-child { border-bottom: 0; }
+.ldg-row[data-focused="1"] { background: var(--wash); border-left-color: var(--ink); }
+
+/* The struck state. The single most important visual in the product.
+   The assessor's input was recorded, and then discounted. Both must show. */
+.ldg-row[data-struck="1"] { background: var(--struck-wash); border-left-color: var(--struck); }
+.ldg-row[data-struck="1"][data-focused="1"] { background: var(--struck-wash-hi); }
+
+.ldg-ref { font-size: var(--t-sm); font-weight: 600; padding-top: 0.1rem; }
+.ldg-body { min-width: 0; }
+
+.ldg-title-line { display: flex; align-items: baseline; gap: var(--s3); }
+.ldg-title { font-size: var(--t-md); font-weight: 600; flex: 1; letter-spacing: -0.005em; }
+.ldg-weight { font-size: var(--t-xs); color: var(--ink-70); white-space: nowrap; }
+.ldg-weight[data-gate="1"] { font-weight: 600; color: var(--ink); }
+/* -- Citation marker -- */
+/* A citation nobody has checked against the gazette is flagged in ink, never in
+   the struck or pending colours: it qualifies the law cited, not the claim made. */
+.ldg-title-line { flex-wrap: wrap; }
+.ldg-cite {
+  font-size: var(--t-xs); color: var(--ink-70);
+  border: 1px dashed var(--rule-hi); padding: 0 var(--s1); white-space: nowrap;
+}
+/* -- end citation marker -- */
+
+.ldg-q { margin: var(--s1) 0 0; font-size: var(--t-base); color: var(--ink-70); max-width: var(--measure); }
+
+.ldg-controls { display: flex; align-items: center; gap: var(--s4); margin-top: var(--s3); flex-wrap: wrap; }
+
+/* The status mark. The selected cell is a filled ink mark — no green, ever.
+   A control that is Present is recorded, not congratulated. */
+.status { display: flex; border: 1px solid var(--ink); }
+.status button {
+  font: inherit; font-size: var(--t-sm); font-weight: 500;
+  padding: 0.28rem 0.9rem; min-width: 5.4rem;
+  background: var(--paper); color: var(--ink-70); border: 0;
+  transition: background var(--tx), color var(--tx);
+}
+.status button + button { border-left: 1px solid var(--rule-hi); }
+.status button:hover { background: var(--wash); color: var(--ink); }
+.status button[aria-pressed="true"] { background: var(--ink); color: var(--paper); font-weight: 600; }
+.status button[aria-pressed="true"][data-v="Partial"] { background: var(--pending); }
+/* Struck: the selection still shows, ruled through. Recorded, then discounted. */
+.ldg-row[data-struck="1"] .status { border-color: var(--struck); }
+.ldg-row[data-struck="1"] .status button + button { border-left-color: #C98B89; }
+.ldg-row[data-struck="1"] .status button[aria-pressed="true"] {
+  background: var(--struck); color: var(--paper);
+  text-decoration: line-through; text-decoration-thickness: 1px;
+}
+
+.ldg-tools { display: flex; gap: var(--s3); align-items: center; flex-wrap: wrap; }
+.ldg-tools button {
+  font: inherit; font-size: var(--t-xs); background: none; border: 0;
+  padding: 0; color: var(--ink-70);
+  border-bottom: 1px solid var(--rule-hi);
+  transition: color var(--tx), border-color var(--tx);
+}
+.ldg-tools button:hover { color: var(--ink); border-bottom-color: var(--ink); }
+.ldg-tools button[aria-expanded="true"] { color: var(--ink); font-weight: 600; border-bottom-color: var(--ink); }
+.ldg-tools .mark { font-size: var(--t-xs); color: var(--ink-70); }
+.ldg-tools .mark b { color: var(--ink); font-weight: 600; }
+
+/* The reason line. States what happened and what fixes it.
+   It does not apologise and it does not scold. */
+.strike-note {
+  margin-top: var(--s3); padding: var(--s2) var(--s3);
+  border-left: 2px solid var(--struck);
+  color: var(--struck); font-size: var(--t-sm); max-width: var(--measure);
+}
+.strike-note b { font-weight: 600; }
+
+.ev-sought { margin-top: var(--s2); font-size: var(--t-sm); color: var(--ink-70); max-width: var(--measure); }
+.ev-sought .lbl { color: var(--ink-50); }
+
+.dropzone {
+  margin-top: var(--s3); display: flex; align-items: center; gap: var(--s3);
+  border: 1px dashed var(--rule-hi); padding: var(--s2) var(--s3);
+  font-size: var(--t-sm); color: var(--ink-70); max-width: 34rem;
+  transition: border-color var(--tx), background var(--tx);
+}
+.dropzone[data-over="1"] { border-color: var(--ink); border-style: solid; background: var(--wash); }
+.dropzone .count { margin-left: auto; white-space: nowrap; font-size: var(--t-xs); }
+.dropzone .count[data-zero="1"] { color: var(--struck); font-weight: 600; }
+.ldg-row[data-struck="1"] .dropzone { border-color: var(--struck); }
+
+.ev-list { margin: var(--s2) 0 0; padding: 0; list-style: none; font-size: var(--t-xs); color: var(--ink-70); }
+.ev-list li { padding-left: var(--s3); border-left: 1px solid var(--rule); margin-bottom: 1px; }
+
+/* Guidance is revealed on demand. All of it at once makes the ledger unreadable. */
+.guidance {
+  margin-top: var(--s3); padding: var(--s3) var(--s4);
+  background: var(--wash); border-left: 2px solid var(--rule-hi);
+  font-size: var(--t-sm); line-height: 1.6; max-width: var(--measure);
+  white-space: pre-wrap;
+}
+
+.panes { margin-top: var(--s3); display: grid; gap: var(--s4); max-width: 46rem; }
+.pane { border-left: 2px solid var(--rule-hi); padding-left: var(--s4); }
+.pane > .hd { font-size: var(--t-sm); font-weight: 600; margin-bottom: var(--s1); }
+.pane > .hd .note { font-weight: 400; font-size: var(--t-xs); color: var(--ink-50); margin-left: var(--s2); }
+/* The management response is printed in the report. The assessor note is not.
+   The weight of the left rule carries that distinction. */
+.pane-mgmt { border-left-color: var(--ink); }
+.mgmt-grid { display: grid; grid-template-columns: 1fr 10rem; gap: var(--s3); margin-top: var(--s3); }
+
+
+.ldg-foot {
+  margin-top: var(--s6); padding-top: var(--s4);
+  border-top: 1px solid var(--rule); font-size: var(--t-sm); color: var(--ink-70);
+}
+
+/* ==========================================================================
+   Position
+   ========================================================================== */
+
+.pos-head {
+  display: flex; gap: var(--s8); align-items: flex-end; flex-wrap: wrap;
+  border-bottom: 2px solid var(--ink); padding-bottom: var(--s4); margin-bottom: var(--s5);
+}
+.pos-score { font-size: var(--t-2xl); font-weight: 600; line-height: 1; letter-spacing: -0.02em; }
+.pos-label { font-size: var(--t-xs); color: var(--ink-50); margin-bottom: var(--s1); }
+.pos-score[data-band="Critical"] { color: var(--struck); }
+
+.h-sec {
+  font-size: var(--t-lg); font-weight: 600; letter-spacing: -0.01em;
+  margin: var(--s6) 0 var(--s3); padding-bottom: var(--s2);
+  border-bottom: 1px solid var(--rule-hi);
+}
+.h-sec:first-child { margin-top: 0; }
+
+
+/* ==========================================================================
+   Tables — ruled columns, low ceremony
+   ========================================================================== */
+
+.tw { overflow-x: auto; }
+table.ruled { border-collapse: collapse; width: 100%; font-size: var(--t-sm); }
+table.ruled caption { text-align: left; font-size: var(--t-sm); color: var(--ink-70); padding-bottom: var(--s2); }
+table.ruled th {
+  text-align: left; font-weight: 600; font-size: var(--t-xs); color: var(--ink-70);
+  padding: var(--s2) var(--s3); border-bottom: 1px solid var(--ink);
+  background: var(--wash); vertical-align: bottom; white-space: nowrap;
+}
+table.ruled td { padding: var(--s3); border-bottom: 1px solid var(--rule); vertical-align: top; }
+table.ruled tbody tr:hover { background: var(--wash); }
+table.ruled td.num { text-align: right; }
+/* A claim struck for want of evidence (Position). The struck
+   colour means that and nothing else. */
+table.ruled tr[data-risk="1"] { background: var(--struck-wash); }
+table.ruled tr[data-risk="1"]:hover { background: var(--struck-wash-hi); }
+table.ruled tr[data-risk="1"] td { border-left: 0; }
+table.ruled tr[data-risk="1"] td:first-child { box-shadow: inset 2px 0 0 var(--struck); }
+.risk-mark { color: var(--struck); font-weight: 600; }
+
+
+/* ==========================================================================
+   13-inch laptop is the floor. Mobile is not a target.
+   ========================================================================== */
+@media (max-width: 1180px) {
+  .rail { width: 11.5rem; }
+  .main { padding: var(--s5) var(--s5) var(--s8); }
+  .topbar { padding: var(--s3) var(--s5); gap: var(--s4); }
+  .mgmt-grid { grid-template-columns: 1fr; }
+  .pos-head { gap: var(--s5); }
+  .ldg-row { grid-template-columns: 2.8rem 1fr; }
+}
+
