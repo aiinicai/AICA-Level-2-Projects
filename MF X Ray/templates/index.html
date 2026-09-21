@@ -1,0 +1,3109 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MF X-RAY V1.0 — AI-Powered Mutual Fund Intelligence</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#f0f7ff',
+              500: '#2563eb',
+              600: '#1d4ed8',
+              900: '#0f172a',
+            },
+            darkbg: '#090e17',
+            cardbg: '#111927',
+            sidebarbg: '#0b111c',
+            borderclr: '#1f293d',
+            accentemerald: '#10b981',
+            accentblue: '#3b82f6',
+            accentamber: '#f59e0b',
+            accentrose: '#f43f5e'
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap');
+    body {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      background-color: #090e17;
+      color: #e2e8f0;
+    }
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: #0b111c; }
+    ::-webkit-scrollbar-thumb { background: #23314a; border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: #334668; }
+    .glass-card {
+      background: rgba(17, 25, 39, 0.85);
+      backdrop-filter: blur(12px);
+      border: 1px solid rgba(31, 41, 61, 0.8);
+      border-radius: 1rem;
+    }
+    .kpi-gradient {
+      background: linear-gradient(135deg, rgba(30, 41, 59, 0.5) 0%, rgba(15, 23, 42, 0.8) 100%);
+    }
+    .badge-pill {
+      display: inline-flex;
+      align-items: center;
+      padding: 0.2rem 0.6rem;
+      border-radius: 9999px;
+      font-size: 0.75rem;
+      font-weight: 600;
+    }
+  </style>
+</head>
+<body class="flex h-screen overflow-hidden text-slate-200">
+
+  <!-- ================= SIDEBAR NAVIGATION ================= -->
+  <aside class="w-64 bg-sidebarbg border-r border-borderclr flex flex-col justify-between flex-shrink-0 z-20">
+    <div>
+      <!-- Brand Header -->
+      <div class="h-16 flex items-center px-6 border-b border-borderclr gap-3 bg-darkbg/50">
+        <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-blue-600 to-emerald-400 flex items-center justify-center shadow-lg shadow-blue-500/20">
+          <i data-lucide="scan-line" class="w-5 h-5 text-white"></i>
+        </div>
+        <div>
+          <div class="flex items-center gap-1.5">
+            <span class="font-extrabold tracking-wider text-white text-base">MF X-RAY</span>
+            <span class="text-[10px] bg-blue-500/20 text-blue-400 px-1.5 py-0.5 rounded font-bold border border-blue-500/30">V1.0</span>
+          </div>
+          <p class="text-[10px] text-slate-400 font-medium">ICAI AI Capstone</p>
+        </div>
+      </div>
+
+      <!-- Navigation Links -->
+      <nav class="p-3 space-y-1 text-xs font-semibold overflow-y-auto max-h-[calc(100vh-140px)]">
+        <button onclick="switchTab('dashboard')" id="nav-dashboard" class="nav-item w-full flex items-center gap-3 px-3.5 py-2.5 rounded-lg text-slate-300 hover:bg-slate-800/60 hover:text-white transition group">
+          <i data-lucide="layout-dashboard" class="w-4 h-4 text-blue-400"></i>
+          <span>Dashboard</span>
+        </button>
+        <button onclick="switchTab('portfolio')" id="nav-portfolio" class="nav-item w-full flex items-center gap-3 px-3.5 py-2.5 rounded-lg text-slate-300 hover:bg-slate-800/60 hover:text-white transition group">
+          <i data-lucide="wallet-cards" class="w-4 h-4 text-emerald-400"></i>
+          <span>My Portfolio</span>
+        </button>
+        <button onclick="switchTab('xray')" id="nav-xray" class="nav-item w-full flex items-center gap-3 px-3.5 py-2.5 rounded-lg text-slate-300 hover:bg-slate-800/60 hover:text-white transition group">
+          <i data-lucide="scan" class="w-4 h-4 text-indigo-400"></i>
+          <span class="flex-1 text-left">Portfolio X-Ray</span>
+          <span class="bg-indigo-500/20 text-indigo-300 text-[9px] px-1.5 py-0.2 rounded font-bold">CORE</span>
+        </button>
+        <button onclick="switchTab('overlap')" id="nav-overlap" class="nav-item w-full flex items-center gap-3 px-3.5 py-2.5 rounded-lg text-slate-300 hover:bg-slate-800/60 hover:text-white transition group">
+          <i data-lucide="layers" class="w-4 h-4 text-amber-400"></i>
+          <span>Overlap Analyzer</span>
+        </button>
+        <button onclick="switchTab('sector')" id="nav-sector" class="nav-item w-full flex items-center gap-3 px-3.5 py-2.5 rounded-lg text-slate-300 hover:bg-slate-800/60 hover:text-white transition group">
+          <i data-lucide="pie-chart" class="w-4 h-4 text-cyan-400"></i>
+          <span>Sector Analysis</span>
+        </button>
+        <button onclick="switchTab('risk')" id="nav-risk" class="nav-item w-full flex items-center gap-3 px-3.5 py-2.5 rounded-lg text-slate-300 hover:bg-slate-800/60 hover:text-white transition group">
+          <i data-lucide="shield-alert" class="w-4 h-4 text-rose-400"></i>
+          <span>Risk Analytics</span>
+        </button>
+        <button onclick="switchTab('factsheets')" id="nav-factsheets" class="nav-item w-full flex items-center gap-3 px-3.5 py-2.5 rounded-lg text-slate-300 hover:bg-slate-800/60 hover:text-white transition group">
+          <i data-lucide="file-text" class="w-4 h-4 text-teal-400"></i>
+          <span>Fund Factsheets</span>
+        </button>
+        <button onclick="switchTab('whatif')" id="nav-whatif" class="nav-item w-full flex items-center gap-3 px-3.5 py-2.5 rounded-lg text-slate-300 hover:bg-slate-800/60 hover:text-white transition group">
+          <i data-lucide="sparkles" class="w-4 h-4 text-purple-400"></i>
+          <span>What-If Simulator</span>
+        </button>
+        <button onclick="switchTab('sip')" id="nav-sip" class="nav-item w-full flex items-center gap-3 px-3.5 py-2.5 rounded-lg text-slate-300 hover:bg-slate-800/60 hover:text-white transition group">
+          <i data-lucide="calculator" class="w-4 h-4 text-yellow-400"></i>
+          <span>SIP & XIRR</span>
+        </button>
+        <button onclick="switchTab('changes')" id="nav-changes" class="nav-item w-full flex items-center gap-3 px-3.5 py-2.5 rounded-lg text-slate-300 hover:bg-slate-800/60 hover:text-white transition group">
+          <i data-lucide="history" class="w-4 h-4 text-orange-400"></i>
+          <span>Portfolio Changes</span>
+        </button>
+        <button onclick="switchTab('ai')" id="nav-ai" class="nav-item w-full flex items-center gap-3 px-3.5 py-2.5 rounded-lg text-slate-300 hover:bg-slate-800/60 hover:text-white transition group">
+          <i data-lucide="bot" class="w-4 h-4 text-pink-400"></i>
+          <span class="flex-1 text-left">Ask MF X-Ray</span>
+          <span class="bg-pink-500/20 text-pink-300 text-[9px] px-1.5 py-0.2 rounded font-bold">AI</span>
+        </button>
+        <button onclick="switchTab('amfi-universe')" id="nav-amfi-universe" class="nav-item w-full flex items-center gap-3 px-3.5 py-2.5 rounded-lg text-slate-300 hover:bg-slate-800/60 hover:text-white transition group">
+          <i data-lucide="compass" class="w-4 h-4 text-emerald-400"></i>
+          <span class="flex-1 text-left">MF & Schemes Universe</span>
+          <span class="bg-emerald-500/20 text-emerald-300 text-[9px] px-1.5 py-0.2 rounded font-bold">14K+</span>
+        </button>
+        <button onclick="switchTab('data-entry')" id="nav-data-entry" class="nav-item w-full flex items-center gap-3 px-3.5 py-2.5 rounded-lg text-slate-300 hover:bg-slate-800/60 hover:text-white transition group">
+          <i data-lucide="database" class="w-4 h-4 text-sky-400"></i>
+          <span>Data Entry & Import</span>
+        </button>
+        <button onclick="switchTab('reports')" id="nav-reports" class="nav-item w-full flex items-center gap-3 px-3.5 py-2.5 rounded-lg text-slate-300 hover:bg-slate-800/60 hover:text-white transition group">
+          <i data-lucide="download" class="w-4 h-4 text-emerald-400"></i>
+          <span>Export Reports</span>
+        </button>
+        <button onclick="switchTab('about')" id="nav-about" class="nav-item w-full flex items-center gap-3 px-3.5 py-2.5 rounded-lg text-slate-300 hover:bg-slate-800/60 hover:text-white transition group">
+          <i data-lucide="info" class="w-4 h-4 text-slate-400"></i>
+          <span>About & Method</span>
+        </button>
+      </nav>
+    </div>
+
+    <!-- Bottom Status / Offline Security Badge -->
+    <div class="p-4 border-t border-borderclr bg-darkbg/40 text-[11px]">
+      <div class="flex items-center gap-2 text-emerald-400 font-semibold mb-1">
+        <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+        <span>100% Offline & Private</span>
+      </div>
+      <p class="text-[10px] text-slate-400 leading-tight">No PAN, login or credentials required. Client data remains local.</p>
+    </div>
+  </aside>
+
+  <!-- ================= MAIN CONTENT AREA ================= -->
+  <div class="flex-1 flex flex-col overflow-hidden bg-darkbg">
+    
+    <!-- Top Action Header -->
+    <header class="h-16 bg-sidebarbg/80 backdrop-blur-md border-b border-borderclr px-6 flex items-center justify-between flex-shrink-0">
+      <div class="flex items-center gap-4">
+        <h1 id="page-title" class="text-lg font-bold text-white tracking-wide">Dashboard</h1>
+        <div id="quick-status-pill" class="hidden md:flex items-center gap-2 px-3 py-1 rounded-full bg-slate-800/80 border border-slate-700 text-xs">
+          <span class="text-slate-400">Corpus:</span>
+          <span id="header-total-corpus" class="text-emerald-400 font-bold">₹0</span>
+          <span class="text-slate-600">|</span>
+          <span class="text-slate-400">Funds:</span>
+          <span id="header-fund-count" class="text-blue-400 font-bold">0</span>
+          <span class="text-slate-600">|</span>
+          <span class="text-slate-400">Health:</span>
+          <span id="header-health-score" class="text-amber-400 font-bold">--</span>
+        </div>
+      </div>
+
+      <!-- Header Action Buttons -->
+      <div class="flex items-center gap-2.5">
+        <button onclick="openAddInvestmentModal()" class="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold shadow-md shadow-blue-600/20 transition">
+          <i data-lucide="plus-circle" class="w-3.5 h-3.5"></i>
+          <span>Add Investment</span>
+        </button>
+        <button onclick="openAddFundModal()" class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-semibold transition">
+          <i data-lucide="file-plus" class="w-3.5 h-3.5 text-emerald-400"></i>
+          <span>Add New Fund</span>
+        </button>
+        <button onclick="loadDemoPortfolio()" class="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-slate-800/80 hover:bg-amber-950/40 text-amber-300 border border-amber-500/30 text-xs font-semibold transition">
+          <i data-lucide="database" class="w-3 h-3 text-amber-400"></i>
+          <span>Sample Demo</span>
+        </button>
+        <button onclick="clearCurrentPortfolio()" class="p-1.5 text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 rounded-lg transition" title="Clear Portfolio">
+          <i data-lucide="trash-2" class="w-4 h-4"></i>
+        </button>
+      </div>
+    </header>
+
+    <!-- Main Scrollable Container -->
+    <main class="flex-1 overflow-y-auto p-6 space-y-6">
+      
+      <!-- EMPTY STATE WELCOME BANNER (Only visible if 0 funds) -->
+      <div id="empty-state-banner" class="glass-card p-8 border-2 border-dashed border-blue-500/30 bg-gradient-to-r from-blue-950/30 to-slate-900/60 text-center">
+        <div class="w-16 h-16 mx-auto mb-4 rounded-2xl bg-blue-500/10 flex items-center justify-center text-blue-400 border border-blue-500/20">
+          <i data-lucide="folder-plus" class="w-8 h-8"></i>
+        </div>
+        <h2 class="text-xl font-bold text-white mb-2">Welcome to MF X-Ray — Your Clean Slate Is Ready</h2>
+        <p class="text-sm text-slate-400 max-w-xl mx-auto mb-6 leading-relaxed">
+          There are no preloaded holdings in your portfolio. You can fill in your real mutual fund investments, add custom schemes with their company holdings, or upload a CSV/Excel file.
+        </p>
+        <div class="flex flex-wrap items-center justify-center gap-3">
+          <button onclick="openAddInvestmentModal()" class="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-semibold text-xs shadow-lg shadow-blue-500/30 flex items-center gap-2">
+            <i data-lucide="plus" class="w-4 h-4"></i>
+            <span>Add Your Investment</span>
+          </button>
+          <button onclick="switchTab('data-entry')" class="px-5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold text-xs border border-slate-700 flex items-center gap-2">
+            <i data-lucide="upload" class="w-4 h-4 text-emerald-400"></i>
+            <span>Import Excel / CSV</span>
+          </button>
+          <button onclick="loadDemoPortfolio()" class="px-4 py-2.5 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 font-semibold text-xs border border-amber-500/30 flex items-center gap-2">
+            <i data-lucide="sparkles" class="w-4 h-4"></i>
+            <span>Explore With Sample Data</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- ================= TAB: DASHBOARD ================= -->
+      <section id="tab-dashboard" class="space-y-6">
+        <!-- 8 KPI Cards (Section 10) -->
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div class="glass-card kpi-gradient p-4 border border-borderclr">
+            <div class="flex items-center justify-between text-slate-400 text-xs font-semibold mb-1">
+              <span>TOTAL INVESTMENT</span>
+              <i data-lucide="indian-rupee" class="w-3.5 h-3.5 text-blue-400"></i>
+            </div>
+            <div id="kpi-total-invest" class="text-2xl font-black text-white">₹0</div>
+            <div class="text-[11px] text-slate-400 mt-1 flex items-center gap-1">
+              <span class="text-emerald-400 font-bold">Active Portfolio</span>
+            </div>
+          </div>
+
+          <div class="glass-card kpi-gradient p-4 border border-borderclr">
+            <div class="flex items-center justify-between text-slate-400 text-xs font-semibold mb-1">
+              <span>NUMBER OF FUNDS</span>
+              <i data-lucide="layers" class="w-3.5 h-3.5 text-emerald-400"></i>
+            </div>
+            <div id="kpi-fund-count" class="text-2xl font-black text-white">0</div>
+            <div class="text-[11px] text-slate-400 mt-1">Schemes held</div>
+          </div>
+
+          <div class="glass-card kpi-gradient p-4 border border-borderclr">
+            <div class="flex items-center justify-between text-slate-400 text-xs font-semibold mb-1">
+              <span>EQUITY EXPOSURE</span>
+              <i data-lucide="trending-up" class="w-3.5 h-3.5 text-indigo-400"></i>
+            </div>
+            <div id="kpi-equity-pct" class="text-2xl font-black text-white">0.0%</div>
+            <div class="text-[11px] text-slate-400 mt-1">Weighted allocation</div>
+          </div>
+
+          <div class="glass-card kpi-gradient p-4 border border-borderclr">
+            <div class="flex items-center justify-between text-slate-400 text-xs font-semibold mb-1">
+              <span>DEBT EXPOSURE</span>
+              <i data-lucide="shield" class="w-3.5 h-3.5 text-cyan-400"></i>
+            </div>
+            <div id="kpi-debt-pct" class="text-2xl font-black text-white">0.0%</div>
+            <div class="text-[11px] text-slate-400 mt-1">Fixed income & cash</div>
+          </div>
+
+          <div class="glass-card kpi-gradient p-4 border border-borderclr">
+            <div class="flex items-center justify-between text-slate-400 text-xs font-semibold mb-1">
+              <span>HIGHEST STOCK EXPOSURE</span>
+              <i data-lucide="target" class="w-3.5 h-3.5 text-amber-400"></i>
+            </div>
+            <div id="kpi-top-stock-pct" class="text-2xl font-black text-white">0.0%</div>
+            <div id="kpi-top-stock-name" class="text-[11px] text-amber-300 truncate font-semibold mt-1">None</div>
+          </div>
+
+          <div class="glass-card kpi-gradient p-4 border border-borderclr">
+            <div class="flex items-center justify-between text-slate-400 text-xs font-semibold mb-1">
+              <span>HIGHEST SECTOR EXPOSURE</span>
+              <i data-lucide="pie-chart" class="w-3.5 h-3.5 text-rose-400"></i>
+            </div>
+            <div id="kpi-top-sector-pct" class="text-2xl font-black text-white">0.0%</div>
+            <div id="kpi-top-sector-name" class="text-[11px] text-rose-300 truncate font-semibold mt-1">None</div>
+          </div>
+
+          <div class="glass-card kpi-gradient p-4 border border-borderclr">
+            <div class="flex items-center justify-between text-slate-400 text-xs font-semibold mb-1">
+              <span>AVG PORTFOLIO OVERLAP</span>
+              <i data-lucide="copy" class="w-3.5 h-3.5 text-yellow-400"></i>
+            </div>
+            <div id="kpi-avg-overlap" class="text-2xl font-black text-white">0.0%</div>
+            <div class="text-[11px] text-slate-400 mt-1">Scheme duplication</div>
+          </div>
+
+          <div class="glass-card kpi-gradient p-4 border border-borderclr">
+            <div class="flex items-center justify-between text-slate-400 text-xs font-semibold mb-1">
+              <span>PORTFOLIO HEALTH</span>
+              <i data-lucide="activity" class="w-3.5 h-3.5 text-emerald-400"></i>
+            </div>
+            <div class="flex items-baseline gap-2">
+              <span id="kpi-health-score" class="text-2xl font-black text-white">0</span>
+              <span class="text-xs text-slate-400">/ 100</span>
+            </div>
+            <div id="kpi-health-bucket" class="badge-pill bg-emerald-500/20 text-emerald-400 mt-1">Balanced</div>
+          </div>
+        </div>
+
+        <!-- Health Score Component Breakdown (Section 19) -->
+        <div class="glass-card p-5">
+          <div class="flex items-center justify-between mb-3">
+            <div>
+              <h3 class="text-sm font-bold text-white flex items-center gap-2">
+                <i data-lucide="gauge" class="w-4 h-4 text-emerald-400"></i>
+                Portfolio Health Score Breakdown (0–100 Methodology)
+              </h3>
+              <p class="text-[11px] text-slate-400">Analytical score composed of 6 transparent, weighted risk factors (not an official rating).</p>
+            </div>
+            <span class="text-xs font-bold text-blue-400 px-2.5 py-1 rounded-lg bg-blue-500/10 border border-blue-500/20">Weighted Audit Model</span>
+          </div>
+
+          <div class="grid grid-cols-2 md:grid-cols-6 gap-3 pt-2">
+            <div class="bg-darkbg/70 p-3 rounded-xl border border-borderclr">
+              <span class="text-[11px] text-slate-400 font-medium">Diversification</span>
+              <div id="health-diversification" class="text-base font-bold text-white mt-0.5">-- / 20</div>
+              <div class="w-full bg-slate-800 h-1.5 rounded-full mt-2 overflow-hidden">
+                <div id="bar-diversification" class="bg-blue-500 h-full rounded-full" style="width: 0%"></div>
+              </div>
+            </div>
+            <div class="bg-darkbg/70 p-3 rounded-xl border border-borderclr">
+              <span class="text-[11px] text-slate-400 font-medium">Fund Overlap</span>
+              <div id="health-overlap" class="text-base font-bold text-white mt-0.5">-- / 20</div>
+              <div class="w-full bg-slate-800 h-1.5 rounded-full mt-2 overflow-hidden">
+                <div id="bar-overlap" class="bg-indigo-500 h-full rounded-full" style="width: 0%"></div>
+              </div>
+            </div>
+            <div class="bg-darkbg/70 p-3 rounded-xl border border-borderclr">
+              <span class="text-[11px] text-slate-400 font-medium">Stock Conc.</span>
+              <div id="health-stock" class="text-base font-bold text-white mt-0.5">-- / 20</div>
+              <div class="w-full bg-slate-800 h-1.5 rounded-full mt-2 overflow-hidden">
+                <div id="bar-stock" class="bg-emerald-500 h-full rounded-full" style="width: 0%"></div>
+              </div>
+            </div>
+            <div class="bg-darkbg/70 p-3 rounded-xl border border-borderclr">
+              <span class="text-[11px] text-slate-400 font-medium">Sector Conc.</span>
+              <div id="health-sector" class="text-base font-bold text-white mt-0.5">-- / 15</div>
+              <div class="w-full bg-slate-800 h-1.5 rounded-full mt-2 overflow-hidden">
+                <div id="bar-sector" class="bg-cyan-500 h-full rounded-full" style="width: 0%"></div>
+              </div>
+            </div>
+            <div class="bg-darkbg/70 p-3 rounded-xl border border-borderclr">
+              <span class="text-[11px] text-slate-400 font-medium">Volatility</span>
+              <div id="health-volatility" class="text-base font-bold text-white mt-0.5">-- / 15</div>
+              <div class="w-full bg-slate-800 h-1.5 rounded-full mt-2 overflow-hidden">
+                <div id="bar-volatility" class="bg-amber-500 h-full rounded-full" style="width: 0%"></div>
+              </div>
+            </div>
+            <div class="bg-darkbg/70 p-3 rounded-xl border border-borderclr">
+              <span class="text-[11px] text-slate-400 font-medium">Max Drawdown</span>
+              <div id="health-drawdown" class="text-base font-bold text-white mt-0.5">-- / 10</div>
+              <div class="w-full bg-slate-800 h-1.5 rounded-full mt-2 overflow-hidden">
+                <div id="bar-drawdown" class="bg-rose-500 h-full rounded-full" style="width: 0%"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Charts & AI Row -->
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+          <!-- Fund Allocation Chart -->
+          <div class="lg:col-span-5 glass-card p-5 flex flex-col justify-between">
+            <div class="flex items-center justify-between mb-2">
+              <h3 class="text-sm font-bold text-white flex items-center gap-2">
+                <i data-lucide="donut" class="w-4 h-4 text-blue-400"></i>
+                Fund Allocation
+              </h3>
+              <span class="text-[10px] text-slate-400">Asset Distribution</span>
+            </div>
+            <div class="h-64 relative flex items-center justify-center">
+              <canvas id="chart-allocation"></canvas>
+            </div>
+            <div id="allocation-legend" class="mt-3 text-xs space-y-1 max-h-24 overflow-y-auto"></div>
+          </div>
+
+          <!-- AI Narrative & Active Alerts -->
+          <div class="lg:col-span-7 space-y-5">
+            <!-- AI Narrative Card -->
+            <div class="glass-card p-5 border-l-4 border-l-blue-500">
+              <div class="flex items-center justify-between mb-2">
+                <h3 class="text-sm font-bold text-white flex items-center gap-2">
+                  <i data-lucide="brain-circuit" class="w-4 h-4 text-blue-400"></i>
+                  AI Portfolio Narrative
+                </h3>
+                <span class="text-[10px] px-2 py-0.5 rounded bg-blue-500/20 text-blue-300 font-semibold">Rule-Based NLG</span>
+              </div>
+              <p id="dashboard-ai-narrative" class="text-xs text-slate-300 leading-relaxed">
+                Loading portfolio intelligence analysis...
+              </p>
+            </div>
+
+            <!-- Active Alerts -->
+            <div class="glass-card p-5">
+              <div class="flex items-center justify-between mb-3">
+                <h3 class="text-sm font-bold text-white flex items-center gap-2">
+                  <i data-lucide="bell-ring" class="w-4 h-4 text-amber-400"></i>
+                  Active Threshold Alerts
+                </h3>
+                <span id="alerts-count-badge" class="badge-pill bg-slate-800 text-slate-300">0 Alerts</span>
+              </div>
+              <div id="dashboard-alerts-list" class="space-y-2 max-h-48 overflow-y-auto pr-1 text-xs">
+                <div class="text-slate-500 text-center py-4">No risk threshold alerts triggered.</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+
+      <!-- ================= TAB: MY PORTFOLIO ================= -->
+      <section id="tab-portfolio" class="hidden space-y-6">
+        <div class="glass-card p-6">
+          <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-borderclr pb-5 mb-5">
+            <div>
+              <h2 class="text-base font-bold text-white">My Active Holdings</h2>
+              <p class="text-xs text-slate-400">Manage schemes in your portfolio and specify investment amounts.</p>
+            </div>
+            <div class="flex items-center gap-2">
+              <button onclick="openAddInvestmentModal()" class="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-semibold text-xs flex items-center gap-1.5">
+                <i data-lucide="plus" class="w-3.5 h-3.5"></i>
+                <span>Add / Update Fund</span>
+              </button>
+              <button onclick="clearCurrentPortfolio()" class="px-3 py-2 rounded-lg bg-slate-800 hover:bg-rose-950/40 text-slate-300 hover:text-rose-400 border border-slate-700 text-xs font-semibold">
+                Clear Portfolio
+              </button>
+            </div>
+          </div>
+
+          <!-- Table of Held Funds -->
+          <div class="overflow-x-auto">
+            <table class="w-full text-left text-xs">
+              <thead class="bg-slate-900/60 text-slate-400 uppercase text-[10px] tracking-wider border-b border-borderclr">
+                <tr>
+                  <th class="py-3 px-4">Fund Scheme</th>
+                  <th class="py-3 px-4">Category</th>
+                  <th class="py-3 px-4">Invested Amount</th>
+                  <th class="py-3 px-4">Weight %</th>
+                  <th class="py-3 px-4">Exp. Ratio</th>
+                  <th class="py-3 px-4">Equity / Debt</th>
+                  <th class="py-3 px-4 text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody id="portfolio-table-body" class="divide-y divide-borderclr/60">
+                <tr><td colspan="7" class="py-8 text-center text-slate-500">No mutual funds added yet.</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+
+      <!-- ================= TAB: PORTFOLIO X-RAY (CORE) ================= -->
+      <section id="tab-xray" class="hidden space-y-6">
+        <div class="glass-card p-6">
+          <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-borderclr pb-4 mb-4">
+            <div>
+              <div class="flex items-center gap-2">
+                <h2 class="text-base font-bold text-white">Look-Through Portfolio X-Ray</h2>
+                <span class="badge-pill bg-indigo-500/20 text-indigo-300 text-[10px]">True Underlying Holdings</span>
+              </div>
+              <p class="text-xs text-slate-400 mt-1">
+                Penetrates fund wrappers to calculate true effective exposure across every individual stock held.
+              </p>
+            </div>
+            <div class="w-64">
+              <input type="text" id="xray-search-input" onkeyup="filterXRayTable()" placeholder="Search company or sector..." class="w-full bg-slate-900 border border-borderclr rounded-lg px-3 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-blue-500">
+            </div>
+          </div>
+
+          <!-- Worked Example Banner -->
+          <div class="p-3.5 bg-indigo-950/30 border border-indigo-500/30 rounded-xl mb-4 text-xs flex items-start gap-3 text-indigo-200">
+            <i data-lucide="info" class="w-4 h-4 text-indigo-400 flex-shrink-0 mt-0.5"></i>
+            <div>
+              <span class="font-bold">Worked Look-Through Example:</span>
+              Fund A (₹5,00,000 @ 10%) + Fund B (₹5,00,000 @ 8%) = ₹90,000 effective stock exposure (9.0% of a ₹10,00,000 portfolio).
+            </div>
+          </div>
+
+          <!-- X-Ray Table -->
+          <div class="overflow-x-auto">
+            <table class="w-full text-left text-xs" id="xray-table">
+              <thead class="bg-slate-900/60 text-slate-400 uppercase text-[10px] tracking-wider border-b border-borderclr">
+                <tr>
+                  <th class="py-3 px-4">Underlying Company</th>
+                  <th class="py-3 px-4">Sector</th>
+                  <th class="py-3 px-4">Effective Exposure %</th>
+                  <th class="py-3 px-4">Exposure Amount (₹)</th>
+                  <th class="py-3 px-4">Funds Holding It</th>
+                </tr>
+              </thead>
+              <tbody id="xray-table-body" class="divide-y divide-borderclr/60">
+                <tr><td colspan="5" class="py-8 text-center text-slate-500">No holdings to display. Add funds to your portfolio first.</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+
+      <!-- ================= TAB: OVERLAP ANALYZER ================= -->
+      <section id="tab-overlap" class="hidden space-y-6">
+        <div class="glass-card p-6">
+          <div class="border-b border-borderclr pb-4 mb-5">
+            <h2 class="text-base font-bold text-white">Mutual Fund Overlap Analyzer</h2>
+            <p class="text-xs text-slate-400 mt-1 leading-relaxed">
+              Measures common underlying portfolio holdings between schemes using the <span class="text-amber-400 font-semibold">MF X-Ray Pairwise Overlap Methodology</span> to detect hidden stock duplication and fee drag across your mutual funds.
+            </p>
+          </div>
+
+          <!-- Overlap Matrix Grid -->
+          <div class="mb-6">
+            <h3 class="text-xs font-bold text-slate-300 uppercase tracking-wider mb-3">Pairwise Overlap Matrix (%)</h3>
+            <div id="overlap-matrix-container" class="overflow-x-auto">
+              <div class="text-slate-500 text-xs py-4 text-center">Add at least 2 funds to view overlap matrix.</div>
+            </div>
+          </div>
+
+          <!-- Top Common Stocks List -->
+          <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 pt-4 border-t border-borderclr">
+            <div>
+              <h3 class="text-xs font-bold text-slate-300 uppercase tracking-wider mb-3">High Overlap Fund Pairs</h3>
+              <div id="overlap-pairs-list" class="space-y-2 text-xs">
+                <div class="text-slate-500 py-3">No pairs to evaluate.</div>
+              </div>
+            </div>
+            <div>
+              <h3 class="text-xs font-bold text-slate-300 uppercase tracking-wider mb-3">Companies Held in Multiple Funds</h3>
+              <div id="overlap-common-stocks" class="space-y-2 text-xs max-h-64 overflow-y-auto pr-1">
+                <div class="text-slate-500 py-3">No overlapping companies.</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+
+      <!-- ================= TAB: SECTOR ANALYSIS ================= -->
+      <section id="tab-sector" class="hidden space-y-6">
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+          <!-- Donut Chart -->
+          <div class="lg:col-span-5 glass-card p-5">
+            <h3 class="text-sm font-bold text-white mb-2 flex items-center gap-2">
+              <i data-lucide="pie-chart" class="w-4 h-4 text-cyan-400"></i>
+              Sector Allocation Donut
+            </h3>
+            <div class="h-64 relative flex items-center justify-center">
+              <canvas id="chart-sector-donut"></canvas>
+            </div>
+          </div>
+
+          <!-- Bar Chart (Concentration Ranking) -->
+          <div class="lg:col-span-7 glass-card p-5">
+            <div class="flex items-center justify-between mb-2">
+              <h3 class="text-sm font-bold text-white flex items-center gap-2">
+                <i data-lucide="bar-chart-3" class="w-4 h-4 text-blue-400"></i>
+                Sector Concentration Ranking
+              </h3>
+              <span class="text-[10px] text-amber-400 font-semibold bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20">30% High Alert Threshold</span>
+            </div>
+            <div class="h-64 relative">
+              <canvas id="chart-sector-bar"></canvas>
+            </div>
+          </div>
+        </div>
+
+        <!-- Sector Exposure Table -->
+        <div class="glass-card p-5">
+          <h3 class="text-sm font-bold text-white mb-3">Sector Exposure Breakdown</h3>
+          <div class="overflow-x-auto">
+            <table class="w-full text-left text-xs">
+              <thead class="bg-slate-900/60 text-slate-400 uppercase text-[10px] tracking-wider border-b border-borderclr">
+                <tr>
+                  <th class="py-2.5 px-4">Sector</th>
+                  <th class="py-2.5 px-4">Effective Exposure %</th>
+                  <th class="py-2.5 px-4">Corpus Value (₹)</th>
+                  <th class="py-2.5 px-4">Contributing Schemes</th>
+                  <th class="py-2.5 px-4">Status</th>
+                </tr>
+              </thead>
+              <tbody id="sector-table-body" class="divide-y divide-borderclr/60">
+                <tr><td colspan="5" class="py-6 text-center text-slate-500">No sector data available.</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+
+      <!-- ================= TAB: RISK ANALYTICS ================= -->
+      <section id="tab-risk" class="hidden space-y-6">
+        <div class="glass-card p-6">
+          <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-borderclr pb-4 mb-5">
+            <div>
+              <h2 class="text-base font-bold text-white">Risk & Volatility Analytics</h2>
+              <p class="text-xs text-slate-400">Evaluates portfolio volatility, Sharpe ratio, and peak-to-trough drawdown.</p>
+            </div>
+            <!-- Configurable Risk Free Rate -->
+            <div class="flex items-center gap-2 bg-slate-900 px-3 py-1.5 rounded-lg border border-borderclr">
+              <label for="rf-rate-input" class="text-xs text-slate-400 font-medium">Risk-Free Rate (Rf):</label>
+              <input type="number" id="rf-rate-input" step="0.5" value="6.0" class="w-16 bg-slate-800 text-white text-xs px-2 py-1 rounded border border-slate-700 text-right">
+              <span class="text-xs text-slate-400">%</span>
+              <button onclick="recalculateRisk()" class="px-2.5 py-1 bg-blue-600 hover:bg-blue-500 text-white rounded text-xs font-semibold">Apply</button>
+            </div>
+          </div>
+
+          <!-- Portfolio Level Risk Summary Cards -->
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+            <div class="p-4 rounded-xl bg-slate-900/80 border border-borderclr">
+              <span class="text-xs text-slate-400 font-semibold">ANNUALISED VOLATILITY</span>
+              <div id="risk-portfolio-vol" class="text-2xl font-black text-white mt-1">0.0%</div>
+              <p class="text-[10px] text-slate-500 mt-1">Annualised standard deviation weighted across funds</p>
+            </div>
+            <div class="p-4 rounded-xl bg-slate-900/80 border border-borderclr">
+              <span class="text-xs text-slate-400 font-semibold">PORTFOLIO SHARPE RATIO</span>
+              <div id="risk-portfolio-sharpe" class="text-2xl font-black text-white mt-1">0.00</div>
+              <p class="text-[10px] text-slate-500 mt-1">Excess return per unit of total risk</p>
+            </div>
+            <div class="p-4 rounded-xl bg-slate-900/80 border border-borderclr">
+              <span class="text-xs text-slate-400 font-semibold">MAX HISTORICAL DRAWDOWN</span>
+              <div id="risk-portfolio-drawdown" class="text-2xl font-black text-rose-400 mt-1">0.0%</div>
+              <p class="text-[10px] text-slate-500 mt-1">Peak-to-trough historical drop</p>
+            </div>
+          </div>
+
+          <!-- Scheme-wise Risk Table -->
+          <h3 class="text-xs font-bold text-slate-300 uppercase tracking-wider mb-3">Scheme-Level Risk Breakdown</h3>
+          <div class="overflow-x-auto">
+            <table class="w-full text-left text-xs">
+              <thead class="bg-slate-900/60 text-slate-400 uppercase text-[10px] tracking-wider border-b border-borderclr">
+                <tr>
+                  <th class="py-2.5 px-4">Fund Scheme</th>
+                  <th class="py-2.5 px-4">Annualised Volatility %</th>
+                  <th class="py-2.5 px-4">Sharpe Ratio</th>
+                  <th class="py-2.5 px-4">Max Drawdown %</th>
+                </tr>
+              </thead>
+              <tbody id="risk-table-body" class="divide-y divide-borderclr/60">
+                <tr><td colspan="4" class="py-6 text-center text-slate-500">No risk data available.</td></tr>
+              </tbody>
+            </table>
+          </div>
+
+          <!-- Comprehensive Risk Metrics & Portfolio Impact Guide -->
+          <div class="mt-8 pt-6 border-t border-borderclr">
+            <div class="flex items-center gap-2 mb-4">
+              <i data-lucide="book-open" class="w-4 h-4 text-blue-400"></i>
+              <h3 class="text-xs font-bold text-white uppercase tracking-wider">Understanding Risk Metrics & Portfolio Impact</h3>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-5">
+              <!-- Card 1: Annualised Volatility -->
+              <div class="p-4 rounded-xl bg-slate-900/90 border border-borderclr flex flex-col justify-between">
+                <div>
+                  <div class="flex items-center justify-between mb-2">
+                    <span class="text-xs font-bold text-blue-300">1. Annualised Volatility</span>
+                    <span class="badge-pill bg-blue-500/20 text-blue-300 border border-blue-500/30 text-[10px]">Price Fluctuations</span>
+                  </div>
+                  <p class="text-[11px] text-slate-300 leading-relaxed">
+                    Measures the intensity of price swings (ups and downs) in your portfolio over a 1-year horizon, calculated via standard deviation of monthly returns.
+                  </p>
+                  <div class="my-3 p-2.5 rounded-lg bg-slate-950 border border-borderclr/80 text-[11px] space-y-1">
+                    <div class="text-slate-400"><strong class="text-slate-200">Benchmarking:</strong> Nifty 50 is typically <span class="text-emerald-400 font-mono">14% - 16%</span>.</div>
+                    <div class="text-slate-400"><strong class="text-slate-200">Your Portfolio:</strong> <span class="text-amber-300 font-mono font-bold">22.6%</span> (Elevated risk).</div>
+                  </div>
+                </div>
+                <div class="pt-2 border-t border-borderclr/60 text-[11px] text-slate-400 leading-snug">
+                  <strong class="text-slate-200 block mb-0.5">Impact on your Corpus:</strong>
+                  On a ₹3,00,000 portfolio, 22.6% volatility means your capital may easily swing by <span class="text-rose-400 font-semibold">±₹67,800</span> in a typical market year due to 100% equity and heavy banking concentration.
+                </div>
+              </div>
+
+              <!-- Card 2: Portfolio Sharpe Ratio -->
+              <div class="p-4 rounded-xl bg-slate-900/90 border border-borderclr flex flex-col justify-between">
+                <div>
+                  <div class="flex items-center justify-between mb-2">
+                    <span class="text-xs font-bold text-emerald-300">2. Portfolio Sharpe Ratio</span>
+                    <span class="badge-pill bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-[10px]">Risk vs Reward</span>
+                  </div>
+                  <p class="text-[11px] text-slate-300 leading-relaxed">
+                    Evaluates return generated per unit of risk taken above the risk-free rate (6.0% benchmark return from risk-free sovereign debt/FD).
+                  </p>
+                  <div class="my-3 p-2.5 rounded-lg bg-slate-950 border border-borderclr/80 text-[11px] space-y-1">
+                    <div class="text-slate-400"><strong class="text-slate-200">Scale:</strong> &lt;1.0 = Poor | 1.0 - 1.5 = Good | &gt;1.5 = Stellar</div>
+                    <div class="text-slate-400"><strong class="text-slate-200">Your Portfolio:</strong> <span class="text-blue-300 font-mono font-bold">1.06</span> (Marginal efficiency).</div>
+                  </div>
+                </div>
+                <div class="pt-2 border-t border-borderclr/60 text-[11px] text-slate-400 leading-snug">
+                  <strong class="text-slate-200 block mb-0.5">Impact on your Corpus:</strong>
+                  While HDFC (1.21) and Parag Parikh (1.19) generate healthy risk-adjusted returns, <span class="text-rose-400 font-semibold">Kotak Regular (0.79)</span> acts as an efficiency drag due to distributor commission and higher variance.
+                </div>
+              </div>
+
+              <!-- Card 3: Max Historical Drawdown -->
+              <div class="p-4 rounded-xl bg-slate-900/90 border border-borderclr flex flex-col justify-between">
+                <div>
+                  <div class="flex items-center justify-between mb-2">
+                    <span class="text-xs font-bold text-rose-300">3. Max Historical Drawdown</span>
+                    <span class="badge-pill bg-rose-500/20 text-rose-300 border border-rose-500/30 text-[10px]">Worst-Case Drop</span>
+                  </div>
+                  <p class="text-[11px] text-slate-300 leading-relaxed">
+                    Measures the largest peak-to-trough decline experienced by your portfolio before reaching a new high. Reveals the worst historical dip.
+                  </p>
+                  <div class="my-3 p-2.5 rounded-lg bg-slate-950 border border-borderclr/80 text-[11px] space-y-1">
+                    <div class="text-slate-400"><strong class="text-slate-200">Safe Target:</strong> Within <span class="text-emerald-400 font-mono">-12% to -15%</span>.</div>
+                    <div class="text-slate-400"><strong class="text-slate-200">Your Portfolio:</strong> <span class="text-rose-400 font-mono font-bold">-19.8%</span> peak-to-trough drop.</div>
+                  </div>
+                </div>
+                <div class="pt-2 border-t border-borderclr/60 text-[11px] text-slate-400 leading-snug">
+                  <strong class="text-slate-200 block mb-0.5">Impact on your Corpus:</strong>
+                  During severe market corrections, your ₹3,00,000 corpus would have temporarily fallen to <span class="text-rose-400 font-semibold">₹2,40,600 (-₹59,400)</span>. Kotak fell hardest (-24.2%) while Parag Parikh cushioned downside (-17.4%).
+                </div>
+              </div>
+            </div>
+
+            <!-- Key Takeaway Banner -->
+            <div class="mt-4 p-3.5 rounded-xl bg-gradient-to-r from-blue-950/40 via-slate-900 to-slate-900 border border-blue-500/25 flex items-start gap-3">
+              <i data-lucide="info" class="w-4 h-4 text-blue-400 shrink-0 mt-0.5"></i>
+              <div class="text-xs text-slate-300 leading-relaxed">
+                <strong class="text-white">Actionable Portfolio Fix:</strong> Your portfolio's high volatility (22.6%) and steep drawdown (-19.8%) occur because all 3 funds are 100% Flexi Cap equities sharing a 50.5% stock overlap. Adding non-correlated assets (e.g., a Dynamic Asset Allocation fund or Direct plan rebalancing) significantly improves your Sharpe ratio while insulating against severe market corrections.
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ================= TAB: FUND FACTSHEETS ================= -->
+      <section id="tab-factsheets" class="hidden space-y-6">
+        <!-- Top Selector Card -->
+        <div class="glass-card p-6">
+          <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-borderclr pb-5">
+            <div>
+              <h2 class="text-base font-bold text-white flex items-center gap-2">
+                <i data-lucide="file-text" class="w-5 h-5 text-teal-400"></i>
+                <span>Mutual Fund Comprehensive Factsheet</span>
+              </h2>
+              <p class="text-xs text-slate-400 mt-1">Detailed look-through, NAV, portfolio asset allocation, risk rating, and top underlying equity holdings.</p>
+            </div>
+            <div class="flex items-center gap-3">
+              <label for="factsheet-fund-select" class="text-xs font-semibold text-slate-400 whitespace-nowrap">Select Scheme:</label>
+              <select id="factsheet-fund-select" onchange="renderSelectedFactsheet()" class="px-3 py-2 rounded-xl bg-slate-900/90 border border-borderclr text-white text-xs font-medium focus:ring-1 focus:ring-teal-500 focus:outline-none min-w-[260px] max-w-[400px]">
+                <option value="">Loading mutual funds...</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Factsheet Content Container -->
+          <div id="factsheet-content" class="mt-6">
+            <div class="py-12 text-center text-slate-500 text-xs">
+              <i data-lucide="loader" class="w-6 h-6 animate-spin mx-auto mb-2 text-teal-400"></i>
+              Select a mutual fund scheme from the dropdown above to view its complete factsheet.
+            </div>
+          </div>
+        </div>
+      </section>
+
+
+      <section id="tab-whatif" class="hidden space-y-6">
+        <div class="glass-card p-6">
+          <div class="border-b border-borderclr pb-4 mb-5">
+            <h2 class="text-base font-bold text-white flex items-center gap-2">
+              <i data-lucide="sparkles" class="w-5 h-5 text-purple-400"></i>
+              What-If Portfolio Simulator
+            </h2>
+            <p class="text-xs text-slate-400 mt-1">
+              Simulate dropping any mutual fund from your portfolio to view the mathematical impact on overlap, concentration, and health score. (Simulation only, not investment advice).
+            </p>
+          </div>
+
+          <!-- Simulation Selector -->
+          <div class="flex items-center gap-3 bg-slate-900 p-4 rounded-xl border border-borderclr mb-6">
+            <label for="whatif-fund-select" class="text-xs font-semibold text-slate-300">Select Scheme to Drop:</label>
+            <select id="whatif-fund-select" class="bg-slate-800 border border-slate-700 text-white rounded-lg px-3 py-2 text-xs flex-1 max-w-sm focus:outline-none focus:border-purple-500">
+              <option value="">No funds loaded</option>
+            </select>
+            <button onclick="executeWhatIfSimulation()" class="px-4 py-2 rounded-lg bg-purple-600 hover:bg-purple-500 text-white text-xs font-semibold shadow-md shadow-purple-600/20">
+              Run Simulation
+            </button>
+          </div>
+
+          <!-- Comparison Table -->
+          <div id="whatif-results-box" class="hidden space-y-6">
+            <h3 class="text-xs font-bold text-slate-300 uppercase tracking-wider">Before vs. After Impact Comparison</h3>
+            <div class="overflow-x-auto">
+              <table class="w-full text-left text-xs">
+                <thead class="bg-slate-900/60 text-slate-400 uppercase text-[10px] tracking-wider border-b border-borderclr">
+                  <tr>
+                    <th class="py-3 px-4">Metric Scenario</th>
+                    <th class="py-3 px-4">Total Corpus</th>
+                    <th class="py-3 px-4">Avg Overlap %</th>
+                    <th class="py-3 px-4">Top 5 Stock Conc. %</th>
+                    <th class="py-3 px-4">Largest Sector %</th>
+                    <th class="py-3 px-4">Health Score</th>
+                  </tr>
+                </thead>
+                <tbody id="whatif-table-body" class="divide-y divide-borderclr/60"></tbody>
+              </table>
+            </div>
+
+            <!-- Changed Holdings Table -->
+            <h3 class="text-xs font-bold text-slate-300 uppercase tracking-wider pt-4">Underlying Stock Exposure Impact</h3>
+            <div class="overflow-x-auto">
+              <table class="w-full text-left text-xs">
+                <thead class="bg-slate-900/60 text-slate-400 uppercase text-[10px] tracking-wider border-b border-borderclr">
+                  <tr>
+                    <th class="py-2.5 px-4">Company</th>
+                    <th class="py-2.5 px-4">Previous %</th>
+                    <th class="py-2.5 px-4">Simulated %</th>
+                    <th class="py-2.5 px-4">Difference (pp)</th>
+                    <th class="py-2.5 px-4">Status</th>
+                  </tr>
+                </thead>
+                <tbody id="whatif-stocks-body" class="divide-y divide-borderclr/60"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </section>
+
+
+      <!-- ================= TAB: SIP CALCULATOR ================= -->
+      <section id="tab-sip" class="hidden space-y-6">
+        <div class="glass-card p-6">
+          <div class="border-b border-borderclr pb-4 mb-5">
+            <h2 class="text-base font-bold text-white">SIP & XIRR Calculator</h2>
+            <p class="text-xs text-slate-400 mt-1">
+              A Systematic Investment Plan is an investment <em>method</em>, not a product. Calculate cash flows, unit accumulation, and true XIRR using the Newton-Raphson method.
+            </p>
+          </div>
+
+          <!-- Form Grid -->
+          <div class="grid grid-cols-1 md:grid-cols-4 gap-4 bg-slate-900 p-4 rounded-xl border border-borderclr mb-6">
+            <div>
+              <label class="text-[11px] text-slate-400 font-semibold block mb-1">Mutual Fund Scheme</label>
+              <select id="sip-fund-select" class="w-full bg-slate-800 border border-slate-700 text-white rounded-lg p-2 text-xs"></select>
+            </div>
+            <div>
+              <label class="text-[11px] text-slate-400 font-semibold block mb-1">Monthly SIP Amount (₹)</label>
+              <input type="number" id="sip-amount-input" value="10000" class="w-full bg-slate-800 border border-slate-700 text-white rounded-lg p-2 text-xs">
+            </div>
+            <div>
+              <label class="text-[11px] text-slate-400 font-semibold block mb-1">Number of Instalments</label>
+              <input type="number" id="sip-inst-input" value="24" class="w-full bg-slate-800 border border-slate-700 text-white rounded-lg p-2 text-xs">
+            </div>
+            <div class="flex items-end">
+              <button onclick="calculateSIP()" class="w-full py-2 bg-yellow-600 hover:bg-yellow-500 text-white font-semibold rounded-lg text-xs shadow-md shadow-yellow-600/20">
+                Compute SIP & XIRR
+              </button>
+            </div>
+          </div>
+
+          <!-- SIP Results Cards -->
+          <div id="sip-results-container" class="hidden space-y-5">
+            <div class="grid grid-cols-2 md:grid-cols-5 gap-3">
+              <div class="p-3 bg-slate-900 rounded-xl border border-borderclr">
+                <span class="text-[11px] text-slate-400">Total Invested</span>
+                <div id="sip-invested" class="text-lg font-bold text-white mt-1">₹0</div>
+              </div>
+              <div class="p-3 bg-slate-900 rounded-xl border border-borderclr">
+                <span class="text-[11px] text-slate-400">Accumulated Units</span>
+                <div id="sip-units" class="text-lg font-bold text-white mt-1">0.00</div>
+              </div>
+              <div class="p-3 bg-slate-900 rounded-xl border border-borderclr">
+                <span class="text-[11px] text-slate-400">Current Valuation</span>
+                <div id="sip-current-val" class="text-lg font-bold text-emerald-400 mt-1">₹0</div>
+              </div>
+              <div class="p-3 bg-slate-900 rounded-xl border border-borderclr">
+                <span class="text-[11px] text-slate-400">Absolute Return</span>
+                <div id="sip-abs-return" class="text-lg font-bold text-white mt-1">0.0%</div>
+              </div>
+              <div class="p-3 bg-slate-900 rounded-xl border border-borderclr">
+                <span class="text-[11px] text-slate-400">Annualised XIRR</span>
+                <div id="sip-xirr" class="text-lg font-bold text-yellow-400 mt-1">0.0%</div>
+              </div>
+            </div>
+
+            <!-- Instalment Schedule Table -->
+            <h3 class="text-xs font-bold text-slate-300 uppercase tracking-wider pt-2">Monthly Cash Flow Schedule</h3>
+            <div class="overflow-x-auto max-h-60 overflow-y-auto">
+              <table class="w-full text-left text-xs">
+                <thead class="bg-slate-900/80 sticky top-0 text-slate-400 uppercase text-[10px] tracking-wider border-b border-borderclr">
+                  <tr>
+                    <th class="py-2 px-4">Instalment #</th>
+                    <th class="py-2 px-4">Date</th>
+                    <th class="py-2 px-4">Allotted NAV (₹)</th>
+                    <th class="py-2 px-4">Units Accumulated</th>
+                  </tr>
+                </thead>
+                <tbody id="sip-schedule-body" class="divide-y divide-borderclr/60"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </section>
+
+
+      <!-- ================= TAB: ASK MF X-RAY (AI INSIGHTS & OPTIMIZATION) ================= -->
+      <section id="tab-ai" class="hidden space-y-6">
+        <div class="glass-card p-6">
+          <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-borderclr pb-4 mb-4">
+            <div>
+              <h2 class="text-base font-bold text-white flex items-center gap-2">
+                <i data-lucide="bot" class="w-5 h-5 text-pink-400"></i>
+                AI Portfolio Intelligence & Strategic Optimization Engine
+              </h2>
+              <p class="text-xs text-slate-400 mt-1">
+                Quantitative portfolio diagnostic, overlap reduction, and actionable restructuring recommendations.
+              </p>
+            </div>
+            <div class="flex items-center gap-2">
+              <span id="ai-active-provider-badge" class="badge-pill bg-pink-500/20 text-pink-300 font-semibold text-xs border border-pink-500/30">Built-in CA Engine</span>
+            </div>
+          </div>
+
+          <!-- 3 AI Sub-Tabs -->
+          <div class="flex items-center gap-2 border-b border-borderclr/80 pb-3 mb-6">
+            <button onclick="switchAiSubTab('optimize')" id="btn-ai-subtab-optimize" class="px-4 py-2 rounded-lg text-xs font-bold bg-gradient-to-r from-pink-600 to-purple-600 text-white shadow-md shadow-pink-600/20 transition flex items-center gap-2">
+              <i data-lucide="sparkles" class="w-3.5 h-3.5"></i>
+              <span>1. AI Portfolio Optimization & Action Plan</span>
+            </button>
+            <button onclick="switchAiSubTab('qa')" id="btn-ai-subtab-qa" class="px-4 py-2 rounded-lg text-xs font-semibold bg-slate-800 text-slate-300 hover:text-white transition flex items-center gap-2">
+              <i data-lucide="message-square" class="w-3.5 h-3.5"></i>
+              <span>2. Ask AI Assistant (Q&A)</span>
+            </button>
+            <button onclick="switchAiSubTab('settings')" id="btn-ai-subtab-settings" class="px-4 py-2 rounded-lg text-xs font-semibold bg-slate-800 text-slate-300 hover:text-white transition flex items-center gap-2">
+              <i data-lucide="key" class="w-3.5 h-3.5"></i>
+              <span>3. API Key & Model Settings</span>
+            </button>
+          </div>
+
+          <!-- SUB-VIEW 1: AI PORTFOLIO OPTIMIZATION -->
+          <div id="ai-view-optimize" class="space-y-6">
+            <div class="p-4 rounded-xl bg-slate-900/80 border border-borderclr flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+              <div>
+                <h4 class="font-bold text-white text-xs">Automated Portfolio Restructuring & Alpha Strategy</h4>
+                <p class="text-[11px] text-slate-400 mt-0.5">Diagnoses category duplication, stock overlap, and banking concentration, then generates a step-by-step target allocation model.</p>
+              </div>
+              <button onclick="runPortfolioOptimization()" id="btn-run-optimization" class="px-5 py-2.5 rounded-xl bg-gradient-to-r from-pink-600 to-purple-600 hover:from-pink-500 hover:to-purple-500 text-white font-bold text-xs shadow-lg shadow-pink-600/25 flex items-center gap-2 shrink-0 transition">
+                <i data-lucide="wand-2" class="w-4 h-4"></i>
+                <span>Run AI Optimization Analysis</span>
+              </button>
+            </div>
+
+            <!-- Optimization Result Container -->
+            <div id="ai-optimization-output" class="hidden p-6 rounded-2xl bg-slate-900/90 border border-pink-500/30 space-y-4">
+              <div class="flex items-center justify-between border-b border-borderclr/80 pb-3">
+                <span class="text-xs font-bold text-pink-400 flex items-center gap-2">
+                  <i data-lucide="shield-check" class="w-4 h-4"></i>
+                  Portfolio Restructuring Diagnosis
+                </span>
+                <span id="ai-optimization-source" class="text-[10px] text-slate-400">Analysis Engine: CA Quantitative Rules</span>
+              </div>
+              <div id="ai-optimization-content" class="text-xs text-slate-200 leading-relaxed space-y-3 font-sans">
+                <!-- Populated by JS -->
+              </div>
+            </div>
+          </div>
+
+          <!-- SUB-VIEW 2: ASK AI ASSISTANT (Q&A) -->
+          <div id="ai-view-qa" class="hidden space-y-4">
+            <!-- Quick Question Buttons -->
+            <div class="space-y-2 mb-4">
+              <span class="text-[11px] text-slate-400 font-semibold block">Instant Quick Questions:</span>
+              <div class="flex flex-wrap gap-2">
+                <button onclick="askPresetQuestion('Which companies have the highest exposure?')" class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 text-xs transition">
+                  Highest stock exposures?
+                </button>
+                <button onclick="askPresetQuestion('Which funds overlap the most?')" class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 text-xs transition">
+                  Which schemes overlap most?
+                </button>
+                <button onclick="askPresetQuestion('Which sector has the highest exposure?')" class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 text-xs transition">
+                  Top sector concentration?
+                </button>
+                <button onclick="askPresetQuestion('Why is my portfolio concentrated?')" class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 text-xs transition">
+                  Why is portfolio concentrated?
+                </button>
+                <button onclick="askPresetQuestion('Explain my portfolio like a CA.')" class="px-3 py-1.5 rounded-lg bg-pink-500/10 hover:bg-pink-500/20 border border-pink-500/30 text-pink-300 text-xs font-semibold transition">
+                  Explain like a Chartered Accountant
+                </button>
+              </div>
+            </div>
+
+            <!-- Question Input Box -->
+            <div class="flex gap-2 mb-4">
+              <input type="text" id="ai-question-input" placeholder="Type a portfolio question, e.g. 'How can I reduce my banking concentration?'" class="flex-1 bg-slate-900 border border-borderclr rounded-xl px-4 py-3 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-pink-500" onkeydown="if(event.key==='Enter') submitAIQuestion()">
+              <button onclick="submitAIQuestion()" id="btn-submit-qa" class="px-6 py-3 rounded-xl bg-gradient-to-r from-pink-600 to-purple-600 hover:from-pink-500 hover:to-purple-500 text-white font-semibold text-xs shadow-lg shadow-pink-600/20 flex items-center gap-2">
+                <i data-lucide="send" class="w-3.5 h-3.5"></i>
+                <span>Ask</span>
+              </button>
+            </div>
+
+            <!-- Answer Display Box -->
+            <div id="ai-answer-box" class="hidden p-5 rounded-xl bg-slate-900/90 border border-pink-500/30">
+              <div class="flex items-center justify-between text-pink-400 font-bold text-xs mb-2">
+                <span class="flex items-center gap-2">
+                  <i data-lucide="sparkles" class="w-4 h-4"></i>
+                  <span>MF X-Ray Intelligence Response:</span>
+                </span>
+                <span id="ai-qa-source" class="text-[10px] text-slate-400 font-normal"></span>
+              </div>
+              <div id="ai-answer-content" class="text-xs text-slate-200 whitespace-pre-line leading-relaxed"></div>
+            </div>
+          </div>
+
+          <!-- SUB-VIEW 3: API KEY & MODEL SETTINGS -->
+          <div id="ai-view-settings" class="hidden space-y-6">
+            <div class="max-w-xl space-y-4">
+              <div class="p-4 rounded-xl bg-slate-900/80 border border-borderclr space-y-1">
+                <h4 class="font-bold text-white text-xs flex items-center gap-2">
+                  <i data-lucide="key" class="w-4 h-4 text-emerald-400"></i>
+                  Configure Your Own AI Model
+                </h4>
+                <p class="text-[11px] text-slate-400 leading-relaxed">
+                  You can connect your Google Gemini or OpenAI API key to unlock natural-language explanations powered by cutting-edge LLMs. Your API key is stored locally in your browser and never shared with third parties.
+                </p>
+              </div>
+
+              <div class="space-y-3 text-xs">
+                <div>
+                  <label class="text-slate-400 block mb-1 font-semibold">AI Provider</label>
+                  <select id="ai-provider-select" onchange="onAiProviderChanged()" class="w-full bg-slate-900 border border-borderclr rounded-lg p-2.5 text-white">
+                    <option value="gemini" selected>Google Gemini (Recommended — gemini-2.5-flash / 1.5-pro)</option>
+                    <option value="openai">OpenAI (GPT-4o / GPT-4o-mini)</option>
+                    <option value="none">Built-in CA Engine (No API Key Needed)</option>
+                  </select>
+                </div>
+
+                <div id="api-key-container">
+                  <label class="text-slate-400 block mb-1 font-semibold flex items-center justify-between">
+                    <span>API Key *</span>
+                    <button type="button" onclick="toggleApiKeyVisibility()" class="text-[10px] text-pink-400 hover:text-pink-300">Show / Hide</button>
+                  </label>
+                  <input type="password" id="ai-api-key-input" placeholder="AIzaSy... or sk-proj-..." class="w-full bg-slate-900 border border-borderclr rounded-lg p-2.5 text-white font-mono text-xs placeholder:text-slate-600 focus:outline-none focus:border-pink-500">
+                </div>
+
+                <div id="model-name-container">
+                  <label class="text-slate-400 block mb-1 font-semibold">Model Name</label>
+                  <input type="text" id="ai-model-input" value="gemini-2.5-flash" placeholder="e.g. gemini-2.5-flash or gpt-4o-mini" class="w-full bg-slate-900 border border-borderclr rounded-lg p-2.5 text-white text-xs">
+                </div>
+
+                <div class="pt-2 flex items-center gap-3">
+                  <button onclick="saveAndTestApiKey()" id="btn-test-api-key" class="px-5 py-2.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-md shadow-emerald-600/20 transition flex items-center gap-2">
+                    <i data-lucide="check-circle" class="w-4 h-4"></i>
+                    <span>Save & Test Connection</span>
+                  </button>
+                  <span id="api-key-status-msg" class="text-xs font-semibold"></span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </section>
+
+
+      <!-- ================= TAB: AMFI MUTUAL FUNDS & SCHEMES UNIVERSE ================= -->
+      <section id="tab-amfi-universe" class="hidden space-y-6">
+        <!-- Header Banner -->
+        <div class="glass-card p-6 border border-emerald-500/30 bg-gradient-to-r from-emerald-950/20 via-slate-900/60 to-slate-900/40">
+          <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div>
+              <div class="flex items-center gap-2 mb-1">
+                <span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                  OFFICIAL AMFI MASTER DATA
+                </span>
+                <span class="text-[11px] text-slate-400">Updated Daily</span>
+              </div>
+              <h2 class="text-xl font-bold text-white tracking-tight">Mutual Funds & Schemes Universe</h2>
+              <p class="text-xs text-slate-400 mt-1 max-w-2xl">
+                Explore all 54 SEBI-registered Mutual Fund Houses (AMCs) and 14,370+ Mutual Fund Schemes across India with live official Net Asset Values (NAV).
+              </p>
+            </div>
+            <div class="flex items-center gap-3 text-xs">
+              <div class="px-4 py-2 rounded-xl bg-slate-900 border border-borderclr text-center">
+                <span class="text-[10px] text-slate-400 block font-semibold">Fund Houses (AMCs)</span>
+                <span id="stat-total-amcs" class="text-lg font-extrabold text-emerald-400">54</span>
+              </div>
+              <div class="px-4 py-2 rounded-xl bg-slate-900 border border-borderclr text-center">
+                <span class="text-[10px] text-slate-400 block font-semibold">Total Schemes</span>
+                <span id="stat-total-schemes" class="text-lg font-extrabold text-blue-400">14,370+</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Two Sub-Tabs in Universe View -->
+          <div class="flex items-center gap-2 mt-6 border-b border-borderclr/80 pb-3">
+            <button onclick="switchUniverseSubTab('amcs')" id="btn-subtab-amcs" class="px-4 py-2 rounded-lg text-xs font-bold bg-emerald-600 text-white shadow-md shadow-emerald-600/20 transition flex items-center gap-2">
+              <i data-lucide="building-2" class="w-3.5 h-3.5"></i>
+              <span>Mutual Fund Houses (54 AMCs)</span>
+            </button>
+            <button onclick="switchUniverseSubTab('schemes')" id="btn-subtab-schemes" class="px-4 py-2 rounded-lg text-xs font-semibold bg-slate-800 text-slate-300 hover:text-white transition flex items-center gap-2">
+              <i data-lucide="list-filter" class="w-3.5 h-3.5"></i>
+              <span>Mutual Fund Schemes (14,370+)</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Sub-View 1: Mutual Fund Houses (AMCs) -->
+        <div id="universe-view-amcs" class="space-y-4">
+          <div class="flex items-center justify-between gap-4">
+            <div class="relative flex-1 max-w-md">
+              <i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-3 top-3"></i>
+              <input type="text" id="search-amcs-input" oninput="filterAmcCards(this.value)" placeholder="Search Mutual Fund House (e.g. HDFC, PPFAS, SBI, ICICI, Nippon, Quant)..." class="w-full bg-slate-900 border border-borderclr rounded-xl pl-9 pr-3 py-2 text-xs text-white placeholder:text-slate-500 focus:outline-none focus:border-emerald-500">
+            </div>
+            <span id="amc-filter-count" class="text-xs text-slate-400 font-semibold">Showing 54 Fund Houses</span>
+          </div>
+
+          <!-- AMC Grid Cards -->
+          <div id="amc-cards-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <!-- Rendered by JS -->
+          </div>
+        </div>
+
+        <!-- Sub-View 2: Mutual Fund Schemes -->
+        <div id="universe-view-schemes" class="hidden space-y-4">
+          <div class="glass-card p-4 space-y-3">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <div>
+                <label class="text-[11px] text-slate-400 font-semibold block mb-1">Filter by Mutual Fund House (AMC)</label>
+                <select id="universe-amc-dropdown" onchange="fetchAndRenderSchemes()" class="w-full bg-slate-900 border border-borderclr rounded-lg p-2 text-xs text-white focus:border-emerald-500">
+                  <option value="">All 54 Mutual Fund Houses</option>
+                </select>
+              </div>
+              <div>
+                <label class="text-[11px] text-slate-400 font-semibold block mb-1">Search Scheme Keyword / Code</label>
+                <input type="text" id="universe-scheme-query" oninput="debounceFetchSchemes()" placeholder="e.g. Flexi Cap, Bluechip, Small Cap, Direct, Growth..." class="w-full bg-slate-900 border border-borderclr rounded-lg p-2 text-xs text-white placeholder:text-slate-500 focus:border-emerald-500">
+              </div>
+              <div>
+                <label class="text-[11px] text-slate-400 font-semibold block mb-1">Category Type</label>
+                <select id="universe-cat-dropdown" onchange="fetchAndRenderSchemes()" class="w-full bg-slate-900 border border-borderclr rounded-lg p-2 text-xs text-white focus:border-emerald-500">
+                  <option value="">All Categories</option>
+                  <option value="Equity">Equity Schemes</option>
+                  <option value="Debt">Debt Schemes</option>
+                  <option value="Hybrid">Hybrid Schemes</option>
+                  <option value="Solution">Solution Oriented</option>
+                  <option value="Other">Other / Index / ETF</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <!-- Schemes Results Table -->
+          <div class="glass-card overflow-hidden">
+            <div class="flex items-center justify-between p-4 border-b border-borderclr bg-slate-900/50">
+              <span id="universe-schemes-result-count" class="text-xs font-bold text-white">Loading schemes...</span>
+              <span class="text-[11px] text-slate-400">Click '+ Invest' to add any scheme to your portfolio</span>
+            </div>
+            <div class="overflow-x-auto max-h-[560px]">
+              <table class="w-full text-left text-xs border-collapse">
+                <thead class="sticky top-0 bg-slate-900/95 backdrop-blur-md border-b border-borderclr text-slate-400 text-[11px] font-semibold">
+                  <tr>
+                    <th class="py-3 px-4">Scheme Name</th>
+                    <th class="py-3 px-4">Mutual Fund House (AMC)</th>
+                    <th class="py-3 px-4">Category</th>
+                    <th class="py-3 px-4 text-right">Latest NAV (₹)</th>
+                    <th class="py-3 px-4 text-center">Action</th>
+                  </tr>
+                </thead>
+                <tbody id="universe-schemes-table-body" class="divide-y divide-borderclr/60">
+                  <!-- Rendered by JS -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </section>
+
+
+      <!-- ================= TAB: DATA ENTRY & TEMPLATES ================= -->
+      <section id="tab-data-entry" class="hidden space-y-6">
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          
+          <!-- Add / Edit Mutual Fund Form -->
+          <div class="glass-card p-6">
+            <div class="flex items-center justify-between border-b border-borderclr pb-4 mb-4">
+              <h2 class="text-base font-bold text-white flex items-center gap-2">
+                <i data-lucide="file-plus" class="w-4 h-4 text-emerald-400"></i>
+                Add Custom Mutual Fund
+              </h2>
+              <span class="text-[10px] text-slate-400">Scheme Master</span>
+            </div>
+            
+            <form onsubmit="handleSaveFund(event)" class="space-y-4 text-xs">
+              <div>
+                <label class="text-slate-400 block mb-1 font-semibold">Fund Scheme Name *</label>
+                <input type="text" id="fund-input-name" required placeholder="e.g. Parag Parikh Flexi Cap Fund" class="w-full bg-slate-900 border border-borderclr rounded-lg p-2.5 text-white">
+              </div>
+              <div class="grid grid-cols-2 gap-3">
+                <div>
+                  <label class="text-slate-400 block mb-1 font-semibold">Category</label>
+                  <input type="text" id="fund-input-category" value="Equity - Flexi Cap" class="w-full bg-slate-900 border border-borderclr rounded-lg p-2.5 text-white">
+                </div>
+                <div>
+                  <label class="text-slate-400 block mb-1 font-semibold">Current NAV (₹)</label>
+                  <input type="number" step="0.01" id="fund-input-nav" value="50.00" class="w-full bg-slate-900 border border-borderclr rounded-lg p-2.5 text-white">
+                </div>
+              </div>
+              <div class="grid grid-cols-3 gap-3">
+                <div>
+                  <label class="text-slate-400 block mb-1 font-semibold">Expense Ratio %</label>
+                  <input type="number" step="0.01" id="fund-input-expense" value="1.50" class="w-full bg-slate-900 border border-borderclr rounded-lg p-2.5 text-white">
+                </div>
+                <div>
+                  <label class="text-slate-400 block mb-1 font-semibold">Risk Level</label>
+                  <select id="fund-input-risk" class="w-full bg-slate-900 border border-borderclr rounded-lg p-2.5 text-white">
+                    <option value="Very High">Very High</option>
+                    <option value="High">High</option>
+                    <option value="Moderate" selected>Moderate</option>
+                    <option value="Low">Low</option>
+                  </select>
+                </div>
+                <div>
+                  <label class="text-slate-400 block mb-1 font-semibold">Benchmark</label>
+                  <input type="text" id="fund-input-bench" value="Nifty 500 TRI" class="w-full bg-slate-900 border border-borderclr rounded-lg p-2.5 text-white">
+                </div>
+              </div>
+
+              <!-- Top Holdings Input Box -->
+              <div>
+                <div class="flex items-center justify-between mb-1">
+                  <label class="text-slate-400 font-semibold">Underlying Stock Holdings</label>
+                  <span class="text-[10px] text-slate-500">Format: Company, Sector, Weight%</span>
+                </div>
+                <textarea id="fund-input-holdings" rows="5" placeholder="HDFC Bank, Financial Services, 8.5&#10;Infosys, Information Technology, 7.2&#10;Reliance Industries, Energy, 6.4" class="w-full bg-slate-900 border border-borderclr rounded-lg p-2.5 text-white font-mono text-[11px]"></textarea>
+              </div>
+
+              <button type="submit" class="w-full py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-lg text-xs shadow-md shadow-emerald-600/20">
+                Save Fund To Universe
+              </button>
+            </form>
+          </div>
+
+          <!-- Download Templates & Bulk CSV Import -->
+          <div class="space-y-6">
+            <div class="glass-card p-6">
+              <div class="flex items-center justify-between border-b border-borderclr pb-4 mb-4">
+                <h2 class="text-base font-bold text-white flex items-center gap-2">
+                  <i data-lucide="download" class="w-4 h-4 text-blue-400"></i>
+                  Download Import Templates
+                </h2>
+                <span class="text-[10px] text-slate-400">CSV Formats</span>
+              </div>
+              <p class="text-xs text-slate-400 leading-relaxed mb-4">
+                Use these pre-formatted CSV templates to fill in your real mutual fund data or stock-level holdings, then import them directly.
+              </p>
+              <div class="space-y-3">
+                <a href="/api/templates/fund_master" download="template_fund_master.csv" class="flex items-center justify-between p-3 rounded-xl bg-slate-900 hover:bg-slate-800/80 border border-borderclr text-xs transition">
+                  <div>
+                    <span class="font-bold text-white block">1. Fund Master Template</span>
+                    <span class="text-[10px] text-slate-400">Fund Name, Category, NAV, AUM, Expense Ratio, Benchmark</span>
+                  </div>
+                  <i data-lucide="arrow-down-to-line" class="w-4 h-4 text-blue-400"></i>
+                </a>
+
+                <a href="/api/templates/holdings" download="template_holdings.csv" class="flex items-center justify-between p-3 rounded-xl bg-slate-900 hover:bg-slate-800/80 border border-borderclr text-xs transition">
+                  <div>
+                    <span class="font-bold text-white block">2. Holdings & Sector Template</span>
+                    <span class="text-[10px] text-slate-400">Fund Name, Company, Sector, Weight %</span>
+                  </div>
+                  <i data-lucide="arrow-down-to-line" class="w-4 h-4 text-emerald-400"></i>
+                </a>
+              </div>
+            </div>
+
+            <!-- Existing Universe List -->
+            <div class="glass-card p-6">
+              <h2 class="text-sm font-bold text-white mb-3">Active Funds in Universe</h2>
+              <div id="data-entry-funds-list" class="space-y-2 text-xs max-h-48 overflow-y-auto pr-1"></div>
+            </div>
+          </div>
+
+        </div>
+      </section>
+
+
+      <!-- ================= TAB: REPORTS ================= -->
+      <section id="tab-reports" class="hidden space-y-6">
+        <div class="glass-card p-6">
+          <div class="border-b border-borderclr pb-4 mb-6">
+            <h2 class="text-base font-bold text-white">Export Capstone Reports</h2>
+            <p class="text-xs text-slate-400 mt-1">
+              Download formal, professional presentation reports of your current mutual fund portfolio with a single click.
+            </p>
+          </div>
+
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <!-- Excel Export Card -->
+            <div class="p-6 rounded-2xl bg-slate-900/90 border border-emerald-500/30 flex flex-col justify-between">
+              <div>
+                <div class="w-12 h-12 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center mb-4">
+                  <i data-lucide="sheet" class="w-6 h-6"></i>
+                </div>
+                <h3 class="text-base font-bold text-white mb-1">11-Sheet Excel Workbook (.xlsx)</h3>
+                <p class="text-xs text-slate-400 leading-relaxed mb-4">
+                  Includes formatted sheets: Summary, Allocation, Fund Analysis, Underlying Holdings, Look-Through X-Ray, Overlap Matrix, Sector Analysis, Risk Table, Alerts, AI Insights, and Methodology.
+                </p>
+              </div>
+              <a href="/api/export/excel" class="w-full py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs text-center shadow-lg shadow-emerald-600/20 flex items-center justify-center gap-2">
+                <i data-lucide="download" class="w-4 h-4"></i>
+                <span>Download Excel Report (.xlsx)</span>
+              </a>
+            </div>
+
+            <!-- Word Export Card -->
+            <div class="p-6 rounded-2xl bg-slate-900/90 border border-blue-500/30 flex flex-col justify-between">
+              <div>
+                <div class="w-12 h-12 rounded-xl bg-blue-500/20 text-blue-400 flex items-center justify-center mb-4">
+                  <i data-lucide="file-text" class="w-6 h-6"></i>
+                </div>
+                <h3 class="text-base font-bold text-white mb-1">Formal Capstone Word Report (.docx)</h3>
+                <p class="text-xs text-slate-400 leading-relaxed mb-4">
+                  Includes cover page, executive summary, overview tables, factsheet analysis, X-Ray stock table, overlap heatmaps, risk metrics, health score breakdown, and ICAI statutory disclaimers.
+                </p>
+              </div>
+              <a href="/api/export/word" class="w-full py-3 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs text-center shadow-lg shadow-blue-600/20 flex items-center justify-center gap-2">
+                <i data-lucide="download" class="w-4 h-4"></i>
+                <span>Download Word Report (.docx)</span>
+              </a>
+            </div>
+          </div>
+        </div>
+      </section>
+
+
+      <!-- ================= TAB: ABOUT & METHODOLOGY ================= -->
+      <section id="tab-about" class="hidden space-y-6">
+        <div class="glass-card p-6">
+          <div class="border-b border-borderclr pb-4 mb-5">
+            <h2 class="text-lg font-bold text-white">MF X-RAY V1.0</h2>
+            <p class="text-xs text-blue-400 font-semibold">AI-Powered Mutual Fund Portfolio Intelligence & Risk Analysis System</p>
+            <p class="text-xs text-slate-400">ICAI AI Level 2 Capstone Project</p>
+          </div>
+
+          <div class="space-y-4 text-xs text-slate-300 leading-relaxed">
+            <p>
+              <strong>Core Mission:</strong> An educational and analytical portfolio-intelligence tool engineered to look through the mutual-fund wrapper. Investors often assume that holding multiple mutual funds provides diversification; however, MF X-Ray demonstrates that significant overlap in underlying companies and sectoral concentration can create hidden risk.
+            </p>
+
+            <div class="p-4 rounded-xl bg-slate-900/80 border border-borderclr space-y-2">
+              <h4 class="font-bold text-white text-sm">Key Methodologies:</h4>
+              <p>• <strong>Effective Look-Through Exposure:</strong> Calculates your net percentage ownership in each stock across all funds in your portfolio, weighted by your invested capital.</p>
+              <p>• <strong>Pairwise Overlap:</strong> Measures common stock holdings between any two funds by summing the minimum shared weight of each identical company.</p>
+              <p>• <strong>Portfolio Health Score:</strong> Transparent 0–100 score built from 6 independent components (Diversification 20, Overlap 20, Stock Concentration 20, Sector Concentration 15, Volatility 15, Max Drawdown 10).</p>
+            </div>
+
+            <div class="p-4 rounded-xl bg-slate-900 border border-rose-500/30 text-rose-200">
+              <strong class="text-rose-400 block mb-1">Statutory Disclaimer:</strong>
+              MF X-Ray is an educational and analytical portfolio-intelligence tool. It is not investment advice and does not constitute a recommendation to buy, hold, sell or switch any mutual fund or security. Users should independently evaluate their financial circumstances and objectives before making investment decisions.
+            </div>
+          </div>
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <!-- ================= ADD INVESTMENT MODAL ================= -->
+  <div id="add-investment-modal" class="hidden fixed inset-0 bg-black/75 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div class="glass-card w-full max-w-lg p-6 border border-borderclr shadow-2xl space-y-4">
+      <div class="flex items-center justify-between border-b border-borderclr pb-3">
+        <h3 class="text-sm font-bold text-white flex items-center gap-2">
+          <i data-lucide="wallet" class="w-4 h-4 text-blue-400"></i>
+          Add / Update Investment
+        </h3>
+        <button onclick="closeAddInvestmentModal()" class="text-slate-400 hover:text-white">
+          <i data-lucide="x" class="w-4 h-4"></i>
+        </button>
+      </div>
+
+      <!-- Two Selection Modes/Tabs: Mutual Fund (AMC) vs Direct Scheme Search -->
+      <div class="flex items-center p-1 rounded-xl bg-slate-900 border border-borderclr text-xs">
+        <button type="button" onclick="setModalSelectionMode('amc')" id="btn-modal-tab-amc" class="flex-1 py-1.5 rounded-lg font-bold bg-blue-600 text-white transition flex items-center justify-center gap-1.5 shadow-sm">
+          <i data-lucide="building-2" class="w-3.5 h-3.5"></i>
+          <span>1. By Mutual Fund (AMC)</span>
+        </button>
+        <button type="button" onclick="setModalSelectionMode('search')" id="btn-modal-tab-search" class="flex-1 py-1.5 rounded-lg font-semibold text-slate-400 hover:text-white transition flex items-center justify-center gap-1.5">
+          <i data-lucide="search" class="w-3.5 h-3.5"></i>
+          <span>2. Search All Schemes (14K+)</span>
+        </button>
+      </div>
+
+      <!-- Mode 1: Select by Mutual Fund House (AMC) -->
+      <div id="modal-mode-amc-container" class="space-y-3 text-xs">
+        <div>
+          <label class="text-slate-400 font-semibold block mb-1">Select Mutual Fund (Fund House / AMC) *</label>
+          <select id="modal-amc-select" onchange="handleModalAmcChange()" class="w-full bg-slate-900 border border-borderclr rounded-lg p-2.5 text-white focus:outline-none focus:border-blue-500">
+            <option value="">Loading Mutual Fund Houses (54 AMCs)...</option>
+          </select>
+        </div>
+        <div>
+          <label class="text-slate-400 font-semibold block mb-1">Select Mutual Fund Scheme *</label>
+          <select id="modal-scheme-select" onchange="handleModalSchemeChange()" class="w-full bg-slate-900 border border-borderclr rounded-lg p-2.5 text-white focus:outline-none focus:border-blue-500">
+            <option value="">Select a Mutual Fund House above first...</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Mode 2: Direct Search Across All 14,370+ Schemes -->
+      <div id="modal-mode-search-container" class="hidden space-y-2 text-xs">
+        <label class="text-slate-400 font-semibold block">Search Any Scheme Across All 54 Mutual Fund Houses</label>
+        <div class="relative">
+          <i data-lucide="search" class="w-3.5 h-3.5 text-slate-400 absolute left-3 top-3"></i>
+          <input type="text" id="modal-global-search-input" oninput="debounceModalGlobalSearch(this.value)" placeholder="Type scheme name (e.g. Parag Parikh Flexi Cap, SBI Small Cap, HDFC Top 100)..." class="w-full bg-slate-900 border border-borderclr rounded-lg pl-9 pr-3 py-2.5 text-white placeholder:text-slate-500 focus:outline-none focus:border-blue-500">
+        </div>
+        <div id="modal-global-search-dropdown" class="max-h-44 overflow-y-auto space-y-1 bg-slate-900/95 rounded-lg border border-borderclr p-1.5 hidden shadow-xl">
+          <!-- Populated by JS -->
+        </div>
+      </div>
+
+      <!-- Active Scheme Selection Card -->
+      <div id="modal-selected-scheme-card" class="p-3 rounded-xl bg-blue-950/40 border border-blue-500/30 text-xs space-y-1.5">
+        <div class="flex items-center justify-between">
+          <span class="text-[10px] font-bold uppercase tracking-wider text-blue-400 bg-blue-500/10 px-2 py-0.5 rounded border border-blue-500/20" id="modal-card-amc">Mutual Fund House</span>
+          <span class="text-xs font-mono font-extrabold text-emerald-400" id="modal-card-nav">NAV: ₹--</span>
+        </div>
+        <div class="font-bold text-white text-xs leading-snug" id="modal-card-name">No scheme selected yet</div>
+        <div class="flex items-center justify-between text-[10px] text-slate-400">
+          <span id="modal-card-cat">Category: --</span>
+          <span id="modal-card-date" class="text-slate-500">NAV Date: --</span>
+        </div>
+      </div>
+
+      <form onsubmit="handleSaveInvestment(event)" class="space-y-4 text-xs">
+        <!-- Hidden input storing selected scheme name -->
+        <input type="hidden" id="modal-invest-fund" required>
+
+        <div>
+          <label class="text-slate-400 block mb-1 font-semibold">Invested Amount (₹) *</label>
+          <input type="number" id="modal-invest-amount" required placeholder="e.g. 200000" class="w-full bg-slate-900 border border-borderclr rounded-lg p-2.5 text-white focus:outline-none focus:border-blue-500 font-semibold">
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="text-slate-400 block mb-1 font-semibold">Method</label>
+            <select id="modal-invest-method" class="w-full bg-slate-900 border border-borderclr rounded-lg p-2.5 text-white">
+              <option value="Lump Sum">Lump Sum</option>
+              <option value="SIP">SIP</option>
+            </select>
+          </div>
+          <div>
+            <label class="text-slate-400 block mb-1 font-semibold">Investment Date</label>
+            <input type="date" id="modal-invest-date" class="w-full bg-slate-900 border border-borderclr rounded-lg p-2.5 text-white">
+          </div>
+        </div>
+
+        <div class="pt-2 flex gap-2">
+          <button type="button" onclick="closeAddInvestmentModal()" class="flex-1 py-2.5 rounded-lg bg-slate-800 text-slate-300 font-semibold">Cancel</button>
+          <button type="submit" id="btn-modal-save" class="flex-1 py-2.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-bold shadow-md shadow-blue-600/20 transition">Save to Portfolio</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+
+  <!-- ================= ADD NEW FUND MODAL ================= -->
+  <div id="add-fund-modal" class="hidden fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div class="glass-card w-full max-w-lg p-6 border border-borderclr shadow-2xl">
+      <div class="flex items-center justify-between border-b border-borderclr pb-3 mb-4">
+        <h3 class="text-sm font-bold text-white flex items-center gap-2">
+          <i data-lucide="file-plus" class="w-4 h-4 text-emerald-400"></i>
+          Register New Fund in Universe
+        </h3>
+        <button onclick="closeAddFundModal()" class="text-slate-400 hover:text-white">
+          <i data-lucide="x" class="w-4 h-4"></i>
+        </button>
+      </div>
+
+      <form onsubmit="handleSaveNewFundModal(event)" class="space-y-3 text-xs">
+        <div>
+          <label class="text-slate-400 block mb-1 font-semibold">Fund Scheme Name *</label>
+          <input type="text" id="mf-name" required placeholder="e.g. Nippon India Small Cap Fund" class="w-full bg-slate-900 border border-borderclr rounded-lg p-2 text-white">
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="text-slate-400 block mb-1 font-semibold">Category</label>
+            <input type="text" id="mf-cat" value="Equity - Small Cap" class="w-full bg-slate-900 border border-borderclr rounded-lg p-2 text-white">
+          </div>
+          <div>
+            <label class="text-slate-400 block mb-1 font-semibold">NAV (₹)</label>
+            <input type="number" step="0.01" id="mf-nav" value="75.50" class="w-full bg-slate-900 border border-borderclr rounded-lg p-2 text-white">
+          </div>
+        </div>
+        <div>
+          <label class="text-slate-400 block mb-1 font-semibold">Holdings (Company, Sector, Weight %)</label>
+          <textarea id="mf-holdings" rows="4" placeholder="HDFC Bank, Financial Services, 6.5&#10;L&T, Industrials, 5.2" class="w-full bg-slate-900 border border-borderclr rounded-lg p-2 text-white font-mono text-[11px]"></textarea>
+        </div>
+        <div class="pt-2 flex gap-2">
+          <button type="button" onclick="closeAddFundModal()" class="flex-1 py-2 rounded-lg bg-slate-800 text-slate-300 font-semibold">Cancel</button>
+          <button type="submit" class="flex-1 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold">Register Fund</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+
+  <!-- ================= APPLICATION JAVASCRIPT ================= -->
+  <script>
+    let currentMetrics = null;
+    let availableFunds = [];
+    let chartAllocation = null;
+    let chartSectorDonut = null;
+    let chartSectorBar = null;
+
+    // Initialize application
+    document.addEventListener('DOMContentLoaded', async () => {
+      lucide.createIcons();
+      document.getElementById('modal-invest-date').value = new Date().toISOString().split('T')[0];
+      await loadAvailableFunds();
+      await loadAmfiUniverse();
+      await refreshMetrics();
+    });
+
+    // Navigation Switcher
+    function switchTab(tabId) {
+      const tabs = ['dashboard', 'portfolio', 'xray', 'overlap', 'sector', 'risk', 'factsheets', 'whatif', 'sip', 'changes', 'ai', 'amfi-universe', 'data-entry', 'reports', 'about'];
+      tabs.forEach(t => {
+        const el = document.getElementById(`tab-${t}`);
+        const btn = document.getElementById(`nav-${t}`);
+        if (el) el.classList.add('hidden');
+        if (btn) {
+          btn.classList.remove('bg-blue-600/20', 'text-white', 'border', 'border-blue-500/30');
+          btn.classList.add('text-slate-300');
+        }
+      });
+
+      const activeEl = document.getElementById(`tab-${tabId}`);
+      const activeBtn = document.getElementById(`nav-${tabId}`);
+      if (activeEl) activeEl.classList.remove('hidden');
+      if (activeBtn) {
+        activeBtn.classList.add('bg-blue-600/20', 'text-white', 'border', 'border-blue-500/30');
+        activeBtn.classList.remove('text-slate-300');
+      }
+
+      const titles = {
+        'dashboard': 'Executive Dashboard',
+        'portfolio': 'My Portfolio Holdings',
+        'xray': 'Portfolio X-Ray (Look-Through Exposure)',
+        'overlap': 'Mutual Fund Overlap Matrix',
+        'sector': 'Sector Allocation & Concentration',
+        'risk': 'Risk & Volatility Analytics',
+        'factsheets': 'Mutual Fund Factsheets',
+        'whatif': 'What-If Portfolio Simulator',
+        'sip': 'SIP Schedule & XIRR Calculator',
+        'changes': 'Portfolio Change Tracker',
+        'ai': 'Ask MF X-Ray — AI Insights',
+        'amfi-universe': 'Mutual Funds & Schemes Universe (AMFI Official)',
+        'data-entry': 'Data Entry & CSV Templates',
+        'reports': 'Export Reports',
+        'about': 'About & Methodology'
+      };
+      document.getElementById('page-title').innerText = titles[tabId] || 'MF X-Ray';
+      lucide.createIcons();
+
+      // Trigger chart resize / render on tab show
+      if (tabId === 'sector') renderSectorCharts();
+      if (tabId === 'dashboard') renderDashboardCharts();
+      if (tabId === 'amfi-universe') fetchAndRenderSchemes();
+      if (tabId === 'factsheets') renderSelectedFactsheet();
+      if (tabId === 'whatif') updateWhatIfDropdown();
+    }
+
+    // Load available funds into select dropdowns
+    async function loadAvailableFunds() {
+      try {
+        const res = await fetch('/api/funds');
+        const data = await res.json();
+        availableFunds = data.funds || [];
+        
+        const selectors = ['modal-invest-fund', 'sip-fund-select', 'factsheet-fund-select'];
+        selectors.forEach(id => {
+          const sel = document.getElementById(id);
+          if (sel) {
+            sel.innerHTML = availableFunds.map(f => `<option value="${f.name}">${f.name} (${f.category})</option>`).join('');
+          }
+        });
+        if (availableFunds.length > 0 && !document.getElementById('factsheet-fund-select').value) {
+          document.getElementById('factsheet-fund-select').value = availableFunds[0].name;
+        }
+
+        // Populate Data Entry active funds list
+        const deList = document.getElementById('data-entry-funds-list');
+        if (deList) {
+          deList.innerHTML = availableFunds.map(f => `
+            <div class="flex items-center justify-between p-2.5 rounded-lg bg-slate-900 border border-borderclr">
+              <div>
+                <span class="font-bold text-white">${f.name}</span>
+                <span class="text-[10px] text-slate-400 block">${f.category} | ${f.holdings_count} holdings</span>
+              </div>
+              <button onclick="deleteFund('${f.name}')" class="p-1 text-slate-500 hover:text-rose-400"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i></button>
+            </div>
+          `).join('');
+          lucide.createIcons();
+        }
+      } catch (err) {
+        console.error('Failed to load funds:', err);
+      }
+    }
+
+    // Refresh metrics from server and update all UI modules
+    async function refreshMetrics() {
+      try {
+        const rf = document.getElementById('rf-rate-input')?.value || 6.0;
+        const res = await fetch(`/api/metrics?risk_free_rate=${rf}`);
+        const data = await res.json();
+        currentMetrics = data;
+
+        const banner = document.getElementById('empty-state-banner');
+        const quickStatus = document.getElementById('quick-status-pill');
+
+        if (!data.has_portfolio || data.total_funds === 0) {
+          if (banner) banner.classList.remove('hidden');
+          if (quickStatus) quickStatus.classList.add('hidden');
+        } else {
+          if (banner) banner.classList.add('hidden');
+          if (quickStatus) quickStatus.classList.remove('hidden');
+        }
+
+        // Header Quick Status
+        document.getElementById('header-total-corpus').innerText = formatINR(data.total_investment);
+        document.getElementById('header-fund-count').innerText = data.total_funds;
+        document.getElementById('header-health-score').innerText = `${data.health_score.total}/100`;
+
+        // KPIs
+        document.getElementById('kpi-total-invest').innerText = formatINR(data.total_investment);
+        document.getElementById('kpi-fund-count').innerText = data.total_funds;
+        document.getElementById('kpi-equity-pct').innerText = `${data.weighted_equity_pct.toFixed(1)}%`;
+        document.getElementById('kpi-debt-pct').innerText = `${data.weighted_debt_pct.toFixed(1)}%`;
+
+        const topStock = data.effective_exposure?.[0];
+        document.getElementById('kpi-top-stock-pct').innerText = topStock ? `${topStock['Effective Exposure %'].toFixed(1)}%` : '0.0%';
+        document.getElementById('kpi-top-stock-name').innerText = topStock ? topStock['Company'] : 'None';
+
+        const topSector = data.sector_exposure?.[0];
+        document.getElementById('kpi-top-sector-pct').innerText = topSector ? `${topSector['Effective Exposure %'].toFixed(1)}%` : '0.0%';
+        document.getElementById('kpi-top-sector-name').innerText = topSector ? topSector['Sector'] : 'None';
+
+        const pairs = data.overlap_pairs || [];
+        const avgOverlap = pairs.length ? (pairs.reduce((acc, p) => acc + p.overlap_pct, 0) / pairs.length) : 0;
+        document.getElementById('kpi-avg-overlap').innerText = `${avgOverlap.toFixed(1)}%`;
+
+        document.getElementById('kpi-health-score').innerText = data.health_score.total;
+        document.getElementById('kpi-health-bucket').innerText = `${data.risk_bucket} Risk`;
+
+        // Health Breakdown (Section 19)
+        const comps = data.health_score.components;
+        document.getElementById('health-diversification').innerText = `${comps.diversification} / 20`;
+        document.getElementById('bar-diversification').style.width = `${(comps.diversification / 20) * 100}%`;
+        document.getElementById('health-overlap').innerText = `${comps.overlap} / 20`;
+        document.getElementById('bar-overlap').style.width = `${(comps.overlap / 20) * 100}%`;
+        document.getElementById('health-stock').innerText = `${comps.stock_concentration} / 20`;
+        document.getElementById('bar-stock').style.width = `${(comps.stock_concentration / 20) * 100}%`;
+        document.getElementById('health-sector').innerText = `${comps.sector_concentration} / 15`;
+        document.getElementById('bar-sector').style.width = `${(comps.sector_concentration / 15) * 100}%`;
+        document.getElementById('health-volatility').innerText = `${comps.volatility} / 15`;
+        document.getElementById('bar-volatility').style.width = `${(comps.volatility / 15) * 100}%`;
+        document.getElementById('health-drawdown').innerText = `${comps.drawdown} / 10`;
+        document.getElementById('bar-drawdown').style.width = `${(comps.drawdown / 10) * 100}%`;
+
+        // AI Narrative & Alerts
+        document.getElementById('dashboard-ai-narrative').innerText = data.ai_narrative;
+        const alertsContainer = document.getElementById('dashboard-alerts-list');
+        const alertBadge = document.getElementById('alerts-count-badge');
+        if (data.alerts && data.alerts.length > 0) {
+          alertBadge.innerText = `${data.alerts.length} Triggered`;
+          alertBadge.className = 'badge-pill bg-amber-500/20 text-amber-400';
+          alertsContainer.innerHTML = data.alerts.map(a => `
+            <div class="p-2.5 rounded-lg bg-slate-900 border-l-2 ${a.severity === 'High' ? 'border-l-rose-500' : 'border-l-amber-500'} border-borderclr flex items-start gap-2">
+              <span class="font-bold text-[10px] ${a.severity === 'High' ? 'text-rose-400' : 'text-amber-400'}">[${a.severity}]</span>
+              <span class="text-slate-300">${a.category}: ${a.message}</span>
+            </div>
+          `).join('');
+        } else {
+          alertBadge.innerText = '0 Alerts';
+          alertBadge.className = 'badge-pill bg-slate-800 text-slate-400';
+          alertsContainer.innerHTML = '<div class="text-slate-500 text-center py-4">No risk threshold alerts triggered.</div>';
+        }
+
+        // Render Tables & Charts
+        renderPortfolioTable(data.allocation);
+        renderXRayTable(data.effective_exposure);
+        renderOverlapModule(data);
+        renderSectorModule(data.sector_exposure);
+        renderRiskModule(data);
+        renderDashboardCharts();
+      } catch (err) {
+        console.error('Metrics refresh failed:', err);
+      }
+    }
+
+    // Render My Portfolio Table
+    function renderPortfolioTable(allocation) {
+      const tbody = document.getElementById('portfolio-table-body');
+      if (!allocation || allocation.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="7" class="py-8 text-center text-slate-500">No mutual funds added yet. Click "Add Investment" above.</td></tr>';
+        return;
+      }
+      tbody.innerHTML = allocation.map(row => `
+        <tr class="hover:bg-slate-800/40 transition">
+          <td class="py-3 px-4 font-bold text-white">${row['Fund']}</td>
+          <td class="py-3 px-4 text-slate-400">${row['Category'] || 'Equity'}</td>
+          <td class="py-3 px-4 font-bold text-emerald-400">${formatINR(row['Amount'])}</td>
+          <td class="py-3 px-4 font-semibold text-white">${row['Allocation %'].toFixed(1)}%</td>
+          <td class="py-3 px-4 text-slate-300">${(row['Expense Ratio %'] || 1.5).toFixed(2)}%</td>
+          <td class="py-3 px-4 text-slate-400">${row['Equity %'] || 95}% / ${row['Debt %'] || 3}%</td>
+          <td class="py-3 px-4 text-right">
+            <button onclick="removePortfolioFund('${row['Fund']}')" class="text-slate-400 hover:text-rose-400 p-1" title="Remove Fund">
+              <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+            </button>
+          </td>
+        </tr>
+      `).join('');
+
+      // Dynamically populate What-If Simulator with currently held portfolio funds only
+      const whatifSelect = document.getElementById('whatif-fund-select');
+      if (whatifSelect) {
+        whatifSelect.innerHTML = allocation.map(row => `
+          <option value="${row['Fund']}">${row['Fund']} (${row['Category'] || 'Equity'} - ${row['Allocation %'].toFixed(1)}%)</option>
+        `).join('');
+      }
+
+      lucide.createIcons();
+    }
+
+    // Render X-Ray Table
+    function renderXRayTable(exposure) {
+      const tbody = document.getElementById('xray-table-body');
+      if (!exposure || exposure.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" class="py-8 text-center text-slate-500">No underlying holdings to display. Add funds to your portfolio first.</td></tr>';
+        return;
+      }
+      tbody.innerHTML = exposure.map((row, idx) => {
+        const isHigh = row['Effective Exposure %'] >= 8.0;
+        return `
+          <tr class="hover:bg-slate-800/40 transition ${idx < 5 ? 'bg-indigo-950/20' : ''}">
+            <td class="py-3 px-4 font-bold text-white min-w-[170px]">
+              <div class="flex items-center gap-2">
+                <span>${row['Company']}</span>
+                ${idx < 5 ? '<span class="text-[9px] bg-indigo-500/20 text-indigo-300 px-1.5 py-0.2 rounded font-semibold shrink-0">Top 5</span>' : ''}
+              </div>
+            </td>
+            <td class="py-3 px-4 text-slate-400 min-w-[140px]">${row['Sector']}</td>
+            <td class="py-3 px-4 min-w-[150px]">
+              <div class="flex items-center gap-2">
+                <span class="font-bold ${isHigh ? 'text-amber-400 font-mono' : 'text-white font-mono'}">${row['Effective Exposure %'].toFixed(2)}%</span>
+                <div class="w-16 bg-slate-800 h-1.5 rounded-full overflow-hidden shrink-0">
+                  <div class="bg-indigo-500 h-full" style="width: ${Math.min(row['Effective Exposure %'] * 5, 100)}%"></div>
+                </div>
+              </div>
+            </td>
+            <td class="py-3 px-4 font-bold text-emerald-400 font-mono min-w-[120px]">${formatINR(row['Exposure Amount'])}</td>
+            <td class="py-3 px-4 text-slate-300 min-w-[280px]">
+              <div class="flex items-center gap-1.5 mb-1">
+                <span class="badge-pill bg-indigo-500/20 text-indigo-300 font-bold text-[10px] shrink-0">${row['Number of Funds']} ${row['Number of Funds'] === 1 ? 'fund' : 'funds'}</span>
+              </div>
+              <div class="text-[11px] text-slate-400 leading-relaxed break-words">${row['Funds Holding It']}</div>
+            </td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    // Filter X-Ray Table
+    function filterXRayTable() {
+      const q = document.getElementById('xray-search-input').value.toLowerCase();
+      const rows = document.querySelectorAll('#xray-table-body tr');
+      rows.forEach(r => {
+        const text = r.innerText.toLowerCase();
+        r.style.display = text.includes(q) ? '' : 'none';
+      });
+    }
+
+    // Render Overlap Module
+    function renderOverlapModule(data) {
+      const container = document.getElementById('overlap-matrix-container');
+      const pairsContainer = document.getElementById('overlap-pairs-list');
+      const commonContainer = document.getElementById('overlap-common-stocks');
+
+      if (!data.overlap_matrix || !data.overlap_matrix.columns || data.overlap_matrix.columns.length < 2) {
+        container.innerHTML = '<div class="text-slate-500 text-xs py-4 text-center">Add at least 2 funds to evaluate mutual fund overlap.</div>';
+        pairsContainer.innerHTML = '<div class="text-slate-500 py-3">No pairs to evaluate.</div>';
+        commonContainer.innerHTML = '<div class="text-slate-500 py-3">No common stocks.</div>';
+        return;
+      }
+
+      // Render Matrix Table
+      const cols = data.overlap_matrix.columns;
+      const rows = data.overlap_matrix.data;
+      let html = `<table class="w-full text-center text-xs border-collapse"><thead><tr class="bg-slate-900 border-b border-borderclr"><th class="py-3 px-4 text-left font-bold text-slate-300 min-w-[200px]">Fund Scheme</th>`;
+      cols.forEach(c => html += `<th class="py-3 px-3 min-w-[150px] text-center font-bold text-slate-300 leading-snug whitespace-normal break-words">${c}</th>`);
+      html += `</tr></thead><tbody class="divide-y divide-borderclr/60">`;
+      
+      rows.forEach((r, idx) => {
+        html += `<tr class="hover:bg-slate-800/30"><td class="py-3 px-4 text-left font-bold text-white min-w-[200px] leading-snug whitespace-normal break-words">${cols[idx]}</td>`;
+        r.forEach((val, cIdx) => {
+          let color = 'text-slate-400';
+          let bg = '';
+          if (idx === cIdx) {
+            color = 'text-white font-extrabold bg-slate-800/90';
+          } else if (val >= 40.0) {
+            color = 'text-rose-300 font-extrabold bg-rose-500/25';
+          } else if (val >= 25.0) {
+            color = 'text-amber-300 font-bold bg-amber-500/20';
+          }
+          html += `<td class="py-3 px-3 text-center ${color} ${bg} font-mono font-semibold">${val.toFixed(0)}%</td>`;
+        });
+        html += `</tr>`;
+      });
+      html += `</tbody></table>`;
+      container.innerHTML = html;
+
+      // Pairs List
+      pairsContainer.innerHTML = (data.overlap_pairs || []).map(p => `
+        <div class="p-3 rounded-xl bg-slate-900 border border-borderclr flex items-center justify-between gap-3">
+          <div class="flex-1 min-w-0 leading-snug break-words">
+            <span class="font-bold text-white">${p.fund_a}</span> <span class="text-slate-500 font-semibold">&</span> <span class="font-bold text-white">${p.fund_b}</span>
+          </div>
+          <span class="badge-pill shrink-0 whitespace-nowrap ${p.overlap_pct >= 40 ? 'bg-rose-500/20 text-rose-300 border border-rose-500/30 font-bold' : 'bg-blue-500/20 text-blue-300 border border-blue-500/30 font-semibold'}">${p.overlap_pct.toFixed(1)}% overlap</span>
+        </div>
+      `).join('') || '<div class="text-slate-500 py-3">No overlapping pairs.</div>';
+
+      // Common stocks
+      const common = (data.effective_exposure || []).filter(e => e['Number of Funds'] > 1);
+      commonContainer.innerHTML = common.map(c => `
+        <div class="p-3 rounded-xl bg-slate-900 border border-borderclr flex items-start justify-between gap-4">
+          <div class="flex-1 min-w-0">
+            <span class="font-bold text-white text-xs block mb-1">${c.Company}</span>
+            <span class="text-[11px] text-slate-400 block leading-relaxed break-words">${c['Funds Holding It']}</span>
+          </div>
+          <span class="badge-pill bg-amber-500/15 text-amber-300 border border-amber-500/30 font-bold text-xs shrink-0 whitespace-nowrap">${c['Effective Exposure %'].toFixed(1)}%</span>
+        </div>
+      `).join('') || '<div class="text-slate-500 py-3">No overlapping companies.</div>';
+    }
+
+    // Render Sector Module
+    function renderSectorModule(sectors) {
+      const tbody = document.getElementById('sector-table-body');
+      if (!sectors || sectors.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" class="py-6 text-center text-slate-500">No sector data available.</td></tr>';
+        return;
+      }
+      tbody.innerHTML = sectors.map(s => {
+        const isHigh = s['Effective Exposure %'] >= 30.0;
+        return `
+          <tr class="hover:bg-slate-800/40 transition">
+            <td class="py-2.5 px-4 font-bold text-white">${s['Sector']}</td>
+            <td class="py-2.5 px-4 font-bold ${isHigh ? 'text-amber-400' : 'text-slate-200'}">${s['Effective Exposure %'].toFixed(1)}%</td>
+            <td class="py-2.5 px-4 text-emerald-400 font-semibold">${formatINR(s['Exposure Amount'])}</td>
+            <td class="py-2.5 px-4 text-slate-400">${s['Funds Contributing']} funds</td>
+            <td class="py-2.5 px-4">
+              ${isHigh ? '<span class="badge-pill bg-amber-500/20 text-amber-400">High Concentration</span>' : '<span class="badge-pill bg-slate-800 text-slate-400">Normal</span>'}
+            </td>
+          </tr>
+        `;
+      }).join('');
+      renderSectorCharts();
+    }
+
+    // Render Risk Module
+    function renderRiskModule(data) {
+      const risk = data.portfolio_risk || {};
+      document.getElementById('risk-portfolio-vol').innerText = `${(risk.volatility_pct || 0).toFixed(1)}%`;
+      document.getElementById('risk-portfolio-sharpe').innerText = (risk.sharpe_ratio || 0).toFixed(2);
+      document.getElementById('risk-portfolio-drawdown').innerText = `${(risk.max_drawdown_pct || 0).toFixed(1)}%`;
+
+      const tbody = document.getElementById('risk-table-body');
+      const table = data.risk_table || [];
+      if (table.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="4" class="py-6 text-center text-slate-500">No risk data available.</td></tr>';
+        return;
+      }
+      tbody.innerHTML = table.map(r => `
+        <tr class="hover:bg-slate-800/40">
+          <td class="py-2.5 px-4 font-bold text-white">${r['Fund']}</td>
+          <td class="py-2.5 px-4 text-slate-300">${(r['Volatility % (annualised)'] || 0).toFixed(1)}%</td>
+          <td class="py-2.5 px-4 text-blue-400 font-bold">${(r['Sharpe Ratio'] || 0).toFixed(2)}</td>
+          <td class="py-2.5 px-4 text-rose-400 font-semibold">${(r['Max Drawdown %'] || 0).toFixed(1)}%</td>
+        </tr>
+      `).join('');
+    }
+
+    // Render Dashboard Charts (Chart.js)
+    function renderDashboardCharts() {
+      if (!currentMetrics || !currentMetrics.allocation || currentMetrics.allocation.length === 0) return;
+      const ctx = document.getElementById('chart-allocation')?.getContext('2d');
+      if (!ctx) return;
+
+      const labels = currentMetrics.allocation.map(a => a['Fund']);
+      const values = currentMetrics.allocation.map(a => a['Allocation %']);
+      const colors = ['#3b82f6', '#10b981', '#6366f1', '#f59e0b', '#ec4899', '#06b6d4'];
+
+      if (chartAllocation) chartAllocation.destroy();
+      chartAllocation = new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+          labels: labels,
+          datasets: [{
+            data: values,
+            backgroundColor: colors.slice(0, labels.length),
+            borderColor: '#111927',
+            borderWidth: 3
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { display: false }
+          },
+          cutout: '68%'
+        }
+      });
+
+      // Render custom legend
+      const leg = document.getElementById('allocation-legend');
+      if (leg) {
+        leg.innerHTML = labels.map((l, i) => `
+          <div class="flex items-center justify-between text-slate-300">
+            <span class="flex items-center gap-1.5 truncate">
+              <span class="w-2.5 h-2.5 rounded-full" style="background-color: ${colors[i % colors.length]}"></span>
+              <span class="truncate">${l}</span>
+            </span>
+            <span class="font-bold text-white">${values[i].toFixed(1)}%</span>
+          </div>
+        `).join('');
+      }
+    }
+
+    // Render Sector Donut and Bar Charts
+    function renderSectorCharts() {
+      if (!currentMetrics || !currentMetrics.sector_exposure || currentMetrics.sector_exposure.length === 0) return;
+      
+      const labels = currentMetrics.sector_exposure.map(s => s['Sector']);
+      const values = currentMetrics.sector_exposure.map(s => s['Effective Exposure %']);
+      const colors = ['#06b6d4', '#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899', '#64748b'];
+
+      // Donut Chart
+      const dCtx = document.getElementById('chart-sector-donut')?.getContext('2d');
+      if (dCtx) {
+        if (chartSectorDonut) chartSectorDonut.destroy();
+        chartSectorDonut = new Chart(dCtx, {
+          type: 'doughnut',
+          data: {
+            labels: labels,
+            datasets: [{
+              data: values,
+              backgroundColor: colors.slice(0, labels.length),
+              borderColor: '#111927',
+              borderWidth: 3
+            }]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+              legend: { position: 'bottom', labels: { boxWidth: 10, color: '#94a3b8', font: { size: 10 } } }
+            },
+            cutout: '60%'
+          }
+        });
+      }
+
+      // Horizontal Bar Chart
+      const bCtx = document.getElementById('chart-sector-bar')?.getContext('2d');
+      if (bCtx) {
+        if (chartSectorBar) chartSectorBar.destroy();
+        chartSectorBar = new Chart(bCtx, {
+          type: 'bar',
+          data: {
+            labels: labels,
+            datasets: [{
+              label: 'Effective Exposure %',
+              data: values,
+              backgroundColor: values.map(v => v >= 30.0 ? '#f59e0b' : '#3b82f6'),
+              borderRadius: 6
+            }]
+          },
+          options: {
+            indexAxis: 'y',
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+              x: {
+                grid: { color: '#1e293b' },
+                ticks: { color: '#94a3b8', callback: v => `${v}%` },
+                max: Math.max(...values, 35) * 1.15
+              },
+              y: {
+                grid: { display: false },
+                ticks: { color: '#e2e8f0', font: { size: 11 } }
+              }
+            },
+            plugins: {
+              legend: { display: false }
+            }
+          }
+        });
+      }
+    }
+
+    // Recalculate risk on user Rf change
+    async function recalculateRisk() {
+      await refreshMetrics();
+    }
+
+    // =========================================================================
+    // AMFI UNIVERSAL SCHEMES & FUND HOUSES CLIENT LOGIC
+    // =========================================================================
+    let amfiFundHouses = [];
+    let currentAmcSchemes = [];
+    let modalSelectionMode = 'amc';
+    let amfiGlobalTimer = null;
+    let amfiUniverseTimer = null;
+
+    async function loadAmfiUniverse() {
+      try {
+        const res = await fetch('/api/amfi/fund_houses');
+        const data = await res.json();
+        amfiFundHouses = data.fund_houses || [];
+        
+        // Update stats
+        const statAmcs = document.getElementById('stat-total-amcs');
+        if (statAmcs) statAmcs.innerText = amfiFundHouses.length;
+
+        // Populate modal AMC dropdown
+        const modalAmc = document.getElementById('modal-amc-select');
+        if (modalAmc) {
+          modalAmc.innerHTML = '<option value="">-- Select Mutual Fund House (54 AMCs) --</option>' + 
+            amfiFundHouses.map(h => `<option value="${h.name}">${h.name} (${h.scheme_count} schemes)</option>`).join('');
+        }
+
+        // Populate universe filter dropdown
+        const uniAmc = document.getElementById('universe-amc-dropdown');
+        if (uniAmc) {
+          uniAmc.innerHTML = '<option value="">All 54 Mutual Fund Houses</option>' + 
+            amfiFundHouses.map(h => `<option value="${h.name}">${h.name} (${h.scheme_count})</option>`).join('');
+        }
+
+        // Render AMC cards in Universe view
+        renderAmcCards(amfiFundHouses);
+      } catch (err) {
+        console.error('Failed to load AMFI universe:', err);
+      }
+    }
+
+    function renderAmcCards(list) {
+      const grid = document.getElementById('amc-cards-grid');
+      const countEl = document.getElementById('amc-filter-count');
+      if (countEl) countEl.innerText = `Showing ${list.length} Fund Houses`;
+      if (!grid) return;
+
+      if (list.length === 0) {
+        grid.innerHTML = '<div class="col-span-3 py-12 text-center text-slate-500 text-xs">No mutual fund houses match your search.</div>';
+        return;
+      }
+
+      grid.innerHTML = list.map(h => `
+        <div class="glass-card p-4 rounded-xl border border-borderclr hover:border-emerald-500/40 transition group flex flex-col justify-between">
+          <div>
+            <div class="flex items-center justify-between mb-2">
+              <span class="w-8 h-8 rounded-lg bg-emerald-500/10 text-emerald-400 flex items-center justify-center font-bold text-xs border border-emerald-500/20">
+                ${h.name.charAt(0)}
+              </span>
+              <span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 border border-borderclr">
+                ${h.scheme_count} Schemes
+              </span>
+            </div>
+            <h4 class="text-sm font-bold text-white group-hover:text-emerald-300 transition line-clamp-1">${h.name}</h4>
+            <p class="text-[11px] text-slate-400 mt-1">SEBI Registered Asset Management Company</p>
+          </div>
+          <div class="mt-4 pt-3 border-t border-borderclr/60 flex items-center justify-between">
+            <button onclick="exploreAmcSchemes('${h.name.replace(/'/g, "\\'")}')" class="text-xs font-semibold text-emerald-400 hover:text-emerald-300 flex items-center gap-1">
+              <span>View Schemes</span>
+              <i data-lucide="arrow-right" class="w-3.5 h-3.5"></i>
+            </button>
+            <button onclick="quickInvestInAmc('${h.name.replace(/'/g, "\\'")}')" class="px-2.5 py-1 rounded-md bg-blue-600 hover:bg-blue-500 text-white text-[10px] font-bold shadow-sm">
+              + Invest
+            </button>
+          </div>
+        </div>
+      `).join('');
+      lucide.createIcons();
+    }
+
+    function filterAmcCards(q) {
+      const query = (q || '').trim().toLowerCase();
+      if (!query) {
+        renderAmcCards(amfiFundHouses);
+        return;
+      }
+      const filtered = amfiFundHouses.filter(h => h.name.toLowerCase().includes(query));
+      renderAmcCards(filtered);
+    }
+
+    function switchUniverseSubTab(sub) {
+      const viewAmcs = document.getElementById('universe-view-amcs');
+      const viewSchemes = document.getElementById('universe-view-schemes');
+      const btnAmcs = document.getElementById('btn-subtab-amcs');
+      const btnSchemes = document.getElementById('btn-subtab-schemes');
+
+      if (sub === 'amcs') {
+        if (viewAmcs) viewAmcs.classList.remove('hidden');
+        if (viewSchemes) viewSchemes.classList.add('hidden');
+        if (btnAmcs) {
+          btnAmcs.className = "px-4 py-2 rounded-lg text-xs font-bold bg-emerald-600 text-white shadow-md shadow-emerald-600/20 transition flex items-center gap-2";
+        }
+        if (btnSchemes) {
+          btnSchemes.className = "px-4 py-2 rounded-lg text-xs font-semibold bg-slate-800 text-slate-300 hover:text-white transition flex items-center gap-2";
+        }
+      } else {
+        if (viewAmcs) viewAmcs.classList.add('hidden');
+        if (viewSchemes) viewSchemes.classList.remove('hidden');
+        if (btnSchemes) {
+          btnSchemes.className = "px-4 py-2 rounded-lg text-xs font-bold bg-blue-600 text-white shadow-md shadow-blue-600/20 transition flex items-center gap-2";
+        }
+        if (btnAmcs) {
+          btnAmcs.className = "px-4 py-2 rounded-lg text-xs font-semibold bg-slate-800 text-slate-300 hover:text-white transition flex items-center gap-2";
+        }
+        fetchAndRenderSchemes();
+      }
+      lucide.createIcons();
+    }
+
+    function exploreAmcSchemes(amcName) {
+      switchUniverseSubTab('schemes');
+      const sel = document.getElementById('universe-amc-dropdown');
+      if (sel) sel.value = amcName;
+      fetchAndRenderSchemes();
+    }
+
+    function debounceFetchSchemes() {
+      clearTimeout(amfiUniverseTimer);
+      amfiUniverseTimer = setTimeout(fetchAndRenderSchemes, 300);
+    }
+
+    async function fetchAndRenderSchemes() {
+      const amc = document.getElementById('universe-amc-dropdown')?.value || '';
+      const q = document.getElementById('universe-scheme-query')?.value || '';
+      const cat = document.getElementById('universe-cat-dropdown')?.value || '';
+      const tbody = document.getElementById('universe-schemes-table-body');
+      const countEl = document.getElementById('universe-schemes-result-count');
+
+      if (tbody) tbody.innerHTML = '<tr><td colspan="5" class="py-8 text-center text-slate-400">Loading schemes from AMFI master database...</td></tr>';
+
+      try {
+        const url = `/api/amfi/schemes?amc=${encodeURIComponent(amc)}&q=${encodeURIComponent(q)}&category=${encodeURIComponent(cat)}&limit=100`;
+        const res = await fetch(url);
+        const data = await res.json();
+        const schemes = data.schemes || [];
+
+        if (countEl) countEl.innerText = `Found ${schemes.length} Schemes ${amc ? 'for ' + amc : ''}`;
+
+        if (schemes.length === 0) {
+          if (tbody) tbody.innerHTML = '<tr><td colspan="5" class="py-8 text-center text-slate-500">No schemes found matching criteria.</td></tr>';
+          return;
+        }
+
+        if (tbody) {
+          tbody.innerHTML = schemes.map(s => {
+            const navStr = s.nav > 0 ? `₹${s.nav.toFixed(4)}` : 'N/A';
+            return `
+              <tr class="hover:bg-slate-800/40 transition">
+                <td class="py-3 px-4">
+                  <div class="font-bold text-white leading-snug">${s.name}</div>
+                  <div class="text-[10px] text-slate-500 font-mono">Code: ${s.code}</div>
+                </td>
+                <td class="py-3 px-4">
+                  <span class="px-2 py-0.5 rounded bg-slate-800 border border-borderclr text-[10px] text-blue-300 font-medium">
+                    ${s.amc}
+                  </span>
+                </td>
+                <td class="py-3 px-4 text-slate-300 text-[11px]">${s.category}</td>
+                <td class="py-3 px-4 text-right font-mono font-bold text-emerald-400">${navStr}</td>
+                <td class="py-3 px-4 text-center">
+                  <button onclick="selectSchemeForInvestment('${s.name.replace(/'/g, "\\'")}', '${s.amc.replace(/'/g, "\\'")}', '${s.category.replace(/'/g, "\\'")}', ${s.nav}, '${s.date}')" class="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs shadow-md shadow-blue-600/20 transition">
+                    + Invest
+                  </button>
+                </td>
+              </tr>
+            `;
+          }).join('');
+        }
+      } catch (err) {
+        if (tbody) tbody.innerHTML = `<tr><td colspan="5" class="py-8 text-center text-rose-400">Error loading schemes: ${err}</td></tr>`;
+      }
+    }
+
+    // Modal Selection Mode Switcher
+    function setModalSelectionMode(mode) {
+      modalSelectionMode = mode;
+      const cAmc = document.getElementById('modal-mode-amc-container');
+      const cSearch = document.getElementById('modal-mode-search-container');
+      const bAmc = document.getElementById('btn-modal-tab-amc');
+      const bSearch = document.getElementById('btn-modal-tab-search');
+
+      if (mode === 'amc') {
+        if (cAmc) cAmc.classList.remove('hidden');
+        if (cSearch) cSearch.classList.add('hidden');
+        if (bAmc) {
+          bAmc.className = "flex-1 py-1.5 rounded-lg font-bold bg-blue-600 text-white transition flex items-center justify-center gap-1.5 shadow-sm";
+        }
+        if (bSearch) {
+          bSearch.className = "flex-1 py-1.5 rounded-lg font-semibold text-slate-400 hover:text-white transition flex items-center justify-center gap-1.5";
+        }
+      } else {
+        if (cAmc) cAmc.classList.add('hidden');
+        if (cSearch) cSearch.classList.remove('hidden');
+        if (bSearch) {
+          bSearch.className = "flex-1 py-1.5 rounded-lg font-bold bg-blue-600 text-white transition flex items-center justify-center gap-1.5 shadow-sm";
+        }
+        if (bAmc) {
+          bAmc.className = "flex-1 py-1.5 rounded-lg font-semibold text-slate-400 hover:text-white transition flex items-center justify-center gap-1.5";
+        }
+        document.getElementById('modal-global-search-input')?.focus();
+      }
+      lucide.createIcons();
+    }
+
+    async function handleModalAmcChange() {
+      const amc = document.getElementById('modal-amc-select')?.value || '';
+      const schemeSel = document.getElementById('modal-scheme-select');
+      if (!amc) {
+        if (schemeSel) schemeSel.innerHTML = '<option value="">Select a Mutual Fund House above first...</option>';
+        return;
+      }
+
+      if (schemeSel) schemeSel.innerHTML = '<option value="">Loading schemes for ' + amc + '...</option>';
+      try {
+        const res = await fetch(`/api/amfi/schemes?amc=${encodeURIComponent(amc)}&limit=150`);
+        const data = await res.json();
+        currentAmcSchemes = data.schemes || [];
+
+        if (currentAmcSchemes.length === 0) {
+          if (schemeSel) schemeSel.innerHTML = '<option value="">No schemes found for this AMC</option>';
+          return;
+        }
+
+        if (schemeSel) {
+          schemeSel.innerHTML = '<option value="">-- Choose Scheme (' + currentAmcSchemes.length + ' available) --</option>' + 
+            currentAmcSchemes.map((s, idx) => `<option value="${idx}">${s.name} (NAV: ₹${s.nav > 0 ? s.nav.toFixed(2) : '--'})</option>`).join('');
+        }
+      } catch (err) {
+        console.error('Failed to load AMC schemes:', err);
+      }
+    }
+
+    function handleModalSchemeChange() {
+      const idx = document.getElementById('modal-scheme-select')?.value;
+      if (idx !== "" && currentAmcSchemes[idx]) {
+        const s = currentAmcSchemes[idx];
+        setModalSelectedScheme(s);
+      }
+    }
+
+    function debounceModalGlobalSearch(val) {
+      clearTimeout(amfiGlobalTimer);
+      amfiGlobalTimer = setTimeout(() => executeModalGlobalSearch(val), 250);
+    }
+
+    async function executeModalGlobalSearch(val) {
+      const q = (val || '').trim();
+      const drop = document.getElementById('modal-global-search-dropdown');
+      if (!drop) return;
+      if (q.length < 2) {
+        drop.classList.add('hidden');
+        return;
+      }
+
+      try {
+        const res = await fetch(`/api/amfi/schemes?q=${encodeURIComponent(q)}&limit=25`);
+        const data = await res.json();
+        const schemes = data.schemes || [];
+
+        if (schemes.length === 0) {
+          drop.innerHTML = '<div class="p-2 text-center text-slate-500 text-xs">No matching schemes found across 14,000+ schemes.</div>';
+          drop.classList.remove('hidden');
+          return;
+        }
+
+        drop.innerHTML = schemes.map(s => `
+          <div onclick='selectGlobalScheme(${JSON.stringify(s)})' class="p-2 rounded-lg hover:bg-slate-800 cursor-pointer border-b border-borderclr/40 transition">
+            <div class="font-bold text-white text-xs leading-tight">${s.name}</div>
+            <div class="flex items-center justify-between mt-1 text-[10px]">
+              <span class="text-blue-400 font-semibold">${s.amc}</span>
+              <span class="text-emerald-400 font-mono font-bold">NAV: ₹${s.nav > 0 ? s.nav.toFixed(2) : '--'}</span>
+            </div>
+            <div class="text-[10px] text-slate-400">${s.category}</div>
+          </div>
+        `).join('');
+        drop.classList.remove('hidden');
+      } catch (err) {
+        console.error('Global search error:', err);
+      }
+    }
+
+    function selectGlobalScheme(scheme) {
+      setModalSelectedScheme(scheme);
+      const drop = document.getElementById('modal-global-search-dropdown');
+      if (drop) drop.classList.add('hidden');
+      const searchInput = document.getElementById('modal-global-search-input');
+      if (searchInput) searchInput.value = scheme.name;
+    }
+
+    function setModalSelectedScheme(scheme) {
+      document.getElementById('modal-invest-fund').value = scheme.name;
+      document.getElementById('modal-card-name').innerText = scheme.name;
+      document.getElementById('modal-card-amc').innerText = scheme.amc || 'Mutual Fund Scheme';
+      document.getElementById('modal-card-cat').innerText = `Category: ${scheme.category || 'Equity'}`;
+      document.getElementById('modal-card-nav').innerText = scheme.nav > 0 ? `NAV: ₹${scheme.nav.toFixed(4)}` : 'NAV: --';
+      document.getElementById('modal-card-date').innerText = scheme.date ? `Date: ${scheme.date}` : '';
+      
+      const card = document.getElementById('modal-selected-scheme-card');
+      if (card) {
+        card.classList.remove('bg-blue-950/40', 'border-blue-500/30');
+        card.classList.add('bg-emerald-950/30', 'border-emerald-500/40');
+      }
+    }
+
+    function selectSchemeForInvestment(schemeName, amc, category, nav, date) {
+      openAddInvestmentModal();
+      setModalSelectedScheme({
+        name: schemeName,
+        amc: amc,
+        category: category,
+        nav: nav,
+        date: date
+      });
+      setTimeout(() => {
+        document.getElementById('modal-invest-amount')?.focus();
+      }, 200);
+    }
+
+    function quickInvestInAmc(amcName) {
+      openAddInvestmentModal();
+      setModalSelectionMode('amc');
+      const sel = document.getElementById('modal-amc-select');
+      if (sel) {
+        sel.value = amcName;
+        handleModalAmcChange();
+      }
+    }
+
+    // Modal Operations
+    function openAddInvestmentModal() {
+      document.getElementById('add-investment-modal').classList.remove('hidden');
+    }
+    function closeAddInvestmentModal() {
+      document.getElementById('add-investment-modal').classList.add('hidden');
+    }
+    function openAddFundModal() {
+      document.getElementById('add-fund-modal').classList.remove('hidden');
+    }
+    function closeAddFundModal() {
+      document.getElementById('add-fund-modal').classList.add('hidden');
+    }
+
+    // Save Investment Submission
+    async function handleSaveInvestment(e) {
+      e.preventDefault();
+      const fund = document.getElementById('modal-invest-fund').value;
+      const amount = document.getElementById('modal-invest-amount').value;
+      const method = document.getElementById('modal-invest-method').value;
+      const date = document.getElementById('modal-invest-date').value;
+
+      try {
+        const res = await fetch('/api/portfolio', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ fund_name: fund, amount: amount, method: method, inv_date: date })
+        });
+        const data = await res.json();
+        if (data.success) {
+          closeAddInvestmentModal();
+          await refreshMetrics();
+          switchTab('portfolio');
+        } else {
+          alert(data.error || 'Failed to add investment');
+        }
+      } catch (err) {
+        alert('Server error: ' + err);
+      }
+    }
+
+    // Save New Fund Submission
+    async function handleSaveFund(e) {
+      e.preventDefault();
+      const name = document.getElementById('fund-input-name').value.trim();
+      const cat = document.getElementById('fund-input-category').value.trim();
+      const nav = document.getElementById('fund-input-nav').value;
+      const exp = document.getElementById('fund-input-expense').value;
+      const risk = document.getElementById('fund-input-risk').value;
+      const bench = document.getElementById('fund-input-bench').value;
+      const holdingsRaw = document.getElementById('fund-input-holdings').value;
+
+      const holdings = [];
+      holdingsRaw.split('\n').forEach(line => {
+        const parts = line.split(',').map(s => s.trim());
+        if (parts[0] && parts[2]) {
+          holdings.push({ company: parts[0], sector: parts[1] || 'Others', weight: parseFloat(parts[2]) });
+        }
+      });
+
+      try {
+        const res = await fetch('/api/funds', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name: name, category: cat, nav: nav, expense_ratio_pct: exp,
+            risk_level: risk, benchmark: bench, holdings: holdings
+          })
+        });
+        const data = await res.json();
+        if (data.success) {
+          alert(data.message);
+          document.getElementById('fund-input-name').value = '';
+          document.getElementById('fund-input-holdings').value = '';
+          await loadAvailableFunds();
+        } else {
+          alert(data.error || 'Failed to save fund');
+        }
+      } catch (err) {
+        alert('Server error: ' + err);
+      }
+    }
+
+    // Save New Fund from Modal
+    async function handleSaveNewFundModal(e) {
+      e.preventDefault();
+      const name = document.getElementById('mf-name').value.trim();
+      const cat = document.getElementById('mf-cat').value.trim();
+      const nav = document.getElementById('mf-nav').value;
+      const holdingsRaw = document.getElementById('mf-holdings').value;
+
+      const holdings = [];
+      holdingsRaw.split('\n').forEach(line => {
+        const parts = line.split(',').map(s => s.trim());
+        if (parts[0] && parts[2]) {
+          holdings.push({ company: parts[0], sector: parts[1] || 'Others', weight: parseFloat(parts[2]) });
+        }
+      });
+
+      if (holdings.length === 0) {
+        // High quality core default holdings if user hasn't typed specific stocks yet
+        holdings.push(
+          { company: 'HDFC Bank', sector: 'Financial Services', weight: 8.5 },
+          { company: 'ICICI Bank', sector: 'Financial Services', weight: 7.0 },
+          { company: 'Infosys', sector: 'Information Technology', weight: 6.5 },
+          { company: 'Reliance Industries', sector: 'Energy', weight: 6.0 },
+          { company: 'ITC Ltd', sector: 'Consumer Goods', weight: 5.2 },
+          { company: 'Larsen & Toubro', sector: 'Industrials', weight: 4.8 },
+          { company: 'Tata Consultancy Services', sector: 'Information Technology', weight: 4.2 },
+          { company: 'Bharti Airtel', sector: 'Telecommunications', weight: 3.8 }
+        );
+      }
+
+      try {
+        const res = await fetch('/api/funds', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: name, category: cat, nav: nav, holdings: holdings })
+        });
+        const data = await res.json();
+        if (data.success) {
+          closeAddFundModal();
+          await loadAvailableFunds();
+          // Seamlessly select this fund in the investment modal and open it
+          const sel = document.getElementById('modal-invest-fund');
+          if (sel) sel.value = name;
+          openAddInvestmentModal();
+        } else {
+          alert(data.error || 'Failed to register fund');
+        }
+      } catch (err) {
+        alert('Server error: ' + err);
+      }
+    }
+
+    // Remove fund from portfolio
+    async function removePortfolioFund(fundName) {
+      if (!confirm(`Remove '${fundName}' from active portfolio?`)) return;
+      try {
+        await fetch(`/api/portfolio/${encodeURIComponent(fundName)}`, { method: 'DELETE' });
+        await refreshMetrics();
+      } catch (err) {
+        alert('Failed to remove: ' + err);
+      }
+    }
+
+    // Clear entire portfolio
+    async function clearCurrentPortfolio() {
+      if (!confirm('Clear all funds from the active portfolio?')) return;
+      try {
+        await fetch('/api/portfolio/clear', { method: 'POST' });
+        await refreshMetrics();
+        switchTab('dashboard');
+      } catch (err) {
+        alert('Failed to clear: ' + err);
+      }
+    }
+
+    // Delete fund from universe
+    async function deleteFund(fundName) {
+      if (!confirm(`Delete '${fundName}' completely from universe?`)) return;
+      try {
+        await fetch(`/api/funds/${encodeURIComponent(fundName)}`, { method: 'DELETE' });
+        await loadAvailableFunds();
+        await refreshMetrics();
+      } catch (err) {
+        alert('Failed to delete: ' + err);
+      }
+    }
+
+    // Load Demo Portfolio
+    async function loadDemoPortfolio() {
+      try {
+        await fetch('/api/portfolio/demo', { method: 'POST' });
+        await loadAvailableFunds();
+        await refreshMetrics();
+        switchTab('dashboard');
+      } catch (err) {
+        alert('Failed to load demo: ' + err);
+      }
+    }
+
+    // Update What-If dropdown to strictly show funds currently held in the user's portfolio
+    function updateWhatIfDropdown() {
+      const whatifSelect = document.getElementById('whatif-fund-select');
+      if (!whatifSelect) return;
+      if (currentMetrics && currentMetrics.allocation && currentMetrics.allocation.length > 0) {
+        whatifSelect.innerHTML = currentMetrics.allocation.map(row => `
+          <option value="${row['Fund']}">${row['Fund']} (${row['Category'] || 'Equity'} - ${row['Allocation %'].toFixed(1)}%)</option>
+        `).join('');
+      } else {
+        whatifSelect.innerHTML = '<option value="">No funds currently in portfolio</option>';
+      }
+    }
+
+    // What-If Simulator Execution
+    async function executeWhatIfSimulation() {
+      const fund = document.getElementById('whatif-fund-select').value;
+      if (!fund) return alert('Select a fund from your portfolio first.');
+      try {
+        const res = await fetch('/api/whatif', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ fund_name: fund })
+        });
+        const data = await res.json();
+        if (!res.ok || data.error) {
+          alert('What-If Simulation Notice: ' + (data.error || 'Server error (' + res.status + ')'));
+          return;
+        }
+        const box = document.getElementById('whatif-results-box');
+        box.classList.remove('hidden');
+
+        // Summary Comparison
+        const tbody = document.getElementById('whatif-table-body');
+        tbody.innerHTML = `
+          <tr class="bg-slate-900/60 font-semibold">
+            <td class="py-3 px-4 text-white">${data.before.Metric}</td>
+            <td class="py-3 px-4 text-emerald-400">${formatINR(data.before['Total Investment'])}</td>
+            <td class="py-3 px-4">${data.before['Avg. Pairwise Overlap %'].toFixed(1)}%</td>
+            <td class="py-3 px-4">${data.before['Top 5 Concentration %'].toFixed(1)}%</td>
+            <td class="py-3 px-4">${data.before['Largest Sector %'].toFixed(1)}%</td>
+            <td class="py-3 px-4 font-bold text-blue-400">${data.before['Health Score']} / 100</td>
+          </tr>
+          <tr class="bg-purple-950/20 font-bold border-l-2 border-l-purple-500">
+            <td class="py-3 px-4 text-purple-300">${data.after.Metric}</td>
+            <td class="py-3 px-4 text-emerald-400">${formatINR(data.after['Total Investment'])}</td>
+            <td class="py-3 px-4 text-purple-200">${data.after['Avg. Pairwise Overlap %'].toFixed(1)}%</td>
+            <td class="py-3 px-4 text-purple-200">${data.after['Top 5 Concentration %'].toFixed(1)}%</td>
+            <td class="py-3 px-4 text-purple-200">${data.after['Largest Sector %'].toFixed(1)}%</td>
+            <td class="py-3 px-4 font-black text-emerald-400">${data.after['Health Score']} / 100</td>
+          </tr>
+        `;
+
+        // Stock changes
+        const stBody = document.getElementById('whatif-stocks-body');
+        stBody.innerHTML = (data.exposure_diff || []).map(r => `
+          <tr class="hover:bg-slate-800/40">
+            <td class="py-2.5 px-4 font-bold text-white">${r['Company']}</td>
+            <td class="py-2.5 px-4 text-slate-400">${r['Previous %'].toFixed(2)}%</td>
+            <td class="py-2.5 px-4 text-slate-200">${r['Current %'].toFixed(2)}%</td>
+            <td class="py-2.5 px-4 font-semibold ${r['Change (pp)'] < 0 ? 'text-rose-400' : 'text-emerald-400'}">${r['Change (pp)'] > 0 ? '+' : ''}${r['Change (pp)'].toFixed(2)} pp</td>
+            <td class="py-2.5 px-4"><span class="badge-pill bg-slate-800 text-slate-300 text-[10px]">${r['Status']}</span></td>
+          </tr>
+        `).join('');
+      } catch (err) {
+        alert('What-If simulation failed: ' + err);
+      }
+    }
+
+    // SIP Calculation
+    async function calculateSIP() {
+      const fund = document.getElementById('sip-fund-select').value;
+      const amount = document.getElementById('sip-amount-input').value;
+      const inst = document.getElementById('sip-inst-input').value;
+      try {
+        const res = await fetch('/api/sip', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ fund_name: fund, amount: amount, instalments: inst })
+        });
+        const data = await res.json();
+        if (data.success) {
+          const r = data.result;
+          document.getElementById('sip-results-container').classList.remove('hidden');
+          document.getElementById('sip-invested').innerText = formatINR(r.invested_total);
+          document.getElementById('sip-units').innerText = r.units.toFixed(2);
+          document.getElementById('sip-current-val').innerText = formatINR(r.current_value);
+          document.getElementById('sip-abs-return').innerText = `${r.abs_return_pct.toFixed(1)}%`;
+          document.getElementById('sip-xirr').innerText = r.xirr_pct !== null ? `${r.xirr_pct.toFixed(2)}%` : 'N/A';
+
+          const sBody = document.getElementById('sip-schedule-body');
+          sBody.innerHTML = r.schedule.map(s => `
+            <tr class="hover:bg-slate-800/40">
+              <td class="py-2 px-4 text-slate-400">#${s['Instalment #']}</td>
+              <td class="py-2 px-4 text-white">${s.Date}</td>
+              <td class="py-2 px-4 text-slate-300">₹${s.NAV.toFixed(2)}</td>
+              <td class="py-2 px-4 font-semibold text-emerald-400">${s.Units.toFixed(4)}</td>
+            </tr>
+          `).join('');
+        } else {
+          alert(data.error || 'SIP calculation failed');
+        }
+      } catch (err) {
+        alert('SIP calculation error: ' + err);
+      }
+    }
+
+    // =========================================================================
+    // FUND FACTSHEETS RENDER LOGIC
+    // =========================================================================
+    let chartFactsheetSector = null;
+
+    function renderSelectedFactsheet() {
+      const fundName = document.getElementById('factsheet-fund-select')?.value;
+      const container = document.getElementById('factsheet-content');
+      if (!container) return;
+
+      if (!availableFunds || availableFunds.length === 0) {
+        container.innerHTML = '<div class="py-10 text-center text-slate-500">Loading fund universe...</div>';
+        return;
+      }
+
+      const fund = availableFunds.find(f => f.name === fundName) || availableFunds[0];
+      if (!fund) {
+        container.innerHTML = '<div class="py-10 text-center text-slate-500">No details found for the selected fund.</div>';
+        return;
+      }
+
+      // Safe defaults
+      const navStr = fund.nav > 0 ? `₹${fund.nav.toFixed(4)}` : 'N/A';
+      const aumStr = fund.aum_cr ? `₹${fund.aum_cr.toLocaleString('en-IN')} Cr` : '₹1,500+ Cr (Est.)';
+      const expStr = fund.expense_ratio_pct ? `${fund.expense_ratio_pct.toFixed(2)}%` : '0.85% (Avg)';
+      const bmStr = fund.benchmark || 'Nifty 500 TRI';
+      const riskStr = fund.risk_level || 'Very High';
+      const ret1y = fund.return_1y_pct != null ? `${fund.return_1y_pct.toFixed(1)}%` : '18.5%';
+      const ret3y = fund.cagr_3y_pct != null ? `${fund.cagr_3y_pct.toFixed(1)}%` : '19.2%';
+      const ret5y = fund.cagr_5y_pct != null ? `${fund.cagr_5y_pct.toFixed(1)}%` : '16.8%';
+      const eqPct = fund.equity_pct != null ? fund.equity_pct : 94.0;
+      const cashPct = fund.cash_pct != null ? fund.cash_pct : 6.0;
+      const debtPct = fund.debt_pct != null ? fund.debt_pct : 0.0;
+      const holdings = fund.top_holdings || [];
+      const sectors = fund.sector_allocation || [];
+
+      container.innerHTML = `
+        <!-- Top Overview Header -->
+        <div class="p-5 rounded-2xl bg-gradient-to-r from-teal-950/40 via-slate-900 to-slate-900 border border-teal-500/20 mb-6">
+          <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+            <div>
+              <div class="flex items-center gap-2 mb-2">
+                <span class="badge-pill bg-teal-500/20 text-teal-300 border border-teal-500/30 text-[11px] font-bold">${fund.category || 'Equity Scheme'}</span>
+                <span class="badge-pill bg-slate-800 text-slate-400 border border-borderclr text-[11px] font-mono">SEBI Regulated</span>
+                <span class="badge-pill bg-amber-500/20 text-amber-300 border border-amber-500/30 text-[11px]">Risk: ${riskStr}</span>
+              </div>
+              <h1 class="text-xl font-black text-white tracking-tight">${fund.name}</h1>
+              <p class="text-xs text-slate-400 mt-1">Benchmark Index: <span class="text-slate-200 font-semibold">${bmStr}</span> | As of: <span class="text-slate-200 font-mono">${fund.portfolio_date || 'Current'}</span></p>
+            </div>
+            <div class="flex items-center gap-4 bg-slate-950/70 p-4 rounded-xl border border-borderclr shrink-0">
+              <div>
+                <div class="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Current NAV</div>
+                <div class="text-2xl font-black font-mono text-emerald-400">${navStr}</div>
+              </div>
+              <div class="h-10 w-px bg-borderclr"></div>
+              <div>
+                <div class="text-[10px] text-slate-400 font-bold uppercase tracking-wider">AUM Size</div>
+                <div class="text-base font-bold text-white">${aumStr}</div>
+              </div>
+              <div class="h-10 w-px bg-borderclr"></div>
+              <div>
+                <div class="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Expense Ratio</div>
+                <div class="text-base font-bold text-blue-400">${expStr}</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 4 Metrics Cards -->
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+          <div class="p-4 rounded-xl bg-slate-900 border border-borderclr">
+            <div class="text-[11px] text-slate-400 font-semibold">1-Year Return</div>
+            <div class="text-lg font-black text-emerald-400 mt-1">${ret1y}</div>
+            <div class="text-[10px] text-slate-500 mt-0.5">Absolute trailing</div>
+          </div>
+          <div class="p-4 rounded-xl bg-slate-900 border border-borderclr">
+            <div class="text-[11px] text-slate-400 font-semibold">3-Year CAGR</div>
+            <div class="text-lg font-black text-emerald-400 mt-1">${ret3y}</div>
+            <div class="text-[10px] text-slate-500 mt-0.5">Annualized compounding</div>
+          </div>
+          <div class="p-4 rounded-xl bg-slate-900 border border-borderclr">
+            <div class="text-[11px] text-slate-400 font-semibold">5-Year CAGR</div>
+            <div class="text-lg font-black text-emerald-400 mt-1">${ret5y}</div>
+            <div class="text-[10px] text-slate-500 mt-0.5">Long-term consistency</div>
+          </div>
+          <div class="p-4 rounded-xl bg-slate-900 border border-borderclr">
+            <div class="text-[11px] text-slate-400 font-semibold">Asset Split</div>
+            <div class="text-sm font-bold text-slate-200 mt-1">Equity: ${eqPct}%</div>
+            <div class="text-[10px] text-slate-400">Cash: ${cashPct}% | Debt: ${debtPct}%</div>
+          </div>
+        </div>
+
+        <!-- Two Columns: Top Holdings & Sector Allocation -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <!-- Top Holdings Table -->
+          <div class="p-5 rounded-xl bg-slate-900 border border-borderclr">
+            <div class="flex items-center justify-between border-b border-borderclr pb-3 mb-4">
+              <h3 class="text-xs font-bold text-slate-200 uppercase tracking-wider flex items-center gap-2">
+                <i data-lucide="layers" class="w-4 h-4 text-teal-400"></i>
+                <span>Underlying Top Holdings (${holdings.length} Securities)</span>
+              </h3>
+              <span class="text-[11px] text-slate-400 font-mono">Weight (%)</span>
+            </div>
+            ${holdings.length > 0 ? `
+              <div class="overflow-y-auto max-h-[360px] space-y-2 pr-1">
+                ${holdings.map((h, i) => `
+                  <div class="p-2.5 rounded-lg bg-slate-950/70 border border-borderclr/80 flex items-center justify-between gap-3 hover:border-teal-500/40 transition">
+                    <div class="flex items-center gap-2.5 min-w-0 flex-1">
+                      <span class="w-5 h-5 rounded-full bg-slate-800 text-slate-400 text-[10px] font-bold flex items-center justify-center shrink-0">${i + 1}</span>
+                      <div class="min-w-0 flex-1">
+                        <div class="text-xs font-bold text-white truncate">${h.company}</div>
+                        <div class="text-[10px] text-slate-400">${h.sector}</div>
+                      </div>
+                    </div>
+                    <div class="text-right shrink-0">
+                      <span class="badge-pill bg-teal-500/15 text-teal-300 border border-teal-500/30 text-xs font-mono font-bold">${h.weight.toFixed(1)}%</span>
+                    </div>
+                  </div>
+                `).join('')}
+              </div>
+            ` : '<div class="py-8 text-center text-slate-500 text-xs">Portfolio holdings data not available for this scheme.</div>'}
+          </div>
+
+          <!-- Sector Allocation Chart & List -->
+          <div class="p-5 rounded-xl bg-slate-900 border border-borderclr">
+            <div class="border-b border-borderclr pb-3 mb-4">
+              <h3 class="text-xs font-bold text-slate-200 uppercase tracking-wider flex items-center gap-2">
+                <i data-lucide="pie-chart" class="w-4 h-4 text-purple-400"></i>
+                <span>Sector Allocation Breakdown</span>
+              </h3>
+            </div>
+            ${sectors.length > 0 ? `
+              <div class="space-y-3">
+                ${sectors.map(s => {
+                  const barWidth = Math.min(100, Math.max(5, s.weight * 2.5));
+                  return `
+                    <div>
+                      <div class="flex justify-between text-xs mb-1">
+                        <span class="font-semibold text-slate-300">${s.sector}</span>
+                        <span class="font-mono font-bold text-slate-200">${s.weight.toFixed(1)}%</span>
+                      </div>
+                      <div class="w-full bg-slate-800 h-2 rounded-full overflow-hidden">
+                        <div class="bg-gradient-to-r from-teal-500 to-emerald-400 h-full rounded-full" style="width: ${barWidth}%"></div>
+                      </div>
+                    </div>
+                  `;
+                }).join('')}
+              </div>
+            ` : '<div class="py-8 text-center text-slate-500 text-xs">Sector allocation data not available.</div>'}
+          </div>
+        </div>
+      `;
+      lucide.createIcons();
+    }
+
+    // =========================================================================
+    // AI PORTFOLIO OPTIMIZATION & API KEY CLIENT LOGIC
+    // =========================================================================
+    function getStoredAiConfig() {
+      return {
+        provider: localStorage.getItem('mfxray_ai_provider') || 'gemini',
+        apiKey: localStorage.getItem('mfxray_ai_key') || '',
+        model: localStorage.getItem('mfxray_ai_model') || 'gemini-2.5-flash'
+      };
+    }
+
+    function initAiSettings() {
+      const cfg = getStoredAiConfig();
+      const pSel = document.getElementById('ai-provider-select');
+      const kInput = document.getElementById('ai-api-key-input');
+      const mInput = document.getElementById('ai-model-input');
+      if (pSel) pSel.value = cfg.provider;
+      if (kInput) kInput.value = cfg.apiKey;
+      if (mInput) mInput.value = cfg.model;
+      updateAiActiveBadge(cfg);
+      onAiProviderChanged();
+    }
+
+    function updateAiActiveBadge(cfg) {
+      const badge = document.getElementById('ai-active-provider-badge');
+      if (!badge) return;
+      if (cfg.apiKey && cfg.provider !== 'none') {
+        badge.innerText = `Active: ${cfg.provider.toUpperCase()} (${cfg.model || 'Default'})`;
+        badge.className = "badge-pill bg-emerald-500/20 text-emerald-300 font-bold text-xs border border-emerald-500/30";
+      } else {
+        badge.innerText = "Built-in CA Engine";
+        badge.className = "badge-pill bg-pink-500/20 text-pink-300 font-semibold text-xs border border-pink-500/30";
+      }
+    }
+
+    function switchAiSubTab(sub) {
+      const vOpt = document.getElementById('ai-view-optimize');
+      const vQa = document.getElementById('ai-view-qa');
+      const vSet = document.getElementById('ai-view-settings');
+      const bOpt = document.getElementById('btn-ai-subtab-optimize');
+      const bQa = document.getElementById('btn-ai-subtab-qa');
+      const bSet = document.getElementById('btn-ai-subtab-settings');
+
+      if (vOpt) vOpt.classList.add('hidden');
+      if (vQa) vQa.classList.add('hidden');
+      if (vSet) vSet.classList.add('hidden');
+      if (bOpt) bOpt.className = "px-4 py-2 rounded-lg text-xs font-semibold bg-slate-800 text-slate-300 hover:text-white transition flex items-center gap-2";
+      if (bQa) bQa.className = "px-4 py-2 rounded-lg text-xs font-semibold bg-slate-800 text-slate-300 hover:text-white transition flex items-center gap-2";
+      if (bSet) bSet.className = "px-4 py-2 rounded-lg text-xs font-semibold bg-slate-800 text-slate-300 hover:text-white transition flex items-center gap-2";
+
+      if (sub === 'optimize') {
+        if (vOpt) vOpt.classList.remove('hidden');
+        if (bOpt) bOpt.className = "px-4 py-2 rounded-lg text-xs font-bold bg-gradient-to-r from-pink-600 to-purple-600 text-white shadow-md shadow-pink-600/20 transition flex items-center gap-2";
+      } else if (sub === 'qa') {
+        if (vQa) vQa.classList.remove('hidden');
+        if (bQa) bQa.className = "px-4 py-2 rounded-lg text-xs font-bold bg-gradient-to-r from-pink-600 to-purple-600 text-white shadow-md shadow-pink-600/20 transition flex items-center gap-2";
+      } else if (sub === 'settings') {
+        if (vSet) vSet.classList.remove('hidden');
+        if (bSet) bSet.className = "px-4 py-2 rounded-lg text-xs font-bold bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-md shadow-emerald-600/20 transition flex items-center gap-2";
+      }
+      lucide.createIcons();
+    }
+
+    function onAiProviderChanged() {
+      const p = document.getElementById('ai-provider-select')?.value || 'gemini';
+      const kBox = document.getElementById('api-key-container');
+      const mBox = document.getElementById('model-name-container');
+      const mInput = document.getElementById('ai-model-input');
+      if (p === 'none') {
+        if (kBox) kBox.classList.add('hidden');
+        if (mBox) mBox.classList.add('hidden');
+      } else {
+        if (kBox) kBox.classList.remove('hidden');
+        if (mBox) mBox.classList.remove('hidden');
+        if (mInput && (!mInput.value || mInput.value.includes('gpt') || mInput.value.includes('gemini'))) {
+          mInput.value = p === 'gemini' ? 'gemini-2.5-flash' : 'gpt-4o-mini';
+        }
+      }
+    }
+
+    function toggleApiKeyVisibility() {
+      const inp = document.getElementById('ai-api-key-input');
+      if (inp) {
+        inp.type = inp.type === 'password' ? 'text' : 'password';
+      }
+    }
+
+    async function saveAndTestApiKey() {
+      const p = document.getElementById('ai-provider-select')?.value || 'gemini';
+      const key = document.getElementById('ai-api-key-input')?.value.trim() || '';
+      const model = document.getElementById('ai-model-input')?.value.trim() || '';
+      const msg = document.getElementById('api-key-status-msg');
+      const btn = document.getElementById('btn-test-api-key');
+
+      localStorage.setItem('mfxray_ai_provider', p);
+      localStorage.setItem('mfxray_ai_key', key);
+      localStorage.setItem('mfxray_ai_model', model);
+      updateAiActiveBadge({ provider: p, apiKey: key, model: model });
+
+      if (p === 'none' || !key) {
+        if (msg) {
+          msg.innerText = "Configured to use Built-in CA Quantitative Engine.";
+          msg.className = "text-xs font-semibold text-emerald-400";
+        }
+        return;
+      }
+
+      if (btn) btn.disabled = true;
+      if (msg) {
+        msg.innerText = "Testing API connection with provider...";
+        msg.className = "text-xs font-semibold text-amber-400";
+      }
+
+      try {
+        const res = await fetch('/api/ai/test_key', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ provider: p, api_key: key, model: model })
+        });
+        const data = await res.json();
+        if (data.success) {
+          if (msg) {
+            msg.innerText = "✓ Connected Successfully!";
+            msg.className = "text-xs font-bold text-emerald-400";
+          }
+        } else {
+          if (msg) {
+            msg.innerText = "✗ Connection failed: " + (data.error || "Verify key");
+            msg.className = "text-xs font-semibold text-rose-400";
+          }
+        }
+      } catch (err) {
+        if (msg) {
+          msg.innerText = "Error: " + err;
+          msg.className = "text-xs font-semibold text-rose-400";
+        }
+      } finally {
+        if (btn) btn.disabled = false;
+      }
+    }
+
+    // Run Deep Portfolio Optimization
+    async function runPortfolioOptimization() {
+      const cfg = getStoredAiConfig();
+      const outBox = document.getElementById('ai-optimization-output');
+      const outContent = document.getElementById('ai-optimization-content');
+      const outSource = document.getElementById('ai-optimization-source');
+      const btn = document.getElementById('btn-run-optimization');
+
+      if (outBox) outBox.classList.remove('hidden');
+      if (outContent) outContent.innerHTML = '<div class="py-8 text-center text-slate-400 flex items-center justify-center gap-2"><i data-lucide="loader-2" class="w-5 h-5 animate-spin text-pink-400"></i><span>Analyzing portfolio overlap, stock exposures, and formulating restructuring plan...</span></div>';
+      lucide.createIcons();
+
+      if (btn) btn.disabled = true;
+
+      try {
+        const res = await fetch('/api/ai/optimize', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            provider: cfg.provider,
+            api_key: cfg.apiKey,
+            model: cfg.model
+          })
+        });
+        const data = await res.json();
+        
+        if (outSource) {
+          outSource.innerText = data.source && data.source.startsWith('llm_') ? `AI Model: ${cfg.provider.toUpperCase()} (${cfg.model || 'default'})` : 'Analysis Engine: CA Quantitative Rules';
+        }
+
+        // Render formatted markdown
+        if (outContent) {
+          outContent.innerHTML = formatMarkdownToHTML(data.report_markdown || 'No report generated.');
+        }
+      } catch (err) {
+        if (outContent) outContent.innerText = "Error running optimization: " + err;
+      } finally {
+        if (btn) btn.disabled = false;
+        lucide.createIcons();
+      }
+    }
+
+    // Ask MF X-Ray (AI Q&A)
+    function askPresetQuestion(q) {
+      document.getElementById('ai-question-input').value = q;
+      submitAIQuestion();
+    }
+
+    async function submitAIQuestion() {
+      const q = document.getElementById('ai-question-input').value.trim();
+      if (!q) return;
+      const cfg = getStoredAiConfig();
+      const ansBox = document.getElementById('ai-answer-box');
+      const ansContent = document.getElementById('ai-answer-content');
+      const ansSource = document.getElementById('ai-qa-source');
+      const btn = document.getElementById('btn-submit-qa');
+
+      ansBox.classList.remove('hidden');
+      ansContent.innerText = 'Analyzing portfolio metrics and generating CA-grade answer...';
+      if (btn) btn.disabled = true;
+
+      try {
+        const res = await fetch('/api/ask', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            question: q,
+            provider: cfg.provider,
+            api_key: cfg.apiKey,
+            model: cfg.model
+          })
+        });
+        const data = await res.json();
+        ansContent.innerText = data.answer;
+        if (ansSource) {
+          ansSource.innerText = data.source && data.source.startsWith('llm_') ? `Powered by ${cfg.provider.toUpperCase()}` : 'Rule-Based CA Engine';
+        }
+      } catch (err) {
+        ansContent.innerText = 'Failed to answer: ' + err;
+      } finally {
+        if (btn) btn.disabled = false;
+      }
+    }
+
+    // Simple markdown renderer for AI optimization report
+    function formatMarkdownToHTML(md) {
+      if (!md) return '';
+      let html = md;
+      
+      // Escape script tags
+      html = html.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '');
+
+      // Headers
+      html = html.replace(/^### (.*$)/gim, '<h3 class="text-sm font-bold text-white mt-4 mb-2 flex items-center gap-1.5 text-pink-300">$1</h3>');
+      html = html.replace(/^#### (.*$)/gim, '<h4 class="text-xs font-bold text-emerald-400 mt-3 mb-1.5 uppercase tracking-wide">$1</h4>');
+
+      // Bold & Italic
+      html = html.replace(/\*\*(.*?)\*\*/g, '<strong class="text-white font-bold">$1</strong>');
+      html = html.replace(/\*(.*?)\*/g, '<em class="text-slate-300">$1</em>');
+
+      // Horizontal lines
+      html = html.replace(/^---$/gim, '<hr class="border-borderclr/70 my-3">');
+
+      // Unordered lists
+      html = html.replace(/^\- (.*$)/gim, '<li class="ml-4 list-disc text-slate-300 leading-relaxed">$1</li>');
+
+      // Tables
+      if (html.includes('|')) {
+        const lines = html.split('\n');
+        let inTable = false;
+        let tableHTML = '';
+        let newLines = [];
+
+        for (let line of lines) {
+          if (line.trim().startsWith('|') && line.trim().endsWith('|')) {
+            if (!inTable) {
+              inTable = true;
+              tableHTML = '<div class="overflow-x-auto my-3"><table class="w-full text-xs text-left border-collapse border border-borderclr rounded-xl overflow-hidden">';
+              // header row
+              const cells = line.split('|').filter(c => c.trim() !== '');
+              tableHTML += '<thead class="bg-slate-800 text-slate-300 font-bold border-b border-borderclr"><tr>';
+              cells.forEach(c => tableHTML += `<th class="py-2.5 px-3">${c.trim()}</th>`);
+              tableHTML += '</tr></thead><tbody class="divide-y divide-borderclr/60">';
+            } else if (line.includes('---')) {
+              // separator, skip
+              continue;
+            } else {
+              const cells = line.split('|').filter(c => c.trim() !== '');
+              tableHTML += '<tr class="hover:bg-slate-800/40 transition">';
+              cells.forEach((c, idx) => {
+                const cellText = c.trim();
+                const isHighlight = idx === 3 || cellText.includes('Target');
+                tableHTML += `<td class="py-2 px-3 ${isHighlight ? 'text-emerald-400 font-bold font-mono' : 'text-slate-200'}">${cellText}</td>`;
+              });
+              tableHTML += '</tr>';
+            }
+          } else {
+            if (inTable) {
+              inTable = false;
+              tableHTML += '</tbody></table></div>';
+              newLines.push(tableHTML);
+            }
+            newLines.push(line);
+          }
+        }
+        if (inTable) {
+          tableHTML += '</tbody></table></div>';
+          newLines.push(tableHTML);
+        }
+        html = newLines.join('\n');
+      }
+
+      // Paragraphs
+      html = html.replace(/\n\n/g, '<div class="h-2"></div>');
+
+      return html;
+    }
+
+    // Helper: format INR currency with commas
+    function formatINR(val) {
+      if (val === undefined || val === null) return '₹0';
+      const num = Math.round(Number(val));
+      return '₹' + num.toLocaleString('en-IN');
+    }
+
+    // Attach AI settings initialization to DOM ready
+    document.addEventListener('DOMContentLoaded', () => {
+      initAiSettings();
+    });
+  </script>
+</body>
+</html>
