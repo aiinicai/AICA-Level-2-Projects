@@ -1,376 +1,2054 @@
-# Ind AS 116 — Lease Accounting Suite
-
-A modular, GUI-based lease accounting model for Chartered Accountancy
-practices, covering **Day-0 measurement** of the Right-of-Use (ROU)
-asset and Lease Liability under **Ind AS 116**, plus month-wise
-liability amortisation and ROU depreciation schedules.
-
-## Requirements
-- Python 3.9 or later
-- Tkinter (ships with standard Python installers on Windows/macOS; on
-  some Linux distributions install via `sudo apt install python3-tk`)
-
-All other third-party packages (`pandas`, `openpyxl`,
-`python-dateutil`) are detected and installed **automatically the
-first time you run the app** — you will see a live installation log
-window while this happens. This only happens once per machine.
-
-## Running the application
-```
-python main.py
-```
-
-## What it does
-1. **Lease Inputs tab** — enter monthly rental, lease term, escalation,
-   payment timing (advance/arrears), the Interest Rate Implicit in the
-   Lease (or Incremental Borrowing Rate if not determinable), initial
-   direct costs, incentives, restoration costs, etc.
-2. **Run Model** computes:
-   - Lease Liability at Day 0 = PV of unpaid lease payments
-   - ROU Asset at Day 0 = Lease Liability + prepaid rentals + initial
-     direct costs − incentives + PV of restoration costs
-   - Month-wise lease liability amortisation (effective interest method)
-   - Month-wise ROU depreciation (straight-line over the lease term)
-3. **Export to Excel** — saves all schedules to a multi-sheet workbook
-   suitable for client working papers.
-4. **Save/Load Template** — save a lease's input set as a `.json` file
-   so recurring engagements (e.g. annual re-runs, similar leases across
-   branches) can be reloaded instantly instead of re-keyed.
-
-## Project structure (for maintenance)
-```
-ind_as_116_suite/
-├── main.py                  Entry point (run this)
-├── README.md
-└── ind_as_116/
-    ├── __init__.py           Package metadata
-    ├── bootstrap.py          First-run dependency detection & install
-    ├── models.py             LeaseInputs / LeaseResult data structures
-    ├── engine.py             All Ind AS 116 calculations (no I/O)
-    ├── excel_export.py       Excel workbook export
-    └── gui.py                Tkinter GUI (install log + main window)
-```
-
-The calculation engine (`engine.py`) is fully decoupled from the GUI —
-it can be imported and run headlessly (e.g. from a script that batch-
-processes many client leases from a CSV, or from a future web/CLI
-front-end) without any Tkinter dependency:
-
-```python
-from datetime import date
-from ind_as_116.models import LeaseInputs
-from ind_as_116.engine import LeaseEngine
-from ind_as_116.excel_export import export_to_excel
-
-inputs = LeaseInputs(
-    lease_commencement_date=date(2025, 4, 1),
-    lease_term_months=60,
-    monthly_rental=100000,
-    incremental_borrowing_rate_annual=0.10,
-)
-result = LeaseEngine(inputs).run()
-print(result.summary)
-export_to_excel(result, "lease_model.xlsx")
-```
-
-## Key accounting reference
-Ind AS 116 (Leases) — lessee recognition and initial measurement:
-the Right-of-Use asset is measured at cost, and the lease liability
-at the present value of lease payments not paid at the commencement
-date, discounted using the interest rate implicit in the lease if
-readily determinable, or otherwise the lessee's incremental
-borrowing rate.
-
-## Notes on assumptions built into this model
-- Depreciation is charged straight-line over the full lease term. If
-  the underlying asset's useful life is shorter and ownership does not
-  transfer, adjust `build_depreciation_schedule()` accordingly.
-- Variable lease payments (not based on an index/rate), sublease
-  accounting, and lease modification/reassessment are **not** yet
-  modelled — flagged here so future maintainers know the current scope
-  boundary.
-- All amounts are assumed to be in a single currency (no FX translation
-  built in).
-
-## Extending this suite
-Because the engine, GUI, and export layers are separate modules,
-common extensions are isolated to one file each:
-- New calculation logic (e.g. lease modifications) → `engine.py`
-- New input fields → add to `LeaseInputs` in `models.py` and to the
-  `FIELDS` list in `gui.py`
-- New export formats (e.g. PDF working paper) → new module alongside
-  `excel_export.py`
-# INNFLOW — Enterprise Hotel Operations & Management Ecosystem
-**AICA Level-2 Capstone Project**  
-**Author:** CA Ankit Tandon  
-**Target Industry:** Hospitality, Hotel Property Management & Internal Financial Controls
-# Upload Your Project Folder to the AICA Level 2 Projects Repository
+# Client Connect Hub
 
-**Target repository:** [aiinicai/AICA-Level-2-Projects](https://github.com/aiinicai/AICA-Level-2-Projects)
+KGMC CSSP — Client Self Service Portal
 
-This guide explains how to contribute your complete project folder to the **AICA-Level-2-Projects** repository using GitHub’s **Fork + Pull Request** workflow.
+AICA Level 2 — Phase 1 MVP Full-Stack Web Application
 
-View your app in AI Studio: https://ai.studio/apps/af3a28f1-b3e2-43c9-b427-5bc8f8761be0
-View your app in AI Studio: https://ai.studio/apps/b49c013d-e05a-4bda-abc3-766b35b09cb9
-Two methods are covered:
+You are acting as a senior product architect, UI/UX designer, and full-stack software engineer.
 
-1. **Website-only method** — no software installation required.
-2. **Git command-line method** — recommended for complete project folders and projects containing many files.
+I want you to build a complete, functional, production-quality full-stack web application called:
 
----
+KGMC CSSP
 
-## Fork + Pull Request Workflow
+Client Self Service Portal
 
-1. **Fork:** Create a personal copy of `aiinicai/AICA-Level-2-Projects` under your GitHub account.
-2. **Add your folder:** Upload or copy your project folder into your fork.
-3. **Commit:** Save the changes in your fork with a clear commit message.
-4. **Open a Pull Request:** Request the `aiinicai` account to merge your changes into the original repository.
-5. **Merge:** The repository owner reviews and accepts your Pull Request. After it is merged, your project folder will appear in the official repository.
+This is an AICA Level 2 project developed for a Chartered Accountancy / Financial Advisory firm.
 
----
+I will provide a UI reference image along with this prompt. Use that image as the primary visual reference for the overall look, layout, spacing, dashboard structure, navigation style, cards, tables, typography hierarchy, and professional SaaS aesthetic.
 
-# Method 1: Website Only
+Do not merely create a static UI prototype. Build a functioning end-to-end application with frontend, backend, database, authentication, authorization, business logic, file handling, notifications, audit trail, dashboards, search, filters, and reports.
 
-Use this method if:
+1. PRODUCT OBJECTIVE
 
-- You do not want to install Git.
-- Your project contains relatively few files.
-- You do not need to preserve the project’s earlier commit history.
+KGMC CSSP solves a common problem in Chartered Accountancy firms.
 
-> [!NOTE]
-> GitHub’s web uploader generally allows up to 100 files in a single upload. If your project contains more files, upload them in batches or use the Git command-line method.
+CA firms have multiple clients and multiple team members. Clients regularly communicate with the CA firm for requests such as:
 
-## Step 1: Fork the Repository
+Provide my ITR copy
 
-1. Log in to your GitHub account.
-2. Open the [AICA-Level-2-Projects repository](https://github.com/aiinicai/AICA-Level-2-Projects).
-3. Click **Fork** in the upper-right corner of the page.
-4. On the **Create a new fork** page, keep the default settings.
-5. Click **Create fork**.
+Provide GST return copy
 
-You will be redirected to your personal copy of the repository:
+Confirm whether GST return has been filed
 
-```text
-https://github.com/YOUR-USERNAME/AICA-Level-2-Projects
-```
+Provide PAN card
 
-Replace `YOUR-USERNAME` with your GitHub username.
+Provide previous years' audit reports
 
-## Step 2: Upload Your Project Folder
+Provide financial statements
 
-GitHub provides two ways to add a folder through the website.
+Clarify tax matters
 
-### Option A: Drag and Drop the Complete Folder
+Ask accounting questions
 
-1. Open your fork of the repository.
-2. Click **Add file** → **Upload files**.
-3. Open the parent location of your project folder in File Explorer.
-4. Drag the **complete project folder**—not only the files inside it—into GitHub’s upload area.
-5. Wait until all the files appear in the upload list.
+Ask compliance-related questions
 
-Modern browsers such as Google Chrome and Microsoft Edge generally preserve the folder structure during upload.
+Request certificates
 
-### Option B: Create the Folder Using a File Path
+Request previously submitted documents
 
-1. Open your fork of the repository.
-2. Click **Add file** → **Create new file**.
-3. In the filename box, enter:
+At the same time, the CA firm regularly needs information and documents from clients:
 
-   ```text
-   MyProjectName/README.md
-   ```
+Bank statements
 
-   Typing `/` in the filename automatically creates the folder.
+Sales data
 
-4. Add a short description of your project to the new `README.md` file.
-5. Click **Commit changes**.
-6. Open the newly created folder.
-7. Click **Add file** → **Upload files** and upload the remaining project files.
+Purchase data
 
-Replace `MyProjectName` with the name of your project.
+GST data
 
-## Step 3: Commit the Upload
+TDS data
 
-1. Scroll down to the **Commit changes** section.
-2. Enter a clear commit message, for example:
+Payroll information
 
-   ```text
-   Add <Your Name> - <Project Name> project folder
-   ```
+Invoices
 
-3. Keep **Commit directly to the main branch** selected.
-4. Click **Commit changes**.
+Agreements
 
-Because this is your personal fork, committing directly to its `main` branch is acceptable for this submission workflow.
+Financial information
 
-## Step 4: Open a Pull Request
+Audit schedules
 
-1. Return to the main page of your fork.
-2. GitHub may display a banner stating:
+Supporting documents
 
-   ```text
-   This branch is X commits ahead of aiinicai:main
-   ```
+Currently this communication is often handled through WhatsApp, email, phone calls, Excel sheets and informal follow-ups.
 
-3. Click **Contribute** → **Open pull request**.
+This creates:
 
-Alternatively:
+Missed queries
 
-1. Open the **Pull requests** tab.
-2. Click **New pull request**.
+Unclear ownership
 
-Before creating the Pull Request, confirm the following direction:
+Delayed responses
 
-| Setting | Selection |
-| --- | --- |
-| Base repository | `aiinicai/AICA-Level-2-Projects` |
-| Base branch | `main` |
-| Head repository | `YOUR-USERNAME/AICA-Level-2-Projects` |
-| Compare branch | `main` |
+No central communication history
 
-Then:
+Difficult follow-up
 
-1. Enter a clear Pull Request title, for example:
+Poor visibility for Partners
 
-   ```text
-   Add AICA Level 2 Project - <Your Name>
-   ```
+Poor workload visibility for Managers
 
-2. In the description, briefly explain:
-   - The purpose of your project.
-   - Its main features.
-   - Any setup or usage instructions.
-3. Click **Create pull request**.
+Repeated document requests
 
-## Step 5: Wait for Review and Merge
+No structured SLA monitoring
 
-The owner of the `aiinicai/AICA-Level-2-Projects` repository will receive your Pull Request.
+Difficulty identifying overdue matters
 
-The repository owner may:
+Lack of audit trail
 
-- Review your project.
-- Ask questions.
-- Suggest changes.
-- Approve and merge the Pull Request.
+KGMC CSSP should centralize this entire communication workflow.
 
-If changes are requested, update the files in your fork and commit them. Your existing Pull Request will update automatically.
+2. CORE VALUE PROPOSITION
 
-After the Pull Request is merged, your project folder will become part of the official repository.
+The application should provide:
 
----
+Visibility
 
-# Method 2: Git Command Line
+Partners and Managers can see what is happening across clients and team members.
 
-This method is recommended when:
+Accountability
 
-- Your project contains many files.
-- You want to upload the complete folder structure reliably.
-- You are comfortable using Git commands.
+Every query/request has an owner, priority, status and due date.
 
-## Prerequisites
+Traceability
 
-Before beginning:
+Every communication, status change, assignment and document upload is recorded.
 
-- Install [Git](https://git-scm.com/downloads).
-- Create or log in to your GitHub account.
-- Fork the [AICA-Level-2-Projects repository](https://github.com/aiinicai/AICA-Level-2-Projects) as explained in Method 1.
+The core product philosophy is:
 
-## Step 1: Clone Your Fork
+ONE PLATFORM
+ONE OWNER
+ONE STATUS
+ONE SLA
+ONE AUDIT TRAIL
 
-Open Terminal, Command Prompt, PowerShell, or Git Bash and run:
+3. IMPORTANT MVP SCOPE
 
-```bash
-git clone https://github.com/YOUR-USERNAME/AICA-Level-2-Projects.git
-```
+This is the Phase 1 AICA Level 2 MVP.
 
-Then open the cloned repository:
+Build ONLY the following 19 core features:
 
-```bash
-cd AICA-Level-2-Projects
-```
+Authentication / Login
 
-Replace `YOUR-USERNAME` with your GitHub username.
+Role-Based Access Control
 
-## Step 2: Copy Your Project Folder
+Client Management
 
-Copy your complete project folder into the cloned `AICA-Level-2-Projects` directory.
+User Management
 
-Recommended folder naming format:
+Query Creation
 
-```text
-YourName-ProjectName/
-```
+Query Assignment
+
+Query Priority
+
+SLA / Due Date
+
+Two-Way Communication
+
+File Upload / Attachments
+
+@Mention
+
+Query Status Workflow
+
+Partner Dashboard
+
+Manager Dashboard
+
+Client Dashboard
+
+In-App Notifications
+
+Search and Filters
+
+Audit Trail
+
+Reports
+
+Do NOT implement the following in Phase 1:
+
+WhatsApp integration
+
+Email integration
+
+OCR
+
+AI
+
+Tally integration
+
+Zoho integration
+
+GST API integration
+
+Income Tax API integration
+
+Calendar integration
+
+SMS
+
+External notification services
+
+Payment gateway
+
+Complex document OCR
+
+AI chatbot
+
+AI-generated responses
+
+These will be considered Phase 2 / Capstone / Future Scope.
+
+However, design the architecture cleanly so these capabilities can be added later without rebuilding the application.
+
+4. USER ROLES
+
+Create the following six roles.
+
+INTERNAL USERS
+
+1. Super Admin
+
+Can:
+
+Create/edit/deactivate users
+
+Create/edit/deactivate clients
+
+Manage roles
+
+Assign Partner to client
+
+Assign Manager to client
+
+Manage departments
+
+Manage query categories
+
+Configure SLA rules
+
+View all queries
+
+View all requests
+
+View reports
+
+View audit logs
+
+2. Partner
+
+Can:
+
+View all assigned clients
+
+View all queries for assigned clients
+
+View all requests
+
+View team performance
+
+View dashboards
+
+View overdue queries
+
+View high-priority queries
+
+View matters requiring Partner attention
+
+Respond to queries
+
+Add internal notes
+
+Mention team members
+
+Resolve/escalate queries
+
+3. Manager
+
+Can:
+
+View assigned clients
+
+View team queries
+
+Assign/reassign queries
+
+Monitor SLA
+
+Monitor overdue queries
+
+Respond to queries
+
+Add internal notes
+
+Mention Partner/team members
+
+Escalate matters
+
+View team performance
+
+4. Team Member
+
+Can:
+
+View assigned queries
+
+View assigned requests
+
+Respond to clients
+
+Upload documents
+
+Add internal notes
+
+Mention Manager/Partner
+
+Change permitted statuses
+
+Resolve queries
+
+View relevant client information
+
+EXTERNAL USERS
+
+5. Client Admin
+
+Can:
+
+View their organization
+
+View organization queries
+
+Raise queries
+
+Respond to queries
+
+Upload documents
+
+View requests from KGMC
+
+Manage permitted client users
+
+View notifications
+
+Close/confirm resolved queries
+
+6. Client User
+
+Can:
+
+Raise queries
+
+View their permitted queries
+
+Respond
+
+Upload documents
+
+Respond to information requests
+
+View notifications
+
+Client users must NEVER be able to see:
+
+Other clients
+
+Internal notes
+
+Internal staff discussions
+
+Other clients' data
+
+Internal performance data
+
+Partner dashboards
+
+Manager dashboards
+
+5. MULTI-TENANT / DATA ISOLATION
+
+The application must maintain strict data isolation.
+
+A client user must only be able to access data belonging to their client organization.
+
+Internal KGMC users can access data according to their role and assigned clients.
+
+Never expose another client's:
+
+Queries
+
+Requests
+
+Documents
+
+Users
+
+Messages
+
+Reports
+
+Implement authorization on the backend/database level, not merely by hiding UI elements.
+
+6. MAIN APPLICATION NAVIGATION
+
+Use a professional left sidebar similar to the provided UI reference.
+
+Main navigation:
+
+Dashboard
+
+Queries
+
+Requests
+
+Clients
+
+Documents
+
+Reports
+
+Notifications
+
+Users
+
+Settings
+
+Not every role should see every menu item.
+
+For example:
+
+Client users should see:
+
+Dashboard
+
+My Queries
+
+My Requests
+
+My Documents
+
+Notifications
+
+Profile
+
+Partner should see:
+
+Dashboard
+
+Queries
+
+Requests
+
+Clients
+
+Documents
+
+Reports
+
+Notifications
+
+Super Admin should see everything.
+
+7. BRANDING
+
+Application name:
+
+KGMC CSSP
+
+Full name:
+
+Client Self Service Portal
+
+Use a premium, modern professional consulting/SaaS visual language.
+
+The UI reference image provided with this prompt should guide the design.
+
+Design characteristics:
+
+Professional
+
+Minimal
+
+Clean
+
+Premium
+
+Corporate
+
+Easy to navigate
+
+High information density without looking cluttered
+
+Strong visual hierarchy
+
+Rounded cards
+
+Clean tables
+
+Status badges
+
+Priority indicators
+
+Professional dashboard charts
+
+Use the KGMC CSSP brand identity consistently throughout the application.
+
+Do not make the interface look like a generic student CRUD project.
+
+It should look like a genuine B2B SaaS product that a professional CA firm could use.
+
+8. AUTHENTICATION
+
+Create a proper authentication system.
+
+Required:
+
+Login
+
+Logout
+
+Session management
+
+Password hashing
+
+Protected routes
+
+Role-based authorization
+
+Password reset capability if supported by the chosen authentication framework
+
+The application must redirect users to the correct dashboard based on their role.
+
+9. CLIENT MASTER
+
+Create a Client Management module.
+
+Client fields:
+
+Client ID
+
+Legal Name
+
+Display Name
+
+Entity Type
+
+PAN
+
+GSTIN
+
+CIN
+
+Industry
+
+Registered Address
+
+Contact Email
+
+Contact Number
+
+Partner
+
+Manager
+
+Status
+
+Onboarding Date
+
+Created Date
+
+Client statuses:
+
+Active
+
+Inactive
+
+Provide:
+
+Add Client
+
+Edit Client
+
+View Client
+
+Search Client
+
+Filter Client
+
+Deactivate Client
+
+10. CLIENT USERS
+
+Each client can have multiple users.
 
 Example:
 
-```text
-Rahul-Sharma-AI-Invoice-Analyzer/
+ABC Pvt Ltd
+
+CFO — Client Admin
+
+Finance Manager — Client User
+
+Accounts Executive — Client User
+
+Client Admin can manage permitted client users.
+
+Each user must be linked to exactly one client organization unless they are internal KGMC users.
+
+11. QUERY MANAGEMENT
+
+This is the primary module.
+
+A Client should be able to click:
+
++ New Query
+
+Create a query with:
+
+Query ID — automatically generated
+
+Client — automatically populated
+
+Category
+
+Subject
+
+Description
+
+Priority
+
+Assigned To
+
+Attachment
+
+Created Date
+
+Due Date
+
+Status
+
+Example:
+
+Query ID:
+
+CSSP-Q-000125
+
+Client:
+
+ABC Pvt Ltd
+
+Category:
+
+Income Tax
+
+Subject:
+
+ITR Copy Required
+
+Description:
+
+"Please provide ITR acknowledgement and computation for FY 2025-26."
+
+Priority:
+
+High
+
+12. QUERY CATEGORIES
+
+Create these default categories:
+
+GST
+
+Income Tax
+
+TDS
+
+Accounting
+
+Audit
+
+ROC / Companies Act
+
+Payroll
+
+Finance
+
+FEMA / RBI
+
+Other
+
+Allow Super Admin to manage categories later.
+
+13. PRIORITY
+
+Three priority levels:
+
+HIGH
+
+Red indicator
+
+MEDIUM
+
+Amber/orange indicator
+
+LOW
+
+Green indicator
+
+Priority must influence SLA calculation.
+
+14. QUERY STATUS WORKFLOW
+
+Implement the following controlled workflow:
+
+NEW
+↓
+ASSIGNED
+↓
+IN PROGRESS
+↓
+AWAITING CLIENT
+↓
+IN PROGRESS
+↓
+RESOLVED
+↓
+CLOSED
+
+Do not allow arbitrary status transitions.
+
+A query marked RESOLVED should not automatically become CLOSED.
+
+The client should be able to confirm that the issue is resolved.
+
+If the client rejects the resolution, allow the query to return to IN PROGRESS.
+
+15. QUERY CONVERSATION
+
+Every query should have a conversation thread.
+
+Example:
+
+CLIENT:
+
+"Please provide ITR copy for FY 2025-26."
+
+TEAM MEMBER:
+
+"Sure. We are arranging the same."
+
+TEAM MEMBER:
+
+"Please find attached the ITR acknowledgement."
+
+CLIENT:
+
+"Thank you. Received."
+
+The conversation should show:
+
+User name
+
+Role
+
+Timestamp
+
+Message
+
+Attachments
+
+Make it visually similar to a professional business communication thread.
+
+16. INTERNAL NOTES
+
+Internal notes are extremely important.
+
+A KGMC internal user should be able to add:
+
+Internal Note
+
+Example:
+
+"@Mohit – Please confirm whether this expenditure is allowable."
+
+Internal notes must NEVER be visible to Client users.
+
+Clearly visually differentiate:
+
+Client-visible messages
+
+Internal notes
+
+17. @MENTION
+
+Allow internal users to mention other internal users.
+
+Example:
+
+@Partner
+
+@Manager
+
+@Team Member
+
+When a user is mentioned:
+
+Create a notification
+
+Highlight the mention
+
+Show "Attention Required" where appropriate
+
+Example:
+
+"@Mohit – Please review this query."
+
+Partner dashboard should show:
+
+Partner Attention Required: 7
+
+18. CA FIRM → CLIENT REQUESTS
+
+This is a separate but equally important module.
+
+KGMC users should be able to create:
+
+Information / Document Request
+
+Example:
+
+Request ID:
+
+CSSP-R-000452
+
+Client:
+
+ABC Pvt Ltd
+
+Request:
+
+"Please upload bank statement for April–September 2026."
+
+Priority:
+
+Medium
+
+Due Date:
+
+20 September 2026
+
+The client should receive an in-app notification.
+
+19. REQUEST WORKFLOW
+
+Use:
+
+REQUESTED
+↓
+CLIENT UPLOADED
+↓
+UNDER REVIEW
+↓
+ACCEPTED
+
+If the document is incorrect:
+
+UNDER REVIEW
+↓
+REVISION REQUIRED
+↓
+CLIENT UPLOADED
+
+Allow KGMC staff to add comments explaining what revision is required.
+
+20. FILE UPLOADS
+
+Allow attachments for:
+
+PDF
+
+XLS
+
+XLSX
+
+DOC
+
+DOCX
+
+JPG
+
+JPEG
+
+PNG
+
+Store:
+
+File name
+
+File size
+
+Uploaded by
+
+Upload date
+
+Related query/request
+
+Version
+
+File URL/path
+
+Provide:
+
+Upload
+
+Download
+
+Preview where technically feasible
+
+Delete according to permission
+
+Implement secure access control for files.
+
+A client must never be able to access a file belonging to another client.
+
+21. SLA ENGINE
+
+Implement basic SLA logic.
+
+Default SLA:
+
+HIGH:
+4 working hours
+
+MEDIUM:
+1 working day
+
+LOW:
+3 working days
+
+When a query is created, automatically calculate the due date/time.
+
+Example:
+
+Created:
+
+15 September 2026 — 10:00 AM
+
+Priority:
+
+HIGH
+
+SLA:
+
+4 working hours
+
+Due:
+
+15 September 2026 — 2:00 PM
+
+Display SLA status:
+
+On Track
+
+Due Soon
+
+Overdue
+
+Use appropriate visual indicators.
+
+Do not count weekends if the business-calendar implementation can reasonably support this.
+
+Keep the initial implementation simple and configurable.
+
+22. OVERDUE LOGIC
+
+When current time exceeds the due time and the query is not closed/resolved according to the SLA rules:
+
+Mark:
+
+OVERDUE
+
+Show:
+
+"Overdue by 2h 14m"
+
+Overdue queries should appear prominently in:
+
+Partner dashboard
+
+Manager dashboard
+
+Team Member dashboard
+
+according to permissions.
+
+23. IN-APP NOTIFICATIONS
+
+Build an in-app notification centre.
+
+Notifications should be generated for events such as:
+
+New query assigned
+
+Query reassigned
+
+User mentioned
+
+New client request
+
+Client uploaded document
+
+Query resolved
+
+Query reopened
+
+Query overdue
+
+Request approaching due date
+
+Notification fields:
+
+Notification ID
+
+Recipient
+
+Notification type
+
+Message
+
+Related entity
+
+Read/unread
+
+Created date
+
+Provide:
+
+Mark as read
+
+and
+
+Mark all as read
+
+24. PARTNER DASHBOARD
+
+The Partner dashboard is the most important management screen.
+
+Use the provided UI image as the primary design reference.
+
+Show KPI cards:
+
+Open Queries
+
+87
+
+Overdue
+
+9
+
+Awaiting Client
+
+23
+
+Total Clients
+
+125
+
+These numbers should be dynamically calculated from the database in the actual application.
+
+Do not hardcode these values in the final application.
+
+25. PARTNER DASHBOARD ANALYTICS
+
+Include:
+
+Queries by Status
+
+New
+
+In Progress
+
+Awaiting Client
+
+Resolved
+
+Closed
+
+Use a donut/pie chart.
+
+Queries by Category
+
+GST
+
+Income Tax
+
+Audit
+
+Accounting
+
+ROC
+
+TDS
+
+Others
+
+Use a bar chart.
+
+Recent Queries
+
+Show:
+
+Query ID
+
+Client
+
+Subject
+
+Priority
+
+Status
+
+Assigned To
+
+Updated On
+
+My To-Dos
+
+Examples:
+
+Queries requiring attention
+
+Overdue queries
+
+Clients awaiting response
+
+Team members needing guidance
+
+Recent Notifications
+
+Show the latest notifications.
+
+Client Engagement
+
+Show:
+
+Active clients
+
+Query count
+
+Top clients by query volume
+
+26. MANAGER DASHBOARD
+
+Manager dashboard should focus on team execution.
+
+KPI cards:
+
+Open Queries
+
+Overdue
+
+Due Today
+
+Awaiting Client
+
+Partner Attention
+
+Team workload table:
+
+Team Member | Open | Overdue | High Priority
+
+Allow Manager to:
+
+Reassign
+
+Escalate
+
+Review
+
+Filter
+
+27. TEAM MEMBER DASHBOARD
+
+Show:
+
+My Open Queries
+
+Due Today
+
+Overdue
+
+Awaiting Client
+
+Partner Attention
+
+Primary focus should be the team member's personal work queue.
+
+28. CLIENT DASHBOARD
+
+Client dashboard must be much simpler.
+
+Show:
+
+My Queries
+
+Open
+
+In Progress
+
+Awaiting Me
+
+Resolved
+
+Closed
+
+My Requests
+
+Pending
+
+Uploaded
+
+Under Review
+
+Accepted
+
+Revision Required
+
+Recent Notifications
+
+Quick Actions
+
++ New Query
+
++ Upload Requested Document
+
+The client should immediately understand what requires their attention.
+
+29. SEARCH
+
+Implement application-level search.
+
+Search should be able to find relevant records according to permissions.
+
+Search examples:
+
+"ITR"
+
+"ABC"
+
+"GST Return"
+
+"CSSP-Q-00125"
+
+"Audit Report"
+
+Never return records that the logged-in user is not authorized to access.
+
+30. FILTERS
+
+Queries should support:
+
+Client
+
+Category
+
+Priority
+
+Status
+
+Assigned To
+
+Date range
+
+SLA status
+
+Requests should support:
+
+Client
+
+Status
+
+Priority
+
+Assigned To
+
+Due date
+
+31. AUDIT TRAIL
+
+Create a proper audit log.
+
+Record important actions such as:
+
+Login
+
+Query created
+
+Query assigned
+
+Query reassigned
+
+Priority changed
+
+Status changed
+
+Message added
+
+Internal note added
+
+User mentioned
+
+Attachment uploaded
+
+Query resolved
+
+Query reopened
+
+Query closed
+
+Request created
+
+Document uploaded
+
+Request accepted
+
+Each audit event should contain:
+
+User
+
+Action
+
+Entity
+
+Entity ID
+
+Timestamp
+
+Relevant details
+
+This information should be accessible only to authorized internal users.
+
+32. REPORTS
+
+Create a Reports section.
+
+Minimum reports:
+
+1. Query Summary Report
+
+2. Client-wise Query Report
+
+3. Team Performance Report
+
+4. SLA Performance Report
+
+Allow filtering by:
+
+Date
+
+Client
+
+Team member
+
+Category
+
+Priority
+
+Status
+
+Provide CSV/Excel export if supported.
+
+33. DASHBOARD DATA MUST BE REAL
+
+This is critical.
+
+Do not create fake static dashboard numbers.
+
+All:
+
+KPI cards
+
+charts
+
+tables
+
+query counts
+
+overdue counts
+
+client counts
+
+team performance
+
+must be calculated from actual database records.
+
+For development/demo purposes, create realistic seed/demo data.
+
+Clearly separate demo seed data from the application logic.
+
+34. DATABASE DESIGN
+
+Use a relational database.
+
+Recommended:
+
+PostgreSQL
+
+Core entities should include at minimum:
+
+users
+
+roles
+
+clients
+
+client_users
+
+departments
+
+query_categories
+
+queries
+
+query_assignments
+
+query_messages
+
+query_mentions
+
+requests
+
+request_messages
+
+attachments
+
+notifications
+
+sla_rules
+
+audit_logs
+
+Create proper:
+
+Primary keys
+
+Foreign keys
+
+Indexes
+
+Timestamps
+
+Status fields
+
+Created_by / updated_by fields where appropriate
+
+Use UUIDs or another secure identifier strategy rather than exposing sequential database IDs unnecessarily.
+
+35. SECURITY REQUIREMENTS
+
+Implement proper security practices.
+
+At minimum:
+
+Authentication
+
+Authorization
+
+Role-based access control
+
+Client-level data isolation
+
+Secure password handling
+
+Protected API endpoints
+
+Input validation
+
+File type validation
+
+File size validation
+
+Secure file access
+
+Server-side permission checks
+
+Audit logging
+
+Do not rely only on frontend restrictions for security.
+
+36. RESPONSIVE DESIGN
+
+The primary application is a desktop web application because CA firms will primarily use it on computers.
+
+However, make the UI responsive enough for:
+
+Laptop
+
+Desktop
+
+Tablet
+
+Mobile browser
+
+The Partner/Manager dashboard should remain usable on smaller screens.
+
+37. UI / UX REQUIREMENTS
+
+Use the supplied UI reference image.
+
+The visual direction should be:
+
+Premium SaaS
+
+Professional CA/consulting environment
+
+Clean
+
+Modern
+
+Minimal
+
+Data-driven
+
+Easy to scan
+
+Use:
+
+Sidebar navigation
+
+Top search
+
+Profile menu
+
+Notification bell
+
+KPI cards
+
+Charts
+
+Data tables
+
+Status badges
+
+Priority badges
+
+Modal/drawer forms
+
+Confirmation dialogs
+
+Empty states
+
+Loading states
+
+Error states
+
+Success notifications/toasts
+
+Maintain consistent spacing, typography, iconography and component design.
+
+38. IMPORTANT UI PRINCIPLE
+
+The application must distinguish clearly between:
+
+ACTION REQUIRED
+
+and
+
+INFORMATION
+
+For example:
+
+RED:
+
+Overdue
+
+AMBER:
+
+Due Soon
+
+BLUE:
+
+Awaiting Client
+
+GREEN:
+
+Resolved
+
+This should allow a Partner or Manager to understand the situation within seconds.
+
+39. QUERY DETAIL PAGE
+
+Create a rich query detail page.
+
+Suggested layout:
+
+LEFT / MAIN:
+
+Query subject
+
+Query information
+
+Conversation
+
+Attachments
+
+RIGHT:
+
+Client
+
+Assigned To
+
+Priority
+
+Status
+
+SLA
+
+Due Date
+
+Created Date
+
+Escalation
+
+Partner Attention
+
+Bottom / activity:
+
+Audit timeline
+
+Include actions such as:
+
+Reply
+
+Add Internal Note
+
+Upload Attachment
+
+Mention User
+
+Change Status
+
+Reassign
+
+Resolve
+
+The UI should be intuitive.
+
+40. CLIENT DETAIL PAGE
+
+For internal users, client detail page should show:
+
+Client profile
+
+Partner
+
+Manager
+
+Client users
+
+Open queries
+
+Requests
+
+Recent activity
+
+Documents
+
+Query statistics
+
+Do not overwhelm the page.
+
+Use tabs where appropriate.
+
+41. EMPTY STATES
+
+Create useful empty states.
+
+Example:
+
+"No open queries"
+
+"All client requests are up to date."
+
+"Great! There are no overdue queries."
+
+Do not leave blank screens.
+
+42. DEMO DATA
+
+Create realistic demo data for the AICA presentation.
+
+Example clients:
+
+ABC Pvt Ltd
+
+XYZ Ltd
+
+LMN Industries
+
+PQR Ltd
+
+DEF Pvt Ltd
+
+Example queries:
+
+ITR Copy Required
+
+GST Return Status
+
+Audit Report FY 2023-24
+
+PAN Card Copy
+
+TDS Certificate
+
+Example team members:
+
+Rahul Sharma
+
+Priya Sharma
+
+Amit Kumar
+
+Neha Verma
+
+Rohit Jain
+
+Create enough records to make dashboards and reports visually meaningful.
+
+43. DEVELOPMENT APPROACH
+
+Do not attempt to build everything in one uncontrolled step.
+
+First establish:
+
+Application architecture
+
+Database schema
+
+Authentication
+
+RBAC
+
+Client management
+
+Query management
+
+Communication
+
+Request management
+
+File uploads
+
+SLA
+
+Notifications
+
+Dashboards
+
+Reports
+
+Audit logs
+
+Testing
+
+After each major module, ensure it is functional before moving to the next.
+
+44. CODE QUALITY
+
+Write maintainable code.
+
+Use:
+
+Reusable components
+
+Reusable UI components
+
+Clear naming conventions
+
+Separation of concerns
+
+Service/business logic separation
+
+Proper error handling
+
+Form validation
+
+Loading states
+
+Empty states
+
+Comments only where useful
+
+Do not duplicate large amounts of code.
+
+45. DO NOT OVERENGINEER
+
+This is an AICA Level 2 MVP.
+
+Do not introduce unnecessary microservices, complex infrastructure or enterprise architecture that is not required.
+
+Keep the application:
+
+Reliable
+
+Maintainable
+
+Understandable
+
+Demonstrable
+
+Scalable enough for future phases
+
+46. FUTURE CAPSTONE — DO NOT BUILD NOW
+
+The following are future enhancements only.
+
+Mention them in the architecture/documentation where appropriate but do not implement them in Phase 1:
+
+Communication integrations
+
+WhatsApp
+
+Email
+
+SMS
+
+Automation
+
+Automated reminders
+
+Escalation engine
+
+Recurring requests
+
+Document intelligence
+
+OCR
+
+Document classification
+
+Document expiry tracking
+
+AI
+
+AI query classification
+
+AI-generated response suggestions
+
+AI document identification
+
+AI priority recommendation
+
+AI summary of long conversations
+
+Accounting/Tax integrations
+
+Tally
+
+Zoho Books
+
+GST
+
+Income Tax
+
+Other APIs
+
+47. CAPSTONE ARCHITECTURE PRINCIPLE
+
+Although the above features are not required now, make sure the application architecture does not prevent future integration.
+
+For example:
+
+Query should be designed so that future fields could include:
+
+Source
+
+AI classification
+
+External reference
+
+Integration ID
+
+Automation status
+
+But do not expose unnecessary future functionality in the MVP UI.
+
+48. FINAL USER EXPERIENCE
+
+The final experience should feel like:
+
+Client
+
+"I know exactly where to ask KGMC for something and I can see what is happening."
+
+Team Member
+
+"I know exactly what work is assigned to me and what is overdue."
+
+Manager
+
+"I know how my team is performing and where intervention is required."
+
+Partner
+
+"I can see the exceptions, bottlenecks and matters requiring my attention without going through hundreds of WhatsApp messages."
+
+This is the fundamental purpose of KGMC CSSP.
+
+49. SUCCESS CRITERIA
+
+The Phase 1 MVP will be considered successful if the following end-to-end workflow works:
+
+Workflow A — Client Query
+
+Client logs in
+→ Raises Query
+→ Selects Category
+→ Selects Priority
+→ Query assigned to KGMC team member
+→ Team member receives notification
+→ Team member responds
+→ Team member uploads document if required
+→ Team member can mention Manager/Partner
+→ Partner can review
+→ Query marked Resolved
+→ Client confirms
+→ Query Closed
+→ Entire activity appears in Audit Trail
+
+Workflow B — KGMC Request
+
+KGMC user logs in
+→ Selects Client
+→ Creates Document/Information Request
+→ Assigns request
+→ Client receives notification
+→ Client uploads document
+→ KGMC reviews
+→ Document accepted OR revision requested
+→ Request completed
+→ Full history retained
+
+Workflow C — SLA
+
+Query created
+→ SLA calculated
+→ Due date displayed
+→ Due Soon status
+→ If unresolved after deadline → Overdue
+→ Dashboard updates
+→ Relevant user receives notification
+→ Manager/Partner can identify overdue item
+
+50. FINAL DESIGN DIRECTION
+
+Use the attached UI image as the visual benchmark.
+
+Do not reproduce the image as a static page.
+
+Instead, use it to create a complete functioning application with:
+
+Real navigation
+
+Real forms
+
+Real database records
+
+Real authentication
+
+Real permissions
+
+Real workflows
+
+Real dashboards
+
+Real notifications
+
+Real file attachments
+
+Real search
+
+Real reports
+
+Real audit history
+
+Every major button shown in the UI should perform a meaningful action.
+
+Avoid placeholder buttons that do nothing.
+
+51. FIRST IMPLEMENTATION STEP
+
+Before generating the complete application, first analyze this specification and establish the application architecture.
+
+Then implement the application module-by-module.
+
+Start with:
+
+Project structure
+
+Database schema
+
+Authentication
+
+Role-based access
+
+Basic application shell
+
+Sidebar
+
+Top navigation
+
+Dashboard framework
+
+Then progressively implement the remaining modules.
+
+At every stage, preserve the functionality already implemented.
+
+The final result must be a cohesive full-stack application rather than disconnected screens.
+
+52. IMPORTANT FINAL INSTRUCTION
+
+This is a real product concept, not merely an academic CRUD exercise.
+
+Make reasonable product and UX decisions where the specification does not explicitly define a detail, but always prioritize:
+
+Security → Data isolation → Usability → Workflow clarity → Maintainability → Visual quality
+
+The final application should look and behave like a professional B2B SaaS platform designed specifically for Chartered Accountancy and financial advisory firms.
+
+Application name throughout the UI:
+
+KGMC CSSP
+
+Subtitle:
+
+Client Self Service Portal
+
+Tagline:
+
+Simpler Communication. Stronger Relationships.
+
+This project was built with [Lovable](https://lovable.dev).
+
+**Live app**: https://cacssp.lovable.app
+
+## Build with Lovable
+
+Continue developing this project in the [Lovable editor](https://lovable.dev/projects/49aaccce-e832-4d9a-9c52-e94af764172b).
+
+- **Ship faster**: describe what you want to build and Lovable handles the code.
+- **Stay in sync**: every change made in Lovable is committed straight to this repository.
+- **Full ownership**: this code is yours. Push to `main` on GitHub and your changes sync back into Lovable, ready for your next prompt.
+
+## Development
+
+Prefer working locally? You need Node.js and npm — [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating).
+
+```sh
+git clone <this-repository-url>
+cd <repository-name>
+npm i
+npm run dev
 ```
-
-## Step 3: Review the Changes
-
-Run:
-
-```bash
-git status
-```
-
-Confirm that Git lists only the files and folders you intend to submit.
-
-## Step 4: Stage and Commit the Project
-
-Stage your project folder:
-
-```bash
-git add YourName-ProjectName/
-```
-
-Commit the changes:
-
-```bash
-git commit -m "Add <Your Name> - <Project Name> project folder"
-```
-
-## Step 5: Push the Changes to Your Fork
-
-Run:
-
-```bash
-git push origin main
-```
-
-Your project folder will now appear in your fork on GitHub.
-
-## Step 6: Open a Pull Request
-
-1. Open your fork on GitHub.
-2. Click **Contribute** → **Open pull request**.
-3. Confirm the base and compare repositories:
-
-| Setting | Selection |
-| --- | --- |
-| Base repository | `aiinicai/AICA-Level-2-Projects` |
-| Base branch | `main` |
-| Head repository | `YOUR-USERNAME/AICA-Level-2-Projects` |
-| Compare branch | `main` |
-
-4. Add a clear title and project description.
-5. Click **Create pull request**.
-
----
-
-## Before Submitting
-
-Please verify the following:
-
-- Your complete project is inside one clearly named folder.
-- Your folder includes a `README.md` explaining the project.
-- The project does not contain passwords, API keys, access tokens, or other confidential information.
-- Unnecessary generated files and dependency folders are excluded where applicable.
-- The project opens or runs using the instructions included in its `README.md`.
-- Your Pull Request targets `aiinicai/AICA-Level-2-Projects` on the `main` branch.
-
-## Need to Update Your Submission?
-
-If your Pull Request is still open, make the required changes in the same fork and branch, then commit and push them. GitHub will automatically add the new commits to the existing Pull Request.
-
