@@ -15,7 +15,7 @@ and where to look.
 | Test skills in a fresh chat; no stale values | `surakshascan/tools/export_catalogue.py` regenerates the skill's reference table from the code, so the skill cannot drift from the catalogue |
 | Scheduled recurring task | `surakshascan/scheduler.py` and `surakshascan.cli watch` — a quarterly re-scan that reports only when the score moves |
 | Approve external actions separately | The scheduler writes to `pending_review/` and sends nothing. The n8n workflow raises a review task rather than an email |
-| Connect an external app; review requested permissions; read-only first | `social.py` connects the school's **own** Facebook or Instagram page through the platform's official interface, read-only, with a token held in the environment and never stored. Nothing outside the school's own pages is requested, and no feed is ever scraped |
+| Connect an external app; review requested permissions; read-only first | Shown through the MCP server (Day 5), which is read-only by default. A connector to the school's own social media page is held back for the hackathon build |
 
 ## Day 2 — Computer vision and comparison analysis
 
@@ -25,7 +25,7 @@ and where to look.
 | Handwritten and scanned text | A PDF with no text layer is flagged as probably a scan rather than silently returning nothing |
 | Two professional perspectives on the same facts | `surakshascan/perspectives.py` — the institution's position and the parent's or the Board's position, with identical agreed facts in both panels |
 | Findings anchored to the clause and the exact words | Every perspective pair carries the provision; every policy finding carries the quoted passage |
-| Image review feeding a structured table | `social.py` reads post screenshots through `vision.py` and returns risk, flags and identifiers per post |
+| Image review feeding a structured table | `vision.py` returns elements present, elements absent and uncertainty per document, shown in the Documents tab and the Word report |
 
 ## Day 3 — Python and small desktop applications
 
@@ -38,14 +38,14 @@ and where to look.
 | PyMuPDF — PDF reading | `surakshascan/vision.py` |
 | Tkinter — GUI | `surakshascan/ui/app.py` |
 | PyInstaller — script to executable | `SurakshaScan.spec`, and `docs/BUILD.md` |
-| Test on sample data | `tests/` — 28 tests running against local HTML fixtures, no network |
+| Test on sample data | `tests/` — 42 tests running against local HTML fixtures, no network |
 | Keep the source code | `legacy_v1/` holds the v1 source recovered from the old .exe, as the documented baseline |
 
 ## Day 4 — Building business applications
 
 | Learning | Where it is in the project |
 |---|---|
-| Tabbed checklist application | `ui/app.py` — six tabs; the working paper itself has five inner tabs |
+| Tabbed checklist application | `ui/app.py` — six tabs (Scan, Working paper, Findings, Two views, Documents, Reports); the working paper itself has five inner tabs |
 | Status options Completed / In Progress / Pending / NA | `questionnaire.py` |
 | Team member mandatory before Completed | `questionnaire.validate()` refuses a Completed line with no reviewer |
 | Auto-generated neutral remark; never asserts unverified work | `questionnaire.NEUTRAL_REMARK` and `finalise()` |
@@ -54,7 +54,6 @@ and where to look.
 | Excel export with status counts by section | `report_xlsx.py` — seven sheets including status counts by domain |
 | Dashboard with counts and distribution | `report_html.py` — a self-contained responsive dashboard |
 | Responsive for mobile, tablet, desktop | The dashboard CSS collapses to one column below 720px |
-| Six-tab working paper | The sixth tab, Publication and Social Media, covers media consent, the do-not-publish list, withdrawals and the staff rule |
 
 ## Day 5 — MCP, Tally, workflow automation
 
@@ -64,11 +63,8 @@ and where to look.
 | Installing an MCP extension does not itself grant safe access | Write tools are registered only when `SURAKSHASCAN_MCP_ALLOW_WRITE=1`; the output directory is fixed and path traversal is refused |
 | Connect read-only first | The default server is read-only and cannot write a file |
 | Grant narrow folder scope | `SURAKSHASCAN_MCP_OUTPUT_DIR` is the only writable location |
-| TallyPrime connectivity via the local port | `systems.review_tally()` reads ledger masters over TallyPrime's own XML interface on port 9000 |
-| Use a test or backup company; connect read-only first | Documented in `docs/CORE_SYSTEMS_AND_AI.md`, and the request is an Export/Collection only - a test fails if any modifying verb appears in it |
-| Reconcile a small report before trusting it | Field presence is counted and reported; no ledger name, contact, bank particular or balance is read into the report |
 | Workflow automation: trigger → action → review → output | `integrations/n8n_dpdp_quarterly_review.json` |
-| TallyPrime connectivity over the local port; test company first; read-only before anything else | `systems.read_accounting()` reads ledger masters over Tally's own XML interface on port 9000. The request is an `Export` of a `Collection` marked `ISMODIFY="No"`, and a test fails if Import, ALTER, DELETE or CREATE ever appear in it. Only counts leave the function |
+| TallyPrime connectivity | **Not in the capstone build.** A read-only TallyPrime reader was prototyped and is held back for the hackathon version; the capstone keeps to the website and its reports |
 | Credentials in the credential manager, never in workflow text | The workflow references credentials by name; no secret appears in the JSON |
 | Inspect imported workflow JSON before activation | Stated in the workflow's own `_documentation` block |
 
@@ -81,5 +77,5 @@ and where to look.
 | Separate approvals | Nothing is ever sent. The scheduler queues for approval; the n8n workflow raises a task; the desktop app only saves files. And the review itself cannot start until the person who authorised it is recorded |
 | Reusability | A packaged skill, a CLI, an MCP server and a GUI over one engine, so the same review runs four ways with identical results |
 | Compliance | Commencement dates are held in the catalogue and printed against every finding, so what is due now is never confused with what is due on 14 May 2027 |
-| Narrow permissions | Config directory scoped to the user; API key from the environment or the OS keyring; never written to disk by the app. The social module reads only the school's own pages and refuses, by design and by test, to scrape anyone's public feed |
+| Narrow permissions | Config directory scoped to the user; API key from the environment or the OS keyring; never written to disk by the app. |
 | Audit trail | Every scan writes a timestamped evidence JSON with secrets redacted, and every report names the evidence file it came from |

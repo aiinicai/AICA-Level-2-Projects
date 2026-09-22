@@ -57,5 +57,5 @@ The result is `dist\SurakshaScan.exe`.
 pytest tests -q
 ```
 
-Expect **87 passed**. If pytest is unavailable, `python tests\run_tests.py`
+Expect **42 passed**. If pytest is unavailable, `python tests\run_tests.py`
 runs the same suite with a bundled substitute.

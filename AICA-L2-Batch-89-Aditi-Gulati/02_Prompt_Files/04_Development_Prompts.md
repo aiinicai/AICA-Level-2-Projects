@@ -147,11 +147,31 @@ was found by using the tool, not by the tests.
 
 ---
 
+## Stage 7 — Narrowing the scope for the capstone
+
+> *"I think for capstone let's remove the functionality of Facebook and school
+> system scan, we can upgrade it later for hackathon. For now let's just scan
+> the school website and create reports."*
+
+**Produced:** a deliberate de-scope. Real testing showed that social media
+exports and ERP fee reports arrive in many formats, and making every one of
+them reliable was a project of its own. The social media module, the ERP /
+fee-software / TallyPrime reader, their eight obligations (C5–C8, S1–S4), the
+two working-paper tabs and the two app tabs were removed from the capstone
+build and archived intact for a later hackathon version. The capstone now
+does one thing reliably: it scans the school website, reads the published
+policy and supporting documents, takes the internal working paper, and
+produces the reports. The catalogue went back to 25 obligations in seven
+domains and the working paper to 26 lines in five tabs; tests were rewritten
+to prove the removal was clean.
+
+---
+
 ## What the assistant was asked to do throughout
 
 - **Verify, don't recall.** Legal dates and provisions were checked against
   current sources before being encoded.
-- **Test, then show the test.** The suite grew to 87 tests; the offline
+- **Test, then show the test.** The suite grew to 95 tests with social media and core systems, and stands at 42 for the website-only capstone build; the offline
   self-test caught two real wiring bugs that the unit tests missed.
 - **Say what it could not check.** The desktop window could not be run in the
   assistant's environment, so a headless build test was written and that

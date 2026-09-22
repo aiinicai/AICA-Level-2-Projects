@@ -2,8 +2,7 @@
 
 **Where it is used:** `surakshascan/vision.py` — AICA Level 2, Day 2 method.
 **What it does:** reads an image of a school document — an admission form, a
-consent slip, CCTV signage, a transport-app screenshot, or a social media post
-— and transcribes only what is visible.
+consent slip, CCTV signage or a transport-app screenshot — and transcribes only what is visible.
 
 ## Design principles
 

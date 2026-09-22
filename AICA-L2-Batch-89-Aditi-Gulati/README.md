@@ -42,12 +42,16 @@ bundled demonstration school and prints `Self-test passed.`
 
 Under the DPDP Act everyone below eighteen is a child, so for a school the
 whole student body is a child Data Principal. SurakshaScan reviews a school
-against 33 obligations from the Act and the DPDP Rules 2025, across its
-website, privacy policy, own social media posts, core systems and internal
-practices. Every rating comes from a deterministic rules engine, so the same
+against 25 obligations from the Act and the DPDP Rules 2025, across its
+website, published privacy policy, supporting documents and internal
+practices, and produces a Word report, an Excel workbook and an HTML
+dashboard. Every rating comes from a deterministic rules engine, so the same
 inputs always produce the same score; an optional AI layer adds quoted
 evidence but can never change a rating. It records who authorised each
-review and refuses to run without it. 87 tests, all passing offline.
+review and refuses to run without it. 42 tests, all passing offline.
+
+Review of a school's own social media and its ERP / Tally records was
+prototyped and is deliberately held back for a later hackathon build.
 
 ---
 
