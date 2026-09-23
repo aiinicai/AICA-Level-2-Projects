@@ -1,0 +1,154 @@
+{
+  "name": "Compliance Reminder & Escalation Workflow",
+  "nodes": [
+    {
+      "id": "59626172-d94f-4609-895b-2a72e772f8c2",
+      "name": "Daily 08:00 IST Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.4,
+      "position": [200, 400],
+      "parameters": { "rule": { "interval": [{ "field": "days", "triggerAtHour": 8, "triggerAtMinute": 0 }] } }
+    },
+    {
+      "id": "ef59966d-84fa-4ca7-b36d-edef325b7075",
+      "name": "Read Task Instances",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [460, 400],
+      "parameters": {
+        "resource": "sheet",
+        "operation": "read",
+        "documentId": { "__rl": true, "mode": "list", "value": "", "cachedResultName": "Compliance Master (Google Sheet)" },
+        "sheetName": { "__rl": true, "mode": "name", "value": "Task Instances" },
+        "options": {}
+      },
+      "credentials": { "googleSheetsOAuth2Api": { "name": "Google Sheets account" } }
+    },
+    {
+      "id": "202ca5d2-0212-47e2-8827-04bbbe340c46",
+      "name": "Compute Reminder Stage",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [720, 400],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const items = $input.all();\nconst today = new Date();\ntoday.setHours(0,0,0,0);\nconst output = [];\nfor (const item of items) {\n  const json = item.json;\n  const complete = String(json['Task Complete (Y/N)'] || '').trim().toUpperCase();\n  if (complete === 'Y') { continue; }\n  const dueRaw = json['Due Date'];\n  if (!dueRaw) { continue; }\n  const dueDate = new Date(dueRaw);\n  dueDate.setHours(0,0,0,0);\n  const diffDays = Math.round((dueDate - today) / 86400000);\n  let stage = 'none';\n  let stageLabel = '';\n  if (diffDays === 2) { stage = 'stage1'; stageLabel = 'Stage 1 - T-2'; }\n  else if (diffDays === 1) { stage = 'stage2'; stageLabel = 'Stage 2 - T-1'; }\n  else if (diffDays <= 0) { stage = 'stage3'; stageLabel = 'Stage 3 - Final/Daily'; }\n  if (stage === 'none') { continue; }\n  const userEmail = json['Assigned User Email'] || '';\n  const supervisorEmail = json['Supervisor Email'] || '';\n  const hodEmail = json['HOD Email'] || '';\n  const taskName = json['Compliance Name'] || '';\n  const instanceId = json['Instance ID'] || '';\n  const userName = json['Assigned User Name'] || 'Team';\n  const dueDateStr = dueDate.toDateString();\n  let subject = '';\n  let ccList = '';\n  if (stage === 'stage1') {\n    subject = 'Reminder: ' + taskName + ' due on ' + dueDateStr + ' (2 days left)';\n  } else if (stage === 'stage2') {\n    subject = 'URGENT: ' + taskName + ' due tomorrow (' + dueDateStr + ')';\n    ccList = supervisorEmail;\n  } else {\n    subject = 'FINAL/OVERDUE: ' + taskName + ' - action required (' + dueDateStr + ')';\n    ccList = [supervisorEmail, hodEmail].filter(function(e){return Boolean(e);}).join(',');\n  }\n  const escalationNote = stage === 'stage3' ? 'This is the final escalation. It will repeat every day until Amount Paid and Task Complete are updated. Supervisor and HOD are cc-d.' : '';\n  const body = 'Dear ' + userName + ',<br><br>' +\n    'This is a reminder that <b>' + taskName + '</b> (' + instanceId + ') is due on <b>' + dueDateStr + '</b>.<br>' +\n    'Amount Due: ' + (json['Amount Due'] || 'N/A') + '<br>' +\n    'Please key in the Amount Paid, Payment Date, and mark Task Complete = Y in the Compliance Tracker once paid.<br><br>' +\n    escalationNote + '<br><br>Regards,<br>Compliance Tracker Automation';\n  output.push({ json: {\n    instanceId: instanceId,\n    stage: stage,\n    stageLabel: stageLabel,\n    userEmail: userEmail,\n    supervisorEmail: supervisorEmail,\n    hodEmail: hodEmail,\n    ccList: ccList,\n    subject: subject,\n    body: body\n  }});\n}\nreturn output;"
+      }
+    },
+    {
+      "id": "a0ca4e3e-252e-4482-ac64-fab13c413f1c",
+      "name": "Route by Reminder Stage",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [980, 400],
+      "parameters": {
+        "mode": "rules",
+        "rules": {
+          "values": [
+            { "outputKey": "Stage 1 (T-2)", "conditions": { "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" }, "conditions": [{ "leftValue": "={{ $json.stage }}", "operator": { "type": "string", "operation": "equals" }, "rightValue": "stage1" }], "combinator": "and" } },
+            { "outputKey": "Stage 2 (T-1)", "conditions": { "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" }, "conditions": [{ "leftValue": "={{ $json.stage }}", "operator": { "type": "string", "operation": "equals" }, "rightValue": "stage2" }], "combinator": "and" } },
+            { "outputKey": "Stage 3 (Final/Daily)", "conditions": { "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" }, "conditions": [{ "leftValue": "={{ $json.stage }}", "operator": { "type": "string", "operation": "equals" }, "rightValue": "stage3" }], "combinator": "and" } }
+          ]
+        },
+        "options": { "fallbackOutput": "none" }
+      }
+    },
+    {
+      "id": "a270113a-61b7-4ba3-aad9-cb5ef43898e7",
+      "name": "Send Stage 1 Reminder (User)",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [1260, 200],
+      "parameters": {
+        "resource": "message", "operation": "send",
+        "sendTo": "={{ $json.userEmail }}", "subject": "={{ $json.subject }}",
+        "emailType": "html", "message": "={{ $json.body }}", "options": {}
+      },
+      "credentials": { "gmailOAuth2": { "name": "Gmail account" } }
+    },
+    {
+      "id": "917d212f-7e1b-467c-abea-86a9249c938d",
+      "name": "Send Stage 2 Reminder (User+Supervisor CC)",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [1260, 400],
+      "parameters": {
+        "resource": "message", "operation": "send",
+        "sendTo": "={{ $json.userEmail }}", "subject": "={{ $json.subject }}",
+        "emailType": "html", "message": "={{ $json.body }}",
+        "options": { "ccList": "={{ $json.ccList }}" }
+      },
+      "credentials": { "gmailOAuth2": { "name": "Gmail account" } }
+    },
+    {
+      "id": "158e27b0-fa8f-434b-8cc4-b99e4ec6b2e2",
+      "name": "Send Stage 3 Reminder (User+Supervisor+HOD)",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [1260, 600],
+      "parameters": {
+        "resource": "message", "operation": "send",
+        "sendTo": "={{ $json.userEmail }}", "subject": "={{ $json.subject }}",
+        "emailType": "html", "message": "={{ $json.body }}",
+        "options": { "ccList": "={{ $json.ccList }}" }
+      },
+      "credentials": { "gmailOAuth2": { "name": "Gmail account" } }
+    },
+    {
+      "id": "88130034-706c-4a7f-afa1-e314b69c7c2e",
+      "name": "Log Reminder Sent",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [1560, 400],
+      "parameters": {
+        "resource": "sheet", "operation": "update",
+        "documentId": { "__rl": true, "mode": "list", "value": "", "cachedResultName": "Compliance Master (Google Sheet)" },
+        "sheetName": { "__rl": true, "mode": "name", "value": "Task Instances" },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Instance ID": "={{ $('Compute Reminder Stage').item.json.instanceId }}",
+            "Reminder Stage": "={{ $('Compute Reminder Stage').item.json.stageLabel }}",
+            "Last Reminder Sent": "={{ $now.toISODate() }}"
+          },
+          "schema": [
+            { "id": "Instance ID", "displayName": "Instance ID", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "Reminder Stage", "displayName": "Reminder Stage", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": false },
+            { "id": "Last Reminder Sent", "displayName": "Last Reminder Sent", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": false }
+          ],
+          "matchingColumns": ["Instance ID"]
+        },
+        "options": {}
+      },
+      "credentials": { "googleSheetsOAuth2Api": { "name": "Google Sheets account" } }
+    },
+    {
+      "id": "5a743bb1-18d0-4ef2-a851-4ecfe48a6021",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [100, 300],
+      "parameters": {
+        "content": "## Compliance Reminder & Escalation Workflow\nReads Task Instances daily, computes which reminder stage each unpaid task is in (T-2 / T-1 / Due-or-overdue), sends the matching email, and logs it back to the sheet.\nBefore first run: connect your Google Sheets + Gmail credentials, and pick the Compliance Master sheet in the two Google Sheets nodes.\nDemo setup uses only the account holder's two emails (User: riteshgarodia@yahoo.com; Supervisor/HOD: garodia1.ritesh@gmail.com).",
+        "color": 4
+      }
+    }
+  ],
+  "connections": {
+    "Daily 08:00 IST Trigger": { "main": [[{ "node": "Read Task Instances", "type": "main", "index": 0 }]] },
+    "Read Task Instances": { "main": [[{ "node": "Compute Reminder Stage", "type": "main", "index": 0 }]] },
+    "Compute Reminder Stage": { "main": [[{ "node": "Route by Reminder Stage", "type": "main", "index": 0 }]] },
+    "Route by Reminder Stage": {
+      "main": [
+        [{ "node": "Send Stage 1 Reminder (User)", "type": "main", "index": 0 }],
+        [{ "node": "Send Stage 2 Reminder (User+Supervisor CC)", "type": "main", "index": 0 }],
+        [{ "node": "Send Stage 3 Reminder (User+Supervisor+HOD)", "type": "main", "index": 0 }]
+      ]
+    },
+    "Send Stage 1 Reminder (User)": { "main": [[{ "node": "Log Reminder Sent", "type": "main", "index": 0 }]] },
+    "Send Stage 2 Reminder (User+Supervisor CC)": { "main": [[{ "node": "Log Reminder Sent", "type": "main", "index": 0 }]] },
+    "Send Stage 3 Reminder (User+Supervisor+HOD)": { "main": [[{ "node": "Log Reminder Sent", "type": "main", "index": 0 }]] }
+  },
+  "settings": { "executionOrder": "v1" }
+}
