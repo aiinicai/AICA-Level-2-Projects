@@ -1,21 +1,423 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Audit Planning Workbench</title>
-    <meta name="description" content="Statutory audit planning platform under ICAI Standards on Auditing (SA 315, SA 240, SA 330, SA 320) with risk matrix, materiality calculator, and Gemini AI assist." />
-    <meta property="og:title" content="Audit Planning Workbench" />
-    <meta property="og:description" content="Statutory audit planning platform under ICAI Standards on Auditing (SA 315, SA 240, SA 330, SA 320) with risk matrix, materiality calculator, and Gemini AI assist." />
-    <meta property="og:type" content="website" />
-    <meta name="twitter:card" content="summary_large_image" />
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700&family=IBM+Plex+Mono:ital,wght@0,400;0,500;0,600;1,400&family=Lora:ital,wght@0,400;0,500;0,600;1,400&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-  </head>
-  <body>
-    <div id="root"></div>
-    <script type="module" src="/src/main.tsx"></script>
-  </body>
-</html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Kashyap &amp; Co. — Assignment Profitability</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect width=%22100%22 height=%22100%22 rx=%2218%22 fill=%22%230f6b5c%22/><text x=%2250%22 y=%2266%22 font-size=%2258%22 text-anchor=%22middle%22 fill=%22%23fff%22 font-family=%22Georgia,serif%22>K</text></svg>">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
 
+<header class="app-header">
+  <div class="app-header__inner">
+    <div class="brand">
+      <div class="brand__name">Kashyap &amp; Co.</div>
+      <div class="brand__tagline">Chartered Accountants — Risk Advisory practice, assignment profitability</div>
+    </div>
+    <nav class="app-nav" id="app-nav">
+      <button class="app-nav__btn is-active" data-view="dashboard">Dashboard</button>
+      <button class="app-nav__btn" data-view="assignments">Assignments</button>
+      <button class="app-nav__btn" data-view="managers">Managers</button>
+      <button class="app-nav__btn" data-view="staff">Staff &amp; cost</button>
+      <button class="app-nav__btn" data-view="revenue">Billing &amp; revenue</button>
+      <button class="app-nav__btn" data-view="about">Method</button>
+    </nav>
+  </div>
+</header>
+
+<main class="app-main">
+
+  <!-- =========================== DASHBOARD =========================== -->
+  <section class="view is-active" id="view-dashboard">
+
+    <div class="hero" id="dash-hero">
+      <div class="hero__figure">
+        <div class="hero__label">Firm profit, all assignments</div>
+        <div class="hero__value num" id="dash-firm-profit">—</div>
+        <div class="hero__period" id="dash-period">Loading…</div>
+      </div>
+      <div class="hero__stats">
+        <div class="stat"><div class="stat__label">Billing</div><div class="stat__value num" id="dash-billing">—</div></div>
+        <div class="stat"><div class="stat__label">Total cost</div><div class="stat__value num" id="dash-cost">—</div></div>
+        <div class="stat"><div class="stat__label">Margin</div><div class="stat__value num" id="dash-margin">—</div></div>
+        <div class="stat"><div class="stat__label">Assignments</div><div class="stat__value num" id="dash-count">—</div></div>
+      </div>
+    </div>
+
+    <div class="grid-2">
+      <div class="panel">
+        <h3>Billing vs cost by manager</h3>
+        <p class="section-sub">Includes each manager's allocated share of pooled and Partner-level cost.</p>
+        <div id="chart-managers"></div>
+      </div>
+      <div class="panel">
+        <h3>Where firm cost goes</h3>
+        <p class="section-sub">Direct staff, pooled &amp; Partner allocations, overhead at <span id="overhead-rate-label">30%</span> of billing.</p>
+        <div id="chart-cost-mix" style="display:flex; justify-content:center;"></div>
+        <div class="legend" id="chart-cost-mix-legend"></div>
+      </div>
+    </div>
+
+    <div class="section-head">
+      <h2>Assignments by outcome</h2>
+      <p class="section-sub">Click any assignment for the full cost breakdown.</p>
+    </div>
+
+    <div class="buckets">
+      <div class="bucket bucket--profitable">
+        <div class="bucket__head">
+          <span class="bucket__title">Profitable</span>
+          <span class="bucket__count" id="count-profitable">0</span>
+        </div>
+        <div class="bucket__list" id="list-profitable"></div>
+      </div>
+      <div class="bucket bucket--nonProfitable">
+        <div class="bucket__head">
+          <span class="bucket__title">Non-profitable</span>
+          <span class="bucket__count" id="count-nonProfitable">0</span>
+        </div>
+        <div class="bucket__list" id="list-nonProfitable"></div>
+      </div>
+      <div class="bucket bucket--inProgress">
+        <div class="bucket__head">
+          <span class="bucket__title">In progress</span>
+          <span class="bucket__count" id="count-inProgress">0</span>
+        </div>
+        <div class="bucket__list" id="list-inProgress"></div>
+      </div>
+    </div>
+
+    <div class="drawer" id="assignment-detail" style="display:none;"></div>
+
+  </section>
+
+  <!-- =========================== ASSIGNMENTS =========================== -->
+  <section class="view" id="view-assignments">
+    <div class="section-head">
+      <h2>Assignments</h2>
+      <button class="btn btn--primary" id="btn-add-assignment">Add assignment</button>
+    </div>
+
+    <div class="toolbar">
+      <div class="field">
+        <label for="flt-a-manager">Manager</label>
+        <select id="flt-a-manager"><option value="">All managers</option></select>
+      </div>
+      <div class="field">
+        <label for="flt-a-status">Status</label>
+        <select id="flt-a-status">
+          <option value="">All statuses</option>
+          <option value="completed">Completed</option>
+          <option value="in-progress">In progress</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Assignment</th>
+            <th>Manager</th>
+            <th>Status</th>
+            <th class="num">Billing</th>
+            <th class="num">Total cost</th>
+            <th class="num">Profit</th>
+            <th class="num">Margin</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="tbl-assignments"></tbody>
+      </table>
+    </div>
+
+    <div class="drawer" id="assignments-detail" style="display:none;"></div>
+  </section>
+
+  <!-- =========================== MANAGERS =========================== -->
+  <section class="view" id="view-managers">
+    <div class="section-head">
+      <h2>Managers</h2>
+      <p class="section-sub">Roll-up of each manager's assignments, including their share of pooled &amp; Partner cost.</p>
+    </div>
+    <div class="mgr-grid" id="mgr-grid"></div>
+
+    <div class="section-head">
+      <h2>Partner</h2>
+      <p class="section-sub">Partner-level cost is spread across managers by billing share, then across each manager's assignments.</p>
+    </div>
+    <div class="mgr-grid" id="partner-card"></div>
+  </section>
+
+  <!-- =========================== STAFF & COST =========================== -->
+  <section class="view" id="view-staff">
+    <div class="section-head">
+      <h2>Staff &amp; prime cost</h2>
+      <button class="btn btn--primary" id="btn-add-staff">Add staff cost entry</button>
+    </div>
+
+    <div class="toolbar">
+      <div class="field">
+        <label for="flt-s-manager">Manager</label>
+        <select id="flt-s-manager"><option value="">All managers</option></select>
+      </div>
+      <div class="field">
+        <label for="flt-s-scope">Cost type</label>
+        <select id="flt-s-scope">
+          <option value="">All types</option>
+          <option value="dedicated">Dedicated to one assignment</option>
+          <option value="many">Many assignments (pooled to manager)</option>
+          <option value="partner">Partner-level pool</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Designation</th>
+            <th>Manager</th>
+            <th>Cost type</th>
+            <th>Assignment</th>
+            <th class="num">Cost</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="tbl-staff"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- =========================== REVENUE =========================== -->
+  <section class="view" id="view-revenue">
+    <div class="section-head">
+      <h2>Billing &amp; revenue entries</h2>
+      <button class="btn btn--primary" id="btn-add-revenue">Add revenue entry</button>
+    </div>
+
+    <div class="toolbar">
+      <div class="field">
+        <label for="flt-r-assignment">Assignment</label>
+        <select id="flt-r-assignment"><option value="">All assignments</option></select>
+      </div>
+      <div class="field">
+        <label for="flt-r-type">Entry type</label>
+        <select id="flt-r-type">
+          <option value="">All entries</option>
+          <option value="billing">Billing</option>
+          <option value="credit">Credit note</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Date</th>
+            <th>Assignment</th>
+            <th>Type</th>
+            <th>Voucher / MID</th>
+            <th>Milestone</th>
+            <th class="num">Amount</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="tbl-revenue"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- =========================== ABOUT / METHOD =========================== -->
+  <section class="view" id="view-about">
+    <div class="section-head"><h2>How profit is calculated</h2></div>
+    <div class="panel">
+      <h3 class="mt-0">1. Billing</h3>
+      <p>Each assignment's billing is the sum of its billing entries, less any credit notes raised against it.</p>
+      <h3>2. Direct (dedicated) staff cost</h3>
+      <p>Staff who work on a single assignment have their full prime cost charged straight to it.</p>
+      <h3>3. "Many assignments" staff cost</h3>
+      <p>A staff member shared across several assignments under one manager has their cost pooled at that manager's
+        level, then spread across the manager's own assignments in proportion to each assignment's billing versus
+        the manager's total billing.</p>
+      <h3>4. Partner-level cost</h3>
+      <p>The Partner's own cost, and any staff who report directly to the Partner across many assignments, are
+        first spread across the four managers in proportion to each manager's billing versus firm-wide billing —
+        then, within each manager, spread across that manager's assignments in proportion to assignment billing,
+        exactly as with pooled "many assignments" cost.</p>
+      <h3>5. Overhead</h3>
+      <p>An overhead charge of <span id="overhead-rate-label-2">30%</span> of each assignment's billing is added
+        on top of the cost above.</p>
+      <h3>6. Profit</h3>
+      <p>Assignment profit = billing − (direct cost + allocated pooled cost + allocated Partner cost + overhead).
+        Manager and firm profit are simple totals of their assignments' figures.</p>
+      <h3>Dashboard buckets</h3>
+      <p><strong>In progress</strong> covers any assignment explicitly marked "in progress", or one with no
+        billing recorded yet. Everything else is <strong>Profitable</strong> or <strong>Non-profitable</strong>
+        based on whether its profit is positive.</p>
+      <p class="text-muted">Change an assignment's status any time from the Assignments tab.</p>
+    </div>
+  </section>
+
+</main>
+
+<div class="footer-note">Kashyap &amp; Co. internal tool · data stored locally in <code>data/db.json</code> · runs entirely on your machine</div>
+
+<!-- =========================== MODALS =========================== -->
+
+<div class="modal-backdrop" id="modal-assignment">
+  <div class="modal">
+    <div class="modal__head">
+      <h3 id="modal-assignment-title">Add assignment</h3>
+      <button class="modal__close" data-close-modal="modal-assignment">&times;</button>
+    </div>
+    <div class="form-error" id="modal-assignment-error"></div>
+    <form id="form-assignment">
+      <input type="hidden" id="a-id">
+      <div class="form-grid">
+        <div class="field field--full">
+          <label for="a-name">Assignment / client name</label>
+          <input type="text" id="a-name" required placeholder="e.g. Client 51">
+        </div>
+        <div class="field">
+          <label for="a-manager">Manager</label>
+          <select id="a-manager" required><option value="">Choose a manager</option></select>
+        </div>
+        <div class="field">
+          <label for="a-status">Status</label>
+          <select id="a-status">
+            <option value="in-progress">In progress</option>
+            <option value="completed">Completed</option>
+          </select>
+        </div>
+        <div class="field field--full">
+          <label for="a-notes">Notes (optional)</label>
+          <textarea id="a-notes" placeholder="Scope, engagement letter reference, etc."></textarea>
+        </div>
+      </div>
+      <div class="form-actions">
+        <button type="button" class="btn" data-close-modal="modal-assignment">Cancel</button>
+        <button type="submit" class="btn btn--primary" id="btn-save-assignment">Save assignment</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="modal-staff">
+  <div class="modal">
+    <div class="modal__head">
+      <h3 id="modal-staff-title">Add staff cost entry</h3>
+      <button class="modal__close" data-close-modal="modal-staff">&times;</button>
+    </div>
+    <div class="form-error" id="modal-staff-error"></div>
+    <form id="form-staff">
+      <input type="hidden" id="s-id">
+      <div class="form-grid">
+        <div class="field field--full">
+          <label for="s-name">Staff name</label>
+          <input type="text" id="s-name" required placeholder="e.g. Priya Shah">
+        </div>
+        <div class="field">
+          <label for="s-designation">Designation</label>
+          <input type="text" id="s-designation" placeholder="e.g. Assistant, Executive, Manager">
+        </div>
+        <div class="field">
+          <label for="s-manager">Manager</label>
+          <select id="s-manager" required><option value="">Choose a manager</option></select>
+        </div>
+        <div class="field">
+          <label for="s-scope">Cost type</label>
+          <select id="s-scope" required>
+            <option value="dedicated">Dedicated to one assignment</option>
+            <option value="many">Many assignments (pooled to manager)</option>
+            <option value="partner">Partner-level pool</option>
+          </select>
+        </div>
+        <div class="field" id="s-assignment-field">
+          <label for="s-assignment">Assignment</label>
+          <select id="s-assignment"></select>
+        </div>
+        <div class="field">
+          <label for="s-cost">Prime cost (₹)</label>
+          <input type="number" id="s-cost" min="0" step="0.01" required placeholder="0.00">
+        </div>
+        <div class="field">
+          <label for="s-period">Period</label>
+          <input type="text" id="s-period" placeholder="e.g. Sep 2026">
+        </div>
+        <div class="field field--full">
+          <label for="s-notes">Notes (optional)</label>
+          <textarea id="s-notes"></textarea>
+        </div>
+      </div>
+      <div class="form-actions">
+        <button type="button" class="btn" data-close-modal="modal-staff">Cancel</button>
+        <button type="submit" class="btn btn--primary" id="btn-save-staff">Save entry</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="modal-revenue">
+  <div class="modal">
+    <div class="modal__head">
+      <h3 id="modal-revenue-title">Add revenue entry</h3>
+      <button class="modal__close" data-close-modal="modal-revenue">&times;</button>
+    </div>
+    <div class="form-error" id="modal-revenue-error"></div>
+    <form id="form-revenue">
+      <input type="hidden" id="r-id">
+      <div class="form-grid">
+        <div class="field field--full">
+          <label for="r-assignment">Assignment</label>
+          <select id="r-assignment" required></select>
+        </div>
+        <div class="field">
+          <label for="r-date">Date</label>
+          <input type="date" id="r-date" required>
+        </div>
+        <div class="field">
+          <label for="r-type">Entry type</label>
+          <select id="r-type">
+            <option value="billing">Billing</option>
+            <option value="credit">Credit note</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="r-voucherType">Voucher type</label>
+          <input type="text" id="r-voucherType" placeholder="e.g. Sales-KV (Mh)">
+        </div>
+        <div class="field">
+          <label for="r-mid">MID</label>
+          <input type="text" id="r-mid" placeholder="e.g. ARM-202609-018200">
+        </div>
+        <div class="field">
+          <label for="r-milestone">Milestone code</label>
+          <input type="text" id="r-milestone" placeholder="e.g. ARM-...-D-01">
+        </div>
+        <div class="field">
+          <label for="r-amount">Professional charges (₹)</label>
+          <input type="number" id="r-amount" step="0.01" required placeholder="0.00">
+        </div>
+        <div class="field field--full">
+          <label for="r-notes">Notes (optional)</label>
+          <textarea id="r-notes"></textarea>
+        </div>
+      </div>
+      <div class="form-actions">
+        <button type="button" class="btn" data-close-modal="modal-revenue">Cancel</button>
+        <button type="submit" class="btn btn--primary" id="btn-save-revenue">Save entry</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="js/charts.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
