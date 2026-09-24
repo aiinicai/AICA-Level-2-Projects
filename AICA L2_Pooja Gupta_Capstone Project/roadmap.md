@@ -1,0 +1,2 @@
+- [x] Verify the saved company appears in the New Query dropdown.
+- [x] Share the Super Admin sign-in link.- [x] OTP sign-in (email or mobile, Myntra-style) + mobile field for all users
