@@ -1,0 +1,132 @@
+using System;
+using System.Diagnostics;
+using System.IO;
+using System.Net;
+using System.Text;
+using System.Threading;
+
+// OfficeFlow desktop launcher.
+//
+// Deliberately minimal, and deliberately unlike the old bundled server:
+//   * binds 127.0.0.1 ONLY, so nothing is reachable from the network
+//   * serves one embedded page and nothing from disk, so there is no path traversal surface
+//   * no tunnel, no firewall changes, no credential files
+//
+// The page itself talks straight to Firebase Auth and Firestore over HTTPS, so this process
+// only exists to give the browser a localhost origin (which Firebase Auth trusts by default).
+namespace OfficeFlow.Desktop
+{
+    public class Program
+    {
+        private const string EmbeddedPageBase64 = "__HTML_BASE64__";
+
+        public static void Main(string[] args)
+        {
+            try { Console.Title = "OfficeFlow Desktop"; } catch { }
+
+            byte[] page = Convert.FromBase64String(EmbeddedPageBase64);
+
+            HttpListener listener = null;
+            int port = 0;
+            foreach (int candidate in new int[] { 8730, 8731, 8732, 8733, 8734, 0 })
+            {
+                int tryPort = candidate == 0 ? FreePort() : candidate;
+                try
+                {
+                    var l = new HttpListener();
+                    l.Prefixes.Add(string.Format("http://127.0.0.1:{0}/", tryPort));
+                    l.Start();
+                    listener = l;
+                    port = tryPort;
+                    break;
+                }
+                catch { }
+            }
+
+            if (listener == null)
+            {
+                Console.WriteLine("Could not open a local port. Is OfficeFlow already running?");
+                Console.WriteLine("Press any key to close.");
+                try { Console.ReadKey(); } catch { }
+                return;
+            }
+
+            string url = string.Format("http://127.0.0.1:{0}/", port);
+
+            Console.WriteLine("========================================================");
+            Console.WriteLine("  OfficeFlow - Prime Accounting");
+            Console.WriteLine("========================================================");
+            Console.WriteLine();
+            Console.WriteLine("  Running at " + url);
+            Console.WriteLine("  Your browser should open automatically.");
+            Console.WriteLine();
+            Console.WriteLine("  Keep this window open while you use OfficeFlow.");
+            Console.WriteLine("  Close it, or press Q, to quit.");
+            Console.WriteLine();
+
+            var running = true;
+            var worker = new Thread(delegate ()
+            {
+                while (running)
+                {
+                    HttpListenerContext ctx;
+                    try { ctx = listener.GetContext(); }
+                    catch { break; }
+
+                    try
+                    {
+                        // Every path returns the same page. Nothing is read from disk.
+                        ctx.Response.StatusCode = 200;
+                        ctx.Response.ContentType = "text/html; charset=utf-8";
+                        ctx.Response.ContentLength64 = page.Length;
+                        ctx.Response.Headers.Add("Cache-Control", "no-store");
+                        ctx.Response.OutputStream.Write(page, 0, page.Length);
+                        ctx.Response.OutputStream.Flush();
+                    }
+                    catch { }
+                    finally { try { ctx.Response.Close(); } catch { } }
+                }
+            });
+            worker.IsBackground = true;
+            worker.Start();
+
+            OpenBrowser(url);
+
+            while (true)
+            {
+                try
+                {
+                    var key = Console.ReadKey(true);
+                    if (key.Key == ConsoleKey.Q) break;
+                    if (key.Key == ConsoleKey.O) OpenBrowser(url);
+                }
+                catch { Thread.Sleep(500); }
+            }
+
+            running = false;
+            try { listener.Stop(); } catch { }
+            try { listener.Close(); } catch { }
+        }
+
+        private static int FreePort()
+        {
+            var l = new System.Net.Sockets.TcpListener(IPAddress.Loopback, 0);
+            l.Start();
+            int p = ((IPEndPoint)l.LocalEndpoint).Port;
+            l.Stop();
+            return p;
+        }
+
+        private static void OpenBrowser(string url)
+        {
+            try
+            {
+                Process.Start(new ProcessStartInfo(url) { UseShellExecute = true });
+            }
+            catch
+            {
+                try { Process.Start("cmd.exe", "/c start \"\" \"" + url + "\""); } catch { }
+            }
+        }
+    }
+}
