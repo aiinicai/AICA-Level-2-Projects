@@ -22,6 +22,14 @@ from new_team t,
   ('TEST-ACC-01', 'Test Accounts', 'staff', true)
 ) as v(code, name, designation, is_accounts);
 
+-- Bootstrap admin — no one is_admin yet, so this one is seeded directly
+-- rather than created through the Admin screen (which needs an existing
+-- admin to use it). Link this one's login the same one-time way, then
+-- every team/employee after it can go through the Admin screen itself.
+insert into employees (employee_code, name, designation, team_id, is_admin)
+select 'TEST-ADMIN-01', 'Test Admin', 'staff', team_id, true
+from teams where team_name = 'Audit & Assurance (TEST)';
+
 -- Step 2: point the team's head_employee_id at the employee just created
 -- for that role. No backup approver in this test set — add one later
 -- with the same pattern if you want to test that path too.
@@ -30,13 +38,16 @@ update teams
 set head_employee_id = (select employee_id from employees where employee_code = 'TEST-HEAD-01')
 where team_name = 'Audit & Assurance (TEST)';
 
--- Sign-up codes for testing, once this runs:
---   TEST-EMP-01  -> ordinary employee, test "My Claims"
---   TEST-HEAD-01 -> team head, test "Approvals"
---   TEST-ACC-01  -> accounts, test "Settlement"
--- Each signs up in the app with their code + a real email + a password
--- of your choosing; that links auth_user_id automatically per the
--- signup logic in expense_tool_lovable_prompt.md.
+-- Test employees, for admin-provisioned logins (no self-service sign-up):
+--   TEST-EMP-01   -> ordinary employee, test "My Claims"
+--   TEST-HEAD-01  -> team head, test "Approvals"
+--   TEST-ACC-01   -> accounts, test "Settlement"
+--   TEST-ADMIN-01 -> bootstrap admin, test the "Admin" screen
+-- Each needs a login created in Supabase Dashboard -> Authentication ->
+-- Add user (check "Auto Confirm User"), then linked to their employee_code.
+-- TEST-ADMIN-01 must be linked directly (see expense_tool_admin_capability.sql's
+-- bootstrap note); the other three can then be linked via the Admin screen's
+-- "Link a login" panel once TEST-ADMIN-01 is signed in.
 
 -- To remove this test data later, in this order (children before parents):
 --   delete from employees where employee_code like 'TEST-%';
