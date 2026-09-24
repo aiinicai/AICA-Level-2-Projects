@@ -1,0 +1,1441 @@
+You are a **senior Python software architect and desktop application developer** with expertise in Indian Income-tax/TDS/TCS compliance documents, PDF text extraction, OCR, document classification, and Windows desktop applications.
+
+I want you to develop a **complete, production-ready Python application** called:
+
+# TDS & TCS Certificate PDF Auto-Renamer
+
+## 1. OBJECTIVE
+
+Develop a Python desktop application that allows the user to select a folder containing multiple Indian **TDS and TCS certificate PDF files**.
+
+The application must:
+
+1. Read every PDF in the selected folder.
+2. Extract text/data from each PDF.
+3. Identify the type of TDS/TCS certificate.
+4. Identify whether the certificate relates to the:
+
+   * **Income-tax Act, 1961**, or
+   * **Income-tax Act, 2025**
+5. Extract the **Deductee/Collectee name** from the certificate.
+6. Rename the PDF using the **Deductee/Collectee name**.
+7. Preserve the original PDF contents without modification.
+8. Process hundreds or thousands of PDFs in batch.
+9. Provide a detailed processing log.
+10. Handle duplicate names intelligently so that no existing file is overwritten accidentally.
+
+The application should primarily be designed for **Indian Chartered Accountants, tax consultants, accountants, businesses and TDS/TCS compliance professionals**.
+
+---
+
+# 2. SUPPORTED CERTIFICATE TYPES
+
+The application must recognize certificates under both Acts.
+
+## A. Income-tax Act, 1961
+
+Support at minimum:
+
+### TDS Certificates
+
+* Form 16
+* Form 16A
+* Form 16B
+* Form 16C
+* Form 16D
+* Form 16E
+
+### TCS Certificate
+
+* Form 27D
+
+The application should also recognize common variations in the PDF text, such as:
+
+* Form No. 16
+* Form No. 16A
+* Form No. 16B
+* FORM 16A
+* FORM-16A
+* Form 27D
+* Form No. 27D
+* Certificate under section 203
+* Certificate under section 206C
+* Tax Deducted at Source
+* Tax Collected at Source
+
+---
+
+# 3. INCOME-TAX ACT, 2025
+
+The application must also support the corresponding certificate numbering applicable under the **Income-tax Act, 2025**.
+
+Support at minimum:
+
+* Form 130
+* Form 131
+* Form 132
+* Form 133
+
+The application must identify the certificate based on the actual content of the PDF rather than relying only on the filename.
+
+Create a configurable mapping layer so that additional forms can easily be added in the future.
+
+For example:
+
+```python
+FORM_MAPPING = {
+    "16": {
+        "act": "Income-tax Act, 1961",
+        "category": "TDS Certificate"
+    },
+    "16A": {
+        "act": "Income-tax Act, 1961",
+        "category": "TDS Certificate"
+    },
+    "16B": {
+        "act": "Income-tax Act, 1961",
+        "category": "TDS Certificate"
+    },
+    "16C": {
+        "act": "Income-tax Act, 1961",
+        "category": "TDS Certificate"
+    },
+    "16D": {
+        "act": "Income-tax Act, 1961",
+        "category": "TDS Certificate"
+    },
+    "16E": {
+        "act": "Income-tax Act, 1961",
+        "category": "TDS Certificate"
+    },
+    "27D": {
+        "act": "Income-tax Act, 1961",
+        "category": "TCS Certificate"
+    },
+    "130": {
+        "act": "Income-tax Act, 2025",
+        "category": "TDS/TCS Certificate"
+    },
+    "131": {
+        "act": "Income-tax Act, 2025",
+        "category": "TDS/TCS Certificate"
+    },
+    "132": {
+        "act": "Income-tax Act, 2025",
+        "category": "TDS/TCS Certificate"
+    },
+    "133": {
+        "act": "Income-tax Act, 2025",
+        "category": "TDS/TCS Certificate"
+    }
+}
+```
+
+Do not hard-code assumptions about the exact future form structure. The application must rely on configurable extraction rules.
+
+---
+
+# 4. MOST IMPORTANT REQUIREMENT — DEDUCTEE NAME
+
+The primary purpose of the application is to rename each PDF according to the **Deductee/Collectee name**.
+
+Example:
+
+Original:
+
+```text
+TDS_ABC123.pdf
+```
+
+Extracted Deductee:
+
+```text
+RAHUL SHARMA
+```
+
+New filename:
+
+```text
+RAHUL SHARMA.pdf
+```
+
+Another example:
+
+```text
+certificate_001.pdf
+```
+
+Deductee:
+
+```text
+XYZ PRIVATE LIMITED
+```
+
+Rename to:
+
+```text
+XYZ PRIVATE LIMITED.pdf
+```
+
+For TCS certificates, use the **Collectee name** where applicable.
+
+---
+
+# 5. NAME EXTRACTION
+
+Implement a robust multi-level name extraction engine.
+
+The application should search for labels such as:
+
+### TDS
+
+* Name of deductee
+* Name of the deductee
+* Deductee Name
+* Name
+* Name of deductee / payee
+* Name of person to whom payment is made
+* PAN of deductee
+* Deductee/payee
+* Name of deductee/payee
+
+### TCS
+
+* Name of collectee
+* Name of the collectee
+* Collectee Name
+* Name of buyer
+* Name of person from whom tax is collected
+* PAN of collectee
+
+The extraction engine should use:
+
+1. Exact label matching.
+2. Case-insensitive matching.
+3. Whitespace-normalized matching.
+4. Regex patterns.
+5. Position-aware PDF text extraction where possible.
+6. Table extraction where necessary.
+7. OCR as a fallback when the PDF is scanned/image-based.
+
+---
+
+# 6. DO NOT USE THE FILE NAME TO DETERMINE THE DEDUCTEE
+
+The application must extract the name from the **actual PDF content**.
+
+For example, if:
+
+```text
+abc123.pdf
+```
+
+contains:
+
+```text
+Name of deductee: PANKIL MEVADA
+```
+
+the output must be:
+
+```text
+PANKIL MEVADA.pdf
+```
+
+---
+
+# 7. PDF PROCESSING ENGINE
+
+Use suitable Python libraries.
+
+Prefer:
+
+* `PyMuPDF` / `fitz` for PDF text extraction.
+* `pypdf` as an additional fallback.
+* `pdfplumber` where table/position extraction is useful.
+* `pytesseract` + suitable OCR engine for scanned PDFs.
+* `Pillow` for image processing.
+* `regex` / Python `re` for extraction.
+
+Do not unnecessarily OCR every PDF.
+
+Use this processing hierarchy:
+
+```text
+PDF
+ ↓
+Attempt native text extraction
+ ↓
+Is sufficient text available?
+ ├── YES → Extract data
+ └── NO
+       ↓
+     Render PDF pages
+       ↓
+     OCR
+       ↓
+     Extract data
+```
+
+---
+
+# 8. OCR
+
+Implement OCR only when required.
+
+The application should detect scanned/image PDFs.
+
+Provide an application setting:
+
+```text
+☑ Enable OCR fallback
+```
+
+If OCR is enabled and normal PDF extraction fails, automatically perform OCR.
+
+Clearly document that OCR may require an installed OCR engine such as **Tesseract OCR**.
+
+The application should gracefully handle the situation where Tesseract is not installed.
+
+---
+
+# 9. PDF CLASSIFICATION
+
+For every PDF, determine:
+
+```text
+Certificate Type
+Act
+TDS/TCS
+Deductee/Collectee Name
+PAN, if available
+Assessment/Financial Year, if available
+Certificate Number, if available
+```
+
+Example internal result:
+
+```python
+{
+    "file": "certificate001.pdf",
+    "form": "16A",
+    "act": "Income-tax Act, 1961",
+    "category": "TDS",
+    "name": "RAHUL SHARMA",
+    "pan": "ABCDE1234F",
+    "financial_year": "2025-26",
+    "certificate_number": "ABC123",
+    "confidence": 0.98
+}
+```
+
+---
+
+# 10. CONFIDENCE SCORE
+
+Implement an extraction confidence score.
+
+For example:
+
+```text
+95–100%   Very High
+80–94%    High
+60–79%    Medium
+Below 60% Low
+```
+
+The application must not blindly rename a file when the extracted name is uncertain.
+
+Provide a configurable minimum confidence threshold:
+
+```text
+Minimum confidence for automatic rename: 80%
+```
+
+If confidence is below the threshold:
+
+```text
+REVIEW REQUIRED
+```
+
+and do not automatically rename unless the user chooses to do so.
+
+---
+
+# 11. SAFE FILE NAME CLEANING
+
+Deductee names may contain Windows-invalid characters.
+
+Windows-invalid characters include:
+
+```text
+\ / : * ? " < > |
+```
+
+The application must sanitize these characters.
+
+Example:
+
+```text
+ABC / XYZ PRIVATE LIMITED
+```
+
+becomes:
+
+```text
+ABC - XYZ PRIVATE LIMITED.pdf
+```
+
+Also:
+
+* Remove leading/trailing spaces.
+* Remove trailing periods.
+* Collapse repeated spaces.
+* Replace line breaks with spaces.
+* Remove invisible/control characters.
+* Preserve meaningful punctuation.
+* Preserve Unicode characters where Windows supports them.
+* Limit filename length to a safe Windows-compatible length.
+
+Do not unnecessarily remove Indian names or meaningful characters.
+
+---
+
+# 12. DUPLICATE FILE HANDLING
+
+If two certificates have the same deductee name, never overwrite the first file.
+
+Example:
+
+```text
+RAHUL SHARMA.pdf
+RAHUL SHARMA (1).pdf
+RAHUL SHARMA (2).pdf
+```
+
+Alternatively provide configurable naming formats:
+
+### Option 1
+
+```text
+RAHUL SHARMA.pdf
+RAHUL SHARMA (1).pdf
+```
+
+### Option 2
+
+```text
+RAHUL SHARMA_01.pdf
+RAHUL SHARMA_02.pdf
+```
+
+### Option 3
+
+Include certificate information:
+
+```text
+RAHUL SHARMA_16A_2025-26.pdf
+```
+
+Allow the user to select the naming pattern.
+
+---
+
+# 13. NAMING TEMPLATE
+
+Provide a GUI setting:
+
+```text
+File Naming Pattern:
+
+{deductee}.pdf
+```
+
+Allow variables:
+
+```text
+{deductee}
+{collectee}
+{pan}
+{form}
+{act}
+{fy}
+{ay}
+{certificate_no}
+```
+
+Examples:
+
+```text
+{deductee}.pdf
+```
+
+or
+
+```text
+{deductee}_{form}.pdf
+```
+
+or
+
+```text
+{deductee}_{form}_{fy}.pdf
+```
+
+or
+
+```text
+{deductee}_{pan}_{form}.pdf
+```
+
+Default should be:
+
+```text
+{deductee}.pdf
+```
+
+because the main requirement is to rename according to the deductee/collectee name.
+
+---
+
+# 14. GUI APPLICATION
+
+Create a professional Windows desktop GUI.
+
+Prefer:
+
+```text
+CustomTkinter
+```
+
+or, if necessary:
+
+```text
+Tkinter + ttk
+```
+
+The application should have a clean professional interface suitable for accounting/tax professionals.
+
+Suggested interface:
+
+```text
+========================================================
+        TDS & TCS CERTIFICATE AUTO-RENAMER
+========================================================
+
+Input Folder:
+[ C:\Users\User\Desktop\TDS Certificates ] [Browse]
+
+Output Folder:
+[ Same as Input ] [Browse]
+
+--------------------------------------------------------
+
+Act Detection:
+(•) Automatic
+( ) Income-tax Act, 1961
+( ) Income-tax Act, 2025
+
+--------------------------------------------------------
+
+Naming Pattern:
+[ {deductee}.pdf ]
+
+Minimum Confidence:
+[ 80 ] %
+
+☑ OCR fallback
+☑ Preserve original files
+☑ Handle duplicate names automatically
+☑ Ignore non-PDF files
+
+--------------------------------------------------------
+
+[ SCAN & PREVIEW ]
+
+[ RENAME FILES ]
+
+--------------------------------------------------------
+
+Progress:
+████████████████████ 100%
+
+Processed: 250
+Renamed: 238
+Review Required: 8
+Failed: 4
+
+--------------------------------------------------------
+```
+
+---
+
+# 15. PREVIEW BEFORE RENAMING
+
+This is mandatory.
+
+When the user clicks:
+
+```text
+SCAN & PREVIEW
+```
+
+the application should NOT immediately rename files.
+
+Instead display a table:
+
+| Original File | Form | Act  | Deductee/Collectee | PAN        | Confidence | Proposed New Name | Status |
+| ------------- | ---- | ---- | ------------------ | ---------- | ---------- | ----------------- | ------ |
+| abc001.pdf    | 16A  | 1961 | RAHUL SHARMA       | XXXXX1234X | 98%        | RAHUL SHARMA.pdf  | Ready  |
+| abc002.pdf    | 16A  | 1961 | ABC PVT LTD        | XXXXX6789X | 96%        | ABC PVT LTD.pdf   | Ready  |
+| abc003.pdf    | 130  | 2025 | XYZ LTD            | XXXXX1111X | 72%        | XYZ LTD.pdf       | Review |
+
+Allow the user to edit the proposed filename before renaming.
+
+---
+
+# 16. MANUAL CORRECTION
+
+For records marked:
+
+```text
+Review Required
+```
+
+provide an editable field.
+
+The user must be able to manually enter:
+
+```text
+Correct Deductee Name
+```
+
+and approve the rename.
+
+---
+
+# 17. BATCH PROCESSING
+
+The application must process:
+
+* 10 PDFs
+* 100 PDFs
+* 500 PDFs
+* 1,000+ PDFs
+
+efficiently.
+
+Use:
+
+* background processing/threading where appropriate;
+* progress bar;
+* responsive GUI;
+* no freezing of the interface.
+
+---
+
+# 18. RECURSIVE FOLDER OPTION
+
+Provide:
+
+```text
+☑ Include PDFs in subfolders
+```
+
+If selected, scan all subfolders recursively.
+
+Allow the user to choose whether renamed files should:
+
+1. Remain in their original folders, or
+2. Be copied/moved to a selected output folder.
+
+Default:
+
+```text
+Rename in original folder
+```
+
+---
+
+# 19. PRESERVE ORIGINAL FILE
+
+Default behavior should be safe.
+
+Provide:
+
+```text
+☑ Preserve original files
+```
+
+If enabled:
+
+```text
+Original → remains unchanged
+Renamed copy → created
+```
+
+If disabled:
+
+```text
+Original file → renamed
+```
+
+Require confirmation before destructive operations.
+
+---
+
+# 20. RENAME HISTORY / UNDO
+
+Implement a rename history.
+
+After processing, save a log containing:
+
+```text
+Original filename
+New filename
+Full path
+Date/time
+Form
+Act
+Deductee name
+Confidence
+Status
+```
+
+Provide:
+
+```text
+[ Export Log ]
+[ Undo Last Batch ]
+```
+
+The Undo function should restore the original filenames wherever possible.
+
+Do not delete PDF contents.
+
+---
+
+# 21. LOGGING
+
+Create a detailed log file such as:
+
+```text
+tds_renamer_2026-09-18.log
+```
+
+Record:
+
+* Start time
+* End time
+* File processed
+* Extracted text status
+* Form detected
+* Act detected
+* Deductee detected
+* Confidence
+* Proposed filename
+* Rename status
+* Error message, if any
+
+---
+
+# 22. ERROR HANDLING
+
+The application must gracefully handle:
+
+* Corrupted PDF
+* Password-protected PDF
+* Empty PDF
+* Scanned PDF
+* OCR failure
+* Missing OCR engine
+* Missing permissions
+* Duplicate filename
+* Invalid characters
+* Extremely long filename
+* File already open
+* PDF with unusual layout
+* Unknown certificate form
+* Certificate with missing deductee name
+
+Do not crash the application because one PDF fails.
+
+Mark that file:
+
+```text
+FAILED
+```
+
+and continue processing the remaining files.
+
+---
+
+# 23. UNKNOWN DOCUMENTS
+
+If a PDF is not recognized as a TDS/TCS certificate:
+
+```text
+UNKNOWN
+```
+
+Do not rename it automatically.
+
+Show:
+
+```text
+Unknown certificate/document
+```
+
+in the preview table.
+
+---
+
+# 24. ACT DETECTION
+
+Do not assume the Act solely from the form number.
+
+Use actual PDF text to detect phrases relating to:
+
+```text
+Income-tax Act, 1961
+Income-tax Act, 2025
+```
+
+Also allow the user to manually override the Act.
+
+If the PDF contains conflicting information, mark:
+
+```text
+REVIEW REQUIRED
+```
+
+rather than guessing.
+
+---
+
+# 25. EXTRACTION RULES
+
+Create a separate configurable module:
+
+```text
+extractors.py
+```
+
+containing rules for:
+
+```text
+extract_form()
+extract_act()
+extract_deductee_name()
+extract_collectee_name()
+extract_pan()
+extract_financial_year()
+extract_assessment_year()
+extract_certificate_number()
+```
+
+Keep extraction logic separate from the GUI.
+
+Suggested architecture:
+
+```text
+tds_tcs_renamer/
+│
+├── main.py
+├── gui.py
+├── pdf_processor.py
+├── extractor.py
+├── classifier.py
+├── ocr_engine.py
+├── filename_manager.py
+├── rename_manager.py
+├── history_manager.py
+├── logger.py
+├── config.py
+├── constants.py
+├── requirements.txt
+├── README.md
+└── tests/
+    ├── test_extractor.py
+    ├── test_classifier.py
+    ├── test_filename_manager.py
+    └── test_rename_manager.py
+```
+
+---
+
+# 26. CONFIGURATION
+
+Create a configuration file:
+
+```text
+config.json
+```
+
+Store:
+
+* naming pattern;
+* OCR enabled/disabled;
+* confidence threshold;
+* duplicate handling;
+* recursive scanning;
+* preserve-original preference;
+* output folder;
+* logging preference.
+
+The user should not have to modify Python source code to change these settings.
+
+---
+
+# 27. SECURITY & PRIVACY
+
+These PDFs contain sensitive tax information.
+
+Therefore:
+
+* Do not upload PDFs to any cloud service.
+* Do not send documents to external APIs.
+* Process files locally on the user's computer.
+* Do not store extracted PAN/name information unnecessarily.
+* Do not include full PAN numbers in logs by default.
+* Provide optional masking of PAN in the GUI/logs.
+* Do not modify PDF contents.
+
+The application should be explicitly described as:
+
+```text
+LOCAL PROCESSING ONLY
+Your certificates are processed on your computer and are not uploaded.
+```
+
+---
+
+# 28. SAMPLE OUTPUT
+
+Suppose the folder contains:
+
+```text
+001.pdf
+002.pdf
+003.pdf
+004.pdf
+005.pdf
+```
+
+PDF contents identify:
+
+```text
+001.pdf → RAMESH PATEL → Form 16A → Act 1961
+002.pdf → ABC PRIVATE LIMITED → Form 16A → Act 1961
+003.pdf → RAMESH PATEL → Form 27D → Act 1961
+004.pdf → XYZ LIMITED → Form 130 → Act 2025
+005.pdf → PANKIL MEVADA → Form 131 → Act 2025
+```
+
+Output should become:
+
+```text
+RAMESH PATEL.pdf
+RAMESH PATEL (1).pdf
+ABC PRIVATE LIMITED.pdf
+XYZ LIMITED.pdf
+PANKIL MEVADA.pdf
+```
+
+If naming pattern is:
+
+```text
+{deductee}_{form}_{fy}.pdf
+```
+
+then:
+
+```text
+RAMESH PATEL_16A_2025-26.pdf
+ABC PRIVATE LIMITED_16A_2025-26.pdf
+RAMESH PATEL_27D_2025-26.pdf
+XYZ LIMITED_130_2025-26.pdf
+PANKIL MEVADA_131_2025-26.pdf
+```
+
+---
+
+# 29. IMPORTANT EXTRACTION PRIORITY
+
+When identifying the person/company whose name should become the filename, prioritize:
+
+### TDS
+
+```text
+1. Explicit "Name of Deductee"
+2. Explicit "Deductee Name"
+3. Explicit "Name of Payee/Deductee"
+4. Structured certificate recipient/payee field
+5. Other reliable contextual fields
+```
+
+### TCS
+
+```text
+1. Explicit "Name of Collectee"
+2. Explicit "Collectee Name"
+3. Explicit buyer/recipient field
+4. Other reliable contextual fields
+```
+
+Never accidentally use:
+
+* Deductor name
+* Collector name
+* TAN holder name
+* Employer name
+* TRACES/department name
+* Bank name
+* Certificate issuer name
+
+as the filename when the certificate contains a separate deductee/collectee name.
+
+---
+
+# 30. SPECIAL HANDLING FOR FORM 16
+
+Form 16 may contain employer/deductor information and employee/deductee information.
+
+The extraction engine must distinguish between:
+
+```text
+Deductor / Employer
+```
+
+and:
+
+```text
+Employee / Deductee
+```
+
+The employee/deductee name must be used for the filename.
+
+Example:
+
+```text
+Employer: ABC LIMITED
+Employee/Deductee: RAHUL SHARMA
+```
+
+Output:
+
+```text
+RAHUL SHARMA.pdf
+```
+
+NOT:
+
+```text
+ABC LIMITED.pdf
+```
+
+---
+
+# 31. SPECIAL HANDLING FOR FORM 16A
+
+Identify the deductee from the appropriate certificate field.
+
+Example:
+
+```text
+Name of Deductee: M/S XYZ PRIVATE LIMITED
+```
+
+Output:
+
+```text
+XYZ PRIVATE LIMITED.pdf
+```
+
+Remove prefixes only when they are clearly honorific/entity prefixes and provide a configuration option for whether prefixes such as:
+
+```text
+M/S
+M/S.
+MR.
+MRS.
+```
+
+should be retained.
+
+Default:
+
+```text
+Remove M/S and similar non-essential prefixes.
+```
+
+Do not remove legitimate parts of company names.
+
+---
+
+# 32. SPECIAL HANDLING FOR FORM 16B / 16C / 16D / 16E
+
+Because these certificates can contain multiple names/parties, the extraction engine must identify the field corresponding to the **deductee/payee/buyer/tenant/etc.**, rather than simply taking the first name appearing in the PDF.
+
+Use form-specific extraction rules where necessary.
+
+Do not assume:
+
+```text
+First name found = Deductee
+```
+
+---
+
+# 33. SPECIAL HANDLING FOR TCS FORM 27D
+
+For Form 27D:
+
+* Identify the collectee.
+* Do not use the collector's name.
+* Use the collectee/buyer name for the output filename.
+
+---
+
+# 34. NEW ACT FORMS
+
+For Forms:
+
+```text
+130
+131
+132
+133
+```
+
+create separate configurable extraction rules.
+
+Do not simply treat them as renamed versions of Forms 16/16A/16B/16C without verifying the actual labels and layout found in the PDF.
+
+The architecture must allow the rules to be updated easily when official certificate layouts change.
+
+---
+
+# 35. DRY RUN MODE
+
+Add:
+
+```text
+☑ Dry Run
+```
+
+In Dry Run:
+
+* PDFs are scanned.
+* Names are extracted.
+* Proposed filenames are displayed.
+* Nothing is renamed.
+
+This should be the default first-run behavior.
+
+---
+
+# 36. SEARCH/FILTER
+
+The preview grid should support:
+
+* Search by filename.
+* Search by deductee.
+* Filter by form.
+* Filter by Act.
+* Filter by status.
+* Filter by confidence.
+
+---
+
+# 37. EXPORT RESULTS
+
+Provide buttons:
+
+```text
+Export CSV
+Export Excel
+Export Processing Log
+```
+
+CSV/Excel should contain:
+
+```text
+Original File
+New File
+Deductee/Collectee
+PAN
+Form
+Act
+Financial Year
+Certificate Number
+Confidence
+Status
+Error
+```
+
+Do not expose full PAN by default. Mask it, for example:
+
+```text
+ABCDE***** 
+```
+
+or another appropriate masking format.
+
+---
+
+# 38. USER EXPERIENCE
+
+Provide:
+
+* Drag-and-drop folder support if practical.
+* Browse folder button.
+* Clear status messages.
+* Progress bar.
+* Cancel button.
+* Confirmation dialogs.
+* Error summary.
+* Success summary.
+
+At completion:
+
+```text
+PROCESS COMPLETED
+
+Total PDFs: 500
+Successfully renamed: 472
+Review required: 20
+Failed: 8
+```
+
+---
+
+# 39. CANCEL PROCESSING
+
+Provide:
+
+```text
+[Cancel]
+```
+
+The user should be able to safely stop a batch operation.
+
+Do not leave partially renamed files without recording them in the history/log.
+
+---
+
+# 40. TESTING
+
+Create unit tests for:
+
+* Form identification.
+* Act identification.
+* Deductee extraction.
+* Collectee extraction.
+* PAN extraction.
+* Filename sanitization.
+* Duplicate filename handling.
+* Confidence calculation.
+* Unknown certificate handling.
+* OCR fallback.
+* Rename/undo functionality.
+
+Create test fixtures using synthetic/sample text where actual PDFs are not available.
+
+---
+
+# 41. DEPENDENCIES
+
+Create a complete:
+
+```text
+requirements.txt
+```
+
+Include only necessary packages.
+
+For example, where appropriate:
+
+```text
+PyMuPDF
+pdfplumber
+pypdf
+pytesseract
+Pillow
+customtkinter
+pandas
+openpyxl
+```
+
+Avoid unnecessary dependencies.
+
+---
+
+# 42. WINDOWS EXE
+
+The final project should be capable of being packaged into a Windows `.exe`.
+
+Provide instructions using:
+
+```text
+PyInstaller
+```
+
+Example target:
+
+```text
+TDS_TCS_Certificate_Renamer.exe
+```
+
+The user should be able to run the application without opening Python/IDLE.
+
+Provide:
+
+```text
+build_exe.bat
+```
+
+with appropriate PyInstaller configuration.
+
+If Tesseract OCR is required, clearly explain how to install/configure it, or provide a design that can detect its installation automatically.
+
+---
+
+# 43. NO INTERNET REQUIREMENT
+
+The core application must work offline.
+
+Internet should NOT be required for:
+
+* PDF reading
+* Name extraction
+* Form detection
+* File renaming
+* OCR
+* Logging
+
+---
+
+# 44. CODE QUALITY
+
+Write clean, modular, maintainable Python code.
+
+Requirements:
+
+* Python 3.11+
+* PEP 8 style.
+* Type hints.
+* Docstrings.
+* Exception handling.
+* Logging.
+* Modular classes/functions.
+* No hard-coded user-specific paths.
+* No unnecessary global variables.
+* No placeholder functions.
+* No pseudocode.
+
+---
+
+# 45. DELIVERABLES
+
+Provide the complete project, including:
+
+```text
+main.py
+gui.py
+pdf_processor.py
+extractor.py
+classifier.py
+ocr_engine.py
+filename_manager.py
+rename_manager.py
+history_manager.py
+logger.py
+config.py
+constants.py
+requirements.txt
+README.md
+build_exe.bat
+tests/
+```
+
+Every file must contain working code.
+
+Do not provide incomplete snippets.
+
+---
+
+# 46. README
+
+Create a detailed README explaining:
+
+1. Purpose of the application.
+2. Supported certificate types.
+3. Supported Acts.
+4. Installation.
+5. Python version.
+6. Dependency installation.
+7. OCR installation.
+8. How to run.
+9. How to select a folder.
+10. How to preview.
+11. How to rename.
+12. How duplicate names are handled.
+13. How confidence scores work.
+14. How to undo.
+15. How to build the EXE.
+16. Privacy/security.
+17. Troubleshooting.
+
+---
+
+# 47. IMPORTANT LEGAL/COMPLIANCE DISCLAIMER
+
+Include a small disclaimer in the application:
+
+```text
+This application is a document-processing and file-renaming utility.
+It does not determine tax liability, tax treatment, or legal compliance.
+Users should verify extracted information before relying on the renamed files.
+```
+
+---
+
+# 48. FINAL IMPLEMENTATION REQUIREMENT
+
+Do NOT merely give me a conceptual solution.
+
+I want the **actual complete Python source code** for the application.
+
+Start by presenting:
+
+1. Project architecture.
+2. Complete `requirements.txt`.
+3. Complete source code for every Python file.
+4. Complete test files.
+5. `config.json` example.
+6. `build_exe.bat`.
+7. Complete README.
+8. Installation instructions.
+9. How to run the application.
+10. How to package it into `.exe`.
+
+The application must be functional immediately after installing the dependencies.
+
+Where certificate layouts may differ between versions, implement the extraction system so that extraction rules can be easily updated without rewriting the GUI.
+
+**Most importantly, the application must prioritize accurate extraction of the DEDUCTEE/COLLECTEE NAME and must never silently use the DEDUCTOR/COLLECTOR name as the filename.**
+
+Before finalizing the code, review it for:
+
+* syntax errors,
+* missing imports,
+* incorrect module references,
+* Windows filename issues,
+* duplicate handling,
+* PDF/OCR failures,
+* GUI freezing,
+* unsafe overwriting,
+* and incomplete functions.
+
+Return production-quality code rather than pseudocode.
