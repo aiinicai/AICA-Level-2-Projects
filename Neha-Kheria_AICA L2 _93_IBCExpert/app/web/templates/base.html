@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}{{ app_name }}{% endblock %}</title>
+  <link rel="stylesheet" href="{{ url_for('static', path='app.css') }}">
+  <script defer src="{{ url_for('static', path='app.js') }}"></script>
+</head>
+<body>
+{% if session %}
+<div class="shell">
+  <aside class="sidebar" aria-label="Primary navigation">
+    <div class="brand">IBC <span>EXPERT</span></div>
+    <nav>
+      <a href="/dashboard" class="nav-link">Dashboard</a>
+      <a href="/clients" class="nav-link">Clients</a>
+      <a href="/documents" class="nav-link">Documents</a>
+      <a href="/legal" class="nav-link">Legal Database</a>
+      <a href="/workflow" class="nav-link">Workflow</a>
+      <a href="/recommendations" class="nav-link">Recommendations</a>
+      <a href="/forms" class="nav-link">Forms</a>
+      <a href="/imports" class="nav-link">Local Import</a>
+      <a href="/review-queue" class="nav-link">Review Queue</a>
+      <a href="/plugins" class="nav-link">Plugins</a>
+      <a href="/backups" class="nav-link">Backup / Restore</a>
+      <a href="/security" class="nav-link">Security</a>
+      <a href="/activation" class="nav-link">Licence</a>
+    </nav>
+    <div class="sidebar-footer">
+      <div class="user-name">{{ session.username }}</div>
+      <form method="post" action="/logout">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <button class="link-button" type="submit">Sign out</button>
+      </form>
+    </div>
+  </aside>
+  <main class="main">
+    <header class="topbar">
+      {% if licence_status.mode == 'TRIAL' %}
+      <a class="licence-badge trial" href="/activation">TRIAL · {{ licence_status.days_remaining }} days remaining</a>
+      {% elif licence_status.mode == 'LICENSED' %}
+      <a class="licence-badge licensed" href="/activation">LICENSED</a>
+      {% else %}
+      <a class="licence-badge restricted" href="/activation">{{ licence_status.mode }} · activation required</a>
+      {% endif %}
+      <button type="button" class="theme-toggle" data-theme-toggle>Light / Dark</button>
+      <span class="local-badge">Offline · Local PC</span>
+    </header>
+    <div class="content">{% block content %}{% endblock %}</div>
+  </main>
+</div>
+{% else %}
+<main class="auth-page">{% block auth_content %}{% endblock %}</main>
+{% endif %}
+<footer class="app-branding">CA IP Neha Kheria &middot; Contact: 8340689051</footer>
+</body>
+</html>

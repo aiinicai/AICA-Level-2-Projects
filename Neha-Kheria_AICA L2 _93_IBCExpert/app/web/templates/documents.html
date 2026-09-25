@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+{% block title %}Documents · IBC Expert{% endblock %}
+{% block content %}
+<div class="page-heading">
+  <div><p class="eyebrow">Encrypted local vault</p><h1>Documents</h1><p class="muted">Files are validated, encrypted at rest and searchable locally.</p></div>
+</div>
+
+{% if notice %}
+  {% if notice.kind == 'uploaded' %}<div class="notice success">Uploaded <strong>{{ notice.filename }}</strong>. <a href="/documents/{{ notice.document_id }}">Open document</a>.</div>{% endif %}
+  {% if notice.kind == 'duplicate' %}<div class="notice warning">This file already exists for the same client/matter, so a duplicate copy was not stored. <a href="/documents/{{ notice.document_id }}">Open existing document</a>.</div>{% endif %}
+  {% if notice.kind == 'zip' %}<div class="notice success">ZIP import completed: {{ notice.imported_document_ids|length }} new, {{ notice.duplicate_document_ids|length }} duplicate, {{ notice.rejected|length }} rejected.</div>{% endif %}
+  {% if notice.kind == 'zip' and notice.rejected %}<section class="panel"><h2>Rejected ZIP entries</h2><div class="table-wrap"><table><thead><tr><th>File</th><th>Reason</th></tr></thead><tbody>{% for item in notice.rejected %}<tr><td>{{ item.file }}</td><td>{{ item.reason }}</td></tr>{% endfor %}</tbody></table></div></section>{% endif %}
+{% endif %}
+
+<section class="panel">
+  <div class="panel-head"><h2>Search vault</h2><span class="muted">{{ documents|length }} result(s)</span></div>
+  <form class="document-filter" method="get" action="/documents">
+    <label>Search<input name="q" value="{{ q }}" placeholder="Filename, tag or extracted text"></label>
+    <label>Client<select name="client_id"><option value="">All clients</option>{% for client in clients %}<option value="{{ client.id }}" {% if selected_client_id == client.id %}selected{% endif %}>{{ client.name }}</option>{% endfor %}</select></label>
+    <label>Matter<select name="matter_id"><option value="">All matters</option>{% for matter in matters %}<option value="{{ matter.id }}" {% if selected_matter_id == matter.id %}selected{% endif %}>{{ matter.title }}</option>{% endfor %}</select></label>
+    <label>Category<select name="category"><option value="">All categories</option>{% for item in categories %}<option value="{{ item }}" {% if selected_category == item %}selected{% endif %}>{{ item }}</option>{% endfor %}</select></label>
+    <div class="filter-actions"><button class="primary" type="submit">Search</button><a class="button secondary" href="/documents">Clear</a></div>
+  </form>
+</section>
+
+<div class="two-column document-actions-grid">
+<section class="panel">
+  <h2>Upload document</h2>
+  <form class="stack-form" method="post" action="/documents/upload" enctype="multipart/form-data">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <label>File<input type="file" name="file" required accept=".pdf,.docx,.xlsx,.csv,.txt,.html,.htm,.png,.jpg,.jpeg,.tif,.tiff"></label>
+    <div class="form-grid compact-grid">
+      <label>Client<select name="client_id"><option value="">Unassigned</option>{% for client in clients %}<option value="{{ client.id }}" {% if selected_client_id == client.id %}selected{% endif %}>{{ client.name }}</option>{% endfor %}</select></label>
+      <label>Matter<select name="matter_id"><option value="">No matter</option>{% for matter in matters %}<option value="{{ matter.id }}" {% if selected_matter_id == matter.id %}selected{% endif %}>{{ matter.title }}</option>{% endfor %}</select></label>
+    </div>
+    <label>Category<input name="category" value="{{ selected_category }}" placeholder="Claim, Order, CoC, Financial Statement..."></label>
+    <label>Tags<input name="tags" placeholder="creditor, claim, verification"></label>
+    <label class="check-label"><input type="checkbox" name="force_ocr" value="1"> Force local OCR for PDF/image</label>
+    <button class="primary" type="submit">Upload and encrypt</button>
+  </form>
+</section>
+
+<section class="panel">
+  <h2>Import ZIP safely</h2>
+  <p class="muted">Every file is validated separately. Unsafe paths, suspicious compression and nested ZIP files are rejected.</p>
+  <form class="stack-form" method="post" action="/documents/import-zip" enctype="multipart/form-data">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <label>ZIP archive<input type="file" name="file" required accept=".zip"></label>
+    <div class="form-grid compact-grid">
+      <label>Client<select name="client_id"><option value="">Unassigned</option>{% for client in clients %}<option value="{{ client.id }}" {% if selected_client_id == client.id %}selected{% endif %}>{{ client.name }}</option>{% endfor %}</select></label>
+      <label>Matter<select name="matter_id"><option value="">No matter</option>{% for matter in matters %}<option value="{{ matter.id }}" {% if selected_matter_id == matter.id %}selected{% endif %}>{{ matter.title }}</option>{% endfor %}</select></label>
+    </div>
+    <label>Category<input name="category" value="{{ selected_category }}"></label>
+    <label>Tags<input name="tags" placeholder="imported, case-record"></label>
+    <button type="submit">Import ZIP</button>
+  </form>
+</section>
+</div>
+
+<section class="panel">
+  <div class="panel-head"><h2>Stored documents</h2></div>
+  {% if documents %}
+  <div class="table-wrap"><table><thead><tr><th>Document</th><th>Client / matter</th><th>Category</th><th>Size</th><th>OCR</th><th>Review</th><th>Added</th></tr></thead><tbody>
+    {% for document in documents %}<tr>
+      <td><a href="/documents/{{ document.id }}"><strong>{{ document.safe_filename }}</strong></a><div class="small muted">{{ document.media_type }}</div></td>
+      <td>{{ document.client_name or 'Unassigned' }}{% if document.matter_title %}<div class="small muted">{{ document.matter_title }}</div>{% endif %}</td>
+      <td>{{ document.category or '—' }}{% if document.tags %}<div class="tag-row">{% for tag in document.tags[:4] %}<span class="tag">{{ tag }}</span>{% endfor %}</div>{% endif %}</td>
+      <td>{{ '%.1f'|format(document.size_bytes / 1024) }} KB</td><td>{{ document.ocr_status }}</td><td>{{ document.review_status }}</td><td>{{ document.created_at }}</td>
+    </tr>{% endfor %}
+  </tbody></table></div>
+  {% else %}<div class="empty">No documents match the current filters.</div>{% endif %}
+</section>
+{% endblock %}

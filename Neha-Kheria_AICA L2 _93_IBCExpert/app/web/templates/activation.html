@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block title %}Licence · IBC Expert{% endblock %}
+{% block content %}
+<div class="page-heading">
+  <div><p class="eyebrow">Offline licensing</p><h1>Licence & activation</h1></div>
+  {% if licence_status.normal_use_allowed %}<a class="button secondary" href="/dashboard">Return to Dashboard</a>{% endif %}
+</div>
+{% if activated %}<div class="notice success">Licence activated and validated successfully.</div>{% endif %}
+{% if licence_status.warning %}<div class="notice danger">{{ licence_status.warning }}</div>{% endif %}
+<div class="two-column licence-layout">
+  <section class="panel">
+    <h2>Current status</h2>
+    <dl class="details">
+      <div><dt>Mode</dt><dd><strong>{{ licence_status.mode }}</strong></dd></div>
+      <div><dt>Trial days remaining</dt><dd>{{ licence_status.days_remaining }}</dd></div>
+      <div class="wide"><dt>Trial expiry (UTC)</dt><dd>{{ licence_status.expires_at }}</dd></div>
+      <div class="wide"><dt>Device / installation request code</dt><dd><code class="request-code">{{ licence_status.request_code }}</code></dd></div>
+    </dl>
+    <p class="muted">Send the Device Request Code to the software owner when an offline activation is required.</p>
+  </section>
+  <section class="panel">
+    <h2>Installed licence</h2>
+    {% if active_licence %}
+      <dl class="details">
+        <div><dt>Licence ID</dt><dd>{{ active_licence.licence_id }}</dd></div>
+        <div><dt>Type</dt><dd>{{ active_licence.licence_type }}</dd></div>
+        <div><dt>Customer</dt><dd>{{ active_licence.customer_name }}</dd></div>
+        <div><dt>Organisation</dt><dd>{{ active_licence.organisation or '—' }}</dd></div>
+        <div><dt>Starts</dt><dd>{{ active_licence.starts_at }}</dd></div>
+        <div><dt>Expires</dt><dd>{{ active_licence.expires_at or 'No expiry' }}</dd></div>
+      </dl>
+    {% else %}<div class="empty">No owner-issued licence is installed.</div>{% endif %}
+  </section>
+</div>
+<section class="panel activation-panel">
+  <div class="panel-head"><h2>Enter owner-issued activation credentials</h2></div>
+  {% if not licence_verification_configured %}
+    <div class="notice danger">This development build does not yet contain the owner's public verification key. It can run the trial, but cannot validate activation credentials until that public key is installed.</div>
+  {% endif %}
+  <form method="post" action="/activation" class="stack-form">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <label>Activation ID<textarea name="activation_id" rows="5" required autocomplete="off" spellcheck="false"></textarea></label>
+    <label>Activation Password / Code<textarea name="activation_code" rows="3" required autocomplete="off" spellcheck="false"></textarea></label>
+    <div class="actions"><button class="primary" type="submit" {% if not licence_verification_configured %}disabled{% endif %}>Validate and activate</button></div>
+  </form>
+  <p class="muted">Activation is validated entirely on this computer. The owner's private signing key is never required by IBC Expert.</p>
+</section>
+{% endblock %}

@@ -1,0 +1,43 @@
+{% extends "base.html" %}{% block title %}Local Import · IBC EXPERT{% endblock %}
+{% block content %}
+<section class="page-heading"><div><h1>Local Data Import</h1><p>User-selected files only. No web download, automatic internet import or online database update is performed.</p></div><div class="actions"><a class="button" href="/review-queue">Open Review Queue</a></div></section>
+{% if request.query_params.get('notice') %}<div class="notice success">{{ request.query_params.get('notice') }}</div>{% endif %}
+
+<div class="two-column">
+<section class="panel"><h2>Store a local document</h2>
+<form method="post" action="/imports/local" enctype="multipart/form-data" class="form-grid">
+<input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+<label class="wide">File<input type="file" name="file" required></label>
+<label>Client<select name="client_id"><option value="">None</option>{% for c in clients %}<option value="{{ c.id }}">{{ c.name }}</option>{% endfor %}</select></label>
+<label>Matter<select name="matter_id"><option value="">None</option>{% for m in matters %}<option value="{{ m.id }}">{{ m.title }}</option>{% endfor %}</select></label>
+<label>Category<input name="category" placeholder="Legal source, claim, order..."></label>
+<label>Tags<input name="tags" placeholder="comma,separated,tags"></label>
+<div class="wide"><button class="button primary" type="submit">Import selected file</button></div>
+</form><p class="muted">Safe local formats include PDF, DOCX, XLSX, CSV, TXT, HTML, PNG, JPG/JPEG, TIFF and ZIP. Imported content remains on this computer.</p></section>
+
+<section class="panel"><h2>Legal source → manual review</h2><p>Use this for Acts, Rules, Regulations, circulars, judgments or other source files that should be retained and reviewed. The app will not treat extracted text as verified law automatically.</p>
+<form method="post" action="/imports/legal-source" enctype="multipart/form-data" class="form-grid">
+<input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+<label class="wide">Source file<input type="file" name="file" required></label>
+<label>Client<select name="client_id"><option value="">None</option>{% for c in clients %}<option value="{{ c.id }}">{{ c.name }}</option>{% endfor %}</select></label>
+<label>Matter<select name="matter_id"><option value="">None</option>{% for m in matters %}<option value="{{ m.id }}">{{ m.title }}</option>{% endfor %}</select></label>
+<label class="wide">Tags<input name="tags" placeholder="IBC, regulation, judgment..."></label>
+<div class="wide"><button class="button primary" type="submit">Store & send to review</button></div>
+</form></section>
+</div>
+
+<section class="panel"><h2>Structured file mapping</h2><p>CSV, XLSX, DOCX tables and JSON records can be mapped to application fields. Every row is staged in the Review Queue first; no client or legal record is created until you approve that row.</p>
+<form method="post" action="/imports/structured" enctype="multipart/form-data" class="form-grid">
+<input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+<label>Structured file<input type="file" name="file" accept=".csv,.xlsx,.docx,.json" required></label>
+<label>Target<select name="target_type" required>{% for target in target_fields %}<option value="{{target}}">{{target.replace('_',' ')|title}}</option>{% endfor %}</select></label>
+<label>Optional profile name<input name="profile_name" placeholder="e.g. Bank client master"></label>
+<label class="wide">Optional column mapping JSON<textarea name="mapping_json" rows="6" placeholder='{"Client Name":"name","CIN":"cin","Email":"primary_email"}'></textarea></label>
+<div class="wide"><button class="button primary" type="submit">Stage rows for manual review</button></div>
+</form>
+<div class="mapping-help"><strong>Allowed target fields</strong>{% for target, fields in target_fields.items() %}<p><code>{{target}}</code>: {{ fields|join(', ') }}</p>{% endfor %}<p class="muted">If mapping JSON is blank, the app only maps obvious matching headings. Unmapped source columns are ignored, not guessed into legal fields.</p></div>
+</section>
+
+<section class="panel"><h2>Saved mapping profiles</h2><div class="table-wrap"><table><thead><tr><th>Name</th><th>Target</th><th>Format</th><th>Mapping</th></tr></thead><tbody>{% for p in profiles %}<tr><td>{{p.name}}</td><td>{{p.target_type}}</td><td>{{p.source_format}}</td><td><code>{{p.mapping}}</code></td></tr>{% else %}<tr><td colspan="4">No mapping profiles saved yet.</td></tr>{% endfor %}</tbody></table></div></section>
+<section class="panel"><h2>Import history</h2><div class="table-wrap"><table><thead><tr><th>Started</th><th>Source</th><th>Type</th><th>Status</th><th>Imported / resolved</th><th>Rejected</th></tr></thead><tbody>{% for i in imports %}<tr><td>{{ i.started_at }}</td><td>{{ i.source_name }}</td><td>{{ i.import_type }}</td><td>{{ i.status }}</td><td>{{ i.imported_items }}</td><td>{{ i.rejected_items }}</td></tr>{% else %}<tr><td colspan="6">No imports yet.</td></tr>{% endfor %}</tbody></table></div></section>
+{% endblock %}

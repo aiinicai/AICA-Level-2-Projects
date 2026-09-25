@@ -1,0 +1,60 @@
+# IBC Expert Release Gate
+
+This checklist is authoritative. The product must not be called COMPLETE while any item is unchecked.
+
+- [ ] Windows installation works on a clean machine
+- [ ] Packaged application launches
+- [ ] First-run dependency setup works online and from wheelhouse
+- [x] First-run master-password setup UI works
+- [x] Password envelope accepts correct password and rejects incorrect password
+- [x] Database persistence and transactions work
+- [x] Authenticated encryption round trip works against RFC vector
+- [x] Tampered ciphertext is rejected
+- [x] Client create/view/edit/search/archive/restore/soft delete/permanent delete works
+- [x] Client edit history persists
+- [x] Encrypted document vault round trip works
+- [x] Document Vault UI/API upload, validation, metadata, search, download/retrieval, deduplication feedback, OCR action and safe ZIP import work
+- [x] Document signature validation works
+- [x] Local OCR command integration implemented
+- [x] ZIP import, ZIP-slip, ratio bomb and symlink protections implemented/tested
+- [x] Generic legal JSON import works
+- [x] FTS5/BM25 legal and client-document search works
+- [x] Point-in-time amendment versioning works
+- [x] Data-driven workflow engine works
+- [x] Trigger-date deadline recalculation and recalculation history work
+- [x] Checklist/stage completion persistence works
+- [x] Form merge/versioning works
+- [x] TXT/DOCX/PDF/XLSX form exports implemented
+- [x] Offline communication drafts and TXT/EML export work
+- [x] Deterministic recommendation engine works
+- [x] Uncited legal recommendation is rejected in code and test
+- [x] Dashboard service uses real database queries
+- [x] Encrypted chunked backup creation and verification work
+- [x] Restore returns original database and encrypted vault document
+- [x] Scheduled encrypted local backup policy and retention controls work
+- [x] Scheduled retention preserves manual backups
+- [x] 30-day trial persists across service restart
+- [x] Trial expiry and clock rollback detection work
+- [x] Owner licence key generation/issuance utility implemented
+- [x] Offline signed activation validates
+- [x] Forged/modified licence fails
+- [x] Device-bound copied activation fails
+- [x] Valid licence persists after database restart
+- [x] Premium local UI complete and all visible controls integrated
+- [x] Authentication/session/CSRF UI flow complete
+- [x] Dynamic-port PyWebView source desktop shell and controlled shutdown implemented
+- [x] Trial/licence status and offline activation gating integrated into shell UI/API
+- [x] Optional TOTP UI flow complete
+- [x] Plugin architecture and sample plugin complete
+- [x] Versioned localhost API complete
+- [x] Outbound-network guard complete and tested
+- [x] First-run bootstrap/progress application complete
+- [x] Offline wheelhouse build procedure complete
+- [ ] Windows PyInstaller onedir package builds successfully
+- [ ] Windows installer builds successfully
+- [ ] Clean-Windows acceptance sequence passes
+- [ ] Full pytest suite runs with pinned dependencies and passes
+- [x] User, installation, owner-licensing and developer manuals complete
+- [x] Windows release/acceptance harness and tamper-evident evidence recording implemented
+- [x] Python 3.14-compatible dependency pins and x64 release-target validation implemented
+- [ ] Windows release/acceptance harness passes under CPython 3.14 x64
