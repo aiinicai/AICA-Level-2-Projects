@@ -257,6 +257,29 @@ create policy "read_unlock_log" on unlock_log for select using (
 
 
 -- ============================================================
+-- GRANTS
+-- RLS policies alone are not sufficient in Postgres: a role needs a
+-- baseline table-level GRANT before its RLS policies are even
+-- evaluated. Without these, every query from `authenticated` fails
+-- with 42501 (permission denied) regardless of how correct the RLS
+-- policies above are. These grants are deliberately minimal, matching
+-- exactly what each table's policies above already gate — nothing
+-- broader. Notably, `claims` gets no UPDATE grant: every status change
+-- goes through the security-definer functions below, which run with
+-- the function owner's privileges, not the caller's — granting direct
+-- UPDATE here would reopen the bypass those functions exist to close.
+
+grant select on public.teams to authenticated;
+grant insert, update on public.teams to authenticated;
+grant select, insert on public.employees to authenticated;
+grant update on public.employees to authenticated;
+grant select, insert on public.claims to authenticated;
+grant select, insert, update, delete on public.claim_lines to authenticated;
+grant select on public.approval_log to authenticated;
+grant select on public.unlock_log to authenticated;
+
+
+-- ============================================================
 -- STATE-TRANSITION FUNCTIONS
 -- Each enforces its own authorization and business rule, then logs the
 -- action. Client code calls these via Supabase's RPC endpoint rather than
