@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Backup / Restore</h1>
+<p class="muted">All backups are encrypted and stored locally. No cloud or internet backup is used.</p>
+{% if notice %}<div class="notice success">{{ notice }}</div>{% endif %}
+<div class="grid two">
+  <section class="card">
+    <h2>Manual backup</h2>
+    <p class="muted">Database: {{ database_path }}</p>
+    <p class="muted">Backup folder: {{ backup_path }}</p>
+    <form method="post" action="/backups/create">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <label>Optional label<input name="label" maxlength="160" placeholder="e.g. Before filing update"></label>
+      <button>Create encrypted local backup</button>
+    </form>
+  </section>
+
+  <section class="card">
+    <h2>Scheduled local backup</h2>
+    <p>Runs automatically when IBC Expert is in authenticated use and the schedule is due.</p>
+    <form method="post" action="/backups/schedule">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <label class="check-row"><input type="checkbox" name="enabled" value="1" {% if schedule.enabled %}checked{% endif %}> Enable scheduled encrypted backups</label>
+      <label>Every (days)<input type="number" min="1" max="30" name="interval_days" value="{{ schedule.interval_days }}" required></label>
+      <label>Retain scheduled backups<input type="number" min="1" max="100" name="retention" value="{{ schedule.retention }}" required></label>
+      <button>Save schedule</button>
+    </form>
+    <div class="status-list compact">
+      <div><span>Last successful run</span><strong>{{ schedule.last_run_at or 'Not yet run' }}</strong></div>
+      <div><span>Next due</span><strong>{{ schedule.next_due_at or ('At next authenticated use' if schedule.enabled else 'Disabled') }}</strong></div>
+      {% if schedule.last_error %}<div><span>Last error</span><strong class="danger-text">{{ schedule.last_error }}</strong></div>{% endif %}
+    </div>
+    <div class="button-row">
+      <form method="post" action="/backups/schedule/run" class="inline-form">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}"><button>Run scheduled backup now</button>
+      </form>
+      <form method="post" action="/backups/retention/apply" class="inline-form">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}"><button class="secondary">Apply retention now</button>
+      </form>
+    </div>
+    <p class="muted small">Retention automatically deletes only older <b>scheduled</b> backups. Manual backups are never removed by this retention rule.</p>
+  </section>
+</div>
+
+<section class="card">
+  <h2>Backup history</h2>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Created</th><th>Type</th><th>Label</th><th>Status</th><th>Size</th><th>Action</th></tr></thead>
+      <tbody>
+      {% for b in backups %}
+        <tr>
+          <td>{{ b.created_at }}</td>
+          <td>{{ b.backup_type }}</td>
+          <td>{{ b.label or '—' }}</td>
+          <td>{{ b.status }}</td>
+          <td>{{ b.size_bytes }} bytes</td>
+          <td>{% if b.status != 'DELETED' %}<form method="post" action="/backups/{{ b.id }}/verify" class="inline-form"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><button class="secondary">Verify</button></form>{% else %}<span class="muted">Removed by retention</span>{% endif %}</td>
+        </tr>
+      {% else %}
+        <tr><td colspan="6">No backups yet.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endblock %}

@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block title %}{{ document.safe_filename }} · IBC Expert{% endblock %}
+{% block content %}
+<div class="page-heading"><div><p class="eyebrow">Encrypted document</p><h1>{{ document.safe_filename }}</h1><p class="muted">SHA-256: <code class="hash-code">{{ document.content_hash }}</code></p></div><div class="actions"><a class="button secondary" href="/documents">Back</a><a class="button primary" href="/documents/{{ document.id }}/download">Download decrypted copy</a></div></div>
+{% if changed == 'metadata' %}<div class="notice success">Document metadata was saved.</div>{% endif %}
+{% if changed == 'ocr' %}<div class="notice success">Local OCR/text extraction was reprocessed.</div>{% endif %}
+<div class="two-column">
+<section class="panel"><h2>Document details</h2><dl class="details">
+  <div><dt>Client</dt><dd>{% if document.client_id %}<a href="/clients/{{ document.client_id }}">{{ document.client_name }}</a>{% else %}Unassigned{% endif %}</dd></div>
+  <div><dt>Matter</dt><dd>{{ document.matter_title or '—' }}</dd></div>
+  <div><dt>Media type</dt><dd>{{ document.media_type }}</dd></div><div><dt>Size</dt><dd>{{ '%.1f'|format(document.size_bytes / 1024) }} KB</dd></div>
+  <div><dt>OCR status</dt><dd>{{ document.ocr_status }}</dd></div><div><dt>Review status</dt><dd>{{ document.review_status }}</dd></div>
+  <div><dt>Source</dt><dd>{{ document.source or '—' }}</dd></div><div><dt>Added</dt><dd>{{ document.created_at }}</dd></div>
+</dl></section>
+<section class="panel"><h2>Metadata and actions</h2><form class="stack-form" method="post" action="/documents/{{ document.id }}/metadata"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><label>Category<input name="category" value="{{ document.category or '' }}"></label><label>Tags<input name="tags" value="{{ document.tags|join(', ') }}"></label><label>Review status<select name="review_status"><option value="REVIEW_REQUIRED" {% if document.review_status == 'REVIEW_REQUIRED' %}selected{% endif %}>Review required</option><option value="ACCEPTED" {% if document.review_status == 'ACCEPTED' %}selected{% endif %}>Accepted</option><option value="REJECTED" {% if document.review_status == 'REJECTED' %}selected{% endif %}>Rejected</option></select></label><button type="submit">Save metadata</button></form>
+{% if document.media_type == 'application/pdf' or document.media_type[:6] == 'image/' %}<form method="post" action="/documents/{{ document.id }}/ocr" class="ocr-action"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><button type="submit">Run local OCR again</button><p class="small muted">OCR remains completely local. Tesseract must be installed/configured for image OCR.</p></form>{% endif %}
+</section></div>
+<section class="panel"><div class="panel-head"><h2>Extracted searchable text</h2>{% if document.extraction_methods %}<span class="muted">{{ document.extraction_methods|join(', ') }}</span>{% endif %}</div>{% if document.extracted_text %}<pre class="document-text">{{ document.extracted_text }}</pre>{% if document.text_truncated %}<p class="muted">Preview truncated. The complete extracted text remains stored locally for search.</p>{% endif %}{% else %}<div class="empty">No searchable text was extracted. For an image or scanned PDF, use local OCR.</div>{% endif %}</section>
+{% endblock %}
