@@ -1,0 +1,28 @@
+# Render Blueprint - deploys the FastAPI backend and the Streamlit demo UI as
+# two separate web services from this one repo. Deploy via Render's
+# "New +" -> "Blueprint" flow, pointing at this repo; Render reads this file
+# automatically. See README.md "Deploying" for step-by-step setup.
+#
+# Note: TALLY_MCP_COMMAND / TALLY_MCP_ARGS are deliberately NOT set here.
+# Tally Prime and its MCP server are local-only (see connectors/connector_setup.md),
+# so both cloud services correctly fall back to the cached sample Tally data.
+services:
+  - type: web
+    name: ca-practiceos-backend
+    env: python
+    plan: free
+    buildCommand: pip install -r src/requirements.txt
+    startCommand: cd src && uvicorn main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: ANTHROPIC_API_KEY
+        sync: false
+
+  - type: web
+    name: ca-practiceos-streamlit
+    env: python
+    plan: free
+    buildCommand: pip install -r src/requirements.txt
+    startCommand: streamlit run src/streamlit_app.py --server.port $PORT --server.address 0.0.0.0 --server.headless true
+    envVars:
+      - key: ANTHROPIC_API_KEY
+        sync: false
