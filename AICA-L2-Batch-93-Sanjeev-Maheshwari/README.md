@@ -83,6 +83,21 @@ edited out of the story.
    the project's publishable key (or leave it — the app will prompt for
    it once and remember it in the browser)
 3. Open `index.html` directly, or host it via GitHub Pages
-4. Sign up using one of the test employee codes from
-   `4_seed_test_data.sql` (`TEST-EMP-01`, `TEST-HEAD-01`,
-   `TEST-ACC-01`) to see each role's view
+4. Sign in with one of the test logins (see `4_seed_test_data.sql` for
+   the employee codes: `TEST-EMP-01`, `TEST-HEAD-01`, `TEST-ACC-01`,
+   `TEST-ADMIN-01`) — each needs a login created first in Supabase
+   Dashboard and linked, per the "On logins" section below
+
+## On logins: no real email addresses needed
+
+Supabase's login system technically requires an email field, but it
+never has to be a real, externally-reachable address — with "Auto
+Confirm User" checked, no confirmation mail is ever sent. In practice,
+HR creates each login with a synthetic address derived from the
+employee code (e.g. `TEST-EMP-01@gmj.internal`) and a temporary
+password. The employee signs in with that temporary password, then
+uses the "Change password" link in the sidebar to set their own — no
+email round-trip involved anywhere in that flow. The one trade-off:
+without a real mailbox, there's no self-service "forgot password" via
+email link — a forgotten password needs an admin reset, same as the
+initial provisioning step.

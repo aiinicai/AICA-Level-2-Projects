@@ -111,7 +111,7 @@ let state = {
   employee: null,
   isHead: false,
   isAccounts: false,
-  view: "claims",
+  view: "dashboard",
   claimId: null,
 };
 
@@ -165,6 +165,7 @@ function render() {
     <div id="sidebar">
       <div><div class="wordmark">GMJ</div><div class="sub">Expense Settlement</div></div>
       <nav>
+        <a href="#" class="${state.view==='dashboard'?'active':''}" onclick="setView('dashboard');return false;">Dashboard</a>
         <a href="#" class="${state.view==='claims'?'active':''}" onclick="setView('claims');return false;">My Claims</a>
         ${state.isHead ? `<a href="#" class="${state.view==='approvals'?'active':''}" onclick="setView('approvals');return false;">Approvals</a>` : ""}
         ${state.isAccounts ? `<a href="#" class="${state.view==='settlement'?'active':''}" onclick="setView('settlement');return false;">Settlement</a>` : ""}
@@ -172,12 +173,44 @@ function render() {
       </nav>
       <div class="whoami">
         ${esc(state.employee.name)}<br>${esc(state.employee.employee_code)}
+        <button class="signout" onclick="showChangePassword()" style="margin-top:8px;">Change password</button>
         <button class="signout" onclick="signOut()">Sign out</button>
       </div>
     </div>
     <div id="main"><div class="empty">Loading…</div></div>
+    <div id="pwModal" style="display:none;position:fixed;inset:0;background:rgba(29,36,48,.4);align-items:center;justify-content:center;z-index:50;">
+      <div class="card" style="width:320px;background:#fff;">
+        <h2 style="margin-bottom:12px;">Change password</h2>
+        <div id="pwMsg"></div>
+        <div class="field"><label>New password</label><input id="pw_new" type="password"></div>
+        <div class="field"><label>Confirm new password</label><input id="pw_confirm" type="password"></div>
+        <div class="btn-row">
+          <button class="btn" onclick="doChangePassword()">Update</button>
+          <button class="btn secondary" onclick="document.getElementById('pwModal').style.display='none';">Cancel</button>
+        </div>
+      </div>
+    </div>
   `;
   renderView();
+}
+
+function showChangePassword() {
+  document.getElementById("pwMsg").innerHTML = "";
+  document.getElementById("pw_new").value = "";
+  document.getElementById("pw_confirm").value = "";
+  document.getElementById("pwModal").style.display = "flex";
+}
+
+async function doChangePassword() {
+  const pw = document.getElementById("pw_new").value;
+  const confirm = document.getElementById("pw_confirm").value;
+  const msgEl = document.getElementById("pwMsg");
+  if (pw.length < 8) { msgEl.innerHTML = `<div class="msg error">Password must be at least 8 characters.</div>`; return; }
+  if (pw !== confirm) { msgEl.innerHTML = `<div class="msg error">Passwords don't match.</div>`; return; }
+  const { error } = await sb.auth.updateUser({ password: pw });
+  if (error) { msgEl.innerHTML = `<div class="msg error">${esc(error.message)}</div>`; return; }
+  msgEl.innerHTML = `<div class="msg info">Password updated.</div>`;
+  setTimeout(() => { document.getElementById("pwModal").style.display = "none"; }, 1000);
 }
 
 function setView(v, id) { state.view = v; state.claimId = id || null; render(); }
@@ -211,6 +244,7 @@ async function doAuth() {
 
 /* ================= VIEW ROUTER ================= */
 async function renderView() {
+  if (state.view === "dashboard") return renderDashboard();
   if (state.view === "claims") return renderClaimsList();
   if (state.view === "claimDetail") return renderClaimDetail();
   if (state.view === "approvals") return renderApprovals();
@@ -218,6 +252,165 @@ async function renderView() {
   if (state.view === "settlement") return renderSettlement();
   if (state.view === "settlementDetail") return renderSettlementDetail();
   if (state.view === "admin") return renderAdmin();
+}
+
+/* ================= DASHBOARD ================= */
+async function renderDashboard() {
+  const main = document.getElementById("main");
+  main.innerHTML = `<div class="empty">Loading…</div>`;
+
+  const { data: myClaims } = await sb.from("claims").select("*").eq("employee_id", state.employee.employee_id);
+  const myTotals = await totalsFor((myClaims||[]).map(c=>c.claim_id));
+  const myTotal = Object.values(myTotals).reduce((a,b)=>a+b,0);
+  const myByStatus = { draft:0, submitted:0, approved:0, settled:0 };
+  (myClaims||[]).forEach(c => myByStatus[c.status] = (myByStatus[c.status]||0) + 1);
+
+  let headSection = "", accountsSection = "", adminSection = "";
+
+  if (state.isHead) {
+    const { data: pending } = await sb.from("claims").select("claim_id").eq("status", "submitted");
+    headSection = `
+      <div class="tile"><div class="n" style="color:var(--med)">${(pending||[]).length}</div><div class="l">Awaiting your approval</div></div>
+    `;
+  }
+
+  if (state.isAccounts) {
+    const { data: awaiting } = await sb.from("claims").select("claim_id").eq("status", "approved");
+    const now = new Date();
+    const monthStr = now.toISOString().slice(0,7);
+    const { data: settledThisMonth } = await sb.from("claims").select("claim_id, settled_at").eq("status", "settled").gte("settled_at", monthStr + "-01");
+    accountsSection = `
+      <div class="tile"><div class="n" style="color:var(--med)">${(awaiting||[]).length}</div><div class="l">Awaiting settlement</div></div>
+      <div class="tile"><div class="n" style="color:var(--good)">${(settledThisMonth||[]).length}</div><div class="l">Settled this month</div></div>
+    `;
+  }
+
+  if (state.isAdmin) {
+    const { data: emps } = await sb.from("employees").select("employee_id, auth_user_id");
+    const linked = (emps||[]).filter(e=>e.auth_user_id).length;
+    const { data: teams } = await sb.from("teams").select("team_id");
+    adminSection = `
+      <div class="tile"><div class="n">${(emps||[]).length}</div><div class="l">Employees (${linked} linked)</div></div>
+      <div class="tile"><div class="n">${(teams||[]).length}</div><div class="l">Teams</div></div>
+    `;
+  }
+
+  // last 6 months of my own claim amounts, for a simple volume strip
+  const months = [];
+  const now = new Date();
+  for (let i=5;i>=0;i--){
+    const d = new Date(now.getFullYear(), now.getMonth()-i, 1);
+    months.push({ key: d.toISOString().slice(0,7), label: d.toLocaleString(undefined,{month:'short'}), amount: 0 });
+  }
+  (myClaims||[]).forEach(c => {
+    const m = months.find(m=>m.key===c.month);
+    if (m) m.amount += myTotals[c.claim_id] || 0;
+  });
+  const maxAmt = Math.max(1, ...months.map(m=>m.amount));
+
+  const recent = (myClaims||[]).slice().sort((a,b)=>new Date(b.created_at)-new Date(a.created_at)).slice(0,5);
+
+  let overviewHtml = "";
+  if (state.isHead || state.isAccounts || state.isAdmin) {
+    const { data: stats, error: statsErr } = await sb.rpc("get_dashboard_stats");
+    if (!statsErr && stats) {
+      const byStatus = stats.by_status || {};
+      const amtByStatus = stats.amount_by_status || {};
+      const catTotals = stats.category_totals || {};
+      const maxCat = Math.max(1, ...Object.values(catTotals));
+      const topClaimants = stats.top_claimants || [];
+      const monthly = (stats.monthly_totals || []).slice().reverse();
+      const maxMonthly = Math.max(1, ...monthly.map(m=>Number(m.total)));
+      const recentFirm = stats.recent_activity || [];
+
+      overviewHtml = `
+        <h1 style="margin:28px 0 4px;">Firm Overview</h1>
+        <div style="color:var(--low);font-size:13px;margin-bottom:18px;">Aggregate across all teams &mdash; individual claim detail stays restricted to who's already allowed to see it</div>
+
+        <div class="tiles">
+          <div class="tile"><div class="n">${stats.total_claims}</div><div class="l">Total claims</div></div>
+          <div class="tile"><div class="n" style="color:var(--med)">${byStatus.submitted||0}</div><div class="l">Awaiting approval &middot; ₹${fmtMoney(amtByStatus.submitted)}</div></div>
+          <div class="tile"><div class="n" style="color:var(--accent)">${byStatus.approved||0}</div><div class="l">Awaiting settlement &middot; ₹${fmtMoney(amtByStatus.approved)}</div></div>
+          <div class="tile"><div class="n" style="color:var(--good)">${byStatus.settled||0}</div><div class="l">Settled &middot; ₹${fmtMoney(amtByStatus.settled)}</div></div>
+        </div>
+
+        <div class="grid2" style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px;">
+          <div class="card">
+            <h2 style="margin-bottom:12px;">Spend by category</h2>
+            ${Object.entries(catTotals).map(([cat,amt]) => `
+              <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
+                <span style="width:110px;font-size:12px;color:var(--low);">${esc(CATEGORY_LABELS[cat]||cat)}</span>
+                <div style="flex:1;height:8px;background:var(--border);border-radius:4px;overflow:hidden;"><div style="height:100%;background:var(--accent);width:${(amt/maxCat*100).toFixed(0)}%"></div></div>
+                <span style="font-size:12px;font-weight:600;width:80px;text-align:right;">₹${fmtMoney(amt)}</span>
+              </div>
+            `).join("") || `<div class="empty">No data yet.</div>`}
+          </div>
+          <div class="card">
+            <h2 style="margin-bottom:12px;">Top claimants</h2>
+            ${topClaimants.map(t => `
+              <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border);font-size:13px;">
+                <span>${esc(t.name)} <span class="mono" style="color:var(--low);font-size:11px;">${esc(t.employee_code)}</span></span>
+                <span class="mono">₹${fmtMoney(t.total)}</span>
+              </div>
+            `).join("") || `<div class="empty">No data yet.</div>`}
+          </div>
+        </div>
+
+        <div class="grid2" style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+          <div class="card">
+            <h2 style="margin-bottom:12px;">Firm-wide, last 6 months</h2>
+            <div style="display:flex;align-items:flex-end;gap:8px;height:70px;">
+              ${monthly.map(m=>`<div style="flex:1;background:var(--accent);border-radius:3px 3px 0 0;min-height:3px;height:${Math.max(4,(m.total/maxMonthly*70))}px" title="₹${fmtMoney(m.total)}"></div>`).join("")}
+            </div>
+            <div style="display:flex;gap:8px;margin-top:4px;">
+              ${monthly.map(m=>`<div style="flex:1;font-size:10px;color:var(--low);text-align:center;">${esc(m.month)}</div>`).join("")}
+            </div>
+          </div>
+          <div class="card">
+            <h2 style="margin-bottom:12px;">Recent activity, firm-wide</h2>
+            ${recentFirm.slice(0,5).map(r => `
+              <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border);font-size:12.5px;">
+                <span>${esc(r.name)} &middot; ${esc(r.month)}</span>${statusBadge(r.status)}
+              </div>
+            `).join("") || `<div class="empty">No activity yet.</div>`}
+          </div>
+        </div>
+      `;
+    }
+  }
+
+  main.innerHTML = `
+    <h1 style="margin-bottom:4px;">Dashboard</h1>
+    <div style="color:var(--low);font-size:13px;margin-bottom:18px;">${esc(state.employee.name)} &middot; ${esc(state.employee.employee_code)}</div>
+
+    <div class="tiles">
+      <div class="tile"><div class="n">₹${fmtMoney(myTotal)}</div><div class="l">My total claimed</div></div>
+      <div class="tile"><div class="n" style="color:var(--med)">${myByStatus.submitted}</div><div class="l">My claims pending</div></div>
+      <div class="tile"><div class="n" style="color:var(--good)">${myByStatus.settled}</div><div class="l">My claims settled</div></div>
+      ${headSection}${accountsSection}${adminSection}
+    </div>
+
+    <div class="grid2" style="display:grid;grid-template-columns:1.3fr 1fr;gap:16px;">
+      <div class="card">
+        <h2 style="margin-bottom:14px;">My claims, last 6 months</h2>
+        <div style="display:flex;align-items:flex-end;gap:8px;height:70px;">
+          ${months.map(m=>`<div style="flex:1;background:var(--accent);border-radius:3px 3px 0 0;min-height:3px;height:${Math.max(4,(m.amount/maxAmt*70))}px" title="₹${fmtMoney(m.amount)}"></div>`).join("")}
+        </div>
+        <div style="display:flex;gap:8px;margin-top:4px;">
+          ${months.map(m=>`<div style="flex:1;font-size:10px;color:var(--low);text-align:center;">${m.label}</div>`).join("")}
+        </div>
+      </div>
+      <div class="card">
+        <h2 style="margin-bottom:12px;">Recent activity</h2>
+        ${recent.length ? recent.map(c => `
+          <div style="display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--border);font-size:13px;">
+            <span>${esc(c.month)}</span>${statusBadge(c.status)}
+          </div>
+        `).join("") : `<div style="color:var(--low);font-size:12.5px;">No claims yet.</div>`}
+      </div>
+    </div>
+    ${overviewHtml}
+  `;
 }
 
 /* ================= MY CLAIMS ================= */
