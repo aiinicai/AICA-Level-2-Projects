@@ -1,0 +1,102 @@
+{
+  "name": "SurakshaScan - quarterly DPDP re-scan",
+  "_documentation": {
+    "purpose": "Trigger -> action -> review -> output. Re-scans each school on the list every quarter, and raises a human review task only when the readiness score has moved. Nothing is emailed by the workflow.",
+    "credentials": "No credential is stored in this JSON. The SMTP and sheet credentials are referenced by name and live in the n8n credential manager. Inspect this file before importing, as you would any workflow JSON.",
+    "approval": "The 'Await human approval' node is deliberate. The workflow prepares the message; a person sends it."
+  },
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {"interval": [{"field": "cronExpression", "expression": "0 6 1 1,4,7,10 *"}]}
+      },
+      "id": "trigger",
+      "name": "Every quarter",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [200, 300]
+    },
+    {
+      "parameters": {
+        "documentId": "={{ $env.SCHOOL_LIST_SHEET_ID }}",
+        "sheetName": "Schools"
+      },
+      "id": "list",
+      "name": "Read the school list",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [420, 300],
+      "credentials": {"googleSheetsOAuth2Api": {"id": "REPLACE_IN_CREDENTIAL_MANAGER", "name": "Sheets (read only)"}},
+      "notes": "Read-only scope. Columns: name, url, authorised (yes/no)."
+    },
+    {
+      "parameters": {
+        "conditions": {"options": {"caseSensitive": false}, "conditions": [
+          {"leftValue": "={{ $json.authorised }}", "rightValue": "yes", "operator": {"type": "string", "operation": "equals"}}
+        ]}
+      },
+      "id": "gate",
+      "name": "Only schools that authorised the scan",
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 2,
+      "position": [640, 300],
+      "notes": "A school must have given written authorisation before its site is scanned."
+    },
+    {
+      "parameters": {
+        "command": "=python -m surakshascan.cli watch --name \"{{ $json.name }}\" --url \"{{ $json.url }}\" --threshold 5 --docx \"{{ $env.SURAKSHASCAN_OUTPUT_DIR }}/{{ $json.name }}.docx\""
+      },
+      "id": "scan",
+      "name": "Re-scan and compare",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [860, 300],
+      "notes": "Calls the same CLI the desktop app uses, so the results are identical. Writes an evidence file and, when the score moved, a Word report."
+    },
+    {
+      "parameters": {"jsCode": "return items.map(i => ({ json: JSON.parse(i.json.stdout) }));"},
+      "id": "parse",
+      "name": "Parse the result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1080, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {"options": {}, "conditions": [
+          {"leftValue": "={{ $json.changed }}", "rightValue": true, "operator": {"type": "boolean", "operation": "true"}}
+        ]}
+      },
+      "id": "changed",
+      "name": "Did anything move?",
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 2,
+      "position": [1300, 300],
+      "notes": "A quiet quarter produces no output at all."
+    },
+    {
+      "parameters": {
+        "operation": "create",
+        "title": "=DPDP review: {{ $json.institution }} moved {{ $json.delta }} points",
+        "content": "=Score {{ $json.previous_score }} -> {{ $json.score }} ({{ $json.band }}).\nReason: {{ $json.reason }}\nReport: {{ $json.docx }}\nEvidence: {{ $json.evidence }}\n\nReview the report, then send it yourself if it should go out. This workflow has sent nothing."
+      },
+      "id": "task",
+      "name": "Await human approval",
+      "type": "n8n-nodes-base.todoist",
+      "typeVersion": 2,
+      "position": [1520, 300],
+      "credentials": {"todoistApi": {"id": "REPLACE_IN_CREDENTIAL_MANAGER", "name": "Task list"}},
+      "notes": "Creates a review task. It does not email the school. Sending is a separate, deliberate human act."
+    }
+  ],
+  "connections": {
+    "Every quarter": {"main": [[{"node": "Read the school list", "type": "main", "index": 0}]]},
+    "Read the school list": {"main": [[{"node": "Only schools that authorised the scan", "type": "main", "index": 0}]]},
+    "Only schools that authorised the scan": {"main": [[{"node": "Re-scan and compare", "type": "main", "index": 0}]]},
+    "Re-scan and compare": {"main": [[{"node": "Parse the result", "type": "main", "index": 0}]]},
+    "Parse the result": {"main": [[{"node": "Did anything move?", "type": "main", "index": 0}]]},
+    "Did anything move?": {"main": [[{"node": "Await human approval", "type": "main", "index": 0}]]}
+  },
+  "settings": {"executionOrder": "v1"},
+  "pinData": {}
+}
