@@ -329,7 +329,7 @@ function renderLineRow(l, editable) {
 }
 
 async function addBlankRow() {
-  await sb.from("claim_lines").insert({ claim_id: state.claimId, expense_date: new Date().toISOString().slice(0,10), category: "conveyance", client_code: "GMJ", amount: 0 });
+  await sb.from("claim_lines").insert({ claim_id: state.claimId, expense_date: new Date().toISOString().slice(0,10), category: "conveyance", client_code: "GMJ", amount: 1 });
   renderClaimDetail();
 }
 async function copyPreviousRow() {
@@ -339,13 +339,14 @@ async function copyPreviousRow() {
     claim_id: state.claimId, expense_date: new Date().toISOString().slice(0,10),
     category: last ? last.category : "conveyance", client_code: last ? last.client_code : "GMJ",
     from_location: last?.from_location, to_location: last?.to_location, mode_of_transport: last?.mode_of_transport,
-    amount: 0,
+    amount: 1,
   });
   renderClaimDetail();
 }
 async function updateLine(lineId, field, value) {
   const payload = {}; payload[field] = field === "amount" ? Number(value) : value;
-  await sb.from("claim_lines").update(payload).eq("line_id", lineId);
+  const { error } = await sb.from("claim_lines").update(payload).eq("line_id", lineId);
+  if (error) { alert("Could not save: " + error.message); renderClaimDetail(); }
 }
 async function deleteLine(lineId) { await sb.from("claim_lines").delete().eq("line_id", lineId); renderClaimDetail(); }
 
