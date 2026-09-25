@@ -171,10 +171,10 @@ function render() {
       <div><div class="wordmark">GMJ</div><div class="sub">Expense Settlement</div></div>
       <nav>
         <a href="#" class="${state.view==='dashboard'?'active':''}" onclick="setView('dashboard');return false;">Dashboard</a>
-        <a href="#" class="${state.view==='claims'?'active':''}" onclick="setView('claims');return false;">My Claims</a>
         ${state.isHead ? `<a href="#" class="${state.view==='approvals'?'active':''}" onclick="setView('approvals');return false;">Approvals</a>` : ""}
         ${state.isAccounts ? `<a href="#" class="${state.view==='settlement'?'active':''}" onclick="setView('settlement');return false;">Settlement</a>` : ""}
         ${state.isAdmin ? `<a href="#" class="${state.view==='admin'?'active':''}" onclick="setView('admin');return false;">Admin</a>` : ""}
+        <a href="#" class="${state.view==='claims'?'active':''}" onclick="setView('claims');return false;">${(state.isHead||state.isAccounts||state.isAdmin) ? 'My Own Expenses' : 'My Claims'}</a>
       </nav>
       <div class="whoami">
         ${esc(state.employee.name)}<br>${esc(state.employee.employee_code)}
@@ -264,208 +264,179 @@ async function renderDashboard() {
   const main = document.getElementById("main");
   main.innerHTML = `<div class="empty">Loading…</div>`;
 
-  const { data: myClaims } = await sb.from("claims").select("*").eq("employee_id", state.employee.employee_id);
-  const myTotals = await totalsFor((myClaims||[]).map(c=>c.claim_id));
-  const myTotal = Object.values(myTotals).reduce((a,b)=>a+b,0);
-  const myByStatus = { draft:0, submitted:0, approved:0, settled:0 };
-  (myClaims||[]).forEach(c => myByStatus[c.status] = (myByStatus[c.status]||0) + 1);
+  const isManager = state.isHead || state.isAccounts || state.isAdmin;
 
-  let headSection = "", accountsSection = "", adminSection = "";
+  // ---- Pure employee: personal dashboard only ----
+  if (!isManager) {
+    const { data: myClaims } = await sb.from("claims").select("*").eq("employee_id", state.employee.employee_id);
+    const myTotals = await totalsFor((myClaims||[]).map(c=>c.claim_id));
+    const myTotal = Object.values(myTotals).reduce((a,b)=>a+b,0);
+    const myByStatus = { draft:0, submitted:0, approved:0, settled:0 };
+    (myClaims||[]).forEach(c => myByStatus[c.status] = (myByStatus[c.status]||0) + 1);
 
-  if (state.isHead) {
-    const { data: pending } = await sb.from("claims").select("claim_id").eq("status", "submitted");
-    headSection = `
-      <div class="tile"><div class="n" style="color:var(--med)">${(pending||[]).length}</div><div class="l">Awaiting your approval</div></div>
-    `;
-  }
-
-  if (state.isAccounts) {
-    const { data: awaiting } = await sb.from("claims").select("claim_id").eq("status", "approved");
+    const months = [];
     const now = new Date();
-    const monthStr = now.toISOString().slice(0,7);
-    const { data: settledThisMonth } = await sb.from("claims").select("claim_id, settled_at").eq("status", "settled").gte("settled_at", monthStr + "-01");
-    accountsSection = `
-      <div class="tile"><div class="n" style="color:var(--med)">${(awaiting||[]).length}</div><div class="l">Awaiting settlement</div></div>
-      <div class="tile"><div class="n" style="color:var(--good)">${(settledThisMonth||[]).length}</div><div class="l">Settled this month</div></div>
-    `;
-  }
-
-  if (state.isAdmin) {
-    const { data: emps } = await sb.from("employees").select("employee_id, auth_user_id");
-    const linked = (emps||[]).filter(e=>e.auth_user_id).length;
-    const { data: teams } = await sb.from("teams").select("team_id");
-    adminSection = `
-      <div class="tile"><div class="n">${(emps||[]).length}</div><div class="l">Employees (${linked} linked)</div></div>
-      <div class="tile"><div class="n">${(teams||[]).length}</div><div class="l">Teams</div></div>
-    `;
-  }
-
-  // last 6 months of my own claim amounts, for a simple volume strip
-  const months = [];
-  const now = new Date();
-  for (let i=5;i>=0;i--){
-    const d = new Date(now.getFullYear(), now.getMonth()-i, 1);
-    months.push({ key: d.toISOString().slice(0,7), label: d.toLocaleString(undefined,{month:'short'}), amount: 0 });
-  }
-  (myClaims||[]).forEach(c => {
-    const m = months.find(m=>m.key===c.month);
-    if (m) m.amount += myTotals[c.claim_id] || 0;
-  });
-  const maxAmt = Math.max(1, ...months.map(m=>m.amount));
-
-  const recent = (myClaims||[]).slice().sort((a,b)=>new Date(b.created_at)-new Date(a.created_at)).slice(0,5);
-
-  let overviewHtml = "";
-  let ovStats = null;
-  if (state.isHead || state.isAccounts || state.isAdmin) {
-    const { data: stats, error: statsErr } = await sb.rpc("get_dashboard_stats");
-    if (!statsErr && stats) {
-      ovStats = stats;
-      const byStatus = stats.by_status || {};
-      const amtByStatus = stats.amount_by_status || {};
-      const catTotals = stats.category_totals || {};
-      const topClaimants = stats.top_claimants || [];
-
-      overviewHtml = `
-        <h1 style="margin:28px 0 4px;">${stats.scope === 'firm' ? 'Firm Overview' : 'My Team Overview'}</h1>
-        <div style="color:var(--low);font-size:13px;margin-bottom:18px;">${stats.scope === 'firm' ? "Aggregate across all teams — individual claim detail stays restricted to who's already allowed to see it" : "Aggregate across the team(s) you head — individual claim detail stays restricted to who's already allowed to see it"}</div>
-
-        <div class="tiles">
-          <div class="tile"><div class="n">${stats.total_claims}</div><div class="l">Total claims</div></div>
-          <div class="tile"><div class="n" style="color:${STATUS_COLORS.submitted}">${byStatus.submitted||0}</div><div class="l">Awaiting approval &middot; ₹${fmtMoney(amtByStatus.submitted)}</div></div>
-          <div class="tile"><div class="n" style="color:${STATUS_COLORS.approved}">${byStatus.approved||0}</div><div class="l">Awaiting settlement &middot; ₹${fmtMoney(amtByStatus.approved)}</div></div>
-          <div class="tile"><div class="n" style="color:${STATUS_COLORS.settled}">${byStatus.settled||0}</div><div class="l">Settled &middot; ₹${fmtMoney(amtByStatus.settled)}</div></div>
-        </div>
-
-        <div class="grid2" style="display:grid;grid-template-columns:0.8fr 1.2fr;gap:16px;margin-bottom:16px;">
-          <div class="card">
-            <h2 style="margin-bottom:12px;">Claims by status</h2>
-            <div style="height:180px;"><canvas id="ovStatusChart"></canvas></div>
-          </div>
-          <div class="card">
-            <h2 style="margin-bottom:12px;">Spend by category</h2>
-            <div style="height:180px;"><canvas id="ovCategoryChart"></canvas></div>
-          </div>
-        </div>
-
-        <div class="grid2" style="display:grid;grid-template-columns:1.3fr 1fr;gap:16px;margin-bottom:16px;">
-          <div class="card">
-            <h2 style="margin-bottom:12px;">${stats.scope === 'firm' ? 'Firm-wide' : 'My team'}, last 6 months</h2>
-            <div style="height:160px;"><canvas id="ovMonthlyChart"></canvas></div>
-          </div>
-          <div class="card">
-            <h2 style="margin-bottom:12px;">Top claimants</h2>
-            ${topClaimants.map((t,i) => `
-              <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--border);font-size:13px;">
-                <span><span style="display:inline-block;width:18px;color:var(--low);font-size:11px;">#${i+1}</span>${esc(t.name)} <span class="mono" style="color:var(--low);font-size:11px;">${esc(t.employee_code)}</span></span>
-                <span class="mono" style="font-weight:600;">₹${fmtMoney(t.total)}</span>
-              </div>
-            `).join("") || `<div class="empty">No data yet.</div>`}
-          </div>
-        </div>
-
-        <div class="card">
-          <h2 style="margin-bottom:12px;">Recent activity${stats.scope === 'firm' ? ', firm-wide' : ', my team'}</h2>
-          ${(stats.recent_activity||[]).slice(0,5).map(r => `
-            <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border);font-size:12.5px;">
-              <span>${esc(r.name)} &middot; ${esc(r.month)}</span>${statusBadge(r.status)}
-            </div>
-          `).join("") || `<div class="empty">No activity yet.</div>`}
-        </div>
-      `;
+    for (let i=5;i>=0;i--){
+      const d = new Date(now.getFullYear(), now.getMonth()-i, 1);
+      months.push({ key: d.toISOString().slice(0,7), label: d.toLocaleString(undefined,{month:'short'}), amount: 0 });
     }
-  }
+    (myClaims||[]).forEach(c => {
+      const m = months.find(m=>m.key===c.month);
+      if (m) m.amount += myTotals[c.claim_id] || 0;
+    });
 
-  main.innerHTML = `
-    <h1 style="margin-bottom:4px;">My Personal Claims</h1>
-    <div style="color:var(--low);font-size:13px;margin-bottom:18px;">${esc(state.employee.name)} &middot; ${esc(state.employee.employee_code)} &middot; your own reimbursements, regardless of role</div>
+    const recent = (myClaims||[]).slice().sort((a,b)=>new Date(b.created_at)-new Date(a.created_at)).slice(0,5);
 
-    <div class="tiles">
-      <div class="tile"><div class="n">₹${fmtMoney(myTotal)}</div><div class="l">My total claimed</div></div>
-      <div class="tile"><div class="n" style="color:${STATUS_COLORS.submitted}">${myByStatus.submitted}</div><div class="l">My claims pending</div></div>
-      <div class="tile"><div class="n" style="color:${STATUS_COLORS.settled}">${myByStatus.settled}</div><div class="l">My claims settled</div></div>
-      ${headSection}${accountsSection}${adminSection}
-    </div>
+    main.innerHTML = `
+      <h1 style="margin-bottom:4px;">My Claims</h1>
+      <div style="color:var(--low);font-size:13px;margin-bottom:18px;">${esc(state.employee.name)} &middot; ${esc(state.employee.employee_code)}</div>
 
-    <div class="grid2" style="display:grid;grid-template-columns:0.8fr 1.2fr 1fr;gap:16px;">
-      <div class="card">
-        <h2 style="margin-bottom:12px;">My status</h2>
-        <div style="height:150px;"><canvas id="myStatusChart"></canvas></div>
+      <div class="tiles">
+        <div class="tile"><div class="n">₹${fmtMoney(myTotal)}</div><div class="l">Total claimed</div></div>
+        <div class="tile"><div class="n" style="color:${STATUS_COLORS.submitted}">${myByStatus.submitted}</div><div class="l">Pending approval</div></div>
+        <div class="tile"><div class="n" style="color:${STATUS_COLORS.settled}">${myByStatus.settled}</div><div class="l">Settled</div></div>
       </div>
-      <div class="card">
-        <h2 style="margin-bottom:14px;">My claims, last 6 months</h2>
-        <div style="height:150px;"><canvas id="myMonthlyChart"></canvas></div>
+
+      <div class="grid2" style="display:grid;grid-template-columns:0.8fr 1.2fr 1fr;gap:16px;">
+        <div class="card">
+          <h2 style="margin-bottom:12px;">My status</h2>
+          <div style="height:150px;"><canvas id="myStatusChart"></canvas></div>
+        </div>
+        <div class="card">
+          <h2 style="margin-bottom:14px;">My claims, last 6 months</h2>
+          <div style="height:150px;"><canvas id="myMonthlyChart"></canvas></div>
+        </div>
+        <div class="card">
+          <h2 style="margin-bottom:12px;">Recent activity</h2>
+          ${recent.length ? recent.map(c => `
+            <div style="display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--border);font-size:13px;">
+              <span>${esc(c.month)}</span>${statusBadge(c.status)}
+            </div>
+          `).join("") : `<div style="color:var(--low);font-size:12.5px;">No claims yet.</div>`}
+        </div>
       </div>
-      <div class="card">
-        <h2 style="margin-bottom:12px;">Recent activity</h2>
-        ${recent.length ? recent.map(c => `
-          <div style="display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--border);font-size:13px;">
-            <span>${esc(c.month)}</span>${statusBadge(c.status)}
-          </div>
-        `).join("") : `<div style="color:var(--low);font-size:12.5px;">No claims yet.</div>`}
-      </div>
-    </div>
-    ${overviewHtml}
-  `;
+    `;
 
-  // Charts must be created AFTER innerHTML is set, since the canvases
-  // don't exist in the DOM until then. Destroy any previous instances
-  // first (re-rendering reuses the same canvas ids).
-  clearCharts();
-
-  const myStatusEntries = Object.entries(myByStatus).filter(([,v]) => v > 0);
-  if (myStatusEntries.length) {
-    activeCharts.push(new Chart(document.getElementById('myStatusChart'), {
-      type: 'doughnut',
-      data: {
-        labels: myStatusEntries.map(([k])=>k.charAt(0).toUpperCase()+k.slice(1)),
-        datasets: [{ data: myStatusEntries.map(([,v])=>v), backgroundColor: myStatusEntries.map(([k])=>STATUS_COLORS[k]), borderWidth: 0 }]
-      },
-      options: { plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 11 } } } }, maintainAspectRatio: false }
-    }));
-  }
-
-  activeCharts.push(new Chart(document.getElementById('myMonthlyChart'), {
-    type: 'bar',
-    data: { labels: months.map(m=>m.label), datasets: [{ data: months.map(m=>m.amount), backgroundColor: '#2B4C4A', borderRadius: 4 }] },
-    options: { plugins: { legend: { display: false } }, maintainAspectRatio: false, scales: { y: { beginAtZero: true, ticks: { font: { size: 10 } } }, x: { ticks: { font: { size: 10 } } } } }
-  }));
-
-  if (ovStats) {
-    const byStatus = ovStats.by_status || {};
-    const catTotals = ovStats.category_totals || {};
-    const monthly = (ovStats.monthly_totals || []).slice().reverse();
-
-    const statusEntries = Object.entries(byStatus).filter(([,v]) => v > 0);
-    if (statusEntries.length) {
-      activeCharts.push(new Chart(document.getElementById('ovStatusChart'), {
+    clearCharts();
+    const myStatusEntries = Object.entries(myByStatus).filter(([,v]) => v > 0);
+    if (myStatusEntries.length) {
+      activeCharts.push(new Chart(document.getElementById('myStatusChart'), {
         type: 'doughnut',
-        data: {
-          labels: statusEntries.map(([k])=>k.charAt(0).toUpperCase()+k.slice(1)),
-          datasets: [{ data: statusEntries.map(([,v])=>v), backgroundColor: statusEntries.map(([k])=>STATUS_COLORS[k]), borderWidth: 0 }]
-        },
+        data: { labels: myStatusEntries.map(([k])=>k.charAt(0).toUpperCase()+k.slice(1)), datasets: [{ data: myStatusEntries.map(([,v])=>v), backgroundColor: myStatusEntries.map(([k])=>STATUS_COLORS[k]), borderWidth: 0 }] },
         options: { plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 11 } } } }, maintainAspectRatio: false }
       }));
     }
-
-    const catEntries = Object.entries(catTotals);
-    if (catEntries.length) {
-      activeCharts.push(new Chart(document.getElementById('ovCategoryChart'), {
-        type: 'bar',
-        data: {
-          labels: catEntries.map(([k])=>CATEGORY_LABELS[k]||k),
-          datasets: [{ data: catEntries.map(([,v])=>v), backgroundColor: catEntries.map(([k])=>CATEGORY_COLORS[k]||'#8A93A6'), borderRadius: 4 }]
-        },
-        options: { indexAxis: 'y', plugins: { legend: { display: false } }, maintainAspectRatio: false, scales: { x: { beginAtZero: true, ticks: { font: { size: 10 } } }, y: { ticks: { font: { size: 11 } } } } }
-      }));
-    }
-
-    activeCharts.push(new Chart(document.getElementById('ovMonthlyChart'), {
+    activeCharts.push(new Chart(document.getElementById('myMonthlyChart'), {
       type: 'bar',
-      data: { labels: monthly.map(m=>m.month), datasets: [{ data: monthly.map(m=>Number(m.total)), backgroundColor: '#5B8DEF', borderRadius: 4 }] },
+      data: { labels: months.map(m=>m.label), datasets: [{ data: months.map(m=>m.amount), backgroundColor: '#2B4C4A', borderRadius: 4 }] },
       options: { plugins: { legend: { display: false } }, maintainAspectRatio: false, scales: { y: { beginAtZero: true, ticks: { font: { size: 10 } } }, x: { ticks: { font: { size: 10 } } } } }
     }));
+    return;
   }
+
+  // ---- Manager roles (head / accounts / admin): role report only, no personal section ----
+  const { data: stats, error: statsErr } = await sb.rpc("get_dashboard_stats");
+  if (statsErr || !stats) {
+    main.innerHTML = `<div class="empty">Could not load dashboard: ${esc(statsErr ? statsErr.message : 'unknown error')}</div>`;
+    return;
+  }
+
+  const roleLabel = { admin: 'Firm Overview', accounts: 'Firm Overview', team: 'My Team Overview' }[stats.role] || 'Overview';
+  const roleSub = stats.role === 'team'
+    ? "Aggregate across the team(s) you head — individual claim detail stays restricted to who's already allowed to see it"
+    : "Aggregate across all teams — individual claim detail stays restricted to who's already allowed to see it";
+  const trendLabel = stats.role === 'team' ? 'My team' : 'Firm-wide';
+  const activityLabel = stats.role === 'team' ? ', my team' : ', firm-wide';
+
+  const byStatus = stats.by_status || {};
+  const amtByStatus = stats.amount_by_status || {};
+  const catTotals = stats.category_totals || {};
+  const breakdown = stats.employee_breakdown || [];
+
+  const adminTiles = stats.role === 'admin' ? `
+    <div class="tile"><div class="n">${stats.employee_count}</div><div class="l">Employees (${stats.linked_employee_count} linked)</div></div>
+    <div class="tile"><div class="n">${stats.team_count}</div><div class="l">Teams</div></div>
+  ` : "";
+
+  main.innerHTML = `
+    <h1 style="margin-bottom:4px;">${roleLabel}</h1>
+    <div style="color:var(--low);font-size:13px;margin-bottom:18px;">${roleSub}</div>
+
+    <div class="tiles">
+      <div class="tile"><div class="n">${stats.total_claims}</div><div class="l">Total claims</div></div>
+      <div class="tile"><div class="n" style="color:${STATUS_COLORS.submitted}">${byStatus.submitted||0}</div><div class="l">Awaiting approval &middot; ₹${fmtMoney(amtByStatus.submitted)}</div></div>
+      <div class="tile"><div class="n" style="color:${STATUS_COLORS.approved}">${byStatus.approved||0}</div><div class="l">Awaiting settlement &middot; ₹${fmtMoney(amtByStatus.approved)}</div></div>
+      <div class="tile"><div class="n" style="color:${STATUS_COLORS.settled}">${byStatus.settled||0}</div><div class="l">Settled &middot; ₹${fmtMoney(amtByStatus.settled)}</div></div>
+      <div class="tile"><div class="n" style="color:${STATUS_COLORS.draft}">${stats.rejected_count||0}</div><div class="l">Rejected (returned) &middot; ₹${fmtMoney(stats.rejected_amount)}</div></div>
+      ${adminTiles}
+    </div>
+
+    <div class="grid2" style="display:grid;grid-template-columns:0.8fr 1.2fr;gap:16px;margin-bottom:16px;">
+      <div class="card">
+        <h2 style="margin-bottom:12px;">Claims by status</h2>
+        <div style="height:180px;"><canvas id="ovStatusChart"></canvas></div>
+      </div>
+      <div class="card">
+        <h2 style="margin-bottom:12px;">Spend by category</h2>
+        <div style="height:180px;"><canvas id="ovCategoryChart"></canvas></div>
+      </div>
+    </div>
+
+    <div class="grid2" style="display:grid;grid-template-columns:1fr 1.4fr;gap:16px;margin-bottom:16px;">
+      <div class="card">
+        <h2 style="margin-bottom:12px;">${trendLabel}, last 6 months</h2>
+        <div style="height:160px;"><canvas id="ovMonthlyChart"></canvas></div>
+      </div>
+      <div class="card">
+        <h2 style="margin-bottom:12px;">By person${activityLabel}</h2>
+        <table>
+          <thead><tr><th>Name</th><th>Pending</th><th>Approved</th><th>Settled</th><th>Total</th></tr></thead>
+          <tbody>
+            ${breakdown.map(t => `
+              <tr class="readonly">
+                <td>${esc(t.name)} <span class="mono" style="color:var(--low);font-size:10.5px;">${esc(t.employee_code)}</span></td>
+                <td>${t.pending_count}</td><td>${t.approved_count}</td><td>${t.settled_count}</td>
+                <td class="mono" style="font-weight:600;">₹${fmtMoney(t.total_amount)}</td>
+              </tr>
+            `).join("") || `<tr><td colspan="5" class="empty">No data yet.</td></tr>`}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2 style="margin-bottom:12px;">Recent activity${activityLabel}</h2>
+      ${(stats.recent_activity||[]).slice(0,5).map(r => `
+        <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border);font-size:12.5px;">
+          <span>${esc(r.name)} &middot; ${esc(r.month)}</span>${statusBadge(r.status)}
+        </div>
+      `).join("") || `<div class="empty">No activity yet.</div>`}
+    </div>
+  `;
+
+  clearCharts();
+  const statusEntries = Object.entries(byStatus).filter(([,v]) => v > 0);
+  if (statusEntries.length) {
+    activeCharts.push(new Chart(document.getElementById('ovStatusChart'), {
+      type: 'doughnut',
+      data: { labels: statusEntries.map(([k])=>k.charAt(0).toUpperCase()+k.slice(1)), datasets: [{ data: statusEntries.map(([,v])=>v), backgroundColor: statusEntries.map(([k])=>STATUS_COLORS[k]), borderWidth: 0 }] },
+      options: { plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 11 } } } }, maintainAspectRatio: false }
+    }));
+  }
+  const catEntries = Object.entries(catTotals);
+  if (catEntries.length) {
+    activeCharts.push(new Chart(document.getElementById('ovCategoryChart'), {
+      type: 'bar',
+      data: { labels: catEntries.map(([k])=>CATEGORY_LABELS[k]||k), datasets: [{ data: catEntries.map(([,v])=>v), backgroundColor: catEntries.map(([k])=>CATEGORY_COLORS[k]||'#8A93A6'), borderRadius: 4 }] },
+      options: { indexAxis: 'y', plugins: { legend: { display: false } }, maintainAspectRatio: false, scales: { x: { beginAtZero: true, ticks: { font: { size: 10 } } }, y: { ticks: { font: { size: 11 } } } } }
+    }));
+  }
+  const monthly = (stats.monthly_totals || []).slice().reverse();
+  activeCharts.push(new Chart(document.getElementById('ovMonthlyChart'), {
+    type: 'bar',
+    data: { labels: monthly.map(m=>m.month), datasets: [{ data: monthly.map(m=>Number(m.total)), backgroundColor: '#5B8DEF', borderRadius: 4 }] },
+    options: { plugins: { legend: { display: false } }, maintainAspectRatio: false, scales: { y: { beginAtZero: true, ticks: { font: { size: 10 } } }, x: { ticks: { font: { size: 10 } } } } }
+  }));
 }
 
 /* ================= MY CLAIMS ================= */
@@ -476,7 +447,7 @@ async function renderClaimsList() {
 
   main.innerHTML = `
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px;">
-      <h1>My Claims</h1>
+      <h1>${(state.isHead||state.isAccounts||state.isAdmin) ? 'My Own Expenses' : 'My Claims'}</h1>
       <button class="btn" onclick="newClaim()">New Claim</button>
     </div>
     <div class="row-list">
