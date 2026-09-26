@@ -1,0 +1,40 @@
+role 'SC Viewer'
+	modelPermission: read
+
+	tablePermission Dim_OpCo =
+			VAR _u = USERPRINCIPALNAME ()
+			RETURN
+			    NOT ISEMPTY (
+			        FILTER (
+			            User_Access,
+			            User_Access[User Email] = _u
+			                && User_Access[Active] = "Y"
+			                && TODAY () >= User_Access[Valid From]
+			                && TODAY () <= User_Access[Valid To]
+			                && ( User_Access[Region] = "ALL" || User_Access[Region] = Dim_OpCo[Region] )
+			                && ( User_Access[OpCo Code] = "ALL" || User_Access[OpCo Code] = Dim_OpCo[OpCo Code] )
+			        )
+			    )
+
+	tablePermission Dim_SC_Function =
+			VAR _u = USERPRINCIPALNAME ()
+			RETURN
+			    NOT ISEMPTY (
+			        FILTER (
+			            User_Access,
+			            User_Access[User Email] = _u
+			                && User_Access[Active] = "Y"
+			                && TODAY () >= User_Access[Valid From]
+			                && TODAY () <= User_Access[Valid To]
+			                && ( User_Access[SC Function] = "ALL" || User_Access[SC Function] = Dim_SC_Function[SC Function] )
+			        )
+			    )
+
+	tablePermission User_Access = User_Access[User Email] = USERPRINCIPALNAME ()
+
+	tablePermission DQ_Exceptions = FALSE ()
+
+	tablePermission Refresh_Log = FALSE ()
+
+	annotation PBI_Id = 8714acb4499e48ebb5279f3a625cf65f
+

@@ -1,0 +1,76 @@
+table 'CG Scenario'
+	lineageTag: 3caa27ef-e970-42c3-8c0a-85ccc901dd50
+
+	calculationGroup
+		precedence: 10
+
+		calculationItem Actual = CALCULATE ( SELECTEDMEASURE (), Dim_Scenario[Scenario] = "Actual" )
+
+		calculationItem Budget = CALCULATE ( SELECTEDMEASURE (), Dim_Scenario[Scenario] = "Budget" )
+
+		calculationItem LY =
+				VAR _src = CALCULATE ( SELECTEDMEASURE (), Dim_Scenario[Scenario] = "LY" )
+				RETURN
+				    IF (
+				        NOT ISBLANK ( _src ),
+				        _src,
+				        CALCULATE ( SELECTEDMEASURE (), Dim_Scenario[Scenario] = "Actual", DATEADD ( Dim_Date[Date], -1, YEAR ) )
+				    )
+
+		calculationItem 'Var vs Bud' =
+				VAR _a = CALCULATE ( SELECTEDMEASURE (), Dim_Scenario[Scenario] = "Actual" )
+				VAR _b = CALCULATE ( SELECTEDMEASURE (), Dim_Scenario[Scenario] = "Budget" )
+				RETURN IF ( NOT ISBLANK ( _a ) && NOT ISBLANK ( _b ), _a - _b )
+
+		calculationItem 'Var vs Bud %' =
+				VAR _a = CALCULATE ( SELECTEDMEASURE (), Dim_Scenario[Scenario] = "Actual" )
+				VAR _b = CALCULATE ( SELECTEDMEASURE (), Dim_Scenario[Scenario] = "Budget" )
+				VAR _isRatio = ISSELECTEDMEASURE ( [Gross Margin %], [EBITDA Margin %], [EBIT Margin %], [EBIT BNRI Margin %], [Channel Operating Margin %], [Cost of Sales %], [Channel Cost %], [PPV %], [Turnover SC Markup %], [Factory Personnel Cost %], [Other Factory Cost %], [Import Mix %], [Local Sourcing Mix %] )
+				RETURN
+				    IF (
+				        ISBLANK ( _a ) || ISBLANK ( _b ), BLANK (),
+				        IF ( _isRatio, ( _a - _b ) * 100, DIVIDE ( _a - _b, ABS ( _b ) ) )
+				    )
+
+			formatStringDefinition = IF ( ISSELECTEDMEASURE ( [Gross Margin %], [EBITDA Margin %], [EBIT Margin %], [EBIT BNRI Margin %], [Channel Operating Margin %], [Cost of Sales %], [Channel Cost %], [PPV %], [Turnover SC Markup %], [Factory Personnel Cost %], [Other Factory Cost %], [Import Mix %], [Local Sourcing Mix %] ), "+0.00"" pp"";-0.00"" pp""", "+0.0%;-0.0%;0.0%" )
+
+		calculationItem 'Var vs LY' =
+				VAR _a = CALCULATE ( SELECTEDMEASURE (), Dim_Scenario[Scenario] = "Actual" )
+				VAR _lySrc = CALCULATE ( SELECTEDMEASURE (), Dim_Scenario[Scenario] = "LY" )
+				VAR _ly = IF ( NOT ISBLANK ( _lySrc ), _lySrc, CALCULATE ( SELECTEDMEASURE (), Dim_Scenario[Scenario] = "Actual", DATEADD ( Dim_Date[Date], -1, YEAR ) ) )
+				RETURN IF ( NOT ISBLANK ( _a ) && NOT ISBLANK ( _ly ), _a - _ly )
+
+		calculationItem 'Var vs LY %' =
+				VAR _a = CALCULATE ( SELECTEDMEASURE (), Dim_Scenario[Scenario] = "Actual" )
+				VAR _lySrc = CALCULATE ( SELECTEDMEASURE (), Dim_Scenario[Scenario] = "LY" )
+				VAR _ly = IF ( NOT ISBLANK ( _lySrc ), _lySrc, CALCULATE ( SELECTEDMEASURE (), Dim_Scenario[Scenario] = "Actual", DATEADD ( Dim_Date[Date], -1, YEAR ) ) )
+				VAR _isRatio = ISSELECTEDMEASURE ( [Gross Margin %], [EBITDA Margin %], [EBIT Margin %], [EBIT BNRI Margin %], [Channel Operating Margin %], [Cost of Sales %], [Channel Cost %], [PPV %], [Turnover SC Markup %], [Factory Personnel Cost %], [Other Factory Cost %], [Import Mix %], [Local Sourcing Mix %] )
+				RETURN
+				    IF (
+				        ISBLANK ( _a ) || ISBLANK ( _ly ), BLANK (),
+				        IF ( _isRatio, ( _a - _ly ) * 100, DIVIDE ( _a - _ly, ABS ( _ly ) ) )
+				    )
+
+			formatStringDefinition = IF ( ISSELECTEDMEASURE ( [Gross Margin %], [EBITDA Margin %], [EBIT Margin %], [EBIT BNRI Margin %], [Channel Operating Margin %], [Cost of Sales %], [Channel Cost %], [PPV %], [Turnover SC Markup %], [Factory Personnel Cost %], [Other Factory Cost %], [Import Mix %], [Local Sourcing Mix %] ), "+0.00"" pp"";-0.00"" pp""", "+0.0%;-0.0%;0.0%" )
+
+	column Comparison
+		dataType: string
+		lineageTag: 1c792440-b046-4eb3-b433-7e0a434e56cc
+		summarizeBy: none
+		sourceColumn: Name
+		sortByColumn: Ordinal
+
+		annotation SummarizationSetBy = Automatic
+
+	column Ordinal
+		dataType: int64
+		isHidden
+		formatString: 0
+		lineageTag: aa8c08ef-bb61-4932-9ba9-d2501d7e64c2
+		summarizeBy: sum
+		sourceColumn: Ordinal
+
+		annotation SummarizationSetBy = Automatic
+
+	partition 'CG Scenario' = calculationGroup
+

@@ -1,0 +1,81 @@
+table Dim_Account
+	lineageTag: be474163-92c2-4ba8-becc-608a538dcded
+
+	column 'Account Code'
+		dataType: string
+		lineageTag: 625f7b8b-a029-4354-abba-5b55b3efec7a
+		summarizeBy: none
+		sourceColumn: Account Code
+
+		annotation SummarizationSetBy = User
+
+	column 'P&L Line'
+		dataType: string
+		lineageTag: 7e81e2bc-ebd6-4917-a823-401c4a9d1a94
+		summarizeBy: none
+		sourceColumn: P&L Line
+
+		annotation SummarizationSetBy = User
+
+	column 'P&L Group'
+		dataType: string
+		lineageTag: 6d0a8830-e2bb-4b50-aea8-08808b8a4115
+		summarizeBy: none
+		sourceColumn: P&L Group
+
+		annotation SummarizationSetBy = User
+
+	column Level
+		dataType: string
+		lineageTag: a6ab7d81-3fd3-4a0a-9871-05808d1dc358
+		summarizeBy: none
+		sourceColumn: Level
+
+		annotation SummarizationSetBy = User
+
+	column 'Measure Type'
+		dataType: string
+		lineageTag: 2a513802-ef12-41c1-a71e-cc696bdb8f29
+		summarizeBy: none
+		sourceColumn: Measure Type
+
+		annotation SummarizationSetBy = User
+
+	column 'Cost Category'
+		dataType: string
+		lineageTag: 0fee9d86-fac7-4ccd-8b2b-2c18269a2eae
+		summarizeBy: none
+		sourceColumn: Cost Category
+
+		annotation SummarizationSetBy = User
+
+	column 'Mapping Status'
+		dataType: string
+		lineageTag: eb324118-7dfb-4e2e-8479-fae1aa542778
+		summarizeBy: none
+		sourceColumn: Mapping Status
+
+		annotation SummarizationSetBy = User
+
+	column 'Parent Account'
+		dataType: string
+		lineageTag: 4f0ad43c-bee6-47bc-9e91-58300d10cbe1
+		summarizeBy: none
+		sourceColumn: Parent Account
+
+		annotation SummarizationSetBy = User
+
+	partition Dim_Account = m
+		mode: import
+		source =
+				let
+				    Source = Excel.Workbook(File.Contents(SampleDataFile), null, true),
+				    Sheet = Source{[Item="Dim_Account",Kind="Sheet"]}[Data],
+				    Promoted = Table.PromoteHeaders(Sheet, [PromoteAllScalars=true]),
+				    Renamed = Table.RenameColumns(Promoted, {{"Level (I/T/Q)", "Level"}}),
+				    Result = Table.TransformColumnTypes(Renamed, {{"Account Code", type text}, {"P&L Line", type text}, {"P&L Group", type text}, {"Level", type text}, {"Measure Type", type text}, {"Cost Category", type text}, {"Mapping Status", type text}, {"Parent Account", type text}})
+				in
+				    Result
+
+	annotation PBI_ResultType = Table
+

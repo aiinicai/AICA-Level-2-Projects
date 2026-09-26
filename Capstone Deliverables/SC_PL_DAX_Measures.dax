@@ -1,0 +1,373 @@
+// =====================================================================================
+// Global Supply Chain P&L - Power BI semantic model - DAX measure library
+// KPI definitions taken ONLY from "Summary Page KPI's_Updated"; P&L structure and
+// account codes from "Supply Chain P&L Dashboard - Template" (Dashboard Guide / Detailed tab).
+// Sign convention (ASSUMPTION A04): revenue and credits positive, costs negative (as SMART).
+// All monetary measures are USD. Display scaling (Unit / Thousand / Million) is done by
+// dynamic format strings, never by changing values.
+// =====================================================================================
+
+// ==== [BASE] ====
+// Scenario-safe base: if no single scenario is in context, default to Actual.
+Amount USD =
+IF (
+    HASONEVALUE ( Dim_Scenario[Scenario] ),
+    SUM ( Fact_SC_PL[Amount USD] ),
+    CALCULATE ( SUM ( Fact_SC_PL[Amount USD] ), Dim_Scenario[Scenario] = "Actual" )
+)
+
+Pairs =
+IF (
+    HASONEVALUE ( Dim_Scenario[Scenario] ),
+    SUM ( Fact_SC_PL[Volume Pairs] ),
+    CALCULATE ( SUM ( Fact_SC_PL[Volume Pairs] ), Dim_Scenario[Scenario] = "Actual" )
+)
+
+Display Divisor = SELECTEDVALUE ( Display_Unit[Divisor], 1 )
+
+// Dynamic format string used by every USD amount measure (Format: Dynamic):
+//   SWITCH ( SELECTEDVALUE ( Display_Unit[Display Unit], "Unit" ),
+//            "Thousand", "#,0.0,""K"";-#,0.0,""K""",
+//            "Million",  "#,0.00,,""M"";-#,0.00,,""M""",
+//            "#,0;-#,0" )
+
+// ==== [LINES] ====
+// P&L lines - one measure per SMART account (codes from template 'Dashboard Guide')
+Purchase Pairs            = CALCULATE ( [Pairs], Dim_Account[Account Code] = "PURCH_PAIRS" )
+Production Pairs          = CALCULATE ( [Pairs], Dim_Account[Account Code] = "PROD_PAIRS" )
+Total Pairs               = [Purchase Pairs] + [Production Pairs]            // "Purchase and Production Pairs"
+
+Turnover SC               = CALCULATE ( [Amount USD], Dim_Account[Account Code] = "PL_119001I" )
+Turnover SC Markup        = CALCULATE ( [Amount USD], Dim_Account[Account Code] = "PL_119002I" )
+Net Turnover SC           = CALCULATE ( [Amount USD], Dim_Account[Account Code] = "PL_119000T" )
+COGS SC                   = CALCULATE ( [Amount USD], Dim_Account[Account Code] = "PL_219000T" )
+Inventory Valuation       = CALCULATE ( [Amount USD], Dim_Account[Account Code] = "PL_222000I" )
+Factory Personnel         = CALCULATE ( [Amount USD], Dim_Account[Account Code] = "PL_227100I" )
+Other Factory Costs       = CALCULATE ( [Amount USD], Dim_Account[Account Code] = "PL_227200I" )
+Factory Costs             = CALCULATE ( [Amount USD], Dim_Account[Account Code] = "PL_227100T" )
+Recoveries of Factory     = CALCULATE ( [Amount USD], Dim_Account[Account Code] = "PL_227600I" )
+Factory Under Over Recovery = CALCULATE ( [Amount USD], Dim_Account[Account Code] = "PL_227000T" )
+Freight Costs             = CALCULATE ( [Amount USD], Dim_Account[Account Code] = "PL_225000I" )
+PPV                       = CALCULATE ( [Amount USD], Dim_Account[Account Code] = "PL_224000I" )
+Cost of Sales             = CALCULATE ( [Amount USD], Dim_Account[Account Code] = "PL_200000T" )
+Intercompany GP           = CALCULATE ( [Amount USD], Dim_Account[Account Code] = "PL_IC0000T" )
+Gross Profit              = CALCULATE ( [Amount USD], Dim_Account[Account Code] = "PL_920000T" )  // Total Gross Profit
+Marketing Expenses        = CALCULATE ( [Amount USD], Dim_Account[Account Code] = "PL_310000T" )
+Four Walls Expenses       = CALCULATE ( [Amount USD], Dim_Account[Account Code] = "PL_4W0000T" )
+Channel Expenses          = CALCULATE ( [Amount USD], Dim_Account[Account Code] = "PL_CH0000T" )
+Channel Operating Profit  = CALCULATE ( [Amount USD], Dim_Account[Account Code] = "PL_CP0000T" )
+Enabling Functions Expenses = CALCULATE ( [Amount USD], Dim_Account[Account Code] = "PL_OH0000T" )
+Non Recurring Items       = CALCULATE ( [Amount USD], Dim_Account[Account Code] = "PL_380000I" )  // mapping TBC (Q07)
+
+// ==== [PROFIT] ====
+// Profit levels that the template marks as "Calculated"
+EBITDA =
+[Channel Operating Profit] + [Enabling Functions Expenses]        // ASSUMPTION A07 (template sample = GP + Channel Expenses)
+
+EBIT BNRI = [EBITDA]                                              // template: EBIT BNRI = EBITDA (D&A line TBC, Q07)
+
+EBIT = [EBIT BNRI] + [Non Recurring Items]                        // ASSUMPTION A08 - NRI signed as in SMART (template shows "minus")
+
+// ==== [RATIOS] ====
+// Financial KPIs (Section A of KPI file)
+Turnover SC Markup %        = DIVIDE ( [Turnover SC Markup], [Turnover SC] )
+Gross Margin %              = DIVIDE ( [Gross Profit], [Net Turnover SC] )
+EBITDA Margin %             = DIVIDE ( [EBITDA], [Net Turnover SC] )
+EBIT BNRI Margin %          = DIVIDE ( [EBIT BNRI], [Net Turnover SC] )
+EBIT Margin %               = DIVIDE ( [EBIT], [Net Turnover SC] )
+Channel Operating Margin %  = DIVIDE ( [Channel Operating Profit], [Net Turnover SC] )
+
+// Cost Analytics - cost ratios shown as positive magnitudes (lower = better)
+Cost of Sales %             = DIVIDE ( - [Cost of Sales], [Net Turnover SC] )          // ASSUMPTION A06: "Turnover" = Net Turnover SC
+Channel Cost %              = DIVIDE ( - [Channel Expenses], [Net Turnover SC] )       // = template "Channel Expenses %" (A05)
+Freight Cost per Pair       = DIVIDE ( - [Freight Costs], [Total Pairs] )              // Freight / (Purchase + Production Pairs)
+Factory Cost per Pair       = DIVIDE ( - [Factory Costs], [Production Pairs] )
+Recovery per Pair           = DIVIDE ( [Recoveries of Factory], [Production Pairs] )
+Channel Expenses per Pair   = DIVIDE ( - [Channel Expenses], [Total Pairs] )
+
+// ==== [FACTORY_SOURCING] ====
+// Manufacturing KPIs - denominator = Turnover SC of the Manufacturing function (KPI file remark)
+Factory Personnel Cost % =
+CALCULATE (
+    DIVIDE ( - [Factory Personnel], [Turnover SC] ),
+    KEEPFILTERS ( Dim_SC_Function[SC Function] = "Manufacturing" )
+)
+
+Other Factory Cost % =
+CALCULATE (
+    DIVIDE ( - [Other Factory Costs], [Turnover SC] ),
+    KEEPFILTERS ( Dim_SC_Function[SC Function] = "Manufacturing" )
+)
+
+// Procurement KPIs - denominator = Turnover SC of Imports + Local Sourcing (KPI file remark)
+PPV % =
+CALCULATE (
+    DIVIDE ( [PPV], [Turnover SC] ),
+    KEEPFILTERS ( Dim_SC_Function[SC Function] IN { "Imports", "Local Sourcing" } )
+)
+
+Import Mix % =
+DIVIDE (
+    CALCULATE ( [Purchase Pairs], KEEPFILTERS ( Dim_SC_Function[SC Function] = "Imports" ) ),
+    CALCULATE ( [Purchase Pairs], KEEPFILTERS ( Dim_SC_Function[SC Function] IN { "Imports", "Local Sourcing" } ) )
+)
+
+Local Sourcing Mix % =
+DIVIDE (
+    CALCULATE ( [Purchase Pairs], KEEPFILTERS ( Dim_SC_Function[SC Function] = "Local Sourcing" ) ),
+    CALCULATE ( [Purchase Pairs], KEEPFILTERS ( Dim_SC_Function[SC Function] IN { "Imports", "Local Sourcing" } ) )
+)
+
+Average Cost per Pair = DIVIDE ( - [COGS SC], [Total Pairs] )
+
+Average Cost per Pair Import =
+CALCULATE ( DIVIDE ( - [COGS SC], [Purchase Pairs] ), KEEPFILTERS ( Dim_SC_Function[SC Function] = "Imports" ) )
+
+Average Cost per Pair LS =
+CALCULATE ( DIVIDE ( - [COGS SC], [Purchase Pairs] ), KEEPFILTERS ( Dim_SC_Function[SC Function] = "Local Sourcing" ) )
+
+Average Cost per Pair IHM =
+CALCULATE ( DIVIDE ( - [COGS SC], [Production Pairs] ), KEEPFILTERS ( Dim_SC_Function[SC Function] = "Manufacturing" ) )
+
+// ==== [CALC_GROUPS] ====
+// Calculation group 'CG Scenario' (column [Comparison], precedence 10)
+// Mirrors the template columns: Actual | Budget | LY | vs Bud % | vs LY %
+// Item "Actual"
+CALCULATE ( SELECTEDMEASURE (), Dim_Scenario[Scenario] = "Actual" )
+// Item "Budget"
+CALCULATE ( SELECTEDMEASURE (), Dim_Scenario[Scenario] = "Budget" )
+// Item "LY"  - SMART LY scenario if supplied, otherwise prior-year Actual (ASSUMPTION A03)
+VAR _src = CALCULATE ( SELECTEDMEASURE (), Dim_Scenario[Scenario] = "LY" )
+RETURN
+    IF (
+        NOT ISBLANK ( _src ),
+        _src,
+        CALCULATE ( SELECTEDMEASURE (), Dim_Scenario[Scenario] = "Actual", DATEADD ( Dim_Date[Date], -1, YEAR ) )
+    )
+// Item "Var vs Bud"   (absolute; for % KPIs this is the difference in percentage points)
+VAR _a = CALCULATE ( SELECTEDMEASURE (), Dim_Scenario[Scenario] = "Actual" )
+VAR _b = CALCULATE ( SELECTEDMEASURE (), Dim_Scenario[Scenario] = "Budget" )
+RETURN IF ( NOT ISBLANK ( _a ) && NOT ISBLANK ( _b ), _a - _b )
+// Item "Var vs Bud %"  (relative for amounts; pp for ratio KPIs)
+VAR _a = CALCULATE ( SELECTEDMEASURE (), Dim_Scenario[Scenario] = "Actual" )
+VAR _b = CALCULATE ( SELECTEDMEASURE (), Dim_Scenario[Scenario] = "Budget" )
+VAR _isRatio = CONTAINSSTRING ( SELECTEDMEASUREFORMATSTRING (), "%" )
+RETURN
+    IF (
+        ISBLANK ( _a ) || ISBLANK ( _b ), BLANK (),               // shown as "n.a" (template)
+        IF ( _isRatio, ( _a - _b ) * 100, DIVIDE ( _a - _b, ABS ( _b ) ) )
+    )
+//   Format string expression:
+//   IF ( CONTAINSSTRING ( SELECTEDMEASUREFORMATSTRING (), "%" ), "+0.0 ""pp"";-0.0 ""pp""", "+0.0%;-0.0%" )
+// Item "Var vs LY" / "Var vs LY %" - same pattern, with _b replaced by the LY logic:
+VAR _a = CALCULATE ( SELECTEDMEASURE (), Dim_Scenario[Scenario] = "Actual" )
+VAR _lySrc = CALCULATE ( SELECTEDMEASURE (), Dim_Scenario[Scenario] = "LY" )
+VAR _ly =
+    IF ( NOT ISBLANK ( _lySrc ), _lySrc,
+         CALCULATE ( SELECTEDMEASURE (), Dim_Scenario[Scenario] = "Actual", DATEADD ( Dim_Date[Date], -1, YEAR ) ) )
+VAR _isRatio = CONTAINSSTRING ( SELECTEDMEASUREFORMATSTRING (), "%" )
+RETURN
+    IF ( ISBLANK ( _a ) || ISBLANK ( _ly ), BLANK (),
+         IF ( _isRatio, ( _a - _ly ) * 100, DIVIDE ( _a - _ly, ABS ( _ly ) ) ) )
+
+// Calculation group 'CG Period' (column [Period], precedence 20 = applied outside CG Scenario)
+// Mirrors template filter "Period: Monthly | Quarterly | YTD" (calendar year - ASSUMPTION A12)
+// Item "Monthly"
+SELECTEDMEASURE ()
+// Item "Quarterly" (quarter-to-date)
+CALCULATE ( SELECTEDMEASURE (), DATESQTD ( Dim_Date[Date] ) )
+// Item "YTD"
+CALCULATE ( SELECTEDMEASURE (), DATESYTD ( Dim_Date[Date] ) )
+
+// ==== [EXPLICIT_VARIANCE] ====
+// Explicit equivalents (used in email query / tooltips, and to show the logic without calc groups)
+Net Turnover SC Budget   = CALCULATE ( [Net Turnover SC], Dim_Scenario[Scenario] = "Budget" )
+Net Turnover SC LY       = CALCULATE ( [Net Turnover SC], 'CG Scenario'[Comparison] = "LY" )
+Net Turnover SC vs Bud % = DIVIDE ( [Net Turnover SC] - [Net Turnover SC Budget], ABS ( [Net Turnover SC Budget] ) )
+Net Turnover SC vs LY %  = DIVIDE ( [Net Turnover SC] - [Net Turnover SC LY], ABS ( [Net Turnover SC LY] ) )
+Net Turnover SC YTD      = CALCULATE ( [Net Turnover SC], DATESYTD ( Dim_Date[Date] ) )
+Net Turnover SC YTD Bud  = CALCULATE ( [Net Turnover SC Budget], DATESYTD ( Dim_Date[Date] ) )
+Net Turnover SC YTD LY   = CALCULATE ( [Net Turnover SC], Dim_Scenario[Scenario] = "Actual",
+                                       DATESYTD ( DATEADD ( Dim_Date[Date], -1, YEAR ) ) )
+Freight Cost per Pair YTD = CALCULATE ( [Freight Cost per Pair], DATESYTD ( Dim_Date[Date] ) )
+Gross Margin % vs Bud pp = ( [Gross Margin %] - CALCULATE ( [Gross Margin %], Dim_Scenario[Scenario] = "Budget" ) ) * 100
+
+// ==== [PL_MATRIX] ====
+// Detailed P&L matrix: rows = PL_Layout[Row Label] (sorted by PL_Layout[Sort]), columns = 'CG Scenario'[Comparison]
+P&L Row Value =
+VAR _type = SELECTEDVALUE ( PL_Layout[Row Type] )
+VAR _key  = SELECTEDVALUE ( PL_Layout[Account Code / Measure] )
+RETURN
+    SWITCH (
+        TRUE (),
+        _type = "Account" && _key IN { "PURCH_PAIRS", "PROD_PAIRS" }, CALCULATE ( [Pairs], Dim_Account[Account Code] = _key ),
+        _type = "Account", CALCULATE ( [Amount USD], Dim_Account[Account Code] = _key ),
+        _key = "Total Pairs", [Total Pairs],
+        _key = "Gross Margin %", [Gross Margin %],
+        _key = "Channel Cost %", [Channel Cost %],
+        _key = "Channel Operating Margin %", [Channel Operating Margin %],
+        _key = "EBITDA", [EBITDA],
+        _key = "EBITDA Margin %", [EBITDA Margin %],
+        _key = "EBIT BNRI", [EBIT BNRI],
+        _key = "EBIT BNRI Margin %", [EBIT BNRI Margin %],
+        _key = "EBIT", [EBIT],
+        _key = "EBIT Margin %", [EBIT Margin %]
+    )
+// Dynamic format string:  SWITCH ( SELECTEDVALUE ( PL_Layout[Format] ), "%", "0.0%", "#,0", "#,0", <USD dynamic format> )
+
+// ==== [KPI_SELECTOR] ====
+// Trend page: KPI slicer bound to Dim_KPI (single select)
+KPI Value =
+SWITCH (
+    SELECTEDVALUE ( Dim_KPI[KPI ID] ),
+    "K01", [Net Turnover SC],        "K02", [Turnover SC Markup %],     "K03", [Gross Profit],
+    "K04", [Gross Margin %],         "K05", [EBITDA],                   "K06", [EBITDA Margin %],
+    "K07", [EBIT],                   "K08", [EBIT Margin %],            "K09", [Cost of Sales],
+    "K10", [Purchase Pairs],         "K11", [Production Pairs],         "K12", [Total Pairs],
+    "K13", [Freight Cost per Pair],  "K14", [Factory Cost per Pair],    "K15", [Recovery per Pair],
+    "K16", [Channel Expenses per Pair], "K17", [Channel Cost %],        "K18", [Cost of Sales %],
+    "K19", [Factory Under Over Recovery], "K20", [Factory Personnel Cost %], "K21", [Other Factory Cost %],
+    "K22", [PPV %],                  "K23", [Import Mix %],             "K24", [Local Sourcing Mix %],
+    "K25", [Average Cost per Pair],  "K26", [Average Cost per Pair Import],
+    "K27", [Average Cost per Pair LS], "K28", [Average Cost per Pair IHM]
+)
+KPI Definition (tooltip) = SELECTEDVALUE ( Dim_KPI[Description (source)] ) & " | " & SELECTEDVALUE ( Dim_KPI[Formula] )
+
+// ==== [ALERTS] ====
+// Exception management - traffic lights (KPI file section C). Comparison bases = ASSUMPTION A11.
+Alert GP Margin =
+VAR _a  = [Gross Margin %]
+VAR _b  = CALCULATE ( [Gross Margin %], 'CG Scenario'[Comparison] = "Budget" )
+VAR _ly = CALCULATE ( [Gross Margin %], 'CG Scenario'[Comparison] = "LY" )
+RETURN IF ( ( NOT ISBLANK ( _b ) && _a - _b < -0.01 ) || ( NOT ISBLANK ( _ly ) && _a - _ly < -0.01 ), "Red", "Green" )
+
+Alert EBITDA = IF ( [EBITDA] < 0, "Red", "Green" )
+
+Alert Freight =
+VAR _a  = [Freight Cost per Pair]
+VAR _ly = CALCULATE ( [Freight Cost per Pair], 'CG Scenario'[Comparison] = "LY" )
+RETURN IF ( DIVIDE ( _a - _ly, _ly ) > 0.10, "Amber", "Green" )
+
+Alert PPV =
+VAR _a = [PPV]
+VAR _b = CALCULATE ( [PPV], Dim_Scenario[Scenario] = "Budget" )
+RETURN IF ( DIVIDE ( _a - _b, ABS ( _b ) ) < -0.05, "Amber", "Green" )        // PPV positive = favourable
+
+Alert Recovery =
+VAR _a = [Recoveries of Factory]
+VAR _b = CALCULATE ( [Recoveries of Factory], Dim_Scenario[Scenario] = "Budget" )
+RETURN IF ( ABS ( DIVIDE ( _a - _b, _b ) ) > 0.10, "Red", "Green" )
+
+Alert Colour (hex) =                                  // used by conditional formatting "Field value"
+SWITCH ( [Alert GP Margin], "Red", "#C62828", "Amber", "#E0A100", "#1E8E3E" )
+
+OpCos Flagged EBITDA = COUNTROWS ( FILTER ( VALUES ( Dim_OpCo[OpCo Code] ), [Alert EBITDA] = "Red" ) )
+OpCos Flagged PPV    = COUNTROWS ( FILTER ( VALUES ( Dim_OpCo[OpCo Code] ), [Alert PPV] = "Amber" ) )
+
+// ==== [DQ] ====
+// Data Quality & Refresh Status page (Admin audience)
+Last Refresh (UTC)   = MAX ( Refresh_Stamp[Refreshed At (UTC)] )      // stamped by Power Query at every refresh
+Latest Published Period =
+CALCULATE ( MAX ( Publish_Control[Period] ), Publish_Control[Status] = "Published", Publish_Control[Scenario] = "Actual" )
+Reporting Month =
+VAR _p = [Latest Published Period]
+RETURN FORMAT ( DATE ( INT ( _p / 100 ), MOD ( _p, 100 ), 1 ), "MMM-yyyy" )
+Records Loaded (Latest) =
+VAR _p = [Latest Published Period]
+RETURN CALCULATE ( COUNTROWS ( Fact_SC_PL ), Dim_Date[Period] = _p, REMOVEFILTERS ( Dim_Scenario ) )
+OpCos Loaded =
+VAR _p = [Latest Published Period]
+RETURN CALCULATE ( DISTINCTCOUNT ( Fact_SC_PL[OpCo Code] ), Dim_Date[Period] = _p, Dim_Scenario[Scenario] = "Actual" )
+OpCos Expected   = CALCULATE ( COUNTROWS ( Dim_OpCo ), Dim_OpCo[Active] = "Y" )
+Data Completeness % = DIVIDE ( [OpCos Loaded], [OpCos Expected] )
+Critical Errors  = CALCULATE ( COUNTROWS ( DQ_Exceptions ), DQ_Exceptions[Severity] = "Critical", DQ_Exceptions[Status] = "Open" )
+Warnings         = CALCULATE ( COUNTROWS ( DQ_Exceptions ), DQ_Exceptions[Severity] IN { "High", "Medium", "Low" }, DQ_Exceptions[Status] = "Open" )
+Validation Status =
+SWITCH ( TRUE (), [Critical Errors] > 0, "FAILED", [Warnings] > 0, "PASSED WITH WARNINGS", "PASSED" )
+Recon Diff Net Turnover = [Net Turnover SC] - ( [Turnover SC] + [Turnover SC Markup] )          // DQ12 (tolerance USD 1)
+Recon Diff Gross Profit = [Gross Profit] - ( [Net Turnover SC] + [Cost of Sales] + [Intercompany GP] )
+KPI Calculation Errors =                                                                           // DQ15
+COUNTROWS ( FILTER ( VALUES ( Dim_OpCo[OpCo Code] ), NOT ISBLANK ( [Net Turnover SC] ) && ISBLANK ( [Gross Margin %] ) ) )
+  + COUNTROWS ( FILTER ( VALUES ( Dim_OpCo[OpCo Code] ), NOT ISBLANK ( [Factory Costs] ) && ISBLANK ( [Production Pairs] ) ) )
+
+// ==== [CALC_COLUMNS] ====
+// Dim_Date calculated column - lets the Month slicer default to the latest published month
+Period Selector =
+VAR _lp =
+    MAXX ( FILTER ( Publish_Control, Publish_Control[Status] = "Published" && Publish_Control[Scenario] = "Actual" ),
+           Publish_Control[Period] )
+RETURN IF ( Dim_Date[Period] = _lp, "Latest Month", FORMAT ( Dim_Date[Date], "MMM-yyyy" ) )
+
+// ==== [RLS] ====
+// Role "SC Viewer" - table filter on Dim_OpCo
+VAR _u = USERPRINCIPALNAME ()
+RETURN
+    NOT ISEMPTY (
+        FILTER (
+            User_Access,
+            User_Access[User Email] = _u                       // DAX "=" is case-insensitive
+                && User_Access[Active] = "Y"
+                && TODAY () >= User_Access[Valid From]
+                && TODAY () <= User_Access[Valid To]
+                && ( User_Access[Region] = "ALL" || User_Access[Region] = Dim_OpCo[Region] )
+                && ( User_Access[OpCo Code] = "ALL" || User_Access[OpCo Code] = Dim_OpCo[OpCo Code] )
+        )
+    )
+
+// Role "SC Viewer" - table filter on Dim_SC_Function
+VAR _u = USERPRINCIPALNAME ()
+RETURN
+    NOT ISEMPTY (
+        FILTER (
+            User_Access,
+            User_Access[User Email] = _u
+                && User_Access[Active] = "Y"
+                && TODAY () >= User_Access[Valid From]
+                && TODAY () <= User_Access[Valid To]
+                && ( User_Access[SC Function] = "ALL" || User_Access[SC Function] = Dim_SC_Function[SC Function] )
+        )
+    )
+
+// Role "SC Viewer" - table filter on User_Access (users can only see their own mapping rows)
+User_Access[User Email] = USERPRINCIPALNAME ()
+
+// Role "SC Viewer" - Admin tables hidden from viewers
+// Publish_Control, Refresh_Log, DQ_Exceptions :  FALSE ()
+
+// Role "SC Admin" - no filter (Global SC Finance Controller). Workspace Admin/Member are not subject to RLS anyway.
+TRUE ()
+
+// Optional stricter variant (exact OpCo x Function pairs) - filter on Fact_SC_PL instead of the two dimension filters
+VAR _u = USERPRINCIPALNAME ()
+VAR _region = RELATED ( Dim_OpCo[Region] )
+VAR _opco = Fact_SC_PL[OpCo Code]
+VAR _func = RELATED ( Dim_SC_Function[SC Function] )
+RETURN
+    NOT ISEMPTY (
+        FILTER (
+            User_Access,
+            User_Access[User Email] = _u && User_Access[Active] = "Y"
+                && ( User_Access[Region] = "ALL" || User_Access[Region] = _region )
+                && ( User_Access[OpCo Code] = "ALL" || User_Access[OpCo Code] = _opco )
+                && ( User_Access[SC Function] = "ALL" || User_Access[SC Function] = _func )
+        )
+    )
+
+// ==== [TE_SCRIPT] ====
+// Tabular Editor (C#) script - generates the 6 card measures (Monthly/YTD x Actual/vs Bud %/vs LY %)
+// for every measure annotated SummaryCard = "Y" - no manual measure writing when a card KPI is added.
+/*
+foreach (var m in Model.AllMeasures.Where(x => x.GetAnnotation("SummaryCard") == "Y").ToList())
+{
+    foreach (var p in new[] { "Monthly", "YTD" })
+    foreach (var s in new[] { "Actual", "Var vs Bud %", "Var vs LY %" })
+    {
+        var n = m.Name + " | " + p + " | " + s;
+        var expr = "CALCULATE ( " + m.DaxObjectFullName + ", 'CG Scenario'[Comparison] = \"" + s
+                 + "\", 'CG Period'[Period] = \"" + p + "\" )";
+        var nm = m.Table.AddMeasure(n, expr, "Summary Cards");
+        nm.FormatString = s == "Actual" ? m.FormatString
+                        : (m.FormatString.Contains("%") ? "+0.0 \"pp\";-0.0 \"pp\"" : "+0.0%;-0.0%");
+    }
+}
+*/
