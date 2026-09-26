@@ -1,0 +1,2671 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Revenue Audit Toolkit — Web Edition</title>
+<style>
+  :root {
+    --navy: #1F3864; --navy-light: #2E5395; --gray-band: #F2F2F2; --gray-border: #BFBFBF;
+    --red: #C00000; --green: #375623; --amber: #BF8F00; --bg: #FFFFFF; --text: #1a1a1a;
+    --muted: #595959; --card-bg: #FFFFFF;
+    box-sizing: border-box; padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  html { scroll-padding-top: env(safe-area-inset-top, 0px); }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) { --bg: #14171c; --text: #e8e8e8; --muted: #a0a5ad; --card-bg: #1c2027; --gray-band: #232833; --gray-border: #3a4048; }
+  }
+  :root[data-theme="dark"] { --bg: #14171c; --text: #e8e8e8; --muted: #a0a5ad; --card-bg: #1c2027; --gray-band: #232833; --gray-border: #3a4048; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font-family: Arial, Helvetica, sans-serif; min-height: 100%; }
+  header { background: var(--navy); color: white; padding: 18px 20px; padding-top: calc(18px + env(safe-area-inset-top, 0px)); }
+  header h1 { margin: 0; font-size: 1.3rem; }
+  header p { margin: 4px 0 0; font-size: 0.82rem; color: #cdd7ea; }
+  .scope-note { background: var(--gray-band); border-bottom: 1px solid var(--gray-border); padding: 10px 20px; font-size: 0.78rem; color: var(--muted); line-height: 1.5; }
+  nav { display: flex; gap: 2px; background: var(--gray-band); border-bottom: 2px solid var(--navy); overflow-x: auto; position: sticky; top: 0; z-index: 10; }
+  nav button { flex: 1; min-width: 110px; padding: 12px 8px; border: none; background: transparent; color: var(--muted); font-weight: bold; font-size: 0.8rem; cursor: pointer; border-bottom: 3px solid transparent; white-space: nowrap; }
+  nav button.active { color: var(--navy); border-bottom-color: var(--navy); background: var(--bg); }
+  @media (prefers-color-scheme: dark) { nav button.active { color: #8fb2ff; } }
+  :root[data-theme="dark"] nav button.active { color: #8fb2ff; }
+  main { max-width: 980px; margin: 0 auto; padding: 20px; padding-bottom: 60px; }
+  .panel { display: none; }
+  .panel.active { display: block; }
+  .card { background: var(--card-bg); border: 1px solid var(--gray-border); border-radius: 8px; padding: 18px; margin-bottom: 16px; }
+  .card h2 { margin-top: 0; color: var(--navy); font-size: 1.05rem; }
+  @media (prefers-color-scheme: dark) { .card h2 { color: #8fb2ff; } }
+  :root[data-theme="dark"] .card h2 { color: #8fb2ff; }
+  label { display: block; font-size: 0.8rem; font-weight: bold; color: var(--muted); margin: 10px 0 4px; }
+  input, select, textarea { width: 100%; padding: 8px; border: 1px solid var(--gray-border); border-radius: 4px; font-size: 0.9rem; background: var(--bg); color: var(--text); font-family: inherit; }
+  .row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .row3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
+  .row4 { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 12px; }
+  @media (max-width: 700px) { .row, .row3, .row4 { grid-template-columns: 1fr; } }
+  .checkbox-row { display: flex; align-items: center; gap: 8px; margin: 10px 0; }
+  .checkbox-row input { width: auto; }
+  .checkbox-row label { margin: 0; font-weight: normal; color: var(--text); }
+  button.primary { background: var(--navy); color: white; border: none; padding: 10px 20px; border-radius: 4px; font-weight: bold; cursor: pointer; margin-top: 14px; font-size: 0.9rem; }
+  button.primary:hover { background: var(--navy-light); }
+  button.secondary { background: transparent; color: var(--navy); border: 1px solid var(--navy); padding: 8px 16px; border-radius: 4px; font-weight: bold; cursor: pointer; font-size: 0.85rem; margin-top: 8px; margin-right: 6px; }
+  @media (prefers-color-scheme: dark) { button.secondary { color: #8fb2ff; border-color: #8fb2ff; } }
+  :root[data-theme="dark"] button.secondary { color: #8fb2ff; border-color: #8fb2ff; }
+  button.tiny { font-size: 0.72rem; padding: 4px 8px; margin: 2px; border-radius: 4px; border: 1px solid var(--gray-border); background: var(--bg); color: var(--text); cursor: pointer; }
+  table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 0.8rem; }
+  th, td { border: 1px solid var(--gray-border); padding: 6px 8px; text-align: left; }
+  th { background: var(--navy); color: white; }
+  tr:nth-child(even) td { background: var(--gray-band); }
+  .table-wrap { overflow-x: auto; }
+  .result-banner { padding: 14px; border-radius: 6px; font-weight: bold; font-size: 1rem; margin-top: 12px; text-align: center; }
+  .banner-low { background: #e6f0e6; color: var(--green); border: 1px solid var(--green); }
+  .banner-medium { background: #fbf1d6; color: var(--amber); border: 1px solid var(--amber); }
+  .banner-high { background: #fbe0e0; color: var(--red); border: 1px solid var(--red); }
+  .warning { background: #fbf1d6; border: 1px solid var(--amber); color: #6b5200; padding: 8px 10px; border-radius: 4px; font-size: 0.82rem; margin-top: 8px; }
+  @media (prefers-color-scheme: dark) { .warning { color: #e0c060; background: #332a10; } }
+  :root[data-theme="dark"] .warning { color: #e0c060; background: #332a10; }
+  .info-box { background: #e3edf7; border: 1px solid var(--navy-light); color: #123a6b; padding: 8px 10px; border-radius: 4px; font-size: 0.82rem; margin-top: 8px; }
+  @media (prefers-color-scheme: dark) { .info-box { background: #12253f; color: #a9c8ef; } }
+  :root[data-theme="dark"] .info-box { background: #12253f; color: #a9c8ef; }
+  .note { font-size: 0.78rem; color: var(--muted); margin-top: 8px; line-height: 1.5; }
+  .file-drop { border: 2px dashed var(--gray-border); border-radius: 6px; padding: 18px; text-align: center; font-size: 0.85rem; color: var(--muted); margin-top: 8px; }
+  .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 10px; }
+  .grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-top: 10px; }
+  @media (max-width: 700px) { .grid-3, .grid-4 { grid-template-columns: 1fr 1fr; } }
+  .stat-box { background: var(--gray-band); border-radius: 6px; padding: 10px; text-align: center; }
+  .stat-box .label { font-size: 0.72rem; color: var(--muted); }
+  .stat-box .value { font-size: 1.1rem; font-weight: bold; color: var(--navy); }
+  @media (prefers-color-scheme: dark) { .stat-box .value { color: #8fb2ff; } }
+  :root[data-theme="dark"] .stat-box .value { color: #8fb2ff; }
+  .badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 0.7rem; font-weight: bold; }
+  .badge-open { background: #fbe0e0; color: var(--red); }
+  .badge-progress { background: #fbf1d6; color: var(--amber); }
+  .badge-resolved { background: #dcebff; color: #14509e; }
+  .badge-closed { background: #e6f0e6; color: var(--green); }
+  .sev-high { color: var(--red); font-weight: bold; }
+  .sev-medium { color: var(--amber); font-weight: bold; }
+  .sev-low { color: var(--muted); }
+  .sev-critical { color: white; background: var(--red); padding: 1px 6px; border-radius: 4px; font-weight: bold; }
+  details.finding-card { border: 1px solid var(--gray-border); border-radius: 6px; padding: 8px 12px; margin-bottom: 8px; background: var(--card-bg); }
+  details.finding-card summary { cursor: pointer; font-weight: bold; }
+</style>
+</head>
+<script src="https://cdn.jsdelivr.net/npm/exceljs@4/dist/exceljs.min.js"></script>
+<body>
+
+<header>
+  <h1>Revenue Audit Toolkit — Web Edition</h1>
+  <p>Upload once, use everywhere — runs entirely in your browser, nothing installed</p>
+</header>
+<div class="scope-note">
+  <strong>Scope note:</strong> a browser-only reimplementation of 8 procedures from RevenueAuditSuite
+  (Materiality, Analytical Review, Sampling, Risk Scoring, Walkthrough, Unpredictability procedures,
+  and a Findings/Review workflow tracker). All calculation happens on your device — nothing is
+  uploaded anywhere. Data you enter is kept only in this browser tab's memory (and, for the Findings
+  list, in this browser's local storage) — closing the tab clears everything except saved findings.
+</div>
+
+<nav>
+  <button class="tab-btn active" data-tab="upload">1. Upload</button>
+  <button class="tab-btn" data-tab="materiality">2. Materiality</button>
+  <button class="tab-btn" data-tab="analytical">3. Analytical Review</button>
+  <button class="tab-btn" data-tab="sampling">4. Sampling</button>
+  <button class="tab-btn" data-tab="risk">5. Risk Scoring</button>
+  <button class="tab-btn" data-tab="walkthrough">6. Walkthrough</button>
+  <button class="tab-btn" data-tab="unpredictability">7. Unpredictability</button>
+  <button class="tab-btn" data-tab="findings">8. Findings</button>
+  <button class="tab-btn" data-tab="export">9. Export</button>
+</nav>
+
+<main>
+
+  <!-- ================= UPLOAD TAB ================= -->
+  <section class="panel active" id="panel-upload">
+    <div class="card">
+      <h2>Sales Register Upload</h2>
+      <p class="note">Upload the current-period sales register (required) and, optionally, the prior-period
+      sales register — having both lets Analytical Review, the Unpredictability "dormant customers"
+      procedure, and the Walkthrough tab's "new customer" detection compare actual period-to-period data
+      instead of guessing a split point within a single file. Map your actual column names below — every
+      other tab (Materiality's auto-calculated benchmark, Analytical Review, Sampling, Walkthrough,
+      Unpredictability) reads from this same mapping, so you only set it up once.</p>
+
+      <label for="up-file">Current period sales register CSV (required)</label>
+      <input type="file" id="up-file" accept=".csv" onchange="handleMainUpload(event)">
+      <div id="up-file-info" class="file-drop">No file loaded yet.</div>
+      <div id="up-detect-results"></div>
+
+      <label for="up-file-prior" style="margin-top:16px;">Prior period sales register CSV (optional, but recommended for accurate YoY/new-lost-customer analysis)</label>
+      <input type="file" id="up-file-prior" accept=".csv" onchange="handlePriorUpload(event)">
+      <div id="up-file-prior-info" class="file-drop">No prior-period file loaded. Comparisons will fall back to splitting the current file's own date range in half.</div>
+
+      <p class="note" style="margin-top:14px;"><strong>Detected mapping</strong> (auto-filled below after upload — review and correct anything that looks wrong, then click Apply). The same mapping is used to read both files, since they're expected to share the same export format:</p>
+
+      <div class="row3">
+        <div><label for="col-id">ID / invoice number column</label><input type="text" id="col-id" value="invoice_number"></div>
+        <div><label for="col-date">Date column</label><input type="text" id="col-date" value="invoice_date"></div>
+        <div><label for="col-amount">Amount column</label><input type="text" id="col-amount" value="amount"></div>
+      </div>
+      <div class="row3">
+        <div><label for="col-customer">Customer column</label><input type="text" id="col-customer" value="customer_name"></div>
+        <div><label for="col-country">Country column (optional)</label><input type="text" id="col-country" value="country"></div>
+        <div><label for="col-timestamp">Timestamp column (optional, for midnight-transaction detection)</label><input type="text" id="col-timestamp" value=""></div>
+      </div>
+      <label for="up-home-country">Home country (for foreign-customer detection)</label>
+      <input type="text" id="up-home-country" placeholder="e.g. Netherlands">
+
+      <button class="primary" onclick="applyColumnMapping()">Apply mapping</button>
+      <button class="secondary" onclick="autoDetectColumns()">↻ Re-detect columns</button>
+      <div id="up-mapping-result"></div>
+    </div>
+  </section>
+
+  <!-- ================= MATERIALITY TAB ================= -->
+  <section class="panel" id="panel-materiality">
+    <div class="card">
+      <h2>Materiality Calculator</h2>
+      <p class="note">Percentages are a matter of professional judgment — no standard prescribes
+      specific numbers. Ranges below reflect ranges commonly applied in practice, not a rule from
+      any standard-setter. When your benchmark is Revenue and a sales register is uploaded, the
+      amount is <strong>calculated automatically</strong> from your data (sum of the amount column) —
+      you can still override it manually.</p>
+
+      <div class="row">
+        <div>
+          <label for="mat-benchmark">Benchmark</label>
+          <select id="mat-benchmark" onchange="onMatBenchmarkChange()">
+            <option value="revenue">Revenue</option>
+            <option value="pbt">Profit Before Tax</option>
+            <option value="assets">Total Assets</option>
+            <option value="netassets">Net Assets / Equity</option>
+            <option value="normalized">Normalized Earnings</option>
+          </select>
+        </div>
+        <div>
+          <label for="mat-standard">Standard</label>
+          <select id="mat-standard">
+            <option value="ISA">ISA</option>
+            <option value="IFRS">IFRS</option>
+            <option value="US_GAAP">US GAAP</option>
+            <option value="RJ">RJ (Dutch GAAP)</option>
+          </select>
+        </div>
+      </div>
+
+      <label for="mat-amount">Benchmark amount <span id="mat-auto-badge" class="note"></span></label>
+      <div style="display:flex; gap:8px;">
+        <input type="number" id="mat-amount" value="48204110" step="any" style="flex:1;">
+        <button class="secondary" style="margin-top:0; white-space:nowrap;" onclick="autoCalcMaterialityBenchmark()">↻ Recalculate from data</button>
+      </div>
+
+      <div class="row3">
+        <div>
+          <label for="mat-pct">Materiality % <span id="mat-range-hint" class="note"></span></label>
+          <input type="number" id="mat-pct" value="0.75" step="any">
+        </div>
+        <div>
+          <label for="mat-pm-pct">Performance Materiality % of OM</label>
+          <input type="number" id="mat-pm-pct" value="62.5" step="any">
+        </div>
+        <div>
+          <label for="mat-ct-pct">Clearly Trivial % of OM</label>
+          <input type="number" id="mat-ct-pct" value="5" step="any">
+        </div>
+      </div>
+
+      <button class="primary" onclick="calcMateriality()">Calculate</button>
+      <div id="mat-results"></div>
+    </div>
+  </section>
+
+  <!-- ================= ANALYTICAL REVIEW TAB ================= -->
+  <section class="panel" id="panel-analytical">
+    <div class="card">
+      <h2>Analytical Review</h2>
+      <p class="note">Runs directly against the uploaded population (Upload tab). Reproduces five
+      procedures from analytical_review_engine: monthly comparison, year-over-year comparison,
+      customer concentration, new/lost customer analysis, and unusual trend detection (z-score).</p>
+      <div class="row">
+        <div><label for="ar-mom-threshold">Month-over-month variance threshold %</label><input type="number" id="ar-mom-threshold" value="10" step="any"></div>
+        <div><label for="ar-z-threshold">Unusual trend z-score threshold</label><input type="number" id="ar-z-threshold" value="2" step="any"></div>
+      </div>
+      <button class="primary" onclick="runAnalyticalReview()">Run analytical review</button>
+      <div id="ar-results"></div>
+    </div>
+  </section>
+
+  <!-- ================= SAMPLING TAB ================= -->
+  <section class="panel" id="panel-sampling">
+    <div class="card">
+      <h2>Sampling Tool</h2>
+      <p class="note">Uses the population uploaded in the Upload tab (or upload a separate file below
+      if you want to sample a different population than the one used elsewhere). ID/value columns are
+      auto-detected the same way as the Upload tab — synced from there when using the shared population,
+      or freshly detected if you upload a separate file here. Random and MUS use a
+      seeded, reproducible pseudo-random generator (Mulberry32) — the same seed always gives the same
+      sample. High Value is a targeted, non-statistical selection.</p>
+
+      <div class="checkbox-row"><input type="checkbox" id="sample-use-main" checked onchange="toggleSampleSource()"><label for="sample-use-main">Use the population from the Upload tab</label></div>
+      <div id="sample-own-upload" style="display:none;">
+        <label for="sample-file">Separate population CSV</label>
+        <input type="file" id="sample-file" accept=".csv" onchange="handleCsvUpload(event)">
+        <div id="sample-file-info" class="file-drop">No file loaded yet.</div>
+      </div>
+
+      <div class="row3">
+        <div><label for="sample-id-col">ID column name (auto-filled)</label><input type="text" id="sample-id-col" value="invoice_number"></div>
+        <div><label for="sample-value-col">Value column name (auto-filled)</label><input type="text" id="sample-value-col" value="amount"></div>
+        <div>
+          <label for="sample-method">Method</label>
+          <select id="sample-method" onchange="toggleSampleMethodFields()">
+            <option value="random">Random</option>
+            <option value="mus">Monetary Unit Sampling (MUS)</option>
+            <option value="high_value">High Value (targeted)</option>
+          </select>
+        </div>
+      </div>
+      <div class="row" id="sample-size-row">
+        <div><label for="sample-size">Sample size</label><input type="number" id="sample-size" value="25" min="1"></div>
+        <div><label for="sample-seed">Seed (optional — blank = random)</label><input type="number" id="sample-seed" placeholder="e.g. 8841"></div>
+      </div>
+      <div class="row" id="sample-hv-row" style="display:none;">
+        <div><label for="sample-hv-threshold">High-value threshold (blank = none)</label><input type="number" id="sample-hv-threshold" placeholder="e.g. 500000" step="any"></div>
+        <div><label for="sample-hv-topn">Top N by value (blank = none)</label><input type="number" id="sample-hv-topn" placeholder="e.g. 5"></div>
+      </div>
+
+      <button class="primary" onclick="runSampling()">Generate Sample</button>
+      <div id="sample-results"></div>
+    </div>
+  </section>
+
+  <!-- ================= RISK SCORING TAB ================= -->
+  <section class="panel" id="panel-risk">
+    <div class="card">
+      <h2>Explainable Risk Scoring</h2>
+      <p class="note">Transparent, weighted scoring across 9 factors — not a trained ML model. Every
+      point is traceable to a documented formula. Fields left blank score 0 for that factor with a
+      note that data was unavailable, rather than being guessed.</p>
+
+      <div class="row">
+        <div><label for="risk-amount">Transaction amount</label><input type="number" id="risk-amount" value="480000" step="any"></div>
+        <div><label for="risk-pm">Performance materiality</label><input type="number" id="risk-pm" value="500000" step="any"></div>
+      </div>
+      <div class="checkbox-row"><input type="checkbox" id="risk-manual"><label for="risk-manual">Manual journal entry</label></div>
+      <div class="checkbox-row"><input type="checkbox" id="risk-periodend"><label for="risk-periodend">At/near period end</label></div>
+      <div class="row">
+        <div><label for="risk-days">Days to period end (blank = unknown)</label><input type="number" id="risk-days" placeholder="e.g. 1"></div>
+        <div><div class="checkbox-row" style="margin-top:28px;"><input type="checkbox" id="risk-cutoffmismatch"><label for="risk-cutoffmismatch">Cut-off mismatch identified</label></div></div>
+      </div>
+      <div class="checkbox-row"><input type="checkbox" id="risk-newcust"><label for="risk-newcust">New customer (no prior history)</label></div>
+      <label for="risk-concentration">Customer concentration % of revenue (blank = unknown)</label>
+      <input type="number" id="risk-concentration" placeholder="e.g. 22" step="any">
+      <label for="risk-country">Country risk rating</label>
+      <select id="risk-country"><option value="">Not supplied</option><option value="Low">Low</option><option value="Medium">Medium</option><option value="High">High</option></select>
+      <label for="risk-zscore">Revenue trend z-score (blank = unknown)</label>
+      <input type="number" id="risk-zscore" placeholder="e.g. 3.5" step="any">
+      <div class="checkbox-row"><input type="checkbox" id="risk-duplicate"><label for="risk-duplicate">Potential duplicate invoice</label></div>
+      <label for="risk-dupsim">Duplicate similarity (0-1, blank = assume 1.0 if flagged)</label>
+      <input type="number" id="risk-dupsim" placeholder="e.g. 0.9" step="any" min="0" max="1">
+      <div class="checkbox-row"><input type="checkbox" id="risk-relatedparty"><label for="risk-relatedparty">Related party transaction</label></div>
+      <div class="checkbox-row"><input type="checkbox" id="risk-disclosed"><label for="risk-disclosed">...disclosed and approved</label></div>
+      <div class="checkbox-row"><input type="checkbox" id="risk-creditnote"><label for="risk-creditnote">Post-period credit note</label></div>
+      <label for="risk-creditpct">Credit note % of original invoice (blank = unknown)</label>
+      <input type="number" id="risk-creditpct" placeholder="e.g. 40" step="any">
+
+      <button class="primary" onclick="calcRisk()">Score Transaction</button>
+      <button class="secondary" onclick="addRiskFindingToTracker()">+ Add result to Findings</button>
+      <div id="risk-results"></div>
+    </div>
+  </section>
+
+  <!-- ================= WALKTHROUGH TAB ================= -->
+  <section class="panel" id="panel-walkthrough">
+    <div class="card">
+      <h2>Walkthrough Planning</h2>
+      <p class="note">Classifies <strong>every transaction</strong> in the uploaded population against
+      five scenarios — Small/Medium/Large Sale (by value band), New Customer, Foreign Customer — and
+      shows exactly which transactions require which walkthrough, with the specific rule that
+      triggered each match (a transaction can require more than one, e.g. a large sale to a new
+      foreign customer). The highest-value item per category is marked as the recommended
+      representative to actually walk through, but you can see and choose from every qualifying item.
+      Size bands use Performance Materiality (from the Materiality tab) if you've calculated it,
+      otherwise population percentiles.</p>
+      <button class="primary" onclick="runWalkthrough()">Classify population &amp; identify walkthroughs</button>
+      <div id="wt-results"></div>
+    </div>
+  </section>
+
+  <!-- ================= UNPREDICTABILITY TAB ================= -->
+  <section class="panel" id="panel-unpredictability">
+    <div class="card">
+      <h2>ISA 240 Unpredictability Procedures</h2>
+      <p class="note">Detects patterns from the uploaded population: weekend sales, round-number
+      invoices, one-time customers, and dormant customers (reactivated after a gap). Midnight
+      transactions and holiday sales run only if you supply the optional data below.</p>
+      <div class="row3">
+        <div><label for="up2-weekend-days">Weekend days (0=Sun...6=Sat, comma-separated)</label><input type="text" id="up2-weekend-days" value="0,6"></div>
+        <div><label for="up2-dormancy-days">Dormancy threshold (days)</label><input type="number" id="up2-dormancy-days" value="180"></div>
+        <div><label for="up2-holiday-dates">Holiday dates (comma-separated YYYY-MM-DD, optional)</label><input type="text" id="up2-holiday-dates" placeholder="e.g. 2026-12-25"></div>
+      </div>
+      <button class="primary" onclick="runUnpredictability()">Run unpredictability procedures</button>
+      <div id="up2-results"></div>
+    </div>
+  </section>
+
+  <!-- ================= FINDINGS TAB ================= -->
+  <section class="panel" id="panel-findings">
+    <div class="card">
+      <h2>Findings Tracker</h2>
+      <p class="note">Reproduces review_workflow_engine's Open → In Progress → Resolved → Closed
+      state machine: resolving requires Manager (or above) plus a resolution note; closing requires
+      Partner (or EQR). Saved to this browser's local storage, so it survives a page refresh —
+      but is not shared with anyone else and is not backed up anywhere.</p>
+
+      <div class="row4">
+        <div><label for="find-title">Title</label><input type="text" id="find-title" placeholder="e.g. Cut-off exception"></div>
+        <div><label for="find-severity">Severity</label><select id="find-severity"><option>Low</option><option>Medium</option><option selected>High</option><option>Critical</option></select></div>
+        <div><label for="find-amount">Misstated amount (optional)</label><input type="number" id="find-amount" step="any"></div>
+        <div><label for="find-role">Your role (for actions below)</label><select id="find-role"><option>Staff</option><option>Senior</option><option selected>Manager</option><option>Partner</option><option>EQR</option></select></div>
+      </div>
+      <label for="find-desc">Description</label>
+      <textarea id="find-desc" rows="2" placeholder="What was found and why it matters"></textarea>
+      <button class="primary" onclick="addFinding()">+ Add finding</button>
+
+      <div id="findings-list" style="margin-top:16px;"></div>
+    </div>
+  </section>
+
+  <!-- ================= EXPORT TAB ================= -->
+  <section class="panel" id="panel-export">
+    <div class="card">
+      <h2>Export — Working Paper</h2>
+      <p class="note">Compiles everything calculated in this session (Materiality, Analytical Review,
+      Sampling, Risk Scoring, Walkthrough, Unpredictability, Findings) into a formatted audit working
+      paper. Fill in the engagement details below — they appear on the working paper's title block and
+      sign-off section.</p>
+
+      <div class="row4">
+        <div><label for="wp-client">Client name</label><input type="text" id="wp-client" placeholder="e.g. Acme B.V."></div>
+        <div><label for="wp-period">Audit period</label><input type="text" id="wp-period" placeholder="e.g. FY2026 (Year Ended 31 Dec 2026)"></div>
+        <div><label for="wp-preparer">Prepared by</label><input type="text" id="wp-preparer" placeholder="Name"></div>
+        <div><label for="wp-reviewer">Reviewed by</label><input type="text" id="wp-reviewer" placeholder="Name"></div>
+      </div>
+
+      <button class="primary" onclick="exportWorkingPaperHtml()">Download working paper (HTML — open or print to PDF)</button>
+      <button class="secondary" onclick="exportWorkingPaperMarkdown()">Download working paper (Markdown)</button>
+      <button class="secondary" onclick="exportWorkingPaperXlsx()">Download working paper (Excel)</button>
+      <p class="note">The Excel version uses ExcelJS, loaded from cdnjs when you click the button — it
+      needs an internet connection at that moment (everything else in this tool works fully offline).
+      It produces a real multi-tab .xlsx with navy header rows, gray row banding, colored
+      severity/status cells, currency/percentage number formats, autofilters, and frozen header rows —
+      matching the same visual style as the HTML export and the Python-based workbook generator
+      elsewhere in this project.</p>
+      <div id="export-results"></div>
+    </div>
+  </section>
+
+</main>
+<script>
+// ============================================================
+// Shared state and helpers
+// ============================================================
+let mainPopulation = null;       // {headers, rows} from the Upload tab: CURRENT period, raw strings
+let priorPopulation = null;      // {headers, rows} from the Upload tab: PRIOR period (optional), raw strings
+let mainColumns = { id: 'invoice_number', date: 'invoice_date', amount: 'amount', customer: 'customer_name', country: 'country', timestamp: '' };
+let homeCountry = '';
+let lastPerformanceMateriality = null;  // shared into Walkthrough's size bands, if calculated
+let findingsList = [];           // {id, title, description, severity, misstatedAmount, status, history}
+
+function fmt(n) { return Number(n).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2}); }
+function fmtInt(n) { return Number(n).toLocaleString(undefined, {maximumFractionDigits: 0}); }
+function esc(s) { const d = document.createElement('div'); d.textContent = String(s); return d.innerHTML; }
+
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('panel-' + btn.dataset.tab).classList.add('active');
+  });
+});
+
+function parseCsv(text) {
+  const lines = text.split(/\r?\n/).filter(l => l.trim().length > 0);
+  if (lines.length === 0) throw new Error('File is empty.');
+  const headers = lines[0].split(',').map(h => h.trim());
+  const rows = lines.slice(1).map(line => {
+    const cells = line.split(',');
+    const row = {};
+    headers.forEach((h, i) => { row[h] = (cells[i] !== undefined ? cells[i].trim() : ''); });
+    return row;
+  });
+  return {headers, rows};
+}
+
+// Mulberry32: a small, fast, seedable PRNG (deterministic given the same seed).
+function mulberry32(seed) {
+  let t = seed >>> 0;
+  return function () {
+    t += 0x6D2B79F5;
+    let r = Math.imul(t ^ (t >>> 15), 1 | t);
+    r ^= r + Math.imul(r ^ (r >>> 7), 61 | r);
+    return ((r ^ (r >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+function downloadBlob(filename, mimeType, content) {
+  const blob = new Blob([content], {type: mimeType});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+function downloadCsv(filename, headers, rows) {
+  const csvLines = [headers.join(',')];
+  rows.forEach(r => csvLines.push(headers.map(h => (r[h] === undefined ? '' : r[h])).join(',')));
+  downloadBlob(filename, 'text/csv', csvLines.join('\n'));
+}
+
+// Basic descriptive statistics shared by Analytical Review and Unpredictability.
+function mean(arr) { return arr.reduce((a, b) => a + b, 0) / arr.length; }
+function stddev(arr) {
+  if (arr.length < 2) return NaN;
+  const m = mean(arr);
+  const variance = arr.reduce((s, x) => s + (x - m) ** 2, 0) / (arr.length - 1);
+  return Math.sqrt(variance);
+}
+function zScores(arr) {
+  const sd = stddev(arr);
+  if (!sd || isNaN(sd)) return arr.map(() => NaN);
+  const m = mean(arr);
+  return arr.map(x => (x - m) / sd);
+}
+
+// ============================================================
+// AUTOMATIC COLUMN MAPPING (reimplements upload_engine.column_mapping)
+// Exact match first, across ALL fields, before any fuzzy matching is
+// attempted — this two-pass order matters: without it, an early field's
+// fuzzy match can steal a column that's actually a later field's exact
+// match (this exact bug was found and fixed in the Python engine this
+// is ported from).
+// ============================================================
+const CANONICAL_FIELDS = {
+  id: { label: 'ID / invoice number', aliases: ['invoice number', 'invoice no', 'invoiceno', 'inv no', 'inv number', 'id', 'reference', 'ref', 'document number', 'doc number', 'transaction id', 'billing document', 'billing document number', 'billing doc', 'sales document', 'sd document'] },
+  date: { label: 'Date', aliases: ['invoice date', 'invdate', 'inv date', 'date', 'transaction date', 'posting date', 'order date', 'sale date', 'billing date', 'document date'] },
+  amount: { label: 'Amount', aliases: ['amount', 'net amount', 'netamt', 'invoice amount', 'total amount', 'net', 'value', 'revenue', 'sales amount', 'price', 'net value', 'net value in doc currency'] },
+  customer: { label: 'Customer', aliases: ['customer name', 'customer', 'custname', 'client', 'client name', 'account name', 'buyer', 'customer id', 'sold-to party', 'sold to party', 'sold-to party name', 'sold to party name', 'payer', 'ship-to party', 'bill-to party'] },
+  country: { label: 'Country', aliases: ['country', 'customer country', 'ship to country', 'shipping country', 'billing country', 'nation', 'country key'] },
+  timestamp: { label: 'Timestamp', aliases: ['timestamp', 'datetime', 'date time', 'posted at', 'created at', 'time', 'entry time'] },
+};
+const FUZZY_MATCH_THRESHOLD = 0.6; // Dice coefficient scale, not directly comparable to Python's difflib ratio
+
+function normalizeHeader(text) {
+  return text.trim().toLowerCase()
+    .replace(/[._/\\-]+/g, ' ')
+    .replace(/[^\w\s]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function bigrams(s) {
+  const out = [];
+  for (let i = 0; i < s.length - 1; i++) out.push(s.slice(i, i + 2));
+  return out;
+}
+function diceCoefficient(a, b) {
+  if (a === b) return 1;
+  if (a.length < 2 || b.length < 2) return 0;
+  const bigramsA = bigrams(a), bigramsB = bigrams(b);
+  const bigramsBRemaining = bigramsB.slice();
+  let matches = 0;
+  bigramsA.forEach(bg => {
+    const idx = bigramsBRemaining.indexOf(bg);
+    if (idx !== -1) { matches++; bigramsBRemaining.splice(idx, 1); }
+  });
+  return (2 * matches) / (bigramsA.length + bigramsB.length);
+}
+
+function detectColumnMapping(headers) {
+  const normalizedHeaders = headers.map(h => ({ original: h, normalized: normalizeHeader(h) }));
+  const mapping = {};       // field -> {column, confidence}
+  const usedColumns = new Set();
+
+  // Pass 1: exact normalized match, across every field, before any fuzzy pass.
+  Object.entries(CANONICAL_FIELDS).forEach(([field, spec]) => {
+    const candidates = [field, spec.label, ...spec.aliases].map(normalizeHeader);
+    for (const h of normalizedHeaders) {
+      if (usedColumns.has(h.original)) continue;
+      if (candidates.includes(h.normalized)) {
+        mapping[field] = { column: h.original, confidence: 1.0 };
+        usedColumns.add(h.original);
+        break;
+      }
+    }
+  });
+
+  // Pass 2: fuzzy match for fields still unmapped, against columns not yet claimed.
+  Object.entries(CANONICAL_FIELDS).forEach(([field, spec]) => {
+    if (mapping[field]) return;
+    const candidates = [field, spec.label, ...spec.aliases].map(normalizeHeader);
+    let best = null, bestScore = 0;
+    normalizedHeaders.forEach(h => {
+      if (usedColumns.has(h.original)) return;
+      const score = Math.max(...candidates.map(c => diceCoefficient(h.normalized, c)));
+      if (score > bestScore) { bestScore = score; best = h.original; }
+    });
+    if (best !== null && bestScore >= FUZZY_MATCH_THRESHOLD) {
+      mapping[field] = { column: best, confidence: bestScore };
+      usedColumns.add(best);
+    }
+  });
+
+  return mapping;
+}
+
+function autoDetectColumns() {
+  const out = document.getElementById('up-detect-results');
+  if (!mainPopulation) { out.innerHTML = ''; return; }
+  const mapping = detectColumnMapping(mainPopulation.headers);
+
+  const fieldToInput = { id: 'col-id', date: 'col-date', amount: 'col-amount', customer: 'col-customer', country: 'col-country', timestamp: 'col-timestamp' };
+  let html = '<div class="table-wrap"><table><tr><th>Field</th><th>Detected column</th><th>Confidence</th></tr>';
+  Object.entries(CANONICAL_FIELDS).forEach(([field, spec]) => {
+    const inputEl = document.getElementById(fieldToInput[field]);
+    const result = mapping[field];
+    if (result) {
+      inputEl.value = result.column;
+      const confText = result.confidence === 1.0 ? 'exact match' : `~${Math.round(result.confidence * 100)}% match`;
+      html += `<tr><td>${esc(spec.label)}</td><td>${esc(result.column)}</td><td>${confText}</td></tr>`;
+    } else {
+      inputEl.value = '';
+      html += `<tr><td>${esc(spec.label)}</td><td><em>not detected</em></td><td>${field === 'country' || field === 'timestamp' ? 'optional' : '-'}</td></tr>`;
+    }
+  });
+  html += '</table></div><p class="note">Auto-detected from your column headers (exact match, then fuzzy match on common aliases). Review the fields above — this is a suggestion, not a silent decision — and correct anything before clicking Apply mapping.</p>';
+  out.innerHTML = html;
+}
+
+// ============================================================
+// UPLOAD TAB
+// ============================================================
+function handleMainUpload(evt) {
+  const file = evt.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      mainPopulation = parseCsv(e.target.result);
+      document.getElementById('up-file-info').textContent =
+        `Loaded ${mainPopulation.rows.length} row(s). Columns found: ${mainPopulation.headers.join(', ')}`;
+      autoDetectColumns();
+    } catch (err) {
+      document.getElementById('up-file-info').textContent = 'Could not parse this file as CSV: ' + err.message;
+    }
+  };
+  reader.onerror = () => { document.getElementById('up-file-info').textContent = 'Could not read the file.'; };
+  reader.readAsText(file);
+}
+
+function handlePriorUpload(evt) {
+  const file = evt.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      priorPopulation = parseCsv(e.target.result);
+      let msg = `Loaded ${priorPopulation.rows.length} row(s). Columns found: ${priorPopulation.headers.join(', ')}`;
+      // The prior-period file is read using the SAME confirmed column
+      // mapping as the current-period file (mainColumns) — flag it here if
+      // that mapping doesn't actually exist in this file, so a genuinely
+      // different export format doesn't fail silently later on.
+      if (mainColumns && mainColumns.amount) {
+        const missing = ['id', 'date', 'amount', 'customer', 'country', 'timestamp']
+          .filter(f => mainColumns[f] && !priorPopulation.headers.includes(mainColumns[f]));
+        if (missing.length) msg += ` — warning: this file does not contain the mapped column(s): ${missing.map(f => mainColumns[f]).join(', ')}. Check that both files share the same export format.`;
+      } else {
+        msg += ' — set the column mapping below (from the current-period file) before running comparisons; the same mapping is applied to this file.';
+      }
+      document.getElementById('up-file-prior-info').textContent = msg;
+    } catch (err) {
+      document.getElementById('up-file-prior-info').textContent = 'Could not parse this file as CSV: ' + err.message;
+    }
+  };
+  reader.onerror = () => { document.getElementById('up-file-prior-info').textContent = 'Could not read the file.'; };
+  reader.readAsText(file);
+}
+
+function applyColumnMapping() {
+  const out = document.getElementById('up-mapping-result');
+  if (!mainPopulation) { out.innerHTML = '<div class="warning">Upload a CSV first.</div>'; return; }
+  mainColumns = {
+    id: document.getElementById('col-id').value.trim(),
+    date: document.getElementById('col-date').value.trim(),
+    amount: document.getElementById('col-amount').value.trim(),
+    customer: document.getElementById('col-customer').value.trim(),
+    country: document.getElementById('col-country').value.trim(),
+    timestamp: document.getElementById('col-timestamp').value.trim(),
+  };
+  homeCountry = document.getElementById('up-home-country').value.trim();
+
+  const missing = [];
+  if (mainColumns.amount && !mainPopulation.headers.includes(mainColumns.amount)) missing.push(`amount column "${mainColumns.amount}"`);
+  if (mainColumns.date && !mainPopulation.headers.includes(mainColumns.date)) missing.push(`date column "${mainColumns.date}"`);
+
+  const amounts = mainPopulation.rows.map(r => parseFloat(r[mainColumns.amount])).filter(v => !isNaN(v));
+  const total = amounts.reduce((a, b) => a + b, 0);
+
+  let html = `<div class="grid-3">
+    <div class="stat-box"><div class="label">Rows</div><div class="value">${fmtInt(mainPopulation.rows.length)}</div></div>
+    <div class="stat-box"><div class="label">Rows with numeric amount</div><div class="value">${fmtInt(amounts.length)}</div></div>
+    <div class="stat-box"><div class="label">Total value</div><div class="value">${fmt(total)}</div></div>
+  </div>`;
+  if (missing.length) html += `<div class="warning">Column(s) not found in the file: ${missing.join('; ')}. Fix the mapping above and re-apply.</div>`;
+  else html += `<div class="info-box">Mapping applied. Every other tab now reads from this population.</div>`;
+
+  if (priorPopulation) {
+    const priorMissing = ['id', 'date', 'amount', 'customer', 'country', 'timestamp']
+      .filter(f => mainColumns[f] && !priorPopulation.headers.includes(mainColumns[f]));
+    if (priorMissing.length) html += `<div class="warning">The prior-period file does not contain the mapped column(s): ${priorMissing.map(f => mainColumns[f]).join(', ')}. Check both files share the same export format, or the prior-period comparison will be inaccurate.</div>`;
+    else html += `<div class="info-box">Prior-period file's columns also match this mapping — period-over-period comparisons will use both real files.</div>`;
+  }
+
+  out.innerHTML = html;
+  syncSampleColumnsFromMain();
+}
+
+// Prior/current split, used by Analytical Review (new/lost customers) and
+// Unpredictability (dormant customers). Two sources are supported:
+//   1. Real prior-period and current-period sales registers, both uploaded
+//      on the Upload tab — the accurate path, used whenever priorPopulation
+//      is present.
+//   2. A fallback: the single uploaded population's date range split at its
+//      own median date — used only when no separate prior-period file was
+//      supplied, and always labelled as a fallback so it's never mistaken
+//      for a real period-over-period comparison.
+function getPriorCurrentPopulations(dateCol) {
+  if (priorPopulation && mainPopulation) {
+    const dateRows = pop => pop.rows.map(r => ({...r, __date: new Date(r[dateCol])})).filter(r => !isNaN(r.__date));
+    return {
+      prior: dateRows(priorPopulation), current: dateRows(mainPopulation),
+      basis: 'separate_files', medianDate: null,
+      basisNote: `Prior period from the separately uploaded prior-period sales register (${fmtInt(priorPopulation.rows.length)} row(s)); current period from the main uploaded sales register (${fmtInt(mainPopulation.rows.length)} row(s)).`,
+    };
+  }
+  if (!mainPopulation) return {prior: [], current: [], basis: 'none', medianDate: null, basisNote: 'No population uploaded.'};
+  const rows = mainPopulation.rows.map(r => ({...r, __date: new Date(r[dateCol])})).filter(r => !isNaN(r.__date));
+  const split = splitPriorCurrent(mainPopulation.rows, dateCol);
+  return {
+    prior: split.prior, current: split.current, basis: 'median_split', medianDate: split.medianDate,
+    basisNote: split.medianDate
+      ? `No separate prior-period sales register was uploaded, so the single uploaded population was split at its own median date (${split.medianDate.toISOString().slice(0,10)}) as a fallback — upload a prior-period file on the Upload tab for an accurate period-over-period comparison.`
+      : 'Not enough dated rows to split into prior/current periods.',
+  };
+}
+
+function splitPriorCurrent(rows, dateCol) {
+  const dated = rows.map(r => ({...r, __date: new Date(r[dateCol])})).filter(r => !isNaN(r.__date));
+  if (dated.length === 0) return {prior: [], current: [], medianDate: null};
+  const sorted = [...dated].sort((a, b) => a.__date - b.__date);
+  const medianDate = sorted[Math.floor(sorted.length / 2)].__date;
+  return {
+    prior: dated.filter(r => r.__date <= medianDate),
+    current: dated.filter(r => r.__date > medianDate),
+    medianDate,
+  };
+}
+
+// ============================================================
+// MATERIALITY ENGINE (reimplements materiality_engine)
+// ============================================================
+const BENCHMARK_RANGES = {
+  revenue:    {low: 0.5, high: 1.0, label: "Total Revenue"},
+  pbt:        {low: 5.0, high: 10.0, label: "Profit Before Tax"},
+  assets:     {low: 1.0, high: 2.0, label: "Total Assets"},
+  netassets:  {low: 3.0, high: 5.0, label: "Net Assets / Equity"},
+  normalized: {low: 5.0, high: 10.0, label: "Normalized Earnings"},
+};
+const PM_RANGE = {low: 50.0, high: 75.0};
+const STANDARD_CITATIONS = {
+  ISA: "ISA 320, Materiality in Planning and Performing an Audit.",
+  IFRS: "ISA 320 applied to an IFRS reporting entity. IFRS itself does not prescribe audit materiality.",
+  US_GAAP: "PCAOB AS 2105 (concepts consistent with ISA 320). US GAAP itself does not prescribe audit materiality.",
+  RJ: "ISA 320 as applied under NBA / Dutch statutory practice for Titel 9 BW2 (RJ) financial statements. RJ itself does not prescribe audit materiality.",
+};
+
+function updateMatRangeHint() {
+  const bm = BENCHMARK_RANGES[document.getElementById('mat-benchmark').value];
+  document.getElementById('mat-range-hint').textContent = `(commonly ${bm.low}%-${bm.high}%)`;
+}
+document.getElementById('mat-benchmark').addEventListener('change', updateMatRangeHint);
+updateMatRangeHint();
+
+function onMatBenchmarkChange() {
+  updateMatRangeHint();
+  if (document.getElementById('mat-benchmark').value === 'revenue' && mainPopulation) {
+    autoCalcMaterialityBenchmark();
+  } else {
+    document.getElementById('mat-auto-badge').textContent = '';
+  }
+}
+
+// This is the direct fix for "materiality should be self-calculated":
+// when the benchmark is Revenue and a population is loaded, the amount
+// field is populated automatically from SUM(amount column) — no manual
+// typing required — while remaining a normal editable field the auditor
+// can still override.
+function autoCalcMaterialityBenchmark() {
+  const badge = document.getElementById('mat-auto-badge');
+  if (document.getElementById('mat-benchmark').value !== 'revenue') {
+    badge.textContent = '(auto-calculation only applies to the Revenue benchmark)';
+    return;
+  }
+  if (!mainPopulation) {
+    badge.textContent = '(upload a sales register on the Upload tab to auto-calculate)';
+    return;
+  }
+  const amountCol = mainColumns.amount || 'amount';
+  if (!mainPopulation.headers.includes(amountCol)) {
+    badge.textContent = `(amount column "${amountCol}" not found — check the Upload tab's mapping)`;
+    return;
+  }
+  const amounts = mainPopulation.rows.map(r => parseFloat(r[amountCol])).filter(v => !isNaN(v));
+  const total = amounts.reduce((a, b) => a + b, 0);
+  document.getElementById('mat-amount').value = total.toFixed(2);
+  badge.textContent = `(auto-calculated: sum of ${amounts.length} row(s) from the uploaded sales register)`;
+}
+
+function calcMateriality() {
+  const benchmarkKey = document.getElementById('mat-benchmark').value;
+  const standard = document.getElementById('mat-standard').value;
+  const amount = parseFloat(document.getElementById('mat-amount').value);
+  const pct = parseFloat(document.getElementById('mat-pct').value);
+  const pmPct = parseFloat(document.getElementById('mat-pm-pct').value);
+  const ctPct = parseFloat(document.getElementById('mat-ct-pct').value);
+  const out = document.getElementById('mat-results');
+
+  if (!amount || amount <= 0) { out.innerHTML = '<div class="warning">Benchmark amount must be positive. Try "Recalculate from data" if you have uploaded a sales register.</div>'; return; }
+  if (!pct || pct <= 0 || pct > 100) { out.innerHTML = '<div class="warning">Materiality % must be between 0 and 100.</div>'; return; }
+
+  const bm = BENCHMARK_RANGES[benchmarkKey];
+  const warnings = [];
+  const om = amount * pct / 100;
+  if (pct < bm.low || pct > bm.high) warnings.push(`materiality_pct ${pct}% falls outside the ${bm.low}%-${bm.high}% range commonly applied to ${bm.label}; document the rationale for this selection.`);
+  const pm = om * pmPct / 100;
+  if (pmPct < PM_RANGE.low || pmPct > PM_RANGE.high) warnings.push(`performance_materiality_pct ${pmPct}% falls outside the ${PM_RANGE.low}%-${PM_RANGE.high}% range commonly applied; document the rationale.`);
+  const ct = om * ctPct / 100;
+  if (pm >= om) warnings.push("Performance materiality is not less than overall materiality; PM should ordinarily be set below OM to allow margin for aggregation of misstatements (ISA 320.9).");
+  if (ct >= pm) warnings.push("The clearly trivial threshold is not less than performance materiality; it should ordinarily be substantially smaller.");
+
+  lastPerformanceMateriality = pm;
+
+  let html = `
+    <table><tr><th>Measure</th><th>Basis</th><th>Amount</th></tr>
+    <tr><td>Benchmark: ${bm.label}</td><td>-</td><td>${fmt(amount)}</td></tr>
+    <tr><td>Overall (Planning) Materiality</td><td>${pct}% of ${bm.label}</td><td>${fmt(om)}</td></tr>
+    <tr><td>Performance Materiality</td><td>${pmPct}% of OM</td><td>${fmt(pm)}</td></tr>
+    <tr><td>Clearly Trivial Threshold</td><td>${ctPct}% of OM</td><td>${fmt(ct)}</td></tr>
+    </table>
+    <p class="note"><strong>Standard:</strong> ${standard} - ${STANDARD_CITATIONS[standard]}</p>
+    <p class="note">Performance Materiality (${fmt(pm)}) is now available to the Walkthrough tab's size banding.</p>
+  `;
+  warnings.forEach(w => { html += `<div class="warning">${esc(w)}</div>`; });
+  out.innerHTML = html;
+
+  window.__lastMaterialityResult = {benchmarkLabel: bm.label, amount, pct, standard, om, pm, ctPct, ct, warnings};
+}
+
+// ============================================================
+// ANALYTICAL REVIEW ENGINE (reimplements analytical_review_engine)
+// ============================================================
+function runAnalyticalReview() {
+  const out = document.getElementById('ar-results');
+  if (!mainPopulation) { out.innerHTML = '<div class="warning">Upload a sales register on the Upload tab first.</div>'; return; }
+
+  const dateCol = mainColumns.date, amountCol = mainColumns.amount, custCol = mainColumns.customer;
+  if (!mainPopulation.headers.includes(dateCol) || !mainPopulation.headers.includes(amountCol)) {
+    out.innerHTML = `<div class="warning">Date column "${dateCol}" or amount column "${amountCol}" not found. Check the Upload tab's mapping.</div>`;
+    return;
+  }
+  const momThreshold = parseFloat(document.getElementById('ar-mom-threshold').value) || 10;
+  const zThreshold = parseFloat(document.getElementById('ar-z-threshold').value) || 2;
+
+  const rows = mainPopulation.rows
+    .map(r => ({...r, __date: new Date(r[dateCol]), __amount: parseFloat(r[amountCol])}))
+    .filter(r => !isNaN(r.__date) && !isNaN(r.__amount));
+  if (rows.length === 0) { out.innerHTML = '<div class="warning">No rows with both a valid date and a numeric amount were found.</div>'; return; }
+
+  const findings = [];
+  let summaryHtml = '';
+
+  // --- Prior vs Current period comparison (the explicit ask: compare the
+  //     two actual uploaded sales registers, not just infer from one file) ---
+  const periods = getPriorCurrentPopulations(dateCol);
+  if (priorPopulation) {
+    const priorTotal = periods.prior.reduce((s, r) => s + (parseFloat(r[amountCol]) || 0), 0);
+    const currTotal = periods.current.reduce((s, r) => s + (parseFloat(r[amountCol]) || 0), 0);
+    const variancePct = priorTotal !== 0 ? (currTotal - priorTotal) / Math.abs(priorTotal) * 100 : null;
+    summaryHtml += `<div class="info-box">${esc(periods.basisNote)}</div>
+      <div class="grid-3">
+        <div class="stat-box"><div class="label">Prior period total</div><div class="value">${fmt(priorTotal)}</div></div>
+        <div class="stat-box"><div class="label">Current period total</div><div class="value">${fmt(currTotal)}</div></div>
+        <div class="stat-box"><div class="label">Variance</div><div class="value">${variancePct === null ? 'n/a' : (variancePct >= 0 ? '+' : '') + variancePct.toFixed(1) + '%'}</div></div>
+      </div>`;
+    if (variancePct !== null && Math.abs(variancePct) >= momThreshold) {
+      findings.push({procedure: 'Prior vs current period comparison', severity: Math.abs(variancePct) >= momThreshold * 3 ? 'High' : (Math.abs(variancePct) >= momThreshold * 1.5 ? 'Medium' : 'Low'), description:
+        `Current-period revenue of ${fmt(currTotal)} is a ${variancePct >= 0 ? '+' : ''}${variancePct.toFixed(1)}% change from the prior-period sales register total of ${fmt(priorTotal)}, exceeding the ${momThreshold}% threshold.`});
+    }
+  } else {
+    summaryHtml += `<div class="warning">${esc(periods.basisNote)}</div>`;
+  }
+
+  // --- Monthly comparison (within the current file's own date range) ---
+  const byMonth = {};
+  rows.forEach(r => {
+    const key = `${r.__date.getFullYear()}-${String(r.__date.getMonth() + 1).padStart(2, '0')}`;
+    byMonth[key] = (byMonth[key] || 0) + r.__amount;
+  });
+  const months = Object.keys(byMonth).sort();
+  for (let i = 1; i < months.length; i++) {
+    const prior = byMonth[months[i - 1]], curr = byMonth[months[i]];
+    if (prior === 0) continue;
+    const variancePct = (curr - prior) / Math.abs(prior) * 100;
+    if (Math.abs(variancePct) >= momThreshold) {
+      const severity = Math.abs(variancePct) >= momThreshold * 3 ? 'High' : (Math.abs(variancePct) >= momThreshold * 1.5 ? 'Medium' : 'Low');
+      findings.push({procedure: 'Monthly comparison', severity, description:
+        `Revenue in ${months[i]} was ${fmt(curr)}, a ${variancePct >= 0 ? '+' : ''}${variancePct.toFixed(1)}% change from ${months[i - 1]} (${fmt(prior)}), exceeding the ${momThreshold}% threshold.`});
+    }
+  }
+
+  // --- Year-over-year comparison ---
+  // Prefer matching calendar month directly between the two uploaded files
+  // (the accurate path) when a prior-period file exists; otherwise fall
+  // back to requiring two years of history within the single current file.
+  if (priorPopulation) {
+    const byMonthOf = pop => {
+      const m = {};
+      pop.rows.forEach(r => {
+        const d = new Date(r[dateCol]), amt = parseFloat(r[amountCol]);
+        if (isNaN(d) || isNaN(amt)) return;
+        const key = d.getMonth() + 1;
+        m[key] = (m[key] || 0) + amt;
+      });
+      return m;
+    };
+    const priorByMonth = byMonthOf(priorPopulation), currByMonth = byMonthOf(mainPopulation);
+    for (let mo = 1; mo <= 12; mo++) {
+      if (!(mo in priorByMonth) || !(mo in currByMonth)) continue;
+      const prior = priorByMonth[mo], curr = currByMonth[mo];
+      if (prior === 0) continue;
+      const variancePct = (curr - prior) / Math.abs(prior) * 100;
+      if (Math.abs(variancePct) >= 15) {
+        const severity = Math.abs(variancePct) >= 45 ? 'High' : (Math.abs(variancePct) >= 22.5 ? 'Medium' : 'Low');
+        const monthName = new Date(2000, mo - 1, 1).toLocaleString('en', {month: 'long'});
+        findings.push({procedure: 'Year-over-year comparison', severity, description:
+          `${monthName} revenue was ${fmt(curr)} in the current-period file, a ${variancePct >= 0 ? '+' : ''}${variancePct.toFixed(1)}% change from ${fmt(prior)} in the prior-period file (same calendar month).`});
+      }
+    }
+  } else {
+    const byYearMonth = {};
+    rows.forEach(r => {
+      const y = r.__date.getFullYear(), m = r.__date.getMonth() + 1;
+      byYearMonth[`${y}-${m}`] = (byYearMonth[`${y}-${m}`] || 0) + r.__amount;
+    });
+    const years = [...new Set(rows.map(r => r.__date.getFullYear()))].sort();
+    years.forEach(y => {
+      if (!years.includes(y - 1)) return;
+      for (let m = 1; m <= 12; m++) {
+        const currKey = `${y}-${m}`, priorKey = `${y - 1}-${m}`;
+        if (!(currKey in byYearMonth) || !(priorKey in byYearMonth)) continue;
+        const curr = byYearMonth[currKey], prior = byYearMonth[priorKey];
+        if (prior === 0) continue;
+        const variancePct = (curr - prior) / Math.abs(prior) * 100;
+        if (Math.abs(variancePct) >= 15) {
+          const severity = Math.abs(variancePct) >= 45 ? 'High' : (Math.abs(variancePct) >= 22.5 ? 'Medium' : 'Low');
+          findings.push({procedure: 'Year-over-year comparison', severity, description:
+            `${y}-${String(m).padStart(2,'0')} revenue was ${fmt(curr)}, a ${variancePct >= 0 ? '+' : ''}${variancePct.toFixed(1)}% change from the same month last year (${fmt(prior)}).`});
+        }
+      }
+    });
+  }
+
+  // --- Customer concentration ---
+  if (custCol && mainPopulation.headers.includes(custCol)) {
+    const byCust = {};
+    rows.forEach(r => { const c = r[custCol] || '(blank)'; byCust[c] = (byCust[c] || 0) + r.__amount; });
+    const total = rows.reduce((s, r) => s + r.__amount, 0);
+    const sortedCust = Object.entries(byCust).sort((a, b) => b[1] - a[1]);
+    if (sortedCust.length && total > 0) {
+      const [topName, topAmt] = sortedCust[0];
+      const topPct = topAmt / total * 100;
+      if (topPct >= 15) {
+        findings.push({procedure: 'Customer concentration', severity: topPct >= 30 ? 'High' : 'Medium', description:
+          `Customer "${topName}" represents ${topPct.toFixed(1)}% of total revenue (${fmt(topAmt)} of ${fmt(total)}).`});
+      }
+      const top5Amt = sortedCust.slice(0, 5).reduce((s, [, v]) => s + v, 0);
+      const top5Pct = top5Amt / total * 100;
+      if (top5Pct >= 40) {
+        findings.push({procedure: 'Customer concentration', severity: 'Medium', description:
+          `The top 5 customers together represent ${top5Pct.toFixed(1)}% of total revenue (${fmt(top5Amt)} of ${fmt(total)}).`});
+      }
+    }
+
+    // --- New / lost customer analysis: uses the real prior/current files
+    //     when available (via getPriorCurrentPopulations), falling back to
+    //     the median-date split of the single file otherwise. ---
+    if (periods.prior.length && periods.current.length) {
+      const priorCust = new Set(periods.prior.map(r => r[custCol]));
+      const currCust = new Set(periods.current.map(r => r[custCol]));
+      const newCust = [...currCust].filter(c => !priorCust.has(c));
+      const lostCust = [...priorCust].filter(c => !currCust.has(c));
+      const currTotal = periods.current.reduce((s, r) => s + (parseFloat(r[amountCol]) || 0), 0);
+      const priorTotal = periods.prior.reduce((s, r) => s + (parseFloat(r[amountCol]) || 0), 0);
+      const periodLabel = priorPopulation ? 'the prior-period file' : `before ${periods.medianDate.toISOString().slice(0,10)}`;
+      const currentLabel = priorPopulation ? "the current period's" : "the more recent half's";
+      if (newCust.length && currTotal > 0) {
+        const newRevenue = periods.current.filter(r => newCust.includes(r[custCol])).reduce((s, r) => s + (parseFloat(r[amountCol]) || 0), 0);
+        const pct = newRevenue / currTotal * 100;
+        if (pct >= 5) findings.push({procedure: 'New customer analysis', severity: pct >= 15 ? 'High' : 'Medium', description:
+          `${newCust.length} new customer(s) with no revenue in ${periodLabel} contributed ${fmt(newRevenue)} (${pct.toFixed(1)}%) of ${currentLabel} revenue.`});
+      }
+      if (lostCust.length && priorTotal > 0) {
+        const lostRevenue = periods.prior.filter(r => lostCust.includes(r[custCol])).reduce((s, r) => s + (parseFloat(r[amountCol]) || 0), 0);
+        const pct = lostRevenue / priorTotal * 100;
+        const priorLabel = priorPopulation ? 'the prior-period file' : "the earlier half's";
+        if (pct >= 5) findings.push({procedure: 'Lost customer analysis', severity: pct >= 15 ? 'High' : 'Medium', description:
+          `${lostCust.length} customer(s) generating ${fmt(lostRevenue)} (${pct.toFixed(1)}%) of ${priorLabel} revenue generated no revenue in ${priorPopulation ? 'the current-period file' : `after ${periods.medianDate.toISOString().slice(0,10)}`}.`});
+      }
+    }
+  }
+
+  // --- Unusual trend analysis (z-score on the monthly series) ---
+  if (months.length >= 4) {
+    const values = months.map(m => byMonth[m]);
+    const z = zScores(values);
+    months.forEach((m, i) => {
+      if (isNaN(z[i]) || Math.abs(z[i]) < zThreshold) return;
+      findings.push({procedure: 'Unusual trend analysis', severity: Math.abs(z[i]) >= zThreshold * 1.5 ? 'High' : 'Medium', description:
+        `Revenue of ${fmt(values[i])} in ${m} deviates from the average of all periods by a z-score of ${z[i].toFixed(2)}, meeting or exceeding the ${zThreshold} threshold.`});
+    });
+  }
+
+  window.__lastAnalyticalFindings = findings;
+
+  let html = summaryHtml;
+  if (findings.length === 0) {
+    html += '<div class="info-box">No findings above the configured thresholds across prior/current comparison, monthly comparison, YoY, concentration, new/lost customer, and unusual trend procedures.</div>';
+    out.innerHTML = html;
+    return;
+  }
+  html += `<p class="note">${findings.length} finding(s) across ${new Set(findings.map(f=>f.procedure)).size} procedure(s).</p>
+    <div class="table-wrap"><table><tr><th>Procedure</th><th>Severity</th><th>Description</th><th></th></tr>`;
+  findings.forEach((f, i) => {
+    html += `<tr><td>${esc(f.procedure)}</td><td class="sev-${f.severity.toLowerCase()}">${f.severity}</td><td>${esc(f.description)}</td>
+      <td><button class="tiny" onclick="addAnalyticalFindingToTracker(${i})">+ Findings</button></td></tr>`;
+  });
+  html += `</table></div>`;
+  out.innerHTML = html;
+}
+
+function addAnalyticalFindingToTracker(i) {
+  const f = window.__lastAnalyticalFindings[i];
+  addFindingProgrammatic(`${f.procedure}: ${f.description.slice(0, 60)}...`, f.description, f.severity === 'High' ? 'High' : (f.severity === 'Medium' ? 'Medium' : 'Low'), null);
+  switchTab('findings');
+}
+
+function switchTab(tabName) {
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === tabName));
+  document.querySelectorAll('.panel').forEach(p => p.classList.toggle('active', p.id === 'panel-' + tabName));
+  window.scrollTo({top: 0, behavior: 'smooth'});
+}
+
+// ============================================================
+// SAMPLING ENGINE (reimplements sampling_engine: random, mus, high_value)
+// ============================================================
+let samplePopulation = null; // own-upload population, used only if "use main population" is unchecked
+
+function toggleSampleSource() {
+  const useMain = document.getElementById('sample-use-main').checked;
+  document.getElementById('sample-own-upload').style.display = useMain ? 'none' : 'block';
+  if (useMain) syncSampleColumnsFromMain();
+}
+function toggleSampleMethodFields() {
+  const method = document.getElementById('sample-method').value;
+  document.getElementById('sample-size-row').style.display = method === 'high_value' ? 'none' : 'grid';
+  document.getElementById('sample-hv-row').style.display = method === 'high_value' ? 'grid' : 'none';
+}
+
+// Reuses the Upload tab's already-detected mapping (mainColumns), so the
+// Sampling tab never asks you to re-identify columns you've already
+// mapped once — this is called on toggling "use main population" and
+// again whenever the Upload tab's own detection re-runs.
+function syncSampleColumnsFromMain() {
+  if (!mainColumns) return;
+  if (mainColumns.id) document.getElementById('sample-id-col').value = mainColumns.id;
+  if (mainColumns.amount) document.getElementById('sample-value-col').value = mainColumns.amount;
+}
+
+function handleCsvUpload(evt) {
+  const file = evt.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      samplePopulation = parseCsv(e.target.result);
+      document.getElementById('sample-file-info').textContent = `Loaded ${samplePopulation.rows.length} row(s). Columns: ${samplePopulation.headers.join(', ')}`;
+      // Auto-detect id/amount for this SEPARATE population — it may not
+      // share the Upload tab's column names at all, so it gets its own
+      // fresh detection pass rather than reusing mainColumns.
+      const mapping = detectColumnMapping(samplePopulation.headers);
+      let detectNote = '';
+      if (mapping.id) { document.getElementById('sample-id-col').value = mapping.id.column; detectNote += ` ID→"${mapping.id.column}"`; }
+      if (mapping.amount) { document.getElementById('sample-value-col').value = mapping.amount.column; detectNote += ` Amount→"${mapping.amount.column}"`; }
+      if (detectNote) document.getElementById('sample-file-info').textContent += ` — auto-detected:${detectNote} (review before generating a sample).`;
+    } catch (err) {
+      document.getElementById('sample-file-info').textContent = 'Could not parse this file as CSV: ' + err.message;
+    }
+  };
+  reader.onerror = () => { document.getElementById('sample-file-info').textContent = 'Could not read the file.'; };
+  reader.readAsText(file);
+}
+
+function runSampling() {
+  const out = document.getElementById('sample-results');
+  const useMain = document.getElementById('sample-use-main').checked;
+  const population = useMain ? mainPopulation : samplePopulation;
+  if (!population) { out.innerHTML = `<div class="warning">${useMain ? 'Upload a sales register on the Upload tab' : 'Upload a population CSV above'} first.</div>`; return; }
+
+  const idCol = document.getElementById('sample-id-col').value.trim();
+  const valueCol = document.getElementById('sample-value-col').value.trim();
+  const method = document.getElementById('sample-method').value;
+  const seedInput = document.getElementById('sample-seed').value;
+  const seed = seedInput ? parseInt(seedInput, 10) : Math.floor(Math.random() * 1e9);
+
+  if (!population.headers.includes(idCol)) { out.innerHTML = `<div class="warning">Column "${idCol}" not found.</div>`; return; }
+  if (!population.headers.includes(valueCol)) { out.innerHTML = `<div class="warning">Column "${valueCol}" not found.</div>`; return; }
+
+  const rows = population.rows.map(r => ({...r, __value: parseFloat(r[valueCol])})).filter(r => !isNaN(r.__value));
+  if (rows.length === 0) { out.innerHTML = '<div class="warning">No rows with a numeric value in that column.</div>'; return; }
+
+  const rng = mulberry32(seed);
+  let selected = [];
+  let rationale = '';
+
+  if (method === 'random') {
+    const sampleSize = parseInt(document.getElementById('sample-size').value, 10);
+    if (!sampleSize || sampleSize <= 0) { out.innerHTML = '<div class="warning">Sample size must be positive.</div>'; return; }
+    if (sampleSize > rows.length) { out.innerHTML = '<div class="warning">Sample size exceeds population size.</div>'; return; }
+    const indices = rows.map((_, i) => i);
+    for (let i = indices.length - 1; i > 0; i--) {
+      const j = Math.floor(rng() * (i + 1));
+      [indices[i], indices[j]] = [indices[j], indices[i]];
+    }
+    selected = indices.slice(0, sampleSize).map(i => ({...rows[i], __reason: `Selected via simple random sampling (seed=${seed}).`, __key: false}));
+    rationale = `${selected.length} item(s) selected via simple random sampling without replacement, seed=${seed}.`;
+  } else if (method === 'mus') {
+    const sampleSize = parseInt(document.getElementById('sample-size').value, 10);
+    if (!sampleSize || sampleSize <= 0) { out.innerHTML = '<div class="warning">Sample size must be positive.</div>'; return; }
+    const popValue = rows.reduce((s, r) => s + r.__value, 0);
+    if (popValue <= 0) { out.innerHTML = '<div class="warning">Population value must be positive for MUS.</div>'; return; }
+    if (rows.some(r => r.__value < 0)) { out.innerHTML = '<div class="warning">MUS requires non-negative values.</div>'; return; }
+    const interval = popValue / sampleSize;
+    const randomStart = rng() * interval;
+    let cumulative = 0;
+    const cumulativeArr = rows.map(r => (cumulative += r.__value));
+    const keyIndices = new Set(rows.map((r, i) => r.__value >= interval ? i : -1).filter(i => i >= 0));
+    const seenIndices = new Set();
+    for (let k = 0; k < sampleSize; k++) {
+      const point = randomStart + k * interval;
+      let idx = cumulativeArr.findIndex(c => c >= point);
+      if (idx === -1) idx = rows.length - 1;
+      if (seenIndices.has(idx)) continue;
+      seenIndices.add(idx);
+      const isKey = keyIndices.has(idx);
+      selected.push({...rows[idx], __key: isKey, __reason: isKey
+        ? `Key item: value ${fmt(rows[idx].__value)} meets/exceeds the interval of ${fmt(interval)}; selected with certainty.`
+        : `Selected via MUS: cumulative total crosses point ${fmt(point)} (interval=${fmt(interval)}, seed=${seed}).`});
+    }
+    keyIndices.forEach(idx => {
+      if (!seenIndices.has(idx)) { seenIndices.add(idx); selected.push({...rows[idx], __key: true, __reason: `Key item: value ${fmt(rows[idx].__value)} meets/exceeds the interval of ${fmt(interval)}; selected with certainty.`}); }
+    });
+    rationale = `${selected.length} item(s) selected via MUS: population value ${fmt(popValue)}, target sample size ${sampleSize}, interval ${fmt(interval)}, random start ${fmt(randomStart)}, seed=${seed}. ${selected.filter(s => s.__key).length} key item(s) selected with certainty.`;
+  } else { // high_value
+    const thresholdRaw = document.getElementById('sample-hv-threshold').value;
+    const topNRaw = document.getElementById('sample-hv-topn').value;
+    const threshold = thresholdRaw === '' ? null : parseFloat(thresholdRaw);
+    const topN = topNRaw === '' ? null : parseInt(topNRaw, 10);
+    if (threshold === null && topN === null) { out.innerHTML = '<div class="warning">Provide a threshold and/or a top-N value.</div>'; return; }
+    const byValueDesc = [...rows].sort((a, b) => b.__value - a.__value);
+    const topNIds = topN ? new Set(byValueDesc.slice(0, topN).map(r => r[idCol])) : new Set();
+    const seenIds = new Set();
+    rows.forEach(r => {
+      const reasons = [];
+      if (threshold !== null && r.__value >= threshold) reasons.push(`value ${fmt(r.__value)} meets/exceeds the threshold of ${fmt(threshold)}`);
+      if (topN !== null && topNIds.has(r[idCol])) reasons.push(`among the top ${topN} by value`);
+      if (reasons.length && !seenIds.has(r[idCol])) {
+        seenIds.add(r[idCol]);
+        selected.push({...r, __key: true, __reason: `Targeted selection: ${reasons.join('; ')}. Not a statistical sample — excluded from misstatement projection.`});
+      }
+    });
+    rationale = `${selected.length} specific item(s) selected by high value (threshold=${threshold ?? 'none'}, top_n=${topN ?? 'none'}); a targeted, non-statistical selection.`;
+  }
+
+  const popValueTotal = rows.reduce((s, r) => s + r.__value, 0);
+  let html = `<div class="grid-3">
+      <div class="stat-box"><div class="label">Population size</div><div class="value">${fmtInt(rows.length)}</div></div>
+      <div class="stat-box"><div class="label">Population value</div><div class="value">${fmt(popValueTotal)}</div></div>
+      <div class="stat-box"><div class="label">Sample size drawn</div><div class="value">${fmtInt(selected.length)}</div></div>
+    </div>
+    <p class="note">${esc(rationale)}</p>
+    <div class="table-wrap"><table><tr><th>${esc(idCol)}</th><th>${esc(valueCol)}</th><th>Key?</th><th>Reason</th></tr>`;
+  selected.forEach(s => { html += `<tr><td>${esc(s[idCol])}</td><td>${fmt(s.__value)}</td><td>${s.__key ? 'Yes' : 'No'}</td><td>${esc(s.__reason)}</td></tr>`; });
+  html += `</table></div>`;
+  out.innerHTML = html;
+  window.__lastSample = {idCol, valueCol, selected, rationale, popSize: rows.length, popValue: popValueTotal};
+
+  const dlBtn = document.createElement('button');
+  dlBtn.className = 'secondary';
+  dlBtn.textContent = 'Download sample as CSV';
+  dlBtn.onclick = () => downloadCsv('sample.csv', [idCol, valueCol, 'is_key_item', 'reason'],
+    selected.map(s => ({[idCol]: s[idCol], [valueCol]: s.__value, is_key_item: s.__key, reason: s.__reason})));
+  out.appendChild(dlBtn);
+}
+
+// ============================================================
+// RISK SCORING ENGINE (reimplements risk_scoring_engine's 9 factors)
+// ============================================================
+const RISK_WEIGHTS = { materiality: 0.15, manual_je: 0.15, cutoff: 0.15, customer: 0.10, country: 0.05, revenue_spike: 0.15, duplicate_invoice: 0.10, related_party: 0.10, credit_note: 0.05 };
+const HIGH_THRESHOLD = 65, MEDIUM_THRESHOLD = 35;
+function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
+
+function calcRisk() {
+  const amount = parseFloat(document.getElementById('risk-amount').value) || 0;
+  const pm = parseFloat(document.getElementById('risk-pm').value);
+  const isManual = document.getElementById('risk-manual').checked;
+  const isPeriodEnd = document.getElementById('risk-periodend').checked;
+  const daysRaw = document.getElementById('risk-days').value;
+  const days = daysRaw === '' ? null : parseFloat(daysRaw);
+  const cutoffMismatch = document.getElementById('risk-cutoffmismatch').checked;
+  const isNewCust = document.getElementById('risk-newcust').checked;
+  const concRaw = document.getElementById('risk-concentration').value;
+  const concentration = concRaw === '' ? null : parseFloat(concRaw);
+  const country = document.getElementById('risk-country').value;
+  const zRaw = document.getElementById('risk-zscore').value;
+  const zscore = zRaw === '' ? null : parseFloat(zRaw);
+  const isDup = document.getElementById('risk-duplicate').checked;
+  const dupSimRaw = document.getElementById('risk-dupsim').value;
+  const dupSim = dupSimRaw === '' ? 1.0 : parseFloat(dupSimRaw);
+  const isRelated = document.getElementById('risk-relatedparty').checked;
+  const disclosed = document.getElementById('risk-disclosed').checked;
+  const isCreditNote = document.getElementById('risk-creditnote').checked;
+  const creditPctRaw = document.getElementById('risk-creditpct').value;
+  const creditPct = creditPctRaw === '' ? null : parseFloat(creditPctRaw);
+
+  const factors = [];
+  if (!pm || pm <= 0) factors.push({name: 'materiality', score: 0, rationale: 'No performance materiality was supplied.'});
+  else { const ratio = amount / pm; factors.push({name: 'materiality', score: clamp(ratio * 100, 0, 100), rationale: `Amount ${fmt(amount)} is ${(ratio * 100).toFixed(0)}% of performance materiality (${fmt(pm)}).`}); }
+
+  if (!isManual) factors.push({name: 'manual_je', score: 0, rationale: 'System-generated entry; no manual-posting risk.'});
+  else if (isPeriodEnd) factors.push({name: 'manual_je', score: 100, rationale: 'Manually posted entry at/near period end - highest-risk combination per ISA 240.32.'});
+  else factors.push({name: 'manual_je', score: 55, rationale: 'Manually posted entry, not flagged as being at/near period end.'});
+
+  {
+    const window_ = 10, mismatchBonus = 40;
+    let proximity = 0, note;
+    if (days === null) note = 'no period-end proximity data was supplied';
+    else { const distance = Math.min(Math.abs(days), window_); proximity = (window_ - distance) / window_ * (100 - mismatchBonus); note = `the entry is ${Math.abs(days)} day(s) from period end`; }
+    const mismatchComponent = cutoffMismatch ? mismatchBonus : 0;
+    const score = clamp(proximity + mismatchComponent, 0, 100);
+    factors.push({name: 'cutoff', score, rationale: `Cut-off risk: ${note}${cutoffMismatch ? ' and a cut-off mismatch was identified' : ''}.`});
+  }
+  {
+    const newComponent = isNewCust ? 40 : 0;
+    let concComponent = 0, concNote = '';
+    if (concentration !== null) { concComponent = clamp(concentration, 0, 60); concNote = `; this customer represents ${concentration.toFixed(1)}% of total revenue`; }
+    factors.push({name: 'customer', score: clamp(newComponent + concComponent, 0, 100), rationale: `Transaction relates to ${isNewCust ? 'a new customer with no prior-period history' : 'an existing customer'}${concNote}.`});
+  }
+  {
+    const map = {Low: 10, Medium: 50, High: 90};
+    if (!country) factors.push({name: 'country', score: 0, rationale: 'No jurisdiction risk rating was supplied.'});
+    else factors.push({name: 'country', score: map[country], rationale: `Transaction's country carries a firm-assessed jurisdiction risk rating of "${country}".`});
+  }
+  {
+    if (zscore === null) factors.push({name: 'revenue_spike', score: 0, rationale: 'No revenue trend z-score was supplied.'});
+    else { const magnitude = Math.abs(zscore); factors.push({name: 'revenue_spike', score: clamp(magnitude / 4 * 100, 0, 100), rationale: `Period revenue deviates from trend by a z-score of ${zscore.toFixed(2)} (magnitude ${magnitude.toFixed(2)}, ceiling 4).`}); }
+  }
+  {
+    if (!isDup) factors.push({name: 'duplicate_invoice', score: 0, rationale: 'No potential duplicate was identified.'});
+    else factors.push({name: 'duplicate_invoice', score: clamp(50 + dupSim * 50, 0, 100), rationale: `Flagged as a potential duplicate invoice with similarity ${dupSim.toFixed(2)}.`});
+  }
+  {
+    if (!isRelated) factors.push({name: 'related_party', score: 0, rationale: 'Counterparty is not identified as a related party.'});
+    else if (disclosed) factors.push({name: 'related_party', score: 40, rationale: 'Related party; disclosed and approved, but ISA 550 still requires specific procedures.'});
+    else factors.push({name: 'related_party', score: 100, rationale: 'Related party and NOT disclosed/approved - a classic fraud indicator (ISA 550/240).'});
+  }
+  {
+    const postComponent = isCreditNote ? 50 : 0;
+    let pctComponent = 0, pctNote = '';
+    if (creditPct !== null) { pctComponent = clamp(creditPct, 0, 50); pctNote = `; represents ${creditPct.toFixed(1)}% of the original invoice`; }
+    factors.push({name: 'credit_note', score: clamp(postComponent + pctComponent, 0, 100), rationale: `Credit note ${isCreditNote ? 'issued shortly after period end, a classic cut-off manipulation pattern' : 'not flagged as issued shortly after period end'}${pctNote}.`});
+  }
+
+  let overall = 0;
+  factors.forEach(f => { f.weight = RISK_WEIGHTS[f.name]; f.contribution = f.score * f.weight; overall += f.contribution; });
+  let level, bannerClass;
+  if (overall >= HIGH_THRESHOLD) { level = 'High'; bannerClass = 'banner-high'; }
+  else if (overall >= MEDIUM_THRESHOLD) { level = 'Medium'; bannerClass = 'banner-medium'; }
+  else { level = 'Low'; bannerClass = 'banner-low'; }
+  factors.sort((a, b) => b.contribution - a.contribution);
+
+  let html = `<div class="result-banner ${bannerClass}">Overall score: ${overall.toFixed(1)}/100 -> ${level} risk</div>
+    <div class="table-wrap"><table><tr><th>Factor</th><th>Score</th><th>Weight</th><th>Contribution</th><th>Rationale</th></tr>`;
+  factors.forEach(f => { html += `<tr><td>${f.name}</td><td>${f.score.toFixed(0)}</td><td>${(f.weight * 100).toFixed(0)}%</td><td>${f.contribution.toFixed(1)}</td><td>${esc(f.rationale)}</td></tr>`; });
+  html += `</table></div><p class="note">This score is decision support for prioritizing testing, not an automated fraud conclusion.</p>`;
+  document.getElementById('risk-results').innerHTML = html;
+  window.__lastRiskResult = {overall, level, factors};
+}
+
+function addRiskFindingToTracker() {
+  const r = window.__lastRiskResult;
+  if (!r) { alert('Score a transaction first.'); return; }
+  addFindingProgrammatic(`Risk-flagged transaction (${r.level} risk, score ${r.overall.toFixed(1)})`,
+    `Explainable risk scoring produced an overall score of ${r.overall.toFixed(1)}/100 (${r.level} risk). Top factors: ` +
+    r.factors.slice(0,3).map(f => `${f.name} (${f.contribution.toFixed(1)} pts)`).join(', ') + '.',
+    r.level === 'High' ? 'High' : (r.level === 'Medium' ? 'Medium' : 'Low'), null);
+  switchTab('findings');
+}
+
+// ============================================================
+// WALKTHROUGH ENGINE (reimplements walkthrough_engine)
+// ============================================================
+const WALKTHROUGH_TEMPLATES = {
+  small_sale: { title: 'Small Sale', documents: ['Sales order', 'Invoice', 'Proof of delivery/shipment (if applicable)'],
+    steps: ['Inquire how a small-value sales order is initiated and recorded.', 'Observe the order being entered into the sales system.',
+            'Inspect the sales order for system-generated pricing with no manual override.', 'Inspect the invoice for agreement to the sales order.', 'Trace the transaction to the general ledger.'],
+    controls: ['System-enforced price list (preventive)', 'Automated three-way match of order/shipment/invoice (detective)'] },
+  medium_sale: { title: 'Medium Sale', documents: ['Sales order', 'Customer purchase order (if applicable)', 'Evidence of credit limit check', 'Shipping/delivery documentation', 'Invoice'],
+    steps: ['Inquire how a medium-value order is approved before shipment.', 'Inspect evidence of a credit limit check performed prior to fulfillment.',
+            'Inspect evidence of supervisory review/approval of the sales order.', 'Observe the shipment/dispatch process.', 'Inspect the invoice for agreement to order and shipping documentation.', 'Trace to the sales register and general ledger.'],
+    controls: ['Credit limit check (preventive)', 'Supervisory order approval (preventive)', 'Shipping/invoice matching (detective)'] },
+  large_sale: { title: 'Large Sale', documents: ['Signed contract', 'Sales order', 'Senior management/credit committee approval evidence', 'Credit assessment commensurate with size', 'Shipping/delivery documentation', 'Invoice', 'Revenue recognition (five-step model) analysis if complex'],
+    steps: ['Inquire how large/significant sales are identified and escalated for review.', 'Inspect evidence of senior management or credit committee approval.',
+            'Inspect the signed contract for terms, performance obligations, and payment terms.', 'Assess whether the five-step revenue recognition model applies.', 'Inspect evidence of a credit assessment commensurate with size.', 'Observe/inspect shipping and delivery evidence.', 'Inspect the invoice for agreement to contract and shipping documentation.', 'Trace through to the general ledger and financial statements.'],
+    controls: ['Senior management/credit committee approval (preventive)', 'Contract review by legal/finance (preventive)', 'Revenue recognition assessment for complex arrangements (detective)'] },
+  new_customer: { title: 'New Customer', documents: ['New customer setup/onboarding form', 'Credit application', 'Credit check/reference results', 'Evidence of independent verification of customer identity/existence', 'Signed contract', 'First sales order and invoice'],
+    steps: ['Inquire how new customers are set up in the customer master file.', 'Inspect evidence of independent verification of the customer\u2019s identity/existence prior to setup.',
+            'Inspect evidence of a credit assessment performed before the first sale.', 'Inspect evidence of appropriate approval of the new customer master record.', 'Inspect segregation of duties between master file setup and sales order entry.', 'Trace the first transaction through the sales cycle to the general ledger.'],
+    controls: ['New customer approval workflow (preventive)', 'Segregation of duties over master file maintenance (preventive)', 'Credit assessment for new customers (preventive)'] },
+  foreign_customer: { title: 'Foreign Customer', documents: ['Sales order/contract with shipping terms (Incoterms) specified', 'Export/customs documentation', 'Evidence of the FX rate applied', 'Invoice denominated in the applicable currency', 'Evidence of indirect tax (VAT/export duty) treatment applied'],
+    steps: ['Inquire how cross-border sales are processed, including shipping terms and currency determination.', 'Inspect the contract/sales order for shipping terms (Incoterms) used to determine cut-off.',
+            'Inspect export/customs documentation supporting the shipment.', 'Recompute the invoice amount using the FX rate applied and compare to policy.', 'Inspect evidence of the indirect tax treatment applied.', 'Trace to the general ledger, noting functional-currency translation.'],
+    controls: ['FX rate source control (preventive)', 'Export/shipping terms review (preventive)', 'Indirect tax determination (detective)'] },
+};
+
+function percentile(sortedArr, p) {
+  if (sortedArr.length === 0) return 0;
+  const idx = (p / 100) * (sortedArr.length - 1);
+  const lo = Math.floor(idx), hi = Math.ceil(idx);
+  if (lo === hi) return sortedArr[lo];
+  return sortedArr[lo] + (sortedArr[hi] - sortedArr[lo]) * (idx - lo);
+}
+
+// Classifies EVERY row in the population against all five categories,
+// with a specific, quoted reason per match — this is the actual "which
+// procedure is suited to this data" answer, not just a single silent
+// top-value pick. A transaction can legitimately match more than one
+// category at once (e.g. a large sale to a brand-new foreign customer
+// needs all three walkthroughs), so matches are returned as a list per
+// item rather than one item per category.
+function classifyWalkthroughPopulation() {
+  const idCol = mainColumns.id, amountCol = mainColumns.amount, custCol = mainColumns.customer, countryCol = mainColumns.country, dateCol = mainColumns.date;
+  if (!mainPopulation.headers.includes(amountCol)) return { error: `Amount column "${amountCol}" not found.` };
+
+  const rows = mainPopulation.rows.map(r => ({...r, __amount: parseFloat(r[amountCol])})).filter(r => !isNaN(r.__amount));
+  if (rows.length === 0) return { error: 'No rows with a numeric amount.' };
+
+  let smallCutoff, largeCutoff, basisNote;
+  if (lastPerformanceMateriality) {
+    smallCutoff = lastPerformanceMateriality * 0.10;
+    largeCutoff = lastPerformanceMateriality * 0.50;
+    basisNote = `Size bands based on Performance Materiality of ${fmt(lastPerformanceMateriality)}: small &lt; ${fmt(smallCutoff)}, large &gt;= ${fmt(largeCutoff)}.`;
+  } else {
+    const sortedAmounts = rows.map(r => r.__amount).sort((a, b) => a - b);
+    smallCutoff = percentile(sortedAmounts, 33);
+    largeCutoff = percentile(sortedAmounts, 67);
+    basisNote = `No Performance Materiality calculated yet (see Materiality tab); size bands based on population percentiles: small &lt; ${fmt(smallCutoff)} (33rd pct), large &gt;= ${fmt(largeCutoff)} (67th pct).`;
+  }
+
+  let newCustomerSet = new Set(), newCustomerBasisNote = null;
+  if (custCol && mainPopulation.headers.includes(custCol) && dateCol && mainPopulation.headers.includes(dateCol)) {
+    const periods = getPriorCurrentPopulations(dateCol);
+    if (periods.prior.length && periods.current.length) {
+      const priorCust = new Set(periods.prior.map(r => r[custCol]));
+      newCustomerSet = new Set(periods.current.filter(r => !priorCust.has(r[custCol])).map(r => r[custCol]));
+      newCustomerBasisNote = priorPopulation
+        ? `New = a customer with no transaction in the separately uploaded prior-period sales register.`
+        : `New = a customer with no transaction before ${periods.medianDate.toISOString().slice(0,10)} (the single uploaded file's own date-range midpoint — upload a real prior-period file on the Upload tab for a more accurate comparison).`;
+    }
+  }
+
+  const classified = rows.map(r => {
+    const matches = [];
+    if (r.__amount < smallCutoff) matches.push({ key: 'small_sale', reason: `Amount ${fmt(r.__amount)} is below the small-sale threshold of ${fmt(smallCutoff)}.` });
+    else if (r.__amount >= largeCutoff) matches.push({ key: 'large_sale', reason: `Amount ${fmt(r.__amount)} meets/exceeds the large-sale threshold of ${fmt(largeCutoff)} — requires senior management/credit-committee approval walkthrough.` });
+    else matches.push({ key: 'medium_sale', reason: `Amount ${fmt(r.__amount)} falls between the small threshold (${fmt(smallCutoff)}) and the large threshold (${fmt(largeCutoff)}).` });
+
+    if (custCol && newCustomerSet.has(r[custCol])) {
+      matches.push({ key: 'new_customer', reason: `Customer "${r[custCol]}" has no transaction before the population's midpoint date — no prior-period history, so this needs an onboarding-control walkthrough.` });
+    }
+    if (countryCol && homeCountry && r[countryCol] && r[countryCol] !== homeCountry) {
+      matches.push({ key: 'foreign_customer', reason: `Transaction's country "${r[countryCol]}" differs from the configured home country "${homeCountry}" — needs an FX/Incoterms/export-documentation walkthrough.` });
+    }
+    return { row: r, id: idCol ? r[idCol] : undefined, amount: r.__amount, matches };
+  });
+
+  return { classified, smallCutoff, largeCutoff, basisNote, newCustomerBasisNote, idCol, custCol, countryCol, homeCountry };
+}
+
+function runWalkthrough() {
+  const out = document.getElementById('wt-results');
+  if (!mainPopulation) { out.innerHTML = '<div class="warning">Upload a sales register on the Upload tab first.</div>'; return; }
+
+  const result = classifyWalkthroughPopulation();
+  if (result.error) { out.innerHTML = `<div class="warning">${esc(result.error)}</div>`; return; }
+  const { classified, basisNote, newCustomerBasisNote, idCol, homeCountry } = result;
+
+  const elevatedCount = classified.filter(c => c.matches.some(m => ['large_sale', 'new_customer', 'foreign_customer'].includes(m.key))).length;
+
+  let html = `<p class="note">${basisNote}</p>`;
+  if (newCustomerBasisNote) html += `<p class="note">${esc(newCustomerBasisNote)}</p>`;
+  else html += `<div class="warning">New-customer detection needs both a customer column and a date column mapped on the Upload tab.</div>`;
+  if (!homeCountry) html += `<div class="warning">Foreign-customer detection needs a home country set on the Upload tab.</div>`;
+
+  html += `<div class="grid-3">
+    <div class="stat-box"><div class="label">Transactions classified</div><div class="value">${fmtInt(classified.length)}</div></div>
+    <div class="stat-box"><div class="label">Require a walkthrough (Large/New/Foreign)</div><div class="value">${fmtInt(elevatedCount)}</div></div>
+    <div class="stat-box"><div class="label">Categories with at least one match</div><div class="value">${new Set(classified.flatMap(c => c.matches.map(m => m.key))).size} of 5</div></div>
+  </div>`;
+
+  const categorySummaries = [];
+  Object.keys(WALKTHROUGH_TEMPLATES).forEach(key => {
+    const t = WALKTHROUGH_TEMPLATES[key];
+    const candidates = classified
+      .map(c => ({ ...c, matchReason: (c.matches.find(m => m.key === key) || {}).reason }))
+      .filter(c => c.matchReason)
+      .sort((a, b) => b.amount - a.amount);
+
+    categorySummaries.push({
+      key, title: t.title, count: candidates.length,
+      representative: candidates.length ? { id: candidates[0].id, amount: candidates[0].amount, reason: candidates[0].matchReason } : null,
+      documents: t.documents, steps: t.steps, controls: t.controls,
+    });
+
+    html += `<details class="finding-card" ${candidates.length ? 'open' : ''}><summary>${t.title} — ${candidates.length} item(s) require this walkthrough</summary>`;
+    if (candidates.length === 0) {
+      html += `<div class="note">No transactions matched this category with the current data/settings.</div>`;
+    } else {
+      const shown = candidates.slice(0, 20);
+      html += `<p class="note"><strong>Items requiring this walkthrough</strong> (sorted by value; the highest-value item is the recommended representative to actually walk through) — showing ${shown.length} of ${candidates.length}:</p>`;
+      html += `<div class="table-wrap"><table><tr><th>#</th><th>${idCol ? esc(idCol) : 'Row'}</th><th>Amount</th><th>Why this procedure applies</th></tr>`;
+      shown.forEach((c, i) => {
+        html += `<tr><td>${i === 0 ? '&#9733; Recommended' : i + 1}</td><td>${esc(c.id !== undefined ? c.id : '(no id column)')}</td><td>${fmt(c.amount)}</td><td>${esc(c.matchReason)}</td></tr>`;
+      });
+      html += `</table></div>`;
+      if (candidates.length > shown.length) html += `<p class="note">${candidates.length - shown.length} more item(s) also match this category but are not shown, to keep the table readable.</p>`;
+    }
+    html += `<p class="note"><strong>Documents:</strong> ${t.documents.join('; ')}</p>`;
+    html += `<p class="note"><strong>Test steps:</strong></p><ol class="note">` + t.steps.map(s => `<li>${esc(s)}</li>`).join('') + `</ol>`;
+    html += `<p class="note"><strong>Expected controls:</strong> ${t.controls.join('; ')}</p>`;
+    html += `</details>`;
+  });
+  out.innerHTML = html;
+  window.__lastWalkthroughResult = { totalClassified: classified.length, elevatedCount, basisNote, newCustomerBasisNote, categorySummaries };
+}
+
+// ============================================================
+// UNPREDICTABILITY ENGINE (reimplements unpredictability_engine)
+// ============================================================
+function runUnpredictability() {
+  const out = document.getElementById('up2-results');
+  if (!mainPopulation) { out.innerHTML = '<div class="warning">Upload a sales register on the Upload tab first.</div>'; return; }
+  const idCol = mainColumns.id, dateCol = mainColumns.date, amountCol = mainColumns.amount, custCol = mainColumns.customer, tsCol = mainColumns.timestamp;
+  if (!mainPopulation.headers.includes(dateCol) || !mainPopulation.headers.includes(amountCol)) { out.innerHTML = '<div class="warning">Date or amount column not found. Check the Upload tab mapping.</div>'; return; }
+
+  const weekendDays = document.getElementById('up2-weekend-days').value.split(',').map(s => parseInt(s.trim(), 10)).filter(n => !isNaN(n));
+  const dormancyDays = parseFloat(document.getElementById('up2-dormancy-days').value) || 180;
+  const holidayDatesRaw = document.getElementById('up2-holiday-dates').value.trim();
+  const holidayDates = holidayDatesRaw ? new Set(holidayDatesRaw.split(',').map(s => s.trim())) : new Set();
+
+  const rows = mainPopulation.rows.map(r => ({...r, __date: new Date(r[dateCol]), __amount: parseFloat(r[amountCol])})).filter(r => !isNaN(r.__date) && !isNaN(r.__amount));
+  const total = rows.length;
+  const results = [];
+
+  function severityForPct(pct) { return pct >= 25 ? 'High' : (pct >= 10 ? 'Medium' : (pct >= 1 ? 'Low' : 'Info')); }
+
+  // Weekend sales
+  {
+    const flagged = rows.filter(r => weekendDays.includes(r.__date.getDay()));
+    const pct = total ? flagged.length / total * 100 : 0;
+    results.push({procedure: 'Weekend sales', count: flagged.length, pct, severity: severityForPct(pct),
+      note: `Transactions dated on a configured weekend day (${weekendDays.join(',')}, 0=Sun...6=Sat).`, items: flagged});
+  }
+
+  // Holiday sales
+  if (holidayDates.size > 0) {
+    const flagged = rows.filter(r => holidayDates.has(r.__date.toISOString().slice(0, 10)));
+    const pct = total ? flagged.length / total * 100 : 0;
+    results.push({procedure: 'Holiday sales', count: flagged.length, pct, severity: severityForPct(pct), note: 'Transactions dated on a configured holiday.', items: flagged});
+  } else {
+    results.push({procedure: 'Holiday sales', count: null, pct: null, severity: 'Info', note: 'Could not be tested: no holiday dates were supplied.', items: []});
+  }
+
+  // Midnight transactions
+  if (tsCol && mainPopulation.headers.includes(tsCol)) {
+    const flagged = mainPopulation.rows.map(r => ({...r, __ts: new Date(r[tsCol])})).filter(r => !isNaN(r.__ts)).filter(r => {
+      const minutesFromMidnight = r.__ts.getHours() * 60 + r.__ts.getMinutes();
+      return Math.min(minutesFromMidnight, 1440 - minutesFromMidnight) <= 60;
+    });
+    const pct = total ? flagged.length / total * 100 : 0;
+    results.push({procedure: 'Midnight transactions', count: flagged.length, pct, severity: severityForPct(pct), note: 'Transactions recorded within 60 minutes of midnight.', items: flagged});
+  } else {
+    results.push({procedure: 'Midnight transactions', count: null, pct: null, severity: 'Info', note: 'Could not be tested: no timestamp column was mapped on the Upload tab.', items: []});
+  }
+
+  // Round number invoices
+  {
+    const bases = [1000, 500, 100];
+    const flagged = rows.filter(r => r.__amount >= 100 && bases.some(b => r.__amount % b === 0));
+    const pct = total ? flagged.length / total * 100 : 0;
+    results.push({procedure: 'Round number invoices', count: flagged.length, pct, severity: severityForPct(pct), note: 'Amounts >= 100 that are an exact multiple of 1000, 500, or 100.', items: flagged});
+  }
+
+  // One-time customers
+  if (custCol && mainPopulation.headers.includes(custCol)) {
+    const counts = {};
+    rows.forEach(r => { counts[r[custCol]] = (counts[r[custCol]] || 0) + 1; });
+    const oneTimeCustomers = Object.keys(counts).filter(c => counts[c] <= 1);
+    const flagged = rows.filter(r => oneTimeCustomers.includes(r[custCol]));
+    const custTotal = Object.keys(counts).length;
+    const pct = custTotal ? oneTimeCustomers.length / custTotal * 100 : 0;
+    results.push({procedure: 'One-time customers', count: oneTimeCustomers.length, pct, severity: severityForPct(pct), note: `${oneTimeCustomers.length} of ${custTotal} customer(s) have exactly one transaction.`, items: flagged});
+  } else {
+    results.push({procedure: 'One-time customers', count: null, pct: null, severity: 'Info', note: 'Could not be tested: no customer column was mapped.', items: []});
+  }
+
+  // Dormant customers (reactivated after a gap; uses the real prior-period
+  // file when uploaded, otherwise falls back to the median-date split).
+  if (custCol && mainPopulation.headers.includes(custCol)) {
+    const periods = getPriorCurrentPopulations(dateCol);
+    if (periods.prior.length && periods.current.length) {
+      const lastPriorByCust = {};
+      periods.prior.forEach(r => { if (!lastPriorByCust[r[custCol]] || r.__date > lastPriorByCust[r[custCol]]) lastPriorByCust[r[custCol]] = r.__date; });
+      const currCustomers = new Set(periods.current.map(r => r[custCol]));
+      // Reference point for measuring the gap: the real median split point
+      // when falling back to one file, or the earliest date in the actual
+      // current-period file when two real files were uploaded.
+      const referenceDate = periods.medianDate || new Date(Math.min(...periods.current.map(r => r.__date.getTime())));
+      const dormant = [...currCustomers].filter(c => {
+        if (!(c in lastPriorByCust)) return false; // no prior history at all = new customer, not dormant
+        const gapDays = (referenceDate - lastPriorByCust[c]) / 86400000;
+        return gapDays >= dormancyDays;
+      });
+      const flagged = periods.current.filter(r => dormant.includes(r[custCol]));
+      const pct = currCustomers.size ? dormant.length / currCustomers.size * 100 : 0;
+      results.push({procedure: 'Dormant customers', count: dormant.length, pct, severity: severityForPct(pct), note: `${dormant.length} of ${currCustomers.size} current-period customer(s) reactivated after a gap of >= ${dormancyDays} day(s). ${periods.basisNote}`, items: flagged});
+    } else {
+      results.push({procedure: 'Dormant customers', count: null, pct: null, severity: 'Info', note: 'Not enough date spread to establish prior/current periods.', items: []});
+    }
+  } else {
+    results.push({procedure: 'Dormant customers', count: null, pct: null, severity: 'Info', note: 'Could not be tested: no customer column was mapped.', items: []});
+  }
+
+  window.__lastUnpredictabilityResults = results;
+
+  let html = `<div class="table-wrap"><table><tr><th>Procedure</th><th># Flagged</th><th>% of Pop.</th><th>Severity</th><th>Note</th><th></th></tr>`;
+  results.forEach((r, i) => {
+    html += `<tr><td>${esc(r.procedure)}</td><td>${r.count === null ? '-' : fmtInt(r.count)}</td><td>${r.pct === null ? '-' : r.pct.toFixed(1) + '%'}</td>
+      <td class="sev-${r.severity.toLowerCase()}">${r.severity}</td><td>${esc(r.note)}</td>
+      <td>${r.count ? `<button class="tiny" onclick="addUnpredictabilityFindingToTracker(${i})">+ Findings</button>` : ''}</td></tr>`;
+  });
+  html += `</table></div>`;
+  out.innerHTML = html;
+}
+
+function addUnpredictabilityFindingToTracker(i) {
+  const r = window.__lastUnpredictabilityResults[i];
+  addFindingProgrammatic(`${r.procedure}: ${fmtInt(r.count)} item(s) flagged (${r.pct.toFixed(1)}%)`, r.note,
+    r.severity === 'High' ? 'High' : (r.severity === 'Medium' ? 'Medium' : 'Low'), null);
+  switchTab('findings');
+}
+
+// ============================================================
+// FINDINGS TRACKER (reimplements review_workflow_engine)
+// ============================================================
+const ROLE_ORDER = ['Staff', 'Senior', 'Manager', 'Partner', 'EQR'];
+const RESOLVE_ROLES = ['Manager', 'Partner', 'EQR'];
+const CLOSE_ROLES = ['Partner', 'EQR'];
+const REOPEN_ROLES = ['Manager', 'Partner', 'EQR'];
+const FORWARD = {Open: 'In Progress', 'In Progress': 'Resolved', Resolved: 'Closed', Closed: null};
+const STATUS_ORDER = ['Open', 'In Progress', 'Resolved', 'Closed'];
+
+function loadFindings() {
+  try {
+    const raw = localStorage.getItem('rais_findings');
+    findingsList = raw ? JSON.parse(raw) : [];
+  } catch (e) { findingsList = []; }
+}
+function saveFindings() {
+  try { localStorage.setItem('rais_findings', JSON.stringify(findingsList)); } catch (e) { /* storage unavailable; findings stay in-memory only for this session */ }
+}
+
+function addFinding() {
+  const title = document.getElementById('find-title').value.trim();
+  const desc = document.getElementById('find-desc').value.trim();
+  const severity = document.getElementById('find-severity').value;
+  const amountRaw = document.getElementById('find-amount').value;
+  const amount = amountRaw === '' ? null : parseFloat(amountRaw);
+  if (!title) { alert('Enter a title for the finding.'); return; }
+  addFindingProgrammatic(title, desc, severity, amount);
+  document.getElementById('find-title').value = '';
+  document.getElementById('find-desc').value = '';
+  document.getElementById('find-amount').value = '';
+}
+
+function addFindingProgrammatic(title, description, severity, misstatedAmount) {
+  findingsList.push({
+    id: 'F-' + Math.random().toString(36).slice(2, 9),
+    title, description, severity, misstatedAmount,
+    status: 'Open',
+    history: [{from: null, to: 'Open', actor: 'You', role: document.getElementById('find-role').value, at: new Date().toISOString()}],
+  });
+  saveFindings();
+  renderFindings();
+}
+
+function findingById(id) { return findingsList.find(f => f.id === id); }
+
+function transitionFinding(id, newStatus) {
+  const f = findingById(id);
+  if (!f) return;
+  const role = document.getElementById('find-role').value;
+  const currentIdx = STATUS_ORDER.indexOf(f.status), newIdx = STATUS_ORDER.indexOf(newStatus);
+  const isForward = newIdx === currentIdx + 1;
+  const isReopen = newIdx < currentIdx;
+
+  if (isForward) {
+    if (newStatus === 'Resolved' && !RESOLVE_ROLES.includes(role)) { alert(`Role "${role}" cannot resolve a finding; requires Manager, Partner, or EQR.`); return; }
+    if (newStatus === 'Resolved' && f.history.length < 2) { alert('Add at least one status change/comment history entry before resolving (e.g. move to In Progress first with a note).'); return; }
+    if (newStatus === 'Closed' && !CLOSE_ROLES.includes(role)) { alert(`Role "${role}" cannot close a finding; requires Partner or EQR.`); return; }
+  } else if (isReopen) {
+    if (!REOPEN_ROLES.includes(role)) { alert(`Role "${role}" cannot reopen a finding; requires Manager, Partner, or EQR.`); return; }
+    const reason = prompt('Reopening requires a documented reason:');
+    if (!reason || !reason.trim()) { alert('Reopening was cancelled: a reason is required.'); return; }
+    f.history.push({from: f.status, to: newStatus, actor: 'You', role, at: new Date().toISOString(), reason});
+    f.status = newStatus;
+    saveFindings(); renderFindings();
+    return;
+  } else {
+    alert(`Cannot go directly from ${f.status} to ${newStatus}.`);
+    return;
+  }
+
+  f.history.push({from: f.status, to: newStatus, actor: 'You', role, at: new Date().toISOString()});
+  f.status = newStatus;
+  saveFindings();
+  renderFindings();
+}
+
+function deleteFinding(id) {
+  if (!confirm('Remove this finding? This cannot be undone.')) return;
+  findingsList = findingsList.filter(f => f.id !== id);
+  saveFindings();
+  renderFindings();
+}
+
+function renderFindings() {
+  const container = document.getElementById('findings-list');
+  if (findingsList.length === 0) { container.innerHTML = '<p class="note">No findings yet. Add one above, or use "+ Findings" buttons on the Analytical Review, Risk Scoring, or Unpredictability tabs.</p>'; return; }
+
+  const badgeClass = {Open: 'badge-open', 'In Progress': 'badge-progress', Resolved: 'badge-resolved', Closed: 'badge-closed'};
+  let html = '';
+  [...findingsList].reverse().forEach(f => {
+    const next = FORWARD[f.status];
+    html += `<details class="finding-card">
+      <summary>${esc(f.title)} <span class="badge ${badgeClass[f.status]}">${f.status}</span> <span class="sev-${f.severity.toLowerCase()}">${f.severity}</span></summary>
+      <p class="note">${esc(f.description || '(no description)')}</p>
+      ${f.misstatedAmount !== null && f.misstatedAmount !== undefined ? `<p class="note">Misstated amount: ${fmt(f.misstatedAmount)}</p>` : ''}
+      <p class="note"><strong>History:</strong> ${f.history.map(h => `${h.to} by ${h.role}${h.reason ? ' (' + esc(h.reason) + ')' : ''}`).join(' &rarr; ')}</p>
+      <div>
+        ${next ? `<button class="tiny" onclick="transitionFinding('${f.id}','${next}')">Move to ${next}</button>` : ''}
+        ${f.status !== 'Open' ? `<button class="tiny" onclick="transitionFinding('${f.id}','Open')">Reopen to Open</button>` : ''}
+        <button class="tiny" onclick="deleteFinding('${f.id}')">Delete</button>
+      </div>
+    </details>`;
+  });
+  container.innerHTML = html;
+}
+loadFindings();
+renderFindings();
+
+// ============================================================
+// EXPORT: WORKING PAPER (Markdown + styled, printable HTML)
+// ============================================================
+
+// Collects every module's last-run result into one structured object,
+// so both export formats (and any future format) build from the same
+// single source of truth rather than duplicating collection logic.
+function buildWorkingPaperData() {
+  const client = document.getElementById('wp-client').value.trim() || '(client name not entered)';
+  const period = document.getElementById('wp-period').value.trim() || '(audit period not entered)';
+  const preparer = document.getElementById('wp-preparer').value.trim();
+  const reviewer = document.getElementById('wp-reviewer').value.trim();
+
+  const engagementScope = {
+    currentRows: mainPopulation ? mainPopulation.rows.length : 0,
+    currentTotal: mainPopulation ? mainPopulation.rows.reduce((s, r) => s + (parseFloat(r[mainColumns.amount]) || 0), 0) : 0,
+    priorRows: priorPopulation ? priorPopulation.rows.length : 0,
+    priorTotal: priorPopulation ? priorPopulation.rows.reduce((s, r) => s + (parseFloat(r[mainColumns.amount]) || 0), 0) : 0,
+    mapping: mainColumns,
+    homeCountry,
+  };
+
+  const statusCounts = { Open: 0, 'In Progress': 0, Resolved: 0, Closed: 0 };
+  findingsList.forEach(f => { statusCounts[f.status] = (statusCounts[f.status] || 0) + 1; });
+  const openMisstatement = findingsList
+    .filter(f => f.status !== 'Closed' && typeof f.misstatedAmount === 'number')
+    .reduce((s, f) => s + f.misstatedAmount, 0);
+
+  return {
+    client, period, preparer, reviewer,
+    generatedAt: new Date(),
+    engagementScope,
+    materiality: window.__lastMaterialityResult || null,
+    analytical: window.__lastAnalyticalFindings || null,
+    sample: window.__lastSample || null,
+    risk: window.__lastRiskResult || null,
+    walkthrough: window.__lastWalkthroughResult || null,
+    unpredictability: window.__lastUnpredictabilityResults || null,
+    findings: findingsList,
+    statusCounts, openMisstatement,
+  };
+}
+
+function severityRank(s) { return {Critical: 4, High: 3, Medium: 2, Low: 1}[s] || 0; }
+
+// ---------------------------------------------------------------
+// Markdown working paper
+// ---------------------------------------------------------------
+function exportWorkingPaperMarkdown() {
+  const d = buildWorkingPaperData();
+  const lines = [];
+
+  lines.push(`# ${d.client}`);
+  lines.push(`## Revenue Audit — Summary Working Paper`);
+  lines.push(`**Period:** ${d.period}  `);
+  lines.push(`**Generated:** ${d.generatedAt.toISOString()}  `);
+  lines.push(`**Prepared by:** ${d.preparer || '_______________'}  &nbsp;&nbsp; **Reviewed by:** ${d.reviewer || '_______________'}`);
+  lines.push('');
+  lines.push('---');
+  lines.push('');
+
+  lines.push('## Contents');
+  lines.push('1. Engagement Scope & Data');
+  lines.push('2. Materiality');
+  lines.push('3. Analytical Review');
+  lines.push('4. Sampling');
+  lines.push('5. Risk Scoring');
+  lines.push('6. Walkthrough Planning');
+  lines.push('7. ISA 240 Unpredictability Procedures');
+  lines.push('8. Findings Tracker');
+  lines.push('9. Conclusion');
+  lines.push('10. Review Sign-off');
+  lines.push('');
+
+  lines.push('## 1. Engagement Scope & Data');
+  lines.push('| Item | Value |');
+  lines.push('|---|---|');
+  lines.push(`| Current-period rows | ${fmtInt(d.engagementScope.currentRows)} |`);
+  lines.push(`| Current-period total | ${fmt(d.engagementScope.currentTotal)} |`);
+  if (d.engagementScope.priorRows) {
+    lines.push(`| Prior-period rows | ${fmtInt(d.engagementScope.priorRows)} |`);
+    lines.push(`| Prior-period total | ${fmt(d.engagementScope.priorTotal)} |`);
+  } else {
+    lines.push(`| Prior-period file | Not uploaded — comparisons used the current file's own date-range midpoint as a fallback |`);
+  }
+  lines.push(`| Home country | ${d.engagementScope.homeCountry || '(not set)'} |`);
+  lines.push('');
+
+  lines.push('## 2. Materiality');
+  if (d.materiality) {
+    const m = d.materiality;
+    lines.push('| Measure | Basis | Amount |');
+    lines.push('|---|---|---|');
+    lines.push(`| Benchmark: ${m.benchmarkLabel} | — | ${fmt(m.amount)} |`);
+    lines.push(`| Overall Materiality | ${m.pct}% | ${fmt(m.om)} |`);
+    lines.push(`| Performance Materiality | of OM | ${fmt(m.pm)} |`);
+    lines.push(`| Clearly Trivial Threshold | ${m.ctPct}% of OM | ${fmt(m.ct)} |`);
+    lines.push('');
+    lines.push(`**Standard:** ${m.standard}`);
+    if (m.warnings.length) m.warnings.forEach(w => lines.push(`> **Warning:** ${w}`));
+  } else lines.push('_Not calculated in this session._');
+  lines.push('');
+
+  lines.push('## 3. Analytical Review');
+  if (d.analytical && d.analytical.length) {
+    lines.push('| Procedure | Severity | Description |');
+    lines.push('|---|---|---|');
+    [...d.analytical].sort((a, b) => severityRank(b.severity) - severityRank(a.severity))
+      .forEach(f => lines.push(`| ${f.procedure} | ${f.severity} | ${f.description.replace(/\|/g, '\\|')} |`));
+  } else lines.push('_Not run, or no findings, in this session._');
+  lines.push('');
+
+  lines.push('## 4. Sampling');
+  if (d.sample) {
+    lines.push(`- ${d.sample.rationale}`);
+    lines.push(`- Population: ${fmtInt(d.sample.popSize)} items, ${fmt(d.sample.popValue)} total value.`);
+    lines.push(`- Sample drawn: ${fmtInt(d.sample.selected.length)} item(s), ${fmtInt(d.sample.selected.filter(s=>s.__key).length)} key item(s).`);
+  } else lines.push('_Not run in this session._');
+  lines.push('');
+
+  lines.push('## 5. Risk Scoring (last transaction scored)');
+  if (d.risk) {
+    lines.push(`**Overall score:** ${d.risk.overall.toFixed(1)}/100 → **${d.risk.level} risk**`);
+    lines.push('');
+    lines.push('| Factor | Score | Weight | Contribution | Rationale |');
+    lines.push('|---|---|---|---|---|');
+    d.risk.factors.forEach(f => lines.push(`| ${f.name} | ${f.score.toFixed(0)} | ${(f.weight*100).toFixed(0)}% | ${f.contribution.toFixed(1)} | ${f.rationale.replace(/\|/g, '\\|')} |`));
+  } else lines.push('_Not run in this session._');
+  lines.push('');
+
+  lines.push('## 6. Walkthrough Planning');
+  if (d.walkthrough) {
+    lines.push(`${d.walkthrough.basisNote}`);
+    lines.push('');
+    lines.push(`${fmtInt(d.walkthrough.totalClassified)} transaction(s) classified; ${fmtInt(d.walkthrough.elevatedCount)} require a walkthrough for Large Sale, New Customer, or Foreign Customer.`);
+    lines.push('');
+    lines.push('| Category | Items requiring walkthrough | Recommended representative | Why |');
+    lines.push('|---|---|---|---|');
+    d.walkthrough.categorySummaries.forEach(c => {
+      const rep = c.representative ? `${c.representative.id} (${fmt(c.representative.amount)})` : '—';
+      const why = c.representative ? c.representative.reason.replace(/\|/g, '\\|') : 'No matching transactions.';
+      lines.push(`| ${c.title} | ${c.count} | ${rep} | ${why} |`);
+    });
+  } else lines.push('_Not run in this session._');
+  lines.push('');
+
+  lines.push('## 7. ISA 240 Unpredictability Procedures');
+  if (d.unpredictability) {
+    lines.push('| Procedure | # Flagged | % of Pop. | Severity | Note |');
+    lines.push('|---|---|---|---|---|');
+    d.unpredictability.forEach(r => lines.push(`| ${r.procedure} | ${r.count === null ? 'not tested' : fmtInt(r.count)} | ${r.pct === null ? '—' : r.pct.toFixed(1) + '%'} | ${r.severity} | ${r.note.replace(/\|/g, '\\|')} |`));
+  } else lines.push('_Not run in this session._');
+  lines.push('');
+
+  lines.push('## 8. Findings Tracker');
+  if (d.findings.length) {
+    lines.push('| Status | Severity | Title | Misstated Amount |');
+    lines.push('|---|---|---|---|');
+    d.findings.forEach(f => lines.push(`| ${f.status} | ${f.severity} | ${f.title.replace(/\|/g, '\\|')} | ${f.misstatedAmount != null ? fmt(f.misstatedAmount) : '—'} |`));
+  } else lines.push('_No findings recorded._');
+  lines.push('');
+
+  lines.push('## 9. Conclusion');
+  const totalFindings = d.findings.length;
+  const openCount = d.statusCounts.Open + d.statusCounts['In Progress'];
+  lines.push(`${totalFindings} finding(s) recorded: ${d.statusCounts.Open} Open, ${d.statusCounts['In Progress']} In Progress, ${d.statusCounts.Resolved} Resolved, ${d.statusCounts.Closed} Closed.`);
+  if (d.openMisstatement > 0) lines.push(`Aggregate uncorrected/open misstatement: ${fmt(d.openMisstatement)}${d.materiality ? ` (${(d.openMisstatement / d.materiality.pm * 100).toFixed(1)}% of Performance Materiality)` : ''}.`);
+  lines.push(openCount > 0 ? `**${openCount} finding(s) remain open and should be resolved before this working paper is finalized.**` : 'No open findings remain outstanding.');
+  lines.push('');
+
+  lines.push('## 10. Review Sign-off');
+  lines.push('| Role | Name | Date |');
+  lines.push('|---|---|---|');
+  lines.push(`| Preparer | ${d.preparer || '_______________'} | __________ |`);
+  lines.push(`| Reviewer | ${d.reviewer || '_______________'} | __________ |`);
+  lines.push(`| Partner/Approver | _______________ | __________ |`);
+  lines.push('');
+  lines.push('---');
+  lines.push('_Generated entirely client-side by the Revenue Audit Toolkit Web Edition. Decision support only — all conclusions remain a matter of auditor judgment._');
+
+  downloadBlob(`${d.client.replace(/[^a-z0-9]+/gi,'_')}_revenue_audit_working_paper.md`, 'text/markdown', lines.join('\n'));
+  document.getElementById('export-results').innerHTML = '<div class="info-box">Markdown working paper downloaded.</div>';
+}
+
+// ---------------------------------------------------------------
+// Excel (.xlsx) working paper via SheetJS (loaded from cdnjs — see the
+// <script> tag in <head>). One tab per section, built from the exact same
+// buildWorkingPaperData() every other export format uses, so the three
+// formats can never quietly drift apart from each other.
+// ---------------------------------------------------------------
+async function exportWorkingPaperXlsx() {
+  const out = document.getElementById('export-results');
+  if (typeof ExcelJS === 'undefined') {
+    out.innerHTML = '<div class="warning">The Excel library (ExcelJS) could not be loaded from cdnjs — this needs an internet connection at the moment you click this button (everything else in this tool works offline). Check your connection and try again, or use the HTML or Markdown export instead.</div>';
+    return;
+  }
+
+  const d = buildWorkingPaperData();
+  const wb = new ExcelJS.Workbook();
+  wb.creator = 'Revenue Audit Toolkit Web Edition';
+  wb.created = d.generatedAt;
+
+  // Big-4-style palette, matching the navy/gray scheme used throughout
+  // this tool and the HTML export — this is the actual fix for "boring":
+  // ExcelJS supports real cell fills/fonts/borders in its free, open-
+  // source tier, unlike the SheetJS build used previously.
+  const NAVY = 'FF1F3864', NAVY_LIGHT = 'FF2E5395', GRAY_BAND = 'FFF2F2F2', BORDER = 'FFBFBFBF';
+  const RED = 'FFC00000', RED_BG = 'FFFBE0E0', AMBER = 'FFBF8F00', AMBER_BG = 'FFFBF1D6';
+  const GREEN = 'FF375623', GREEN_BG = 'FFE6F0E6', BLUE = 'FF14509E', BLUE_BG = 'FFDCEBFF';
+  const WHITE = 'FFFFFFFF';
+  const thin = { style: 'thin', color: { argb: BORDER } };
+  const allBorders = { top: thin, bottom: thin, left: thin, right: thin };
+
+  const SEV_COLORS = {
+    Critical: { fg: RED_BG, font: RED }, High: { fg: RED_BG, font: RED },
+    Medium: { fg: AMBER_BG, font: AMBER }, Low: { fg: GREEN_BG, font: GREEN }, Info: { fg: 'FFEDEDED', font: 'FF666666' },
+  };
+  const STATUS_COLORS = {
+    Open: { fg: RED_BG, font: RED }, 'In Progress': { fg: AMBER_BG, font: AMBER },
+    Resolved: { fg: BLUE_BG, font: BLUE }, Closed: { fg: GREEN_BG, font: GREEN },
+  };
+
+  // Native Excel data bars via conditional formatting — these render as
+  // actual in-cell bars when opened in Excel, the same feature real audit
+  // workpapers use for visual scanning of a column, without depending on
+  // ExcelJS's much less certain native-chart-object support.
+  function addDataBar(ws, range, color) {
+    ws.addConditionalFormatting({
+      ref: range,
+      rules: [{ type: 'dataBar', cfvo: [{ type: 'min' }, { type: 'max' }], color: { argb: color }, priority: 1 }],
+    });
+  }
+
+  // Groups raw population rows by month-OF-YEAR only (1-12, no calendar
+  // year attached) and sums the amount column. This is deliberately NOT
+  // keyed by full YYYY-MM: two fiscal-year files (e.g. Apr 2024-Mar 2025
+  // vs Apr 2025-Mar 2026) never share a calendar year, so a YYYY-MM key
+  // would put every month on its own row with the other period's column
+  // blank -- exactly the staircase pattern this replaces. Grouping by
+  // month-of-year lets April line up with April on the same row
+  // regardless of which year each period's April falls in.
+  function groupByMonthOfYear(population, dateCol, amountCol) {
+    if (!population) return {};
+    const out = {};
+    population.rows.forEach(r => {
+      const dt = new Date(r[dateCol]), amt = parseFloat(r[amountCol]);
+      if (isNaN(dt) || isNaN(amt)) return;
+      const key = dt.getMonth() + 1; // 1-12
+      out[key] = (out[key] || 0) + amt;
+    });
+    return out;
+  }
+
+  const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+
+  // The actual calendar year(s) a population's dates fall in, as a short
+  // label -- this is what replaces the generic "Current Period" / "Prior
+  // Period" column headers with the real years, per the request.
+  function yearRangeLabel(population, dateCol) {
+    if (!population) return '';
+    const years = population.rows
+      .map(r => { const dt = new Date(r[dateCol]); return isNaN(dt) ? null : dt.getFullYear(); })
+      .filter(y => y !== null);
+    if (!years.length) return '';
+    const minY = Math.min(...years), maxY = Math.max(...years);
+    return minY === maxY ? String(minY) : `${minY}-${String(maxY).slice(-2)}`;
+  }
+
+  // Orders month numbers 1-12 starting from whichever month the data
+  // actually begins in (e.g. an April-start fiscal year lists April first,
+  // wrapping to March), rather than forcing calendar January-first order
+  // on data that isn't calendar-year aligned.
+  function monthOrderStartingFrom(firstMonth) {
+    const order = [];
+    for (let i = 0; i < 12; i++) order.push(((firstMonth - 1 + i) % 12) + 1);
+    return order;
+  }
+
+  function groupByCustomer(population, custCol, amountCol, topN) {
+    if (!population || !custCol) return [];
+    const out = {};
+    population.rows.forEach(r => {
+      const amt = parseFloat(r[amountCol]);
+      if (isNaN(amt)) return;
+      const c = r[custCol] || '(blank)';
+      out[c] = (out[c] || 0) + amt;
+    });
+    return Object.entries(out).sort((a, b) => b[1] - a[1]).slice(0, topN || 10);
+  }
+
+  function titleCell(ws, text, row, cols) {
+    ws.mergeCells(row, 1, row, cols);
+    const cell = ws.getCell(row, 1);
+    cell.value = text;
+    cell.font = { bold: true, size: 14, color: { argb: NAVY } };
+    cell.alignment = { vertical: 'middle' };
+    ws.getRow(row).height = 24;
+  }
+
+  function headerRow(ws, headers, row) {
+    headers.forEach((h, i) => {
+      const cell = ws.getCell(row, i + 1);
+      cell.value = h;
+      cell.font = { bold: true, color: { argb: WHITE } };
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: NAVY } };
+      cell.border = allBorders;
+      cell.alignment = { vertical: 'middle', wrapText: true };
+    });
+    ws.getRow(row).height = 20;
+  }
+
+  function dataRow(ws, values, row, opts) {
+    opts = opts || {};
+    values.forEach((v, i) => {
+      const cell = ws.getCell(row, i + 1);
+      cell.value = v;
+      cell.border = allBorders;
+      cell.alignment = { vertical: 'top', wrapText: true };
+      if (opts.band && row % 2 === 0) cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: GRAY_BAND } };
+      if (opts.currencyCols && opts.currencyCols.includes(i) && typeof v === 'number') cell.numFmt = '#,##0.00';
+      if (opts.pctCols && opts.pctCols.includes(i) && typeof v === 'number') cell.numFmt = '0.0%';
+    });
+    if (opts.sevCol !== undefined) {
+      const sev = values[opts.sevCol];
+      const c = SEV_COLORS[sev];
+      if (c) {
+        const cell = ws.getCell(row, opts.sevCol + 1);
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: c.fg } };
+        cell.font = { bold: true, color: { argb: c.font } };
+        cell.alignment = { horizontal: 'center', vertical: 'middle' };
+      }
+    }
+    if (opts.statusCol !== undefined) {
+      const status = values[opts.statusCol];
+      const c = STATUS_COLORS[status];
+      if (c) {
+        const cell = ws.getCell(row, opts.statusCol + 1);
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: c.fg } };
+        cell.font = { bold: true, color: { argb: c.font } };
+        cell.alignment = { horizontal: 'center', vertical: 'middle' };
+      }
+    }
+  }
+
+  function plainSheet(name, message) {
+    const ws = wb.addWorksheet(name.slice(0, 31));
+    ws.getCell('A1').value = message;
+    ws.getColumn(1).width = 60;
+  }
+
+  // --- Dashboard (added first, so it's the front tab when the file opens) ---
+  {
+    const ws = wb.addWorksheet('Dashboard');
+    ws.columns = [{ width: 26 }, { width: 20 }, { width: 26 }, { width: 20 }];
+    ws.mergeCells('A1:D1');
+    const bannerCell = ws.getCell('A1');
+    bannerCell.value = `${d.client}  \u2014  Revenue Audit Dashboard`;
+    bannerCell.font = { bold: true, size: 16, color: { argb: WHITE } };
+    bannerCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: NAVY } };
+    bannerCell.alignment = { vertical: 'middle', horizontal: 'left', indent: 1 };
+    ws.getRow(1).height = 30;
+    ws.mergeCells('A2:D2');
+    const subCell = ws.getCell('A2');
+    subCell.value = `${d.period}  |  Generated ${d.generatedAt.toISOString().slice(0, 10)}  |  Prepared by ${d.preparer || '-'}  |  Reviewed by ${d.reviewer || '-'}`;
+    subCell.font = { italic: true, size: 9, color: { argb: 'FF595959' } };
+
+    // KPI scorecards: label row + big-number row, colored by tone.
+    const openCount = d.statusCounts.Open + d.statusCounts['In Progress'];
+    const overallTone = openCount === 0 ? GREEN_BG : (d.findings.some(f => (f.severity === 'High' || f.severity === 'Critical') && f.status !== 'Closed') ? RED_BG : AMBER_BG);
+    const overallFont = openCount === 0 ? GREEN : (d.findings.some(f => (f.severity === 'High' || f.severity === 'Critical') && f.status !== 'Closed') ? RED : AMBER);
+    const kpis = [
+      { label: 'Current-Period Revenue', value: fmt(d.engagementScope.currentTotal), tone: GRAY_BAND, font: NAVY },
+      { label: 'Performance Materiality', value: d.materiality ? fmt(d.materiality.pm) : 'n/a', tone: GRAY_BAND, font: NAVY },
+      { label: 'Total Findings', value: String(d.findings.length), tone: d.findings.length === 0 ? GREEN_BG : GRAY_BAND, font: d.findings.length === 0 ? GREEN : NAVY },
+      { label: 'Open Findings', value: String(openCount), tone: overallTone, font: overallFont },
+    ];
+    kpis.forEach((k, i) => {
+      const col = i + 1;
+      const labelCell = ws.getCell(4, col); labelCell.value = k.label; labelCell.font = { bold: true, size: 9, color: { argb: 'FF595959' } };
+      const valueCell = ws.getCell(5, col); valueCell.value = k.value;
+      valueCell.font = { bold: true, size: 18, color: { argb: k.font } };
+      valueCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: k.tone } };
+      valueCell.alignment = { horizontal: 'center', vertical: 'middle' };
+      valueCell.border = allBorders;
+      ws.getRow(5).height = 34;
+    });
+
+    ws.getCell(7, 1).value = 'Conclusion';
+    ws.getCell(7, 1).font = { bold: true, size: 11, color: { argb: NAVY } };
+    ws.mergeCells(8, 1, 8, 4);
+    const banner = ws.getCell(8, 1);
+    banner.value = openCount > 0 ? `${openCount} finding(s) remain open \u2014 review before sign-off.` : 'No open findings outstanding.';
+    banner.font = { bold: true, color: { argb: overallFont } };
+    banner.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: overallTone } };
+    banner.alignment = { vertical: 'middle', indent: 1 };
+    ws.getRow(8).height = 22;
+
+    // Materiality bridge, as a data-bar-visualized mini table (a genuine
+    // native-Excel visual, unlike an image, and one I can actually verify).
+    if (d.materiality) {
+      ws.getCell(10, 1).value = 'Materiality Bridge'; ws.getCell(10, 1).font = { bold: true, size: 11, color: { argb: NAVY } };
+      headerRow(ws, ['Measure', 'Amount'], 11);
+      const rows = [['Overall Materiality', d.materiality.om], ['Performance Materiality', d.materiality.pm], ['Clearly Trivial', d.materiality.ct]];
+      rows.forEach((r, i) => dataRow(ws, r, 12 + i, { band: true, currencyCols: [1] }));
+      addDataBar(ws, `B12:B${11 + rows.length}`, NAVY);
+    }
+
+    // Findings-by-status mini table with a data bar for quick visual scan.
+    const statusRows = [['Open', d.statusCounts.Open], ['In Progress', d.statusCounts['In Progress']], ['Resolved', d.statusCounts.Resolved], ['Closed', d.statusCounts.Closed]];
+    const findingsStartRow = d.materiality ? 17 : 11;
+    ws.getCell(findingsStartRow - 1, 1).value = 'Findings by Status'; ws.getCell(findingsStartRow - 1, 1).font = { bold: true, size: 11, color: { argb: NAVY } };
+    headerRow(ws, ['Status', 'Count'], findingsStartRow);
+    statusRows.forEach((r, i) => dataRow(ws, r, findingsStartRow + 1 + i, { band: true, statusCol: 0 }));
+    addDataBar(ws, `B${findingsStartRow + 1}:B${findingsStartRow + statusRows.length}`, NAVY_LIGHT);
+
+    ws.getCell(findingsStartRow + statusRows.length + 2, 1).value = 'See the numbered tabs for full detail behind every figure above.';
+    ws.getCell(findingsStartRow + statusRows.length + 2, 1).font = { italic: true, size: 8, color: { argb: 'FF888888' } };
+  }
+
+  // --- Pivot-style summary (pre-aggregated, since ExcelJS cannot create a
+  //     real interactive Excel PivotTable object) ---
+  {
+    const ws = wb.addWorksheet('Pivot Summary');
+    ws.columns = [{ width: 14 }, { width: 18 }, { width: 18 }, { width: 14 }];
+    titleCell(ws, 'Revenue Analysis (Pivot-Style Summary)', 1, 4);
+    ws.mergeCells(2, 1, 2, 4);
+    ws.getCell(2, 1).value = 'Pre-aggregated by this tool. For custom pivoting, select the raw data on the Engagement Scope tab (or your original file) and use Excel\u2019s Insert \u2192 PivotTable.';
+    ws.getCell(2, 1).font = { italic: true, size: 9, color: { argb: 'FF444444' } };
+    ws.getCell(2, 1).alignment = { wrapText: true };
+
+    let cursorRow = 4;
+    if (mainPopulation && mainColumns && mainColumns.date && mainColumns.amount) {
+      const currByMonth = groupByMonthOfYear(mainPopulation, mainColumns.date, mainColumns.amount);
+      const priorByMonth = priorPopulation ? groupByMonthOfYear(priorPopulation, mainColumns.date, mainColumns.amount) : {};
+      const monthNumbers = [...new Set([...Object.keys(currByMonth), ...Object.keys(priorByMonth)])].map(Number);
+      if (monthNumbers.length) {
+        // Start the row order from whichever month the current period's
+        // data actually begins in (falling back to the prior period, then
+        // plain January), so an April-start fiscal year reads April first
+        // instead of being forced into calendar January-first order.
+        const firstDate = (mainPopulation.rows.map(r => new Date(r[mainColumns.date])).filter(d => !isNaN(d)).sort((a, b) => a - b))[0]
+          || (priorPopulation ? (priorPopulation.rows.map(r => new Date(r[mainColumns.date])).filter(d => !isNaN(d)).sort((a, b) => a - b))[0] : null);
+        const startMonth = firstDate ? firstDate.getMonth() + 1 : 1;
+        const orderedMonths = monthOrderStartingFrom(startMonth).filter(m => monthNumbers.includes(m));
+
+        const currLabel = yearRangeLabel(mainPopulation, mainColumns.date) || 'Current Period';
+        const priorLabel = priorPopulation ? (yearRangeLabel(priorPopulation, mainColumns.date) || 'Prior Period') : 'Prior Period (not uploaded)';
+
+        ws.getCell(cursorRow, 1).value = 'Revenue by Month'; ws.getCell(cursorRow, 1).font = { bold: true, size: 11, color: { argb: NAVY } };
+        cursorRow++;
+        headerRow(ws, ['Month', currLabel, priorLabel], cursorRow);
+        const headerAt = cursorRow;
+        cursorRow++;
+        orderedMonths.forEach(m => {
+          dataRow(ws, [MONTH_NAMES[m - 1], currByMonth[m] || 0, priorByMonth[m] || ''], cursorRow, { band: true, currencyCols: [1, 2] });
+          cursorRow++;
+        });
+        addDataBar(ws, `B${headerAt + 1}:B${cursorRow - 1}`, NAVY);
+        if (priorPopulation) addDataBar(ws, `C${headerAt + 1}:C${cursorRow - 1}`, NAVY_LIGHT);
+        ws.autoFilter = { from: { row: headerAt, column: 1 }, to: { row: cursorRow - 1, column: 3 } };
+        cursorRow += 2;
+      }
+
+      const topCustomers = groupByCustomer(mainPopulation, mainColumns.customer, mainColumns.amount, 10);
+      if (topCustomers.length) {
+        ws.getCell(cursorRow, 1).value = 'Top 10 Customers by Revenue (Current Period)'; ws.getCell(cursorRow, 1).font = { bold: true, size: 11, color: { argb: NAVY } };
+        cursorRow++;
+        headerRow(ws, ['Customer', 'Revenue', '% of Total'], cursorRow);
+        const headerAt2 = cursorRow;
+        cursorRow++;
+        const total = Object.values(currByMonth).reduce((s, v) => s + v, 0);
+        topCustomers.forEach(([name, amt]) => {
+          dataRow(ws, [name, amt, total ? amt / total : 0], cursorRow, { band: true, currencyCols: [1], pctCols: [2] });
+          cursorRow++;
+        });
+        addDataBar(ws, `B${headerAt2 + 1}:B${cursorRow - 1}`, NAVY_LIGHT);
+      }
+    } else {
+      ws.getCell(cursorRow, 1).value = 'Upload a sales register on the Upload tab to populate this analysis.';
+    }
+  }
+
+  // --- Cover ---
+  {
+    const ws = wb.addWorksheet('Cover');
+    ws.getColumn(1).width = 44; ws.getColumn(2).width = 30;
+    ws.mergeCells('A1:B1');
+    const t = ws.getCell('A1'); t.value = d.client; t.font = { bold: true, size: 22, color: { argb: NAVY } };
+    ws.mergeCells('A2:B2');
+    const st = ws.getCell('A2'); st.value = 'Revenue Audit \u2014 Summary Working Paper'; st.font = { size: 13, color: { argb: 'FF444444' } };
+    ws.getCell('A3').value = 'CONFIDENTIAL \u2014 AUDIT WORKING PAPER';
+    ws.getCell('A3').font = { bold: true, size: 9, color: { argb: NAVY_LIGHT } };
+    const rows = [
+      ['Period', d.period], ['Generated', d.generatedAt.toISOString()],
+      ['Prepared by', d.preparer || ''], ['Reviewed by', d.reviewer || ''],
+    ];
+    rows.forEach((r, i) => {
+      const rowNum = 5 + i;
+      ws.getCell(rowNum, 1).value = r[0]; ws.getCell(rowNum, 1).font = { bold: true, color: { argb: 'FF595959' } };
+      ws.getCell(rowNum, 2).value = r[1];
+    });
+    ws.getCell(10, 1).value = 'Generated entirely client-side by the Revenue Audit Toolkit Web Edition. Decision support only \u2014 all conclusions remain a matter of auditor judgment.';
+    ws.getCell(10, 1).font = { italic: true, size: 8, color: { argb: 'FF888888' } };
+    ws.mergeCells('A10:B10');
+    ws.getCell(10, 1).alignment = { wrapText: true };
+  }
+
+  // --- Engagement Scope ---
+  {
+    const ws = wb.addWorksheet('Engagement Scope');
+    ws.columns = [{ width: 24 }, { width: 44 }];
+    titleCell(ws, 'Engagement Scope & Data', 1, 2);
+    headerRow(ws, ['Item', 'Value'], 2);
+    const rows = [
+      ['Current-period rows', d.engagementScope.currentRows],
+      ['Current-period total', d.engagementScope.currentTotal],
+      ['Prior-period rows', d.engagementScope.priorRows || 'n/a (no prior-period file uploaded)'],
+      ['Prior-period total', d.engagementScope.priorRows ? d.engagementScope.priorTotal : ''],
+      ['Home country', d.engagementScope.homeCountry || '(not set)'],
+      ['ID column', d.engagementScope.mapping.id || ''],
+      ['Date column', d.engagementScope.mapping.date || ''],
+      ['Amount column', d.engagementScope.mapping.amount || ''],
+      ['Customer column', d.engagementScope.mapping.customer || ''],
+      ['Country column', d.engagementScope.mapping.country || ''],
+    ];
+    rows.forEach((r, i) => dataRow(ws, r, 3 + i, { band: true, currencyCols: [1] }));
+    ws.autoFilter = { from: { row: 2, column: 1 }, to: { row: 2 + rows.length, column: 2 } };
+    ws.views = [{ state: 'frozen', ySplit: 2 }];
+  }
+
+  // --- Materiality ---
+  {
+    const ws = wb.addWorksheet('Materiality');
+    ws.columns = [{ width: 28 }, { width: 18 }, { width: 18 }];
+    titleCell(ws, 'Materiality', 1, 3);
+    if (d.materiality) {
+      const m = d.materiality;
+      headerRow(ws, ['Measure', 'Basis', 'Amount'], 2);
+      const rows = [
+        [`Benchmark: ${m.benchmarkLabel}`, '', m.amount],
+        ['Overall Materiality', `${m.pct}%`, m.om],
+        ['Performance Materiality', 'of OM', m.pm],
+        ['Clearly Trivial Threshold', `${m.ctPct}% of OM`, m.ct],
+      ];
+      rows.forEach((r, i) => dataRow(ws, r, 3 + i, { band: true, currencyCols: [2] }));
+      let r = 3 + rows.length + 1;
+      ws.getCell(r, 1).value = 'Standard'; ws.getCell(r, 1).font = { bold: true };
+      ws.getCell(r, 2).value = m.standard;
+      r += 2;
+      if (m.warnings.length) {
+        ws.getCell(r, 1).value = 'Warnings'; ws.getCell(r, 1).font = { bold: true, color: { argb: AMBER } };
+        m.warnings.forEach((w, i) => {
+          ws.getCell(r + 1 + i, 1).value = '\u26A0 ' + w;
+          ws.mergeCells(r + 1 + i, 1, r + 1 + i, 3);
+          ws.getCell(r + 1 + i, 1).font = { color: { argb: AMBER } };
+          ws.getCell(r + 1 + i, 1).alignment = { wrapText: true };
+        });
+      }
+      ws.views = [{ state: 'frozen', ySplit: 2 }];
+    } else {
+      ws.getCell(2, 1).value = 'Not calculated in this session.';
+    }
+  }
+
+  // --- Analytical Review ---
+  {
+    const ws = wb.addWorksheet('Analytical Review');
+    ws.columns = [{ width: 26 }, { width: 14 }, { width: 90 }];
+    titleCell(ws, 'Analytical Review', 1, 3);
+    if (d.analytical && d.analytical.length) {
+      headerRow(ws, ['Procedure', 'Severity', 'Description'], 2);
+      const sorted = [...d.analytical].sort((a, b) => severityRank(b.severity) - severityRank(a.severity));
+      sorted.forEach((f, i) => dataRow(ws, [f.procedure, f.severity, f.description], 3 + i, { band: true, sevCol: 1 }));
+      ws.autoFilter = { from: { row: 2, column: 1 }, to: { row: 2 + sorted.length, column: 3 } };
+      ws.views = [{ state: 'frozen', ySplit: 2 }];
+    } else {
+      ws.getCell(2, 1).value = 'Not run, or no findings, in this session.';
+    }
+  }
+
+  // --- Sampling ---
+  {
+    const ws = wb.addWorksheet('Sampling');
+    ws.columns = [{ width: 20 }, { width: 16 }, { width: 12 }, { width: 80 }];
+    titleCell(ws, 'Sampling', 1, 4);
+    if (d.sample) {
+      ws.mergeCells(2, 1, 2, 4);
+      ws.getCell(2, 1).value = d.sample.rationale;
+      ws.getCell(2, 1).font = { italic: true, size: 9, color: { argb: 'FF444444' } };
+      ws.getCell(2, 1).alignment = { wrapText: true };
+      const summary = [
+        ['Population size', d.sample.popSize], ['Population value', d.sample.popValue],
+        ['Sample size drawn', d.sample.selected.length], ['Key items', d.sample.selected.filter(s => s.__key).length],
+      ];
+      summary.forEach((r, i) => { ws.getCell(4 + i, 1).value = r[0]; ws.getCell(4 + i, 1).font = { bold: true }; ws.getCell(4 + i, 2).value = r[1]; });
+      const headerAt = 9;
+      headerRow(ws, [d.sample.idCol, d.sample.valueCol, 'Key item?', 'Reason'], headerAt);
+      d.sample.selected.forEach((s, i) => {
+        const row = headerAt + 1 + i;
+        dataRow(ws, [s[d.sample.idCol], s.__value, s.__key ? 'Yes' : 'No', s.__reason], row, { band: true, currencyCols: [1] });
+        if (s.__key) { ws.getCell(row, 3).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFF2CC' } }; ws.getCell(row, 3).font = { bold: true, color: { argb: AMBER } }; }
+      });
+      if (d.sample.selected.length) addDataBar(ws, `B${headerAt + 1}:B${headerAt + d.sample.selected.length}`, NAVY);
+      ws.autoFilter = { from: { row: headerAt, column: 1 }, to: { row: headerAt + d.sample.selected.length, column: 4 } };
+      ws.views = [{ state: 'frozen', ySplit: headerAt }];
+    } else {
+      ws.getCell(2, 1).value = 'Not run in this session.';
+    }
+  }
+
+  // --- Risk Scoring ---
+  {
+    const ws = wb.addWorksheet('Risk Scoring');
+    ws.columns = [{ width: 18 }, { width: 10 }, { width: 10 }, { width: 14 }, { width: 80 }];
+    titleCell(ws, 'Risk Scoring (last transaction scored)', 1, 5);
+    if (d.risk) {
+      ws.getCell(2, 1).value = 'Overall score'; ws.getCell(2, 1).font = { bold: true };
+      ws.getCell(2, 2).value = d.risk.overall / 100; ws.getCell(2, 2).numFmt = '0.0%';
+      ws.getCell(2, 3).value = 'Risk level'; ws.getCell(2, 3).font = { bold: true };
+      const lvlColor = SEV_COLORS[d.risk.level] || SEV_COLORS.Low;
+      ws.getCell(2, 4).value = d.risk.level;
+      ws.getCell(2, 4).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: lvlColor.fg } };
+      ws.getCell(2, 4).font = { bold: true, color: { argb: lvlColor.font } };
+      headerRow(ws, ['Factor', 'Score', 'Weight', 'Contribution', 'Rationale'], 4);
+      d.risk.factors.forEach((f, i) => dataRow(ws, [f.name, f.score, f.weight, f.contribution, f.rationale], 5 + i, { band: true, pctCols: [2] }));
+      addDataBar(ws, `D5:D${4 + d.risk.factors.length}`, NAVY);
+      ws.autoFilter = { from: { row: 4, column: 1 }, to: { row: 4 + d.risk.factors.length, column: 5 } };
+      ws.views = [{ state: 'frozen', ySplit: 4 }];
+    } else {
+      ws.getCell(2, 1).value = 'Not run in this session.';
+    }
+  }
+
+  // --- Walkthrough ---
+  {
+    const ws = wb.addWorksheet('Walkthrough');
+    ws.columns = [{ width: 16 }, { width: 14 }, { width: 18 }, { width: 16 }, { width: 80 }];
+    titleCell(ws, 'Walkthrough Planning', 1, 5);
+    if (d.walkthrough) {
+      ws.mergeCells(2, 1, 2, 5);
+      ws.getCell(2, 1).value = d.walkthrough.basisNote;
+      ws.getCell(2, 1).font = { italic: true, size: 9 }; ws.getCell(2, 1).alignment = { wrapText: true };
+      headerRow(ws, ['Category', 'Items requiring walkthrough', 'Recommended item', 'Recommended amount', 'Why'], 4);
+      d.walkthrough.categorySummaries.forEach((c, i) => dataRow(ws, [
+        c.title, c.count, c.representative ? c.representative.id : '', c.representative ? c.representative.amount : '',
+        c.representative ? c.representative.reason : 'No matching transactions.',
+      ], 5 + i, { band: true, currencyCols: [3] }));
+      ws.autoFilter = { from: { row: 4, column: 1 }, to: { row: 4 + d.walkthrough.categorySummaries.length, column: 5 } };
+      ws.views = [{ state: 'frozen', ySplit: 4 }];
+    } else {
+      ws.getCell(2, 1).value = 'Not run in this session.';
+    }
+  }
+
+  // --- Unpredictability ---
+  {
+    const ws = wb.addWorksheet('Unpredictability');
+    ws.columns = [{ width: 22 }, { width: 10 }, { width: 10 }, { width: 14 }, { width: 80 }];
+    titleCell(ws, 'ISA 240 Unpredictability Procedures', 1, 5);
+    if (d.unpredictability) {
+      headerRow(ws, ['Procedure', '# Flagged', '% of Pop.', 'Severity', 'Note'], 2);
+      d.unpredictability.forEach((r, i) => dataRow(ws, [
+        r.procedure, r.count === null ? 'not tested' : r.count, r.pct === null ? '' : r.pct / 100, r.severity, r.note,
+      ], 3 + i, { band: true, pctCols: [2], sevCol: 3 }));
+      addDataBar(ws, `C3:C${2 + d.unpredictability.length}`, NAVY_LIGHT);
+      ws.autoFilter = { from: { row: 2, column: 1 }, to: { row: 2 + d.unpredictability.length, column: 5 } };
+      ws.views = [{ state: 'frozen', ySplit: 2 }];
+    } else {
+      ws.getCell(2, 1).value = 'Not run in this session.';
+    }
+  }
+
+  // --- Findings ---
+  {
+    const ws = wb.addWorksheet('Findings');
+    ws.columns = [{ width: 14 }, { width: 12 }, { width: 30 }, { width: 44 }, { width: 16 }, { width: 60 }];
+    titleCell(ws, 'Findings Tracker', 1, 6);
+    if (d.findings.length) {
+      headerRow(ws, ['Status', 'Severity', 'Title', 'Description', 'Misstated Amount', 'History'], 2);
+      d.findings.forEach((f, i) => dataRow(ws, [
+        f.status, f.severity, f.title, f.description || '',
+        f.misstatedAmount != null ? f.misstatedAmount : '',
+        f.history.map(h => `${h.to} by ${h.role}${h.reason ? ` (${h.reason})` : ''}`).join(' -> '),
+      ], 3 + i, { band: true, currencyCols: [4], statusCol: 0, sevCol: 1 }));
+      ws.autoFilter = { from: { row: 2, column: 1 }, to: { row: 2 + d.findings.length, column: 6 } };
+      ws.views = [{ state: 'frozen', ySplit: 2 }];
+    } else {
+      ws.getCell(2, 1).value = 'No findings recorded.';
+    }
+  }
+
+  // --- Conclusion ---
+  {
+    const ws = wb.addWorksheet('Conclusion');
+    ws.columns = [{ width: 34 }, { width: 30 }];
+    titleCell(ws, 'Conclusion', 1, 2);
+    const openCount = d.statusCounts.Open + d.statusCounts['In Progress'];
+    const rows = [
+      ['Total findings', d.findings.length], ['Open', d.statusCounts.Open], ['In Progress', d.statusCounts['In Progress']],
+      ['Resolved', d.statusCounts.Resolved], ['Closed', d.statusCounts.Closed],
+      ['Aggregate open misstatement', d.openMisstatement],
+      d.materiality ? ['As % of Performance Materiality', d.openMisstatement / d.materiality.pm] : ['As % of Performance Materiality', 'n/a'],
+    ];
+    rows.forEach((r, i) => dataRow(ws, r, 2 + i, { band: true, currencyCols: [1] }));
+    // The last row (% of Performance Materiality) needs a percentage format,
+    // not the currency format just applied to column 2 for every other row
+    // above -- overwritten explicitly here since it's the one exception.
+    if (d.materiality) { ws.getCell(2 + rows.length - 1, 2).numFmt = '0.0%'; }
+    const bannerRow = 2 + rows.length + 1;
+    ws.mergeCells(bannerRow, 1, bannerRow, 2);
+    const banner = ws.getCell(bannerRow, 1);
+    banner.value = openCount > 0 ? `${openCount} finding(s) remain open and should be resolved before this working paper is finalized.` : 'No open findings remain outstanding.';
+    banner.font = { bold: true, color: { argb: openCount > 0 ? RED : GREEN } };
+    banner.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: openCount > 0 ? RED_BG : GREEN_BG } };
+    banner.alignment = { wrapText: true, vertical: 'middle' };
+    ws.getRow(bannerRow).height = 30;
+  }
+
+  // --- Sign-off ---
+  {
+    const ws = wb.addWorksheet('Sign-off');
+    ws.columns = [{ width: 22 }, { width: 22 }, { width: 22 }, { width: 14 }];
+    titleCell(ws, 'Review Sign-off', 1, 4);
+    headerRow(ws, ['Role', 'Name', 'Signature', 'Date'], 2);
+    const rows = [
+      ['Preparer', d.preparer || '', '', ''], ['Reviewer', d.reviewer || '', '', ''], ['Partner / Approver', '', '', ''],
+    ];
+    rows.forEach((r, i) => dataRow(ws, r, 3 + i, { band: true }));
+  }
+
+  const buffer = await wb.xlsx.writeBuffer();
+  downloadBlob(`${d.client.replace(/[^a-z0-9]+/gi,'_')}_revenue_audit_working_paper.xlsx`,
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', buffer);
+  out.innerHTML = '<div class="info-box">Excel working paper downloaded — 13 tabs including a Dashboard (KPI scorecards + Materiality/Findings data-bar visuals) and a Pivot Summary (Revenue by Month, Top 10 Customers). Real navy/gray/severity-colored formatting, native Excel data bars, currency/percentage number formats, autofilters, and frozen header rows throughout.</div>';
+}
+
+// ---------------------------------------------------------------
+// Styled, printable HTML working paper (open in browser, or File > Print
+// > Save as PDF for a finished PDF — no server-side PDF library needed)
+// ---------------------------------------------------------------
+// ---------------------------------------------------------------
+// Styled, printable HTML working paper — a proper dashboard (KPI cards,
+// inline SVG charts, color-coded severity/status throughout, a Kanban-
+// style findings board) rather than a stack of plain tables. Open in
+// browser, or File > Print > Save as PDF for a finished PDF — no
+// server-side PDF library needed.
+// ---------------------------------------------------------------
+
+// A small inline-SVG horizontal bar chart, used for the prior/current
+// comparison and the risk-factor breakdown. No chart library needed —
+// just computed <rect> elements — which also means it survives being
+// printed to PDF perfectly (unlike a canvas-based chart).
+function svgBarChart(items, opts) {
+  opts = opts || {};
+  const width = 560, barHeight = 26, gap = 10, labelWidth = 170, leftPad = labelWidth + 10;
+  const maxVal = Math.max(...items.map(i => Math.abs(i.value)), 1);
+  const chartWidth = width - leftPad - 60;
+  const height = items.length * (barHeight + gap) + gap;
+  let svg = `<svg viewBox="0 0 ${width} ${height}" width="100%" style="max-width:${width}px" xmlns="http://www.w3.org/2000/svg" font-family="Arial, Helvetica, sans-serif">`;
+  items.forEach((it, i) => {
+    const y = gap + i * (barHeight + gap);
+    const barLen = Math.max(2, Math.abs(it.value) / maxVal * chartWidth);
+    const color = it.color || '#1F3864';
+    svg += `<text x="${labelWidth}" y="${y + barHeight / 2 + 4}" text-anchor="end" font-size="11" fill="#333">${escSvg(it.label)}</text>`;
+    svg += `<rect x="${leftPad}" y="${y}" width="${barLen}" height="${barHeight}" fill="${color}" rx="3"></rect>`;
+    svg += `<text x="${leftPad + barLen + 6}" y="${y + barHeight / 2 + 4}" font-size="11" fill="#333">${escSvg(it.display != null ? it.display : it.value)}</text>`;
+  });
+  svg += `</svg>`;
+  return svg;
+}
+function escSvg(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+
+function exportWorkingPaperHtml() {
+  const d = buildWorkingPaperData();
+
+  function table(headers, rows) {
+    let t = '<table><tr>' + headers.map(h => `<th>${esc(h)}</th>`).join('') + '</tr>';
+    rows.forEach(row => { t += '<tr>' + row.map(c => `<td>${c}</td>`).join('') + '</tr>'; });
+    return t + '</table>';
+  }
+  function sevBadge(sev) { return `<span class="wp-pill wp-pill-${sev.toLowerCase()}">${esc(sev)}</span>`; }
+  function statusBadge(status) {
+    const cls = { Open: 'open', 'In Progress': 'progress', Resolved: 'resolved', Closed: 'closed' }[status] || 'open';
+    return `<span class="wp-pill wp-pill-status-${cls}">${esc(status)}</span>`;
+  }
+  function kpiCard(label, value, tone) {
+    return `<div class="wp-kpi wp-kpi-${tone || 'neutral'}"><div class="wp-kpi-value">${value}</div><div class="wp-kpi-label">${esc(label)}</div></div>`;
+  }
+
+  // ---- Overall risk banner tone for the dashboard ----
+  const openCount = d.statusCounts.Open + d.statusCounts['In Progress'];
+  const overallTone = openCount === 0 ? 'good' : (d.findings.some(f => (f.severity === 'High' || f.severity === 'Critical') && f.status !== 'Closed') ? 'bad' : 'warn');
+
+  // =================== DASHBOARD (front page) ===================
+  let dashboard = `<div class="wp-banner">
+    <div class="wp-banner-tag">CONFIDENTIAL — AUDIT WORKING PAPER</div>
+    <h1>${esc(d.client)}</h1>
+    <h2>Revenue Audit — Summary Working Paper</h2>
+    <p class="wp-meta">Period: ${esc(d.period)} &nbsp;|&nbsp; Generated: ${esc(d.generatedAt.toISOString())} &nbsp;|&nbsp;
+    Prepared by: ${esc(d.preparer || '—')} &nbsp;|&nbsp; Reviewed by: ${esc(d.reviewer || '—')}</p>
+  </div>`;
+
+  dashboard += `<nav class="wp-toc"><strong>Contents:</strong> ${
+    ['Engagement Scope', 'Materiality', 'Analytical Review', 'Sampling', 'Risk Scoring', 'Walkthrough',
+     'Unpredictability', 'Findings', 'Conclusion', 'Sign-off'].map((s, i) =>
+      `<a href="#s${i+1}">${i+1}. ${s}</a>`).join(' &nbsp;·&nbsp; ')
+  }</nav>`;
+
+  dashboard += `<div class="wp-kpi-grid">`;
+  dashboard += kpiCard('Current-period revenue', fmt(d.engagementScope.currentTotal), 'neutral');
+  if (d.engagementScope.priorRows) {
+    const growthPct = d.engagementScope.priorTotal ? ((d.engagementScope.currentTotal - d.engagementScope.priorTotal) / Math.abs(d.engagementScope.priorTotal) * 100) : null;
+    dashboard += kpiCard('YoY growth', growthPct === null ? 'n/a' : `${growthPct >= 0 ? '+' : ''}${growthPct.toFixed(1)}%`, growthPct !== null && Math.abs(growthPct) >= 15 ? 'warn' : 'neutral');
+  }
+  if (d.materiality) dashboard += kpiCard('Performance Materiality', fmt(d.materiality.pm), 'neutral');
+  if (d.risk) dashboard += kpiCard('Last transaction risk score', `${d.risk.overall.toFixed(0)}/100`, d.risk.level === 'High' ? 'bad' : (d.risk.level === 'Medium' ? 'warn' : 'good'));
+  dashboard += kpiCard('Total findings', d.findings.length, d.findings.length === 0 ? 'good' : 'neutral');
+  dashboard += kpiCard('Open findings', openCount, openCount === 0 ? 'good' : 'bad');
+  if (d.openMisstatement > 0) dashboard += kpiCard('Open misstatement', fmt(d.openMisstatement), 'warn');
+  if (d.walkthrough) dashboard += kpiCard('Items requiring walkthrough', d.walkthrough.elevatedCount, 'neutral');
+  dashboard += `</div>`;
+
+  dashboard += `<div class="wp-conclusion-banner wp-conclusion-${overallTone}">
+    ${overallTone === 'good' ? '&#9989; No open findings outstanding.' :
+      overallTone === 'bad' ? `&#128721; ${openCount} open finding(s), including High/Critical severity items — review before sign-off.` :
+      `&#9888;&#65039; ${openCount} open finding(s) remain — review before sign-off.`}
+  </div>`;
+
+  // =================== Section bodies ===================
+  let body = dashboard;
+
+  body += `<h3 id="s1">1. Engagement Scope &amp; Data</h3>` + table(['Item', 'Value'], [
+    ['Current-period rows', fmtInt(d.engagementScope.currentRows)],
+    ['Current-period total', fmt(d.engagementScope.currentTotal)],
+    d.engagementScope.priorRows
+      ? ['Prior-period rows / total', `${fmtInt(d.engagementScope.priorRows)} / ${fmt(d.engagementScope.priorTotal)}`]
+      : ['Prior-period file', 'Not uploaded — fallback median-date split was used'],
+    ['Home country', esc(d.engagementScope.homeCountry || '(not set)')],
+  ]);
+
+  body += `<h3 id="s2">2. Materiality</h3>`;
+  if (d.materiality) {
+    const m = d.materiality;
+    body += table(['Measure', 'Basis', 'Amount'], [
+      [`Benchmark: ${esc(m.benchmarkLabel)}`, '—', fmt(m.amount)],
+      ['Overall Materiality', `${m.pct}%`, fmt(m.om)],
+      ['Performance Materiality', 'of OM', fmt(m.pm)],
+      ['Clearly Trivial Threshold', `${m.ctPct}% of OM`, fmt(m.ct)],
+    ]);
+    body += svgBarChart([
+      { label: 'Overall Materiality', value: m.om, display: fmt(m.om), color: '#1F3864' },
+      { label: 'Performance Materiality', value: m.pm, display: fmt(m.pm), color: '#2E5395' },
+      { label: 'Clearly Trivial', value: m.ct, display: fmt(m.ct), color: '#8FA5C7' },
+    ]);
+    body += `<p class="wp-note">Standard: ${esc(m.standard)}</p>`;
+    m.warnings.forEach(w => { body += `<div class="wp-warning">${esc(w)}</div>`; });
+  } else body += `<p class="wp-note">Not calculated in this session.</p>`;
+
+  body += `<h3 id="s3">3. Analytical Review</h3>`;
+  if (d.engagementScope.priorRows) {
+    body += svgBarChart([
+      { label: 'Prior period', value: d.engagementScope.priorTotal, display: fmt(d.engagementScope.priorTotal), color: '#8FA5C7' },
+      { label: 'Current period', value: d.engagementScope.currentTotal, display: fmt(d.engagementScope.currentTotal), color: '#1F3864' },
+    ]);
+  }
+  if (d.analytical && d.analytical.length) {
+    body += table(['Procedure', 'Severity', 'Description'],
+      [...d.analytical].sort((a, b) => severityRank(b.severity) - severityRank(a.severity))
+        .map(f => [esc(f.procedure), sevBadge(f.severity), esc(f.description)]));
+  } else body += `<p class="wp-note">Not run, or no findings, in this session.</p>`;
+
+  body += `<h3 id="s4">4. Sampling</h3>`;
+  if (d.sample) {
+    body += `<p class="wp-note">${esc(d.sample.rationale)}</p>`;
+    body += `<div class="wp-kpi-grid wp-kpi-grid-small">
+      ${kpiCard('Population', `${fmtInt(d.sample.popSize)} items`, 'neutral')}
+      ${kpiCard('Population value', fmt(d.sample.popValue), 'neutral')}
+      ${kpiCard('Sample drawn', fmtInt(d.sample.selected.length), 'neutral')}
+      ${kpiCard('Key items', fmtInt(d.sample.selected.filter(s=>s.__key).length), 'neutral')}
+    </div>`;
+  } else body += `<p class="wp-note">Not run in this session.</p>`;
+
+  body += `<h3 id="s5">5. Risk Scoring (last transaction scored)</h3>`;
+  if (d.risk) {
+    body += `<p class="wp-note">Overall score: <strong>${d.risk.overall.toFixed(1)}/100</strong> &rarr; ${sevBadge(d.risk.level === 'High' ? 'High' : d.risk.level === 'Medium' ? 'Medium' : 'Low')}</p>`;
+    body += svgBarChart([...d.risk.factors].sort((a,b) => b.contribution - a.contribution).map(f => ({
+      label: f.name, value: f.contribution, display: f.contribution.toFixed(1),
+      color: f.contribution >= 10 ? '#C00000' : (f.contribution >= 5 ? '#BF8F00' : '#8FA5C7'),
+    })));
+    body += table(['Factor', 'Score', 'Weight', 'Contribution', 'Rationale'],
+      d.risk.factors.map(f => [f.name, f.score.toFixed(0), `${(f.weight*100).toFixed(0)}%`, f.contribution.toFixed(1), esc(f.rationale)]));
+  } else body += `<p class="wp-note">Not run in this session.</p>`;
+
+  body += `<h3 id="s6">6. Walkthrough Planning</h3>`;
+  if (d.walkthrough) {
+    body += `<p class="wp-note">${esc(d.walkthrough.basisNote)} ${fmtInt(d.walkthrough.totalClassified)} transaction(s) classified; ${fmtInt(d.walkthrough.elevatedCount)} require a walkthrough for Large Sale, New Customer, or Foreign Customer.</p>`;
+    body += `<div class="wp-category-grid">` + d.walkthrough.categorySummaries.map(c => `
+      <div class="wp-category-card ${c.count > 0 ? 'wp-category-active' : ''}">
+        <div class="wp-category-count">${c.count}</div>
+        <div class="wp-category-title">${esc(c.title)}</div>
+        ${c.representative ? `<div class="wp-category-rep">${esc(c.representative.id)} (${fmt(c.representative.amount)})</div><div class="wp-note">${esc(c.representative.reason)}</div>` : '<div class="wp-note">No matching transactions.</div>'}
+      </div>`).join('') + `</div>`;
+  } else body += `<p class="wp-note">Not run in this session.</p>`;
+
+  body += `<h3 id="s7">7. ISA 240 Unpredictability Procedures</h3>`;
+  if (d.unpredictability) {
+    body += table(['Procedure', '# Flagged', '% of Pop.', 'Severity', 'Note'],
+      d.unpredictability.map(r => [r.procedure, r.count === null ? 'not tested' : fmtInt(r.count), r.pct === null ? '—' : r.pct.toFixed(1) + '%', sevBadge(r.severity), esc(r.note)]));
+  } else body += `<p class="wp-note">Not run in this session.</p>`;
+
+  body += `<h3 id="s8">8. Findings Tracker</h3>`;
+  if (d.findings.length) {
+    const columns = ['Open', 'In Progress', 'Resolved', 'Closed'];
+    body += `<div class="wp-kanban">` + columns.map(col => {
+      const items = d.findings.filter(f => f.status === col);
+      return `<div class="wp-kanban-col">
+        <div class="wp-kanban-header wp-kanban-header-${col.toLowerCase().replace(' ', '')}">${col} (${items.length})</div>
+        ${items.map(f => `<div class="wp-kanban-card">
+          <div class="wp-kanban-card-title">${esc(f.title)}</div>
+          ${sevBadge(f.severity)}
+          ${f.misstatedAmount != null ? `<div class="wp-note">${fmt(f.misstatedAmount)}</div>` : ''}
+        </div>`).join('') || '<div class="wp-note">—</div>'}
+      </div>`;
+    }).join('') + `</div>`;
+    body += table(['Status', 'Severity', 'Title', 'Misstated Amount'],
+      d.findings.map(f => [statusBadge(f.status), sevBadge(f.severity), esc(f.title), f.misstatedAmount != null ? fmt(f.misstatedAmount) : '—']));
+  } else body += `<p class="wp-note">No findings recorded.</p>`;
+
+  body += `<h3 id="s9">9. Conclusion</h3>`;
+  body += `<p class="wp-note">${d.findings.length} finding(s) recorded: ${d.statusCounts.Open} Open, ${d.statusCounts['In Progress']} In Progress, ${d.statusCounts.Resolved} Resolved, ${d.statusCounts.Closed} Closed.</p>`;
+  if (d.openMisstatement > 0) body += `<p class="wp-note">Aggregate uncorrected/open misstatement: ${fmt(d.openMisstatement)}${d.materiality ? ` (${(d.openMisstatement / d.materiality.pm * 100).toFixed(1)}% of Performance Materiality)` : ''}.</p>`;
+  body += `<div class="wp-conclusion-banner wp-conclusion-${overallTone}">
+    ${openCount > 0 ? `${openCount} finding(s) remain open and should be resolved before this working paper is finalized.` : 'No open findings remain outstanding.'}
+  </div>`;
+
+  body += `<h3 id="s10">10. Review Sign-off</h3>` + table(['Role', 'Name', 'Signature', 'Date'], [
+    ['Preparer', esc(d.preparer || ''), '________________', '________'],
+    ['Reviewer', esc(d.reviewer || ''), '________________', '________'],
+    ['Partner / Approver', '', '________________', '________'],
+  ]);
+
+  const fullHtml = buildWorkingPaperHtmlDocument(d.client, body);
+  downloadBlob(`${d.client.replace(/[^a-z0-9]+/gi,'_')}_revenue_audit_working_paper.html`, 'text/html', fullHtml);
+  document.getElementById('export-results').innerHTML = '<div class="info-box">HTML working paper downloaded (dashboard, charts, Kanban findings board). Open it and use File &gt; Print &gt; Save as PDF for a PDF copy.</div>';
+}
+
+function buildWorkingPaperHtmlDocument(clientName, body) {
+  return `<!DOCTYPE html><html><head><meta charset="UTF-8">
+<title>${esc(clientName)} — Revenue Audit Working Paper</title>
+<style>
+  :root { --navy: #1F3864; --navy-light: #2E5395; --gray: #F2F2F2; --border: #BFBFBF; --red: #C00000; --amber: #BF8F00; --green: #375623; }
+  body { font-family: Arial, Helvetica, sans-serif; color: #1a1a1a; max-width: 980px; margin: 0 auto; padding: 0 20px 40px; }
+  .wp-banner { background: linear-gradient(135deg, var(--navy) 0%, var(--navy-light) 100%); color: white; margin: 0 -20px 20px; padding: 28px 30px 22px; border-radius: 0 0 10px 10px; }
+  .wp-banner-tag { font-size: 0.68rem; letter-spacing: 1.5px; color: #cdd7ea; font-weight: bold; margin-bottom: 6px; }
+  .wp-banner h1 { margin: 0 0 2px; font-size: 1.8rem; }
+  .wp-banner h2 { margin: 0; font-weight: normal; color: #dbe3f0; font-size: 1.1rem; }
+  .wp-meta { color: #cdd7ea; font-size: 0.82rem; margin-top: 10px; }
+  .wp-toc { background: var(--gray); border-radius: 6px; padding: 10px 14px; font-size: 0.8rem; margin-bottom: 20px; }
+  .wp-toc a { color: var(--navy); text-decoration: none; font-weight: bold; }
+  .wp-toc a:hover { text-decoration: underline; }
+  .wp-kpi-grid { display: flex; flex-wrap: wrap; margin: 0 -5px 16px; }
+  .wp-kpi-grid-small { margin: 10px -5px 0; }
+  .wp-kpi { flex: 1 1 21%; box-sizing: border-box; margin: 5px; min-width: 130px; border-radius: 8px; padding: 12px 10px; text-align: center; border: 1px solid var(--border); }
+  .wp-kpi-value { font-size: 1.3rem; font-weight: bold; color: var(--navy); }
+  .wp-kpi-label { font-size: 0.7rem; color: #666; margin-top: 2px; }
+  .wp-kpi-neutral { background: var(--gray); }
+  .wp-kpi-good { background: #e6f0e6; } .wp-kpi-good .wp-kpi-value { color: var(--green); }
+  .wp-kpi-warn { background: #fbf1d6; } .wp-kpi-warn .wp-kpi-value { color: var(--amber); }
+  .wp-kpi-bad { background: #fbe0e0; } .wp-kpi-bad .wp-kpi-value { color: var(--red); }
+  .wp-conclusion-banner { padding: 12px 16px; border-radius: 8px; font-weight: bold; margin: 12px 0 20px; }
+  .wp-conclusion-good { background: #e6f0e6; color: var(--green); border: 1px solid var(--green); }
+  .wp-conclusion-warn { background: #fbf1d6; color: var(--amber); border: 1px solid var(--amber); }
+  .wp-conclusion-bad { background: #fbe0e0; color: var(--red); border: 1px solid var(--red); }
+  h3 { color: var(--navy); border-bottom: 2px solid var(--navy); padding-bottom: 4px; margin-top: 32px; scroll-margin-top: 12px; }
+  table { width: 100%; border-collapse: collapse; margin: 10px 0; font-size: 0.85rem; }
+  th, td { border: 1px solid var(--border); padding: 6px 8px; text-align: left; }
+  th { background: var(--navy); color: white; }
+  tr:nth-child(even) td { background: var(--gray); }
+  .wp-note { font-size: 0.85rem; color: #444; }
+  .wp-warning { background: #fbf1d6; border: 1px solid var(--amber); color: #6b5200; padding: 8px 10px; border-radius: 4px; font-size: 0.85rem; margin: 8px 0; }
+  .wp-pill { display: inline-block; padding: 2px 10px; border-radius: 10px; font-size: 0.72rem; font-weight: bold; }
+  .wp-pill-high, .wp-pill-critical { background: #fbe0e0; color: var(--red); }
+  .wp-pill-medium { background: #fbf1d6; color: var(--amber); }
+  .wp-pill-low { background: #e6f0e6; color: var(--green); }
+  .wp-pill-status-open { background: #fbe0e0; color: var(--red); }
+  .wp-pill-status-progress { background: #fbf1d6; color: var(--amber); }
+  .wp-pill-status-resolved { background: #dcebff; color: #14509e; }
+  .wp-pill-status-closed { background: #e6f0e6; color: var(--green); }
+  .wp-category-grid { display: flex; flex-wrap: wrap; margin: 12px -5px; }
+  .wp-category-card { flex: 1 1 30%; box-sizing: border-box; margin: 5px; min-width: 200px; border: 1px solid var(--border); border-radius: 8px; padding: 10px; background: var(--gray); }
+  .wp-category-active { border-color: var(--navy); background: #eef2f9; }
+  .wp-category-count { font-size: 1.4rem; font-weight: bold; color: var(--navy); }
+  .wp-category-title { font-weight: bold; font-size: 0.85rem; margin-bottom: 4px; }
+  .wp-category-rep { font-size: 0.78rem; color: #333; font-weight: bold; }
+  .wp-kanban { display: flex; flex-wrap: wrap; margin: 14px -5px; }
+  .wp-kanban-col { flex: 1 1 22%; box-sizing: border-box; margin: 5px; min-width: 180px; background: var(--gray); border-radius: 8px; padding: 8px; }
+  .wp-kanban-header { font-weight: bold; font-size: 0.78rem; padding: 4px 6px; border-radius: 4px; margin-bottom: 8px; color: white; }
+  .wp-kanban-header-open { background: var(--red); }
+  .wp-kanban-header-inprogress { background: var(--amber); }
+  .wp-kanban-header-resolved { background: #14509e; }
+  .wp-kanban-header-closed { background: var(--green); }
+  .wp-kanban-card { background: white; border: 1px solid var(--border); border-radius: 6px; padding: 6px 8px; margin-bottom: 6px; font-size: 0.78rem; }
+  .wp-kanban-card-title { font-weight: bold; margin-bottom: 3px; }
+  footer { margin-top: 30px; border-top: 1px solid var(--border); padding-top: 10px; font-size: 0.75rem; color: #888; }
+  @media print {
+    body { margin: 0; padding: 10px; }
+    .wp-banner { margin: 0 0 16px; border-radius: 6px; }
+    h3 { page-break-after: avoid; }
+    table, .wp-category-grid, .wp-kanban { page-break-inside: avoid; }
+  }
+  @media (max-width: 700px) {
+    .wp-kpi { flex-basis: 45%; }
+    .wp-category-card { flex-basis: 100%; }
+    .wp-kanban-col { flex-basis: 45%; }
+  }
+</style>
+</head><body>
+${body}
+<footer>Generated entirely client-side by the Revenue Audit Toolkit Web Edition. Decision support only — all conclusions remain a matter of auditor judgment. To save as PDF: File &gt; Print &gt; Save as PDF.</footer>
+</body></html>`;
+}
+</script>
+</body>
+</html>
