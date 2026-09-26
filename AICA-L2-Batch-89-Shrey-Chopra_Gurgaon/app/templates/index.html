@@ -1,0 +1,219 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Financial Statement Flux Analyzer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Libre+Baskerville:wght@400;700&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="topbar-inner">
+    <div class="brand">
+      <span class="brand-mark">FX</span>
+      <div class="brand-text">
+        <span class="brand-title">Financial Statement Flux Analyzer</span>
+        <span class="brand-sub">AICA Level 2 Capstone — Batch 89 · Shrey Chopra</span>
+      </div>
+    </div>
+    <div class="topbar-notice">{{ short_notice }}</div>
+  </div>
+</header>
+
+<main class="layout">
+
+  <!-- ===================== LEFT: CONFIG PANEL ===================== -->
+  <aside class="panel config-panel">
+    <h2 class="panel-title">1&nbsp;· Statement</h2>
+    <div class="statement-toggle" id="statementToggle">
+      {% for key, label in statement_types.items() %}
+      <button type="button" class="statement-btn" data-value="{{ key }}">{{ label }}</button>
+      {% endfor %}
+    </div>
+
+    <h2 class="panel-title">2&nbsp;· Periods to compare</h2>
+    <label class="field-label" for="comparisonType">Comparison type</label>
+    <select id="comparisonType" class="input">
+      {% for key, c in comparison_types.items() %}
+      <option value="{{ key }}">{{ c.label }}</option>
+      {% endfor %}
+    </select>
+    <p class="hint" id="comparisonHint"></p>
+
+    <div class="upload-row">
+      <div class="upload-box" id="priorUploadBox">
+        <label class="field-label">Prior period trial balance</label>
+        <input type="file" id="priorFile" accept=".csv,.xlsx,.xls" class="file-input">
+        <p class="upload-filename" id="priorFileName">No file selected</p>
+      </div>
+      <div class="upload-box" id="currentUploadBox">
+        <label class="field-label">Current period trial balance</label>
+        <input type="file" id="currentFile" accept=".csv,.xlsx,.xls" class="file-input">
+        <p class="upload-filename" id="currentFileName">No file selected</p>
+      </div>
+    </div>
+    <p class="hint">Each file: <code>entity, category, line_item, amount</code> — one row per line item, one file per period.</p>
+    <button type="button" class="link-btn" id="useSampleBtn">Use bundled sample data instead</button>
+
+    <h2 class="panel-title">3&nbsp;· Materiality</h2>
+    <label class="field-label" for="thresholdInput">Flag movements greater than (%)</label>
+    <input type="number" id="thresholdInput" class="input" value="10" min="0" step="1">
+    <p class="hint">Lines below $1,000 are never flagged, regardless of %.</p>
+
+    <h2 class="panel-title">4&nbsp;· AI-enhanced commentary <span class="optional-tag">optional</span></h2>
+    <label class="switch-row">
+      <input type="checkbox" id="aiToggle">
+      <span class="switch"></span>
+      <span>Polish draft commentary with AI (senior-manager tone)</span>
+    </label>
+    <div id="aiKeyRow" class="hidden">
+      <input type="password" id="apiKeyInput" class="input" placeholder="OpenAI API key (used only for this session)">
+    </div>
+    <p class="hint">The rule engine always decides which lines are material and what the numbers are. AI, when enabled, only rewrites the sentence — it never changes a number, a flag, or the controller's final decision.</p>
+
+    <button type="button" class="btn-primary" id="runBtn">Run Flux Analysis</button>
+    <p class="error" id="runError"></p>
+  </aside>
+
+  <!-- ===================== RIGHT: RESULTS ===================== -->
+  <section class="panel results-panel" id="resultsPanel">
+    <div class="empty-state" id="emptyState">
+      <div class="empty-icon">📊</div>
+      <h3>No analysis run yet</h3>
+      <p>Choose a statement, upload two periods (or use the sample data), and click <b>Run Flux Analysis</b>.</p>
+    </div>
+
+    <div id="resultsContent" class="hidden">
+
+      <div class="results-header">
+        <div>
+          <h2 id="resultsTitle">Flux Analysis</h2>
+          <p id="resultsSubtitle" class="hint"></p>
+        </div>
+        <div class="badge" id="readinessBadge">DRAFT</div>
+      </div>
+
+      <div id="aiNote" class="ai-note hidden"></div>
+
+      <div class="metrics-row">
+        <div class="metric-tile"><span class="metric-value" id="metricEntities">0</span><span class="metric-label">Entities</span></div>
+        <div class="metric-tile"><span class="metric-value" id="metricLines">0</span><span class="metric-label">Lines Reviewed</span></div>
+        <div class="metric-tile"><span class="metric-value" id="metricMaterial">0</span><span class="metric-label">Flagged Material</span></div>
+        <div class="metric-tile"><span class="metric-value" id="metricApproved">0</span><span class="metric-label">Controller-Approved</span></div>
+      </div>
+
+      <div class="chart-card">
+        <h3>Net Variance by Entity</h3>
+        <div id="entityChart" class="entity-chart"></div>
+      </div>
+
+      <div class="table-card">
+        <div class="table-card-head">
+          <div>
+            <h3>Flagged Lines — Controller Review</h3>
+            <p class="hint">Each line starts as a system-drafted (AI) note in the left commentary column, for reference only. The right column is the Controller's editable final position — only that text ships in a <b>FINAL</b> export, and only lines marked <b>Approved</b> count toward sign-off.</p>
+          </div>
+          <div class="unit-toggle" id="unitToggle" role="group" aria-label="Display units">
+            <button type="button" class="unit-btn active" data-unit="1">Actual</button>
+            <button type="button" class="unit-btn" data-unit="1000">$000s</button>
+            <button type="button" class="unit-btn" data-unit="1000000">$Mn</button>
+          </div>
+        </div>
+
+        <div class="filter-row">
+          <div class="filter-field">
+            <label>Entity</label>
+            <select id="filterEntity" class="input filter-select"><option value="">All entities</option></select>
+          </div>
+          <div class="filter-field">
+            <label>Category</label>
+            <select id="filterCategory" class="input filter-select"><option value="">All categories</option></select>
+          </div>
+          <div class="filter-field">
+            <label>Severity</label>
+            <select id="filterSeverity" class="input filter-select">
+              <option value="">All severities</option>
+              <option value="high">High</option>
+              <option value="elevated">Elevated</option>
+              <option value="standard">Standard</option>
+              <option value="none">None (not material)</option>
+            </select>
+          </div>
+          <div class="filter-field">
+            <label>Status</label>
+            <select id="filterStatus" class="input filter-select">
+              <option value="">All statuses</option>
+              <option value="pending">Pending</option>
+              <option value="explained">Explained</option>
+              <option value="approved">Approved</option>
+              <option value="rejected">Rejected</option>
+            </select>
+          </div>
+          <div class="filter-field filter-search">
+            <label>Search line item</label>
+            <input type="text" id="filterSearch" class="input" placeholder="e.g. revenue, FX, payable…">
+          </div>
+          <button type="button" class="link-btn" id="clearFiltersBtn">Clear filters</button>
+        </div>
+        <p class="hint" id="filterCount"></p>
+
+        <div class="table-scroll">
+          <table id="fluxTable" class="flux-table">
+            <thead>
+              <tr>
+                <th data-sort="entity">Entity</th>
+                <th data-sort="category">Category</th>
+                <th data-sort="line_item">Line Item</th>
+                <th class="num" data-sort="prior_amount">Prior</th>
+                <th class="num" data-sort="current_amount">Current</th>
+                <th class="num" data-sort="variance_usd">Var $</th>
+                <th class="num" data-sort="variance_pct">Var %</th>
+                <th data-sort="severity">Severity</th>
+                <th data-sort="status">Status</th>
+                <th>Reviewer</th>
+                <th class="wide">AI-Generated Commentary <span class="col-tag">reference only</span></th>
+                <th class="wide">Controller Final Commentary <span class="col-tag gold">editable · exported</span></th>
+              </tr>
+            </thead>
+            <tbody id="fluxTableBody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="signoff-card">
+        <h3>Controller Sign-Off</h3>
+        <p class="hint" id="signoffHint"></p>
+        <div class="signoff-row">
+          <input type="text" id="controllerName" class="input" placeholder="Controller name">
+          <input type="text" id="controllerTitle" class="input" placeholder="Title (e.g. Director of Accounting)">
+          <button type="button" class="btn-secondary" id="signoffBtn">Sign Off</button>
+        </div>
+        <p class="signoff-status" id="signoffStatus"></p>
+      </div>
+
+      <div class="export-card">
+        <h3>Download</h3>
+        <div class="export-row">
+          <button type="button" class="btn-export" data-fmt="excel">⬇ Excel Workbook</button>
+          <button type="button" class="btn-export" data-fmt="pdf">⬇ PDF Summary</button>
+          <button type="button" class="btn-export" data-fmt="docx">⬇ Word Report</button>
+          <button type="button" class="btn-export" data-fmt="csv">⬇ CSV</button>
+        </div>
+        <p class="hint">Exports are watermarked <b>DRAFT</b> until every material line is controller-approved and sign-off is recorded.</p>
+      </div>
+
+    </div>
+  </section>
+
+</main>
+
+<footer class="footer">
+  <p>{{ legal_notice }}</p>
+</footer>
+
+<script src="{{ url_for('static', filename='js/app.js') }}"></script>
+</body>
+</html>
