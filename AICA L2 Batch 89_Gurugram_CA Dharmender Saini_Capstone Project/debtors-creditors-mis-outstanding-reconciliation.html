@@ -3861,7 +3861,7 @@ function xlStyles() {
 function xlSheet(sh, X, pos) {
   const width = Math.max(1, ...sh.blocks.map(b => b.cols.length)), rowsXml = [], conds = [], single = sh.blocks.length === 1, m = sh.meta;
   const widths = Array(width).fill(9);
-  let R = 0, filterRef = "", headRow = 0;
+  let R = 0, filterRef = "", headRow = 0; const blocksAt = [];
   const ref = (c, r) => colName(c) + r;
   const cS = (c, r, s, v) => (v === "" || v == null ? `<c r="${ref(c, r)}" s="${s}"/>` : `<c r="${ref(c, r)}" s="${s}" t="inlineStr"><is><t xml:space="preserve">${xmlEsc(v)}</t></is></c>`);
   const cN = (c, r, s, v) => `<c r="${ref(c, r)}" s="${s}"><v>${+v}</v></c>`;
@@ -3918,6 +3918,7 @@ function xlSheet(sh, X, pos) {
     const mcols = b.cols.map((c, i) => (c.t === "money" ? i : -1)).filter(i => i >= 0);
     if (mcols.length && (b.rows.length || totR)) conds.push(mcols.map(i => `${colName(i)}${first}:${colName(i)}${totR || last}`).join(" "));
     if (single && b.rows.length) filterRef = `A${hr}:${colName(b.cols.length - 1)}${last}`;
+    blocksAt.push({ b, hr, first, last, totR });   // where this table sits – used by the Charts sheet
     if (b.note) line(b.note, X.note);
     R++;
   }
@@ -3925,7 +3926,109 @@ function xlSheet(sh, X, pos) {
   if (m.signer) { R++; line("For " + m.company, X.sign); R += 2; line(m.signer, X.sign); line("Authorised signatory", X.foot); }
   const last = colName(width - 1), land = width > 7;
   const xml = `${XML_HEAD}<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheetPr><tabColor rgb="FF${pos ? RC.navy : RC.teal}"/><pageSetUpPr fitToPage="1"/></sheetPr><dimension ref="A1:${last}${Math.max(R, 1)}"/><sheetViews><sheetView workbookViewId="0" showGridLines="0"${pos ? "" : ' tabSelected="1"'} zoomScale="100">${headRow ? `<pane ySplit="${headRow}" topLeftCell="A${headRow + 1}" activePane="bottomLeft" state="frozen"/><selection pane="bottomLeft" activeCell="A${headRow + 1}" sqref="A${headRow + 1}"/>` : ""}</sheetView></sheetViews><sheetFormatPr defaultRowHeight="15"/><cols>${widths.map((w, i) => `<col min="${i + 1}" max="${i + 1}" width="${Math.max(8, Math.round(w * 1.05))}" customWidth="1"/>`).join("")}</cols><sheetData>${rowsXml.join("")}</sheetData>${filterRef ? `<autoFilter ref="${filterRef}"/>` : ""}${conds.map((sq, n) => `<conditionalFormatting sqref="${sq}"><cfRule type="cellIs" dxfId="0" priority="${n + 1}" operator="lessThan"><formula>0</formula></cfRule></conditionalFormatting>`).join("")}<pageMargins left="0.4" right="0.4" top="0.5" bottom="0.6" header="0.3" footer="0.3"/><pageSetup paperSize="9" orientation="${land ? "landscape" : "portrait"}" fitToWidth="1" fitToHeight="0"/><headerFooter><oddFooter>${xmlEsc("&L&8" + String(m.footer || m.company).replace(/&/g, "&&") + "&R&8Page &P of &N")}</oddFooter></headerFooter><ignoredErrors><ignoredError sqref="A1:${colName(Math.max(width, 26) - 1)}${Math.max(R, 1) + 5}" numberStoredAsText="1"/></ignoredErrors></worksheet>`;
-  return { xml, filterRef, headRow };
+  return { xml, filterRef, headRow, blocksAt };
+}
+
+/* ---------- native Excel charts, linked to the report cells ---------- */
+const CH_COL = ["2A72B0", "B97A0C", "1C6B67", "5B4A9E", "C23547", "2F8A4E", "E0457B", "77849A"];
+/**
+ * Decides which charts a workbook gets. Small tables (up to 25 rows) are charted straight from their cells; long
+ * bill-wise tables get a "Top 10" helper table on the Charts sheet whose values are SUMIFS formulas over the detail
+ * sheet, and the chart is drawn from that. Every chart therefore follows the figures in the workbook.
+ */
+function xlChartPlan(sheets, info, names) {
+  const specs = [], q = n => `'${n.replace(/'/g, "''")}'`, A = (c, r) => `$${colName(c)}$${r}`;
+  const num = v => (typeof v === "number" && isFinite(v) ? v : 0);
+  sheets.forEach((sh, si) => (info[si] || []).forEach(p => {
+    const b = p.b, cols = b.cols, rows = b.rows, lab = cols.findIndex(c => !isNumCol(c) && c.t !== "date");
+    if (lab < 0 || rows.length < 2 || specs.length >= 16) return;
+    const money = cols.map((c, k) => (c.t === "money" && rows.some(r => Math.abs(num(r[k])) > 0.5) ? k : -1)).filter(k => k >= 0);
+    if (!money.length) return;
+    const title = b.title || sh.meta.title, S = q(names[si]);
+    if (rows.length <= 25) {
+      // stop at the first total / reconciliation line so only real categories are charted
+      let n = rows.findIndex(r => /^(grand )?total|total .*book|outside the segment|^balance \(|^check:/i.test(String(r[lab] ?? "")));
+      if (n < 0) n = rows.length; if (n < 2) return;
+      const r1 = p.first, r2 = p.first + n - 1, cats = { ref: `${S}!${A(lab, r1)}:${A(lab, r2)}`, vals: rows.slice(0, n).map(r => String(r[lab] ?? "")) };
+      const ser = k => ({ name: cols[k].l, nameRef: `${S}!${A(k, p.hr)}`, ref: `${S}!${A(k, r1)}:${A(k, r2)}`, vals: rows.slice(0, n).map(r => num(r[k])) });
+      const lbl = k => norm(cols[k].l);
+      const due = money.find(k => /^due/.test(lbl(k))), notDue = money.find(k => /^notdue/.test(lbl(k)));
+      const monthly = /month/i.test(cols[lab].l), tgt = money.find(k => /target|plan/.test(lbl(k)));
+      if (monthly) specs.push({ title, kind: "colLine", cats, series: money.filter(k => k !== tgt).slice(0, 2).map(ser), line: tgt != null && rows.some(r => num(r[tgt])) ? [ser(tgt)] : [] });
+      else if (due != null && notDue != null) specs.push({ title: title + " – due vs not due", kind: n > 8 ? "barStack" : "colStack", cats, series: [ser(due), ser(notDue)] });
+      else if (money.length === 1 || /bucket|ageing/i.test(cols[lab].l + title)) {
+        const k = money.find(k => /amount|outstanding|net|balance|total/.test(lbl(k))) ?? money[0];
+        const s = ser(k); if (n <= 8 && s.vals.every(v => v >= 0)) specs.push({ title, kind: "doughnut", cats, series: [s] }); else specs.push({ title, kind: n > 8 ? "bar" : "col", cats, series: [s] });
+      } else specs.push({ title, kind: n > 8 ? "bar" : "col", cats, series: money.slice(0, 3).map(ser) });
+    } else {
+      // long detail table: the most meaningful amount column, summarised with SUMIFS formulas on the Charts sheet
+      const pref = [/netoutstanding|netpayable/, /balance|pending|outstanding/, /net/, /amount|total/];
+      let k = null; for (const re of pref) { k = [...money].reverse().find(x => re.test(norm(cols[x].l))); if (k != null) break; } if (k == null) k = money[money.length - 1];
+      const V = `${S}!${A(k, p.first)}:${A(k, p.last)}`, shortT = String(title).split(" – ")[0].replace(/\s+\d{2}-[A-Za-z]{3}-\d{4}.*$/, "");
+      // (a) Top 10 customers / vendors
+      const pc = cols.findIndex(c => !isNumCol(c) && c.t !== "date" && /party|customer|vendor/i.test(c.l)), pl = pc >= 0 ? pc : /name/i.test(cols[lab].l) ? lab : -1;
+      if (pl >= 0) {
+        const tot = new Map(); rows.forEach(r => { const key = String(r[pl] ?? ""); if (key) tot.set(key, (tot.get(key) || 0) + num(r[k])); });
+        const top = [...tot].filter(([, v]) => v > 0.5).sort((a, b) => b[1] - a[1]).slice(0, 10);
+        if (top.length >= 2) specs.push({ title: `Top ${top.length} ${/vendor/i.test(cols[pl].l) ? "vendors" : /customer/i.test(cols[pl].l) ? "customers" : "parties"} by ${cols[k].l} – ${shortT}`, kind: "bar", helper: { labHead: cols[pl].l, valHead: cols[k].l, rows: top.map(([name, v]) => ({ name, v, f: `SUMIFS(${V},${S}!${A(pl, p.first)}:${A(pl, p.last)},{CELL})` })) } });
+      }
+      // (b) month-wise trend from the first date column
+      const dc = cols.findIndex(c => c.t === "date");
+      if (dc >= 0) {
+        const byM = new Map(); rows.forEach(r => { const d = String(r[dc] ?? ""); if (/^\d{4}-\d{2}/.test(d)) byM.set(d.slice(0, 7), (byM.get(d.slice(0, 7)) || 0) + num(r[k])); });
+        const ms = [...byM.keys()].sort().slice(-12);
+        if (ms.length >= 2) { const D = `${S}!${A(dc, p.first)}:${A(dc, p.last)}`;
+          specs.push({ title: `${cols[k].l} by month – ${shortT}`, kind: "col", helper: { labHead: "Month", valHead: cols[k].l, rows: ms.map(m => { const [y, mo] = m.split("-").map(Number); return { name: monthLabel(m), v: byM.get(m), f: `SUMIFS(${V},${D},">="&DATE(${y},${mo},1),${D},"<="&EOMONTH(DATE(${y},${mo},1),0))` }; }) } }); }
+      }
+    }
+  }));
+  // the Management Summary repeats some tables on detail sheets – chart each table once
+  const seen = new Set();
+  return specs.filter(s => { const k = s.title + "|" + s.kind; if (seen.has(k)) return false; seen.add(k); return true; }).slice(0, 8);
+}
+function xlChartXml(sp) {
+  const e = xmlEsc, font = (sz, b, col) => `<c:txPr><a:bodyPr/><a:lstStyle/><a:p><a:pPr><a:defRPr sz="${sz}"${b ? ' b="1"' : ""}><a:solidFill><a:srgbClr val="${col || "44536A"}"/></a:solidFill></a:defRPr></a:pPr><a:endParaRPr lang="en-IN"/></a:p></c:txPr>`;
+  const strC = v => `<c:strCache><c:ptCount val="${v.length}"/>${v.map((x, i) => `<c:pt idx="${i}"><c:v>${e(x)}</c:v></c:pt>`).join("")}</c:strCache>`;
+  const numC = v => `<c:numCache><c:formatCode>General</c:formatCode><c:ptCount val="${v.length}"/>${v.map((x, i) => `<c:pt idx="${i}"><c:v>${x}</c:v></c:pt>`).join("")}</c:numCache>`;
+  const tx = s => `<c:tx>${s.nameRef ? `<c:strRef><c:f>${e(s.nameRef)}</c:f>${strC([s.name])}</c:strRef>` : `<c:v>${e(s.name)}</c:v>`}</c:tx>`;
+  const cat = `<c:cat><c:strRef><c:f>${e(sp.cats.ref)}</c:f>${strC(sp.cats.vals)}</c:strRef></c:cat>`, val = s => `<c:val><c:numRef><c:f>${e(s.ref)}</c:f>${numC(s.vals)}</c:numRef></c:val>`;
+  const fill = c => `<c:spPr><a:solidFill><a:srgbClr val="${c}"/></a:solidFill></c:spPr>`;
+  const lbls = pos => `<c:dLbls><c:numFmt formatCode="${e(XL_INR)}" sourceLinked="0"/><c:spPr><a:noFill/><a:ln><a:noFill/></a:ln></c:spPr>${font(800)}${pos ? `<c:dLblPos val="${pos}"/>` : ""}<c:showLegendKey val="0"/><c:showVal val="1"/><c:showCatName val="0"/><c:showSerName val="0"/><c:showPercent val="0"/><c:showBubbleSize val="0"/></c:dLbls>`;
+  const axes = (horiz, del) => `<c:catAx><c:axId val="5101"/><c:scaling><c:orientation val="${horiz ? "maxMin" : "minMax"}"/></c:scaling><c:delete val="0"/><c:axPos val="${horiz ? "l" : "b"}"/><c:numFmt formatCode="General" sourceLinked="1"/><c:majorTickMark val="none"/><c:minorTickMark val="none"/><c:tickLblPos val="nextTo"/><c:spPr><a:ln w="9525"><a:solidFill><a:srgbClr val="D5DCE5"/></a:solidFill></a:ln></c:spPr>${font(800)}<c:crossAx val="5102"/><c:crosses val="autoZero"/><c:auto val="1"/><c:lblAlgn val="ctr"/><c:lblOffset val="100"/><c:noMultiLvlLbl val="0"/></c:catAx><c:valAx><c:axId val="5102"/><c:scaling><c:orientation val="minMax"/></c:scaling><c:delete val="${del ? 1 : 0}"/><c:axPos val="${horiz ? "t" : "l"}"/><c:majorGridlines><c:spPr><a:ln w="6350"><a:solidFill><a:srgbClr val="E6EAF0"/></a:solidFill></a:ln></c:spPr></c:majorGridlines><c:numFmt formatCode="${e(XL_INR)}" sourceLinked="0"/><c:majorTickMark val="none"/><c:minorTickMark val="none"/><c:tickLblPos val="nextTo"/><c:spPr><a:ln><a:noFill/></a:ln></c:spPr>${font(800)}<c:crossAx val="5101"/><c:crosses val="autoZero"/><c:crossBetween val="between"/></c:valAx>`;
+  let plot = "", legend = true;
+  const ss = sp.series;
+  if (sp.kind === "doughnut") {
+    const s = ss[0];
+    plot = `<c:doughnutChart><c:varyColors val="1"/><c:ser><c:idx val="0"/><c:order val="0"/>${tx(s)}${sp.cats.vals.map((_, i) => `<c:dPt><c:idx val="${i}"/><c:bubble3D val="0"/>${fill(CH_COL[i % CH_COL.length])}</c:dPt>`).join("")}<c:dLbls><c:numFmt formatCode="0%" sourceLinked="0"/><c:spPr><a:noFill/><a:ln><a:noFill/></a:ln></c:spPr>${font(900, true, "FFFFFF")}<c:showLegendKey val="0"/><c:showVal val="0"/><c:showCatName val="0"/><c:showSerName val="0"/><c:showPercent val="1"/><c:showBubbleSize val="0"/><c:showLeaderLines val="0"/></c:dLbls>${cat}${val(s)}</c:ser><c:firstSliceAng val="0"/><c:holeSize val="55"/></c:doughnutChart>`;
+  } else {
+    const horiz = sp.kind === "bar" || sp.kind === "barStack", stack = /Stack/.test(sp.kind), one = ss.length === 1;
+    const bars = `<c:barChart><c:barDir val="${horiz ? "bar" : "col"}"/><c:grouping val="${stack ? "stacked" : "clustered"}"/><c:varyColors val="0"/>${ss.map((s, i) => `<c:ser><c:idx val="${i}"/><c:order val="${i}"/>${tx(s)}${fill(CH_COL[i % CH_COL.length])}<c:invertIfNegative val="0"/>${cat}${val(s)}</c:ser>`).join("")}${one && !stack ? lbls("outEnd") : ""}<c:gapWidth val="${horiz ? 45 : 70}"/>${stack ? '<c:overlap val="100"/>' : ""}<c:axId val="5101"/><c:axId val="5102"/></c:barChart>`;
+    const lines = (sp.line || []).length ? `<c:lineChart><c:grouping val="standard"/><c:varyColors val="0"/>${sp.line.map((s, i) => `<c:ser><c:idx val="${ss.length + i}"/><c:order val="${ss.length + i}"/>${tx(s)}<c:spPr><a:ln w="28575" cap="rnd"><a:solidFill><a:srgbClr val="C23547"/></a:solidFill><a:prstDash val="dash"/></a:ln></c:spPr><c:marker><c:symbol val="circle"/><c:size val="5"/>${fill("C23547")}</c:marker>${cat}${val(s)}<c:smooth val="0"/></c:ser>`).join("")}<c:marker val="1"/><c:axId val="5101"/><c:axId val="5102"/></c:lineChart>` : "";
+    plot = bars + lines + axes(horiz, one && !stack && horiz);
+    legend = !(one && !lines);
+  }
+  return `${XML_HEAD}<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><c:roundedCorners val="0"/><c:chart><c:title><c:tx><c:rich><a:bodyPr/><a:lstStyle/><a:p><a:pPr><a:defRPr sz="1200" b="1"/></a:pPr><a:r><a:rPr lang="en-IN" sz="1200" b="1"><a:solidFill><a:srgbClr val="${RC.navy}"/></a:solidFill></a:rPr><a:t>${e(sp.title)}</a:t></a:r></a:p></c:rich></c:tx><c:overlay val="0"/></c:title><c:autoTitleDeleted val="0"/><c:plotArea><c:layout/>${plot}</c:plotArea>${legend ? `<c:legend><c:legendPos val="${sp.kind === "doughnut" ? "r" : "b"}"/><c:overlay val="0"/>${font(900)}</c:legend>` : ""}<c:plotVisOnly val="1"/><c:dispBlanksAs val="gap"/></c:chart><c:spPr><a:solidFill><a:srgbClr val="FFFFFF"/></a:solidFill><a:ln w="9525"><a:solidFill><a:srgbClr val="D5DCE5"/></a:solidFill></a:ln></c:spPr><c:txPr><a:bodyPr/><a:lstStyle/><a:p><a:pPr><a:defRPr><a:latin typeface="Calibri"/></a:defRPr></a:pPr><a:endParaRPr lang="en-IN"/></a:p></c:txPr></c:chartSpace>`;
+}
+/** The "Charts" sheet: heading, helper tables (Top 10 with SUMIFS) and one anchored chart per band of 22 rows. */
+function xlChartsSheet(specs, X, meta, sheetName) {
+  const q = `'${sheetName.replace(/'/g, "''")}'`, rows = [], anchors = [], BAND = 22, HC = 11;   // helper table in columns L:M
+  const cS = (c, r, s, v) => `<c r="${colName(c)}${r}" s="${s}" t="inlineStr"><is><t xml:space="preserve">${xmlEsc(v)}</t></is></c>`;
+  rows.push(`<row r="1" ht="24" customHeight="1">${cS(0, 1, X.co, meta.company)}</row>`, `<row r="2" ht="21" customHeight="1">${cS(0, 2, X.title, "Charts – " + meta.title)}</row>`, `<row r="3">${cS(0, 3, X.note, "Every chart is linked to the report cells (Top-10 tables use SUMIFS formulas), so charts update when the figures change. " + meta.asOnFy)}</row>`);
+  specs.forEach((sp, i) => {
+    const r0 = 5 + i * BAND;
+    if (sp.helper) {
+      const h = sp.helper, first = r0 + 1, last = r0 + h.rows.length;
+      rows.push(`<row r="${r0}" ht="30" customHeight="1">${cS(HC, r0, X.hdr, h.labHead)}${cS(HC + 1, r0, X.hdrR, h.valHead)}</row>`);
+      h.rows.forEach((x, j) => { const r = first + j, z = j % 2; rows.push(`<row r="${r}">${cS(HC, r, X.text[z], x.name)}<c r="${colName(HC + 1)}${r}" s="${X.money[z]}"><f>${xmlEsc(x.f.replace("{CELL}", colName(HC) + r))}</f><v>${Math.round(x.v * 100) / 100}</v></c></row>`); });
+      sp.cats = { ref: `${q}!$${colName(HC)}$${first}:$${colName(HC)}$${last}`, vals: h.rows.map(x => x.name) };
+      sp.series = [{ name: h.valHead, nameRef: `${q}!$${colName(HC + 1)}$${r0}`, ref: `${q}!$${colName(HC + 1)}$${first}:$${colName(HC + 1)}$${last}`, vals: h.rows.map(x => Math.round(x.v * 100) / 100) }];
+    }
+    anchors.push({ c1: 0, r1: r0 - 1, c2: 10, r2: r0 - 1 + BAND - 2 });
+  });
+  const last = 5 + specs.length * BAND;
+  const xml = `${XML_HEAD}<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheetPr><tabColor rgb="FFB97A0C"/><pageSetUpPr fitToPage="1"/></sheetPr><dimension ref="A1:M${last}"/><sheetViews><sheetView workbookViewId="0" showGridLines="0"/></sheetViews><sheetFormatPr defaultRowHeight="15"/><cols><col min="1" max="11" width="10" customWidth="1"/><col min="12" max="12" width="34" customWidth="1"/><col min="13" max="13" width="17" customWidth="1"/></cols><sheetData>${rows.join("")}</sheetData><pageMargins left="0.4" right="0.4" top="0.5" bottom="0.6" header="0.3" footer="0.3"/><pageSetup paperSize="9" orientation="landscape" fitToWidth="1" fitToHeight="0"/><headerFooter><oddFooter>${xmlEsc("&L&8" + String(meta.footer || meta.company).replace(/&/g, "&&") + "&R&8Page &P of &N")}</oddFooter></headerFooter><drawing r:id="rId1"/></worksheet>`;
+  const drawing = `${XML_HEAD}<xdr:wsDr xmlns:xdr="http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">${anchors.map((a, i) => `<xdr:twoCellAnchor editAs="oneCell"><xdr:from><xdr:col>${a.c1}</xdr:col><xdr:colOff>0</xdr:colOff><xdr:row>${a.r1}</xdr:row><xdr:rowOff>0</xdr:rowOff></xdr:from><xdr:to><xdr:col>${a.c2}</xdr:col><xdr:colOff>400000</xdr:colOff><xdr:row>${a.r2}</xdr:row><xdr:rowOff>0</xdr:rowOff></xdr:to><xdr:graphicFrame macro=""><xdr:nvGraphicFramePr><xdr:cNvPr id="${i + 2}" name="Chart ${i + 1}"/><xdr:cNvGraphicFramePr/></xdr:nvGraphicFramePr><xdr:xfrm><a:off x="0" y="0"/><a:ext cx="0" cy="0"/></xdr:xfrm><a:graphic><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/chart"><c:chart xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" r:id="rId${i + 1}"/></a:graphicData></a:graphic></xdr:graphicFrame><xdr:clientData/></xdr:twoCellAnchor>`).join("")}</xdr:wsDr>`;
+  return { xml, drawing };
 }
 /** Coloured, formula-based .xlsx: one sheet per report (plus detail sheets of the Management Summary). */
 function buildXlsx(rep) {
@@ -3933,14 +4036,27 @@ function buildXlsx(rep) {
   const cut = s => (s.length <= 31 ? s : (s.slice(0, 31).replace(/\s+\S*$/, "") || s.slice(0, 31)).replace(/[\s–(-]+$/, ""));   // whole words only
   const safe = n => { const b = cut(String(n || "Sheet").split(" – ")[0].replace(/[\[\]:*?\/\\]/g, " ").replace(/\s+/g, " ").trim()) || "Sheet"; let s = b, i = 2; while (used.has(s.toLowerCase())) s = b.slice(0, 27) + " (" + i++ + ")"; used.add(s.toLowerCase()); return s; };
   const abs = r => r.replace(/([A-Z]+)(\d+)/g, "$$$1$$$2");
+  const info = [];
   sheets.forEach((sh, i) => {
-    const nm = safe(sh.name), q = `'${nm.replace(/'/g, "''")}'`, r = xlSheet(sh, X, i); names.push(nm);
+    const nm = safe(sh.name), q = `'${nm.replace(/'/g, "''")}'`, r = xlSheet(sh, X, i); names.push(nm); info.push(r.blocksAt);
     files[`xl/worksheets/sheet${i + 1}.xml`] = r.xml;
     if (r.filterRef) defs.push(`<definedName name="_xlnm._FilterDatabase" localSheetId="${i}" hidden="1">${xmlEsc(q + "!" + abs(r.filterRef))}</definedName>`);
     if (r.headRow) defs.push(`<definedName name="_xlnm.Print_Titles" localSheetId="${i}">${xmlEsc(`${q}!$${r.headRow}:$${r.headRow}`)}</definedName>`);
   });
-  const n = sheets.length, M0 = rep.sheets[0]?.meta || reportMeta(rep.title);
-  files["[Content_Types].xml"] = `${XML_HEAD}<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>${names.map((_, i) => `<Override PartName="/xl/worksheets/sheet${i + 1}.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>`).join("")}<Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/><Override PartName="/docProps/core.xml" ContentType="application/vnd.openxmlformats-package.core-properties+xml"/><Override PartName="/docProps/app.xml" ContentType="application/vnd.openxmlformats-officedocument.extended-properties+xml"/></Types>`;
+  const M0 = rep.sheets[0]?.meta || reportMeta(rep.title);
+  // Charts sheet (native Excel charts linked to the cells above) – added when the report has something to chart
+  const specs = xlChartPlan(sheets, info, names), chartParts = [];
+  if (specs.length) {
+    const nm = safe("Charts"), idx = names.length + 1, cs = xlChartsSheet(specs, X, { ...M0, title: rep.title }, nm);
+    names.push(nm); files[`xl/worksheets/sheet${idx}.xml`] = cs.xml;
+    files[`xl/worksheets/_rels/sheet${idx}.xml.rels`] = `${XML_HEAD}<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/drawing" Target="../drawings/drawing1.xml"/></Relationships>`;
+    files["xl/drawings/drawing1.xml"] = cs.drawing;
+    files["xl/drawings/_rels/drawing1.xml.rels"] = `${XML_HEAD}<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">${specs.map((_, i) => `<Relationship Id="rId${i + 1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/chart" Target="../charts/chart${i + 1}.xml"/>`).join("")}</Relationships>`;
+    specs.forEach((sp, i) => { files[`xl/charts/chart${i + 1}.xml`] = xlChartXml(sp); chartParts.push(`<Override PartName="/xl/charts/chart${i + 1}.xml" ContentType="application/vnd.openxmlformats-officedocument.drawingml.chart+xml"/>`); });
+    chartParts.push(`<Override PartName="/xl/drawings/drawing1.xml" ContentType="application/vnd.openxmlformats-officedocument.drawing+xml"/>`);
+  }
+  const n = names.length;
+  files["[Content_Types].xml"] = `${XML_HEAD}<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>${names.map((_, i) => `<Override PartName="/xl/worksheets/sheet${i + 1}.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>`).join("")}${chartParts.join("")}<Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/><Override PartName="/docProps/core.xml" ContentType="application/vnd.openxmlformats-package.core-properties+xml"/><Override PartName="/docProps/app.xml" ContentType="application/vnd.openxmlformats-officedocument.extended-properties+xml"/></Types>`;
   files["_rels/.rels"] = `${XML_HEAD}<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/package/2006/relationships/metadata/core-properties" Target="docProps/core.xml"/><Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/extended-properties" Target="docProps/app.xml"/></Relationships>`;
   files["xl/_rels/workbook.xml.rels"] = `${XML_HEAD}<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">${names.map((_, i) => `<Relationship Id="rId${i + 1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet${i + 1}.xml"/>`).join("")}<Relationship Id="rId${n + 1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>`;
   files["xl/workbook.xml"] = `${XML_HEAD}<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><bookViews><workbookView xWindow="0" yWindow="0" windowWidth="28800" windowHeight="15600"/></bookViews><sheets>${names.map((nm, i) => `<sheet name="${xmlEsc(nm)}" sheetId="${i + 1}" r:id="rId${i + 1}"/>`).join("")}</sheets>${defs.length ? `<definedNames>${defs.join("")}</definedNames>` : ""}<calcPr calcId="191029" fullCalcOnLoad="1"/></workbook>`;
@@ -6619,8 +6735,6 @@ async function openCompany(id) {
   if (!st) st = emptyState({ name: rec.name, legalName: rec.legalName, gstin: rec.gstin });
   S = ensureCompany(migrate(st));
   if (rec.legacyDb && !S.settings.vendorAnon) {
-    // carried-over company: Segment 1 was fixed to this business unit before it became a setting
-    if (S.settings.company.seg1 == null) { const p = S.parties.find(x => x.side === "D" && (norm(x.bu) === "namaventure" || norm(x.category) === "namaventure")); S.settings.company.seg1 = p ? (norm(p.bu) === "namaventure" ? p.bu : p.category) : ""; }
     const n = anonymiseParties(S, "C", "Vendor");
     S.settings.vendorAnon = 1; S._renamed = true;
     if (n) audit("Anonymise", "Vendors", `${n} vendors`, "name", "real names", `Vendor 001 – Vendor ${String(n).padStart(Math.max(3, String(n).length), "0")}`);

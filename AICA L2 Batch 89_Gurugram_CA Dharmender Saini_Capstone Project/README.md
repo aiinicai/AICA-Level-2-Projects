@@ -60,7 +60,7 @@ Exports contain exactly what the page shows (side, status, filters, selected cus
 ### Report formats
 | Format | Output |
 |---|---|
-| **Excel (.xlsx)** | Coloured header, zebra rows, Indian lakh / crore numbers, negatives in red, frozen header + filters, A4 print setup and **live formulas**: `SUBTOTAL` totals, balance columns such as `=Amount-Received-CN`, and % columns such as `=B8/B$14*100` |
+| **Excel (.xlsx)** | Coloured header, zebra rows, Indian lakh / crore numbers, negatives in red, frozen header + filters, A4 print setup and **live formulas**: `SUBTOTAL` totals, balance columns such as `=Amount-Received-CN`, and % columns such as `=B8/B$14*100`; plus a **Charts** sheet with native Excel charts (due vs not due, ageing doughnut, collections vs target, top 10 parties, month-wise trend) linked to the report cells – Top-10 and monthly tables use `SUMIFS` over the detail sheet, so charts update when figures change |
 | **Word (.docx)** | Company header and logo, coloured tables with repeating header row, landscape for wide reports, page X of Y |
 | **PDF (.pdf)** | Print-ready with company header, zebra rows, negatives in red, page numbers |
 | **HTML (.html)** | One web page for any browser or phone, with a Print / Save as PDF button |
