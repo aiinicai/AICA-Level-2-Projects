@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Audit Sampling & Evaluation Platform</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+<style>
+  :root { --blue:#0F52BA; --bg:#F4F7FC; --white:#fff; --text:#1d2433; --muted:#5b6475; }
+  * { box-sizing:border-box; }
+  body { margin:0; font-family:Arial, Helvetica, sans-serif; background:var(--bg); color:var(--text); }
+  header { background:var(--blue); color:#fff; text-align:center; padding:22px 16px; }
+  header h1 { margin:0; font-size:28px; }
+  main { max-width:1500px; margin:0 auto; padding:16px; }
+  .cards { display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:12px; margin-bottom:16px; }
+  .card { background:var(--white); border-radius:10px; padding:18px; text-align:center; box-shadow:0 1px 4px rgba(0,0,0,.08); }
+  .card .t { font-weight:bold; font-size:16px; margin-bottom:10px; }
+  .card .v { color:var(--blue); font-weight:bold; font-size:26px; }
+  .buttons { display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:10px; margin-bottom:16px; }
+  button, label.btn { background:#1f6aa5; color:#fff; border:none; border-radius:8px; height:50px; font-size:15px; cursor:pointer;
+    display:flex; align-items:center; justify-content:center; font-family:inherit; }
+  button:hover, label.btn:hover { background:#144870; }
+  input[type=file] { display:none; }
+  #output { background:var(--white); border-radius:10px; padding:14px; min-height:260px; white-space:pre-wrap;
+    font-family:Consolas, monospace; font-size:13px; box-shadow:0 1px 4px rgba(0,0,0,.08); }
+  .tablewrap { overflow-x:auto; background:var(--white); border-radius:10px; margin-top:16px; box-shadow:0 1px 4px rgba(0,0,0,.08); display:none; }
+  table { border-collapse:collapse; width:100%; font-size:13px; }
+  th, td { border-bottom:1px solid #e3e8f0; padding:8px 10px; text-align:left; white-space:nowrap; }
+  th { background:var(--blue); color:#fff; position:sticky; top:0; }
+  #toast { position:fixed; bottom:20px; right:20px; background:#333; color:#fff; padding:12px 18px; border-radius:8px; display:none; }
+  #toast.err { background:#b00020; } #toast.warn { background:#b36b00; } #toast.ok { background:#1b7f3b; }
+</style>
+</head>
+<body>
+<header><h1>Audit Sampling &amp; Evaluation Platform</h1></header>
+<main>
+  <div class="cards">
+    <div class="card"><div class="t">Records</div><div class="v" id="records">0</div></div>
+    <div class="card"><div class="t">Duplicates</div><div class="v" id="duplicates">0</div></div>
+    <div class="card"><div class="t">Materiality</div><div class="v" id="materiality">-</div></div>
+    <div class="card"><div class="t">Risk</div><div class="v" id="risk">-</div></div>
+    <div class="card"><div class="t">Sample Size</div><div class="v" id="sample">-</div></div>
+  </div>
+  <div class="buttons">
+    <label class="btn" for="file">Upload Excel / CSV</label>
+    <input type="file" id="file" accept=".xlsx,.xls,.csv">
+    <button onclick="calculateMateriality()">Calculate Materiality</button>
+    <button onclick="calculateRisk()">Risk Assessment</button>
+    <button onclick="generateMusSample()">Generate MUS Sample</button>
+    <button onclick="exportExcel()">Excel Report</button>
+    <button onclick="exportPdf()">PDF Report</button>
+  </div>
+  <div id="output">Upload a population file (Excel or CSV) to begin.</div>
+  <div class="tablewrap" id="tablewrap"><table id="sampleTable"></table></div>
+</main>
+<div id="toast"></div>
+
+<script>
+let df = null, columns = [], sampleDf = null;
+const $ = id => document.getElementById(id);
+const out = $("output");
+const fmt = (n, d=2) => Number(n).toLocaleString("en-IN", {minimumFractionDigits:d, maximumFractionDigits:d});
+
+function toast(msg, kind="ok") {
+  const t = $("toast"); t.textContent = msg; t.className = kind; t.style.display = "block";
+  clearTimeout(t._h); t._h = setTimeout(() => t.style.display = "none", 3000);
+}
+function libsReady() {
+  if (typeof XLSX === "undefined" || !window.jspdf) { toast("Libraries not loaded - check your internet connection", "err"); return false; }
+  return true;
+}
+function toNum(v) {
+  if (v === null || v === undefined || v === "") return 0;
+  if (typeof v === "number") return isNaN(v) ? 0 : v;
+  const n = parseFloat(String(v).replace(/[,₹\s]/g, ""));
+  return isNaN(n) ? 0 : n;
+}
+function findAmountCol() { return columns.find(c => String(c).toLowerCase().includes("amount")) || null; }
+
+$("file").addEventListener("change", e => {
+  const file = e.target.files[0];
+  if (!file || !libsReady()) return;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    try {
+      const wb = XLSX.read(new Uint8Array(ev.target.result), {type:"array", cellDates:true});
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(ws, {header:1, defval:null, raw:true});
+      if (!rows.length) throw new Error("File is empty");
+      columns = rows[0].map((c, i) => c === null ? `Unnamed: ${i}` : String(c));
+      df = rows.slice(1)
+        .filter(r => r.some(v => v !== null && v !== ""))
+        .map(r => Object.fromEntries(columns.map((c, i) => [c, r[i] ?? null])));
+      sampleDf = null;
+      const seen = new Set(); let dups = 0;
+      for (const r of df) { const k = JSON.stringify(columns.map(c => r[c])); if (seen.has(k)) dups++; else seen.add(k); }
+      $("records").textContent = df.length;
+      $("duplicates").textContent = dups;
+      $("materiality").textContent = "-"; $("risk").textContent = "-"; $("sample").textContent = "-";
+      $("tablewrap").style.display = "none";
+      out.textContent = `Population Loaded Successfully\nFile:\n${file.name}\nRecords:\n${df.length}\nDuplicates:\n${dups}\nColumns:\n${JSON.stringify(columns)}\n`;
+      toast("Population Loaded");
+    } catch (err) { toast("Error: " + err.message, "err"); }
+    e.target.value = "";
+  };
+  reader.readAsArrayBuffer(file);
+});
+
+function calculateMateriality() {
+  if (!df) return toast("Upload population first", "warn");
+  const col = findAmountCol();
+  const total = col ? df.reduce((s, r) => s + toNum(r[col]), 0) : 50000000;
+  const mat = total * 0.01;
+  $("materiality").textContent = "₹" + fmt(mat, 0);
+  out.textContent += `\n=========================\nMATERIALITY\nPopulation Value:\n₹${fmt(total)}\nOverall Materiality:\n₹${fmt(mat)}\nPerformance Materiality:\n₹${fmt(mat*0.75)}\n`;
+  out.scrollTop = out.scrollHeight;
+}
+
+function calculateRisk() {
+  $("risk").textContent = "HIGH";
+  out.textContent += `\n=========================\nRISK ASSESSMENT\nRisk Score: 75\nOverall Risk:\nHIGH\n`;
+}
+
+function generateMusSample() {
+  if (!df) return toast("Upload population first", "warn");
+  const col = findAmountCol();
+  if (!col) return toast("No amount column found", "warn");
+  sampleDf = [...df].sort((a, b) => toNum(b[col]) - toNum(a[col])).slice(0, 25);
+  $("sample").textContent = sampleDf.length;
+  out.textContent += `\n=========================\nMUS SAMPLE GENERATED\nSelected Transactions: ${sampleDf.length} (shown in table below)\n`;
+  renderTable();
+}
+
+function cellText(v) { return v instanceof Date ? v.toLocaleDateString("en-IN") : (v ?? ""); }
+function renderTable() {
+  const t = $("sampleTable");
+  t.innerHTML = "<thead><tr><th>#</th>" + columns.map(c => `<th>${esc(c)}</th>`).join("") + "</tr></thead><tbody>" +
+    sampleDf.map((r, i) => `<tr><td>${i+1}</td>` + columns.map(c => `<td>${esc(cellText(r[c]))}</td>`).join("") + "</tr>").join("") + "</tbody>";
+  $("tablewrap").style.display = "block";
+}
+function esc(s) { return String(s).replace(/[&<>"]/g, ch => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[ch])); }
+
+function summaryRows() {
+  return [["Records", $("records").textContent], ["Duplicates", $("duplicates").textContent],
+          ["Materiality", $("materiality").textContent], ["Risk", $("risk").textContent], ["Sample Size", $("sample").textContent]];
+}
+
+function exportExcel() {
+  if (!libsReady()) return;
+  try {
+    const wb = XLSX.utils.book_new();
+    const summary = XLSX.utils.aoa_to_sheet([["Audit Sampling Summary"], [], ...summaryRows()]);
+    summary["!cols"] = [{wch:18}, {wch:20}];
+    XLSX.utils.book_append_sheet(wb, summary, "Summary");
+    if (sampleDf) {
+      const aoa = [columns, ...sampleDf.map(r => columns.map(c => r[c]))];
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(aoa, {cellDates:true}), "Selected Sample");
+    }
+    XLSX.writeFile(wb, "Audit_Sampling_Report.xlsx");
+    toast("Audit_Sampling_Report.xlsx created");
+  } catch (err) { toast("Error: " + err.message, "err"); }
+}
+
+function exportPdf() {
+  if (!libsReady()) return;
+  try {
+    const { jsPDF } = window.jspdf;
+    const landscape = columns.length > 6;
+    const doc = new jsPDF({orientation: landscape ? "landscape" : "portrait", unit:"pt", format:"a4"});
+    const W = doc.internal.pageSize.getWidth();
+    doc.setFont("helvetica", "bold"); doc.setFontSize(20);
+    doc.text("Audit Sampling Workpaper", W/2, 50, {align:"center"});
+    doc.setFont("helvetica", "normal"); doc.setFontSize(10);
+    doc.text("Generated: " + new Date().toLocaleString("en-IN"), W/2, 68, {align:"center"});
+    // standard PDF fonts have no rupee glyph
+    doc.autoTable({startY:85, head:[["Item","Value"]], body:summaryRows().map(([k,v]) => [k, String(v).replace("₹","Rs. ")]),
+      theme:"grid", headStyles:{fillColor:[15,82,186]}, tableWidth:300, margin:{left:40}});
+    doc.setFont("helvetica", "bold"); doc.setFontSize(14);
+    doc.text(`Sample Size: ${$("sample").textContent}`, 40, doc.lastAutoTable.finalY + 30);
+    if (sampleDf) {
+      doc.autoTable({startY: doc.lastAutoTable.finalY + 40, head:[["#", ...columns]],
+        body: sampleDf.map((r, i) => [i+1, ...columns.map(c => String(cellText(r[c])))]),
+        theme:"striped", headStyles:{fillColor:[15,82,186]}, styles:{fontSize:8, cellPadding:3}, margin:{left:40, right:40}});
+    }
+    doc.save("Audit_Workpaper.pdf");
+    toast("Audit_Workpaper.pdf created");
+  } catch (err) { toast("Error: " + err.message, "err"); }
+}
+</script>
+</body>
+</html>

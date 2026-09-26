@@ -1,0 +1,375 @@
+import customtkinter as ctk
+import pandas as pd
+
+from tkinter import filedialog, messagebox
+
+
+# ==================================================
+# THEME
+# ==================================================
+
+ROYAL_BLUE = "#0F52BA"
+DARK_BLUE = "#08306B"
+WHITE = "#FFFFFF"
+LIGHT_BG = "#F5F7FA"
+
+
+# ==================================================
+# APP
+# ==================================================
+
+class AuditSamplingApp(ctk.CTk):
+
+    def __init__(self):
+
+        super().__init__()
+
+        self.title("Audit Sampling & Evaluation Platform")
+        self.geometry("1400x800")
+
+        self.df = None
+
+        self.configure(
+            fg_color=LIGHT_BG
+        )
+
+        self.build_sidebar()
+        self.build_header()
+        self.build_dashboard()
+
+    # ======================================
+    # SIDEBAR
+    # ======================================
+
+    def build_sidebar(self):
+
+        self.sidebar = ctk.CTkFrame(
+            self,
+            width=250,
+            fg_color=ROYAL_BLUE,
+            corner_radius=0
+        )
+
+        self.sidebar.pack(
+            side="left",
+            fill="y"
+        )
+
+        ctk.CTkLabel(
+            self.sidebar,
+            text="AUDIT\nSAMPLING",
+            text_color="white",
+            font=("Arial", 24, "bold")
+        ).pack(
+            pady=30
+        )
+
+        menu_items = [
+            "Dashboard",
+            "Population Upload",
+            "Materiality",
+            "Risk Assessment",
+            "Sampling",
+            "Reports"
+        ]
+
+        for item in menu_items:
+
+            btn = ctk.CTkButton(
+                self.sidebar,
+                text=item,
+                fg_color=DARK_BLUE,
+                hover_color="#021D49",
+                text_color="white"
+            )
+
+            btn.pack(
+                pady=8,
+                padx=10,
+                fill="x"
+            )
+
+    # ======================================
+    # HEADER
+    # ======================================
+
+    def build_header(self):
+
+        self.header = ctk.CTkFrame(
+            self,
+            height=80,
+            fg_color=WHITE
+        )
+
+        self.header.pack(
+            fill="x"
+        )
+
+        ctk.CTkLabel(
+            self.header,
+            text="Audit Sampling & Evaluation Platform",
+            font=("Arial", 24, "bold"),
+            text_color=ROYAL_BLUE
+        ).pack(
+            pady=20
+        )
+
+    # ======================================
+    # DASHBOARD
+    # ======================================
+
+    def build_dashboard(self):
+
+        self.content = ctk.CTkFrame(
+            self,
+            fg_color=LIGHT_BG
+        )
+
+        self.content.pack(
+            fill="both",
+            expand=True,
+            padx=20,
+            pady=20
+        )
+
+        card_frame = ctk.CTkFrame(
+            self.content,
+            fg_color=LIGHT_BG
+        )
+
+        card_frame.pack(
+            fill="x"
+        )
+
+        self.population_card = self.kpi_card(
+            card_frame,
+            "Population",
+            "0"
+        )
+
+        self.population_card.pack(
+            side="left",
+            padx=10
+        )
+
+        self.materiality_card = self.kpi_card(
+            card_frame,
+            "Materiality",
+            "-"
+        )
+
+        self.materiality_card.pack(
+            side="left",
+            padx=10
+        )
+
+        self.risk_card = self.kpi_card(
+            card_frame,
+            "Risk",
+            "-"
+        )
+
+        self.risk_card.pack(
+            side="left",
+            padx=10
+        )
+
+        self.sample_card = self.kpi_card(
+            card_frame,
+            "Samples",
+            "-"
+        )
+
+        self.sample_card.pack(
+            side="left",
+            padx=10
+        )
+
+        # Upload Section
+
+        upload_frame = ctk.CTkFrame(
+            self.content,
+            fg_color=WHITE
+        )
+
+        upload_frame.pack(
+            fill="x",
+            pady=20
+        )
+
+        ctk.CTkLabel(
+            upload_frame,
+            text="Population Upload",
+            font=("Arial", 18, "bold")
+        ).pack(
+            pady=10
+        )
+
+        ctk.CTkButton(
+            upload_frame,
+            text="Upload SAP GL Extract",
+            fg_color=ROYAL_BLUE,
+            command=self.load_population
+        ).pack(
+            pady=10
+        )
+
+        # Output Window
+
+        self.output = ctk.CTkTextbox(
+            self.content,
+            height=300
+        )
+
+        self.output.pack(
+            fill="both",
+            expand=True
+        )
+
+    # ======================================
+    # KPI CARD
+    # ======================================
+
+    def kpi_card(
+        self,
+        parent,
+        title,
+        value
+    ):
+
+        frame = ctk.CTkFrame(
+            parent,
+            width=250,
+            height=120,
+            fg_color=WHITE
+        )
+
+        frame.pack_propagate(False)
+
+        ctk.CTkLabel(
+            frame,
+            text=title,
+            font=("Arial", 16, "bold")
+        ).pack(
+            pady=10
+        )
+
+        value_label = ctk.CTkLabel(
+            frame,
+            text=value,
+            text_color=ROYAL_BLUE,
+            font=("Arial", 24, "bold")
+        )
+
+        value_label.pack()
+
+        frame.value_label = value_label
+
+        return frame
+
+    # ======================================
+    # LOAD POPULATION
+    # ======================================
+
+    def load_population(self):
+
+        file_path = filedialog.askopenfilename(
+            filetypes=[
+                (
+                    "Excel Files",
+                    "*.xlsx"
+                ),
+                (
+                    "CSV Files",
+                    "*.csv"
+                )
+            ]
+        )
+
+        if not file_path:
+            return
+
+        try:
+
+            if file_path.endswith(".xlsx"):
+
+                self.df = pd.read_excel(
+                    file_path
+                )
+
+            else:
+
+                self.df = pd.read_csv(
+                    file_path
+                )
+
+            duplicates = int(
+                self.df.duplicated().sum()
+            )
+
+            record_count = len(self.df)
+
+            self.population_card.value_label.configure(
+                text=str(record_count)
+            )
+
+            report = (
+                "POPULATION ANALYSIS\n"
+                "====================\n\n"
+                f"Records: {record_count}\n"
+                f"Duplicates: {duplicates}\n"
+                f"Columns: {list(self.df.columns)}\n\n"
+            )
+
+            if "Amount LC" in self.df.columns:
+
+                total_value = (
+                    self.df["Amount LC"]
+                    .sum()
+                )
+
+                report += (
+                    f"Population Value: "
+                    f"{total_value:,.2f}\n"
+                )
+
+            self.output.delete(
+                "1.0",
+                "end"
+            )
+
+            self.output.insert(
+                "end",
+                report
+            )
+
+            messagebox.showinfo(
+                "Success",
+                "Population Loaded Successfully"
+            )
+
+        except Exception as e:
+
+            messagebox.showerror(
+                "Error",
+                str(e)
+            )
+
+
+# ==================================================
+# START
+# ==================================================
+
+if __name__ == "__main__":
+
+    ctk.set_appearance_mode(
+        "light"
+    )
+
+    ctk.set_default_color_theme(
+        "blue"
+    )
+
+    app = AuditSamplingApp()
+
+    app.mainloop()
