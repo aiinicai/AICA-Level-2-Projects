@@ -1,0 +1,105 @@
+table Fact_SC_PL
+	lineageTag: 2c68deae-b3d6-4349-8bb6-2210af3059c8
+
+	column 'Date Key'
+		dataType: dateTime
+		isHidden
+		formatString: Short Date
+		lineageTag: 02532d77-ace5-4ec7-ac0c-b0f2336c394d
+		summarizeBy: none
+		sourceColumn: Date Key
+
+		annotation SummarizationSetBy = User
+
+		annotation UnderlyingDateTimeDataType = Date
+
+	column 'OpCo Code'
+		dataType: string
+		isHidden
+		lineageTag: b0d696ec-3d8f-4c72-8e3b-f43eb928f89c
+		summarizeBy: none
+		sourceColumn: OpCo Code
+
+		annotation SummarizationSetBy = User
+
+	column 'SC Function'
+		dataType: string
+		isHidden
+		lineageTag: 30c71981-f0fa-4c66-8709-14e48a656446
+		summarizeBy: none
+		sourceColumn: SC Function
+
+		annotation SummarizationSetBy = User
+
+	column 'Account Code'
+		dataType: string
+		isHidden
+		lineageTag: ab4099bc-c71e-42a5-8e07-295acec9a362
+		summarizeBy: none
+		sourceColumn: Account Code
+
+		annotation SummarizationSetBy = User
+
+	column Scenario
+		dataType: string
+		isHidden
+		lineageTag: 7f485f92-14cd-4bc8-8a29-7f214aa1565a
+		summarizeBy: none
+		sourceColumn: Scenario
+
+		annotation SummarizationSetBy = User
+
+	column Channel
+		dataType: string
+		lineageTag: 627dd462-888f-4345-a740-c32af279e325
+		summarizeBy: none
+		sourceColumn: Channel
+
+		annotation SummarizationSetBy = User
+
+	column AccDetail
+		dataType: string
+		lineageTag: 56676f2f-e047-4419-b329-d1c4b17410d0
+		summarizeBy: none
+		sourceColumn: AccDetail
+
+		annotation SummarizationSetBy = User
+
+	column 'Amount USD'
+		dataType: double
+		isHidden
+		formatString: #,0
+		lineageTag: 90fb391a-03c7-45ec-ae78-d79271cd0b76
+		summarizeBy: none
+		sourceColumn: Amount USD
+
+		annotation SummarizationSetBy = User
+
+	column 'Volume Pairs'
+		dataType: double
+		isHidden
+		formatString: #,0
+		lineageTag: bb152f39-8a3f-4b44-80b3-3c801e346490
+		summarizeBy: none
+		sourceColumn: Volume Pairs
+
+		annotation SummarizationSetBy = User
+
+	partition Fact_SC_PL = m
+		mode: import
+		source =
+				let
+				    Source = Excel.Workbook(File.Contents(SampleDataFile), null, true),
+				    Sheet = Source{[Item="Fact_Extract_Sample",Kind="Sheet"]}[Data],
+				    Promoted = Table.PromoteHeaders(Sheet, [PromoteAllScalars=true]),
+				    Typed = Table.TransformColumnTypes(Promoted, {{"Year", Int64.Type}, {"Month", Int64.Type}, {"Amount", type number}, {"OpCo Code", type text}, {"SC Function", type text}, {"Account", type text}, {"Scenario", type text}, {"Channel", type text}, {"AccDetail", type text}}),
+				    AddDate = Table.AddColumn(Typed, "Date Key", each #date([Year], [Month], 1), type date),
+				    AddUSD = Table.AddColumn(AddDate, "Amount USD", each if List.Contains({"PURCH_PAIRS", "PROD_PAIRS"}, [Account]) then null else [Amount], type nullable number),
+				    AddPairs = Table.AddColumn(AddUSD, "Volume Pairs", each if List.Contains({"PURCH_PAIRS", "PROD_PAIRS"}, [Account]) then [Amount] else null, type nullable number),
+				    Selected = Table.SelectColumns(AddPairs, {"Date Key", "OpCo Code", "SC Function", "Account", "Scenario", "Channel", "AccDetail", "Amount USD", "Volume Pairs"}),
+				    Result = Table.RenameColumns(Selected, {{"Account", "Account Code"}})
+				in
+				    Result
+
+	annotation PBI_ResultType = Table
+

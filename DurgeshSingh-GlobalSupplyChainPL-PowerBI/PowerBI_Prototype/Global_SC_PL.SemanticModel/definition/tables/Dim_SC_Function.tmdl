@@ -1,0 +1,51 @@
+table Dim_SC_Function
+	lineageTag: 603862c2-7c49-4421-922d-c665da4b3a6c
+
+	column 'Function Code'
+		dataType: string
+		lineageTag: 18dd2c77-b36a-477f-ad37-dc8dc8d23aa3
+		summarizeBy: none
+		sourceColumn: Function Code
+
+		annotation SummarizationSetBy = User
+
+	column 'SC Function'
+		dataType: string
+		lineageTag: 5ac15f6d-77ee-4962-9f32-279be133e86d
+		summarizeBy: none
+		sourceColumn: SC Function
+		sortByColumn: Sort
+
+		annotation SummarizationSetBy = User
+
+	column 'Short Name'
+		dataType: string
+		lineageTag: 80874094-5770-452e-b28b-24b58d25bafa
+		summarizeBy: none
+		sourceColumn: Short Name
+
+		annotation SummarizationSetBy = User
+
+	column Sort
+		dataType: int64
+		isHidden
+		formatString: 0
+		lineageTag: 1a8618ce-cfc7-4e03-8623-3ac462f46bb3
+		summarizeBy: none
+		sourceColumn: Sort
+
+		annotation SummarizationSetBy = User
+
+	partition Dim_SC_Function = m
+		mode: import
+		source =
+				let
+				    Source = Excel.Workbook(File.Contents(SampleDataFile), null, true),
+				    Sheet = Source{[Item="Dim_SC_Function",Kind="Sheet"]}[Data],
+				    Promoted = Table.PromoteHeaders(Sheet, [PromoteAllScalars=true]),
+				    Result = Table.TransformColumnTypes(Promoted, {{"Function Code", type text}, {"SC Function", type text}, {"Short Name", type text}, {"Sort", Int64.Type}})
+				in
+				    Result
+
+	annotation PBI_ResultType = Table
+

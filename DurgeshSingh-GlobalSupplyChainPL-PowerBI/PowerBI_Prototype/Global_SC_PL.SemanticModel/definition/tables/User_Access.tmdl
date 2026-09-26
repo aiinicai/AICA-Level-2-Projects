@@ -1,0 +1,96 @@
+table User_Access
+	lineageTag: 2591bc31-8139-4835-b6d2-f17746419d7c
+
+	column 'User Email'
+		dataType: string
+		lineageTag: 6b8641fa-c6b9-4339-986d-249d399487fe
+		summarizeBy: none
+		sourceColumn: User Email
+
+		annotation SummarizationSetBy = User
+
+	column 'User Title'
+		dataType: string
+		lineageTag: ac54270e-f2b9-4501-ba70-d5f6d83a0e54
+		summarizeBy: none
+		sourceColumn: User Title
+
+		annotation SummarizationSetBy = User
+
+	column 'App Role'
+		dataType: string
+		lineageTag: 43210a07-4725-48e7-abe7-c50997c9fffd
+		summarizeBy: none
+		sourceColumn: App Role
+
+		annotation SummarizationSetBy = User
+
+	column Region
+		dataType: string
+		lineageTag: 90ae18b2-1bf8-4b32-a485-b387dc41890a
+		summarizeBy: none
+		sourceColumn: Region
+
+		annotation SummarizationSetBy = User
+
+	column 'OpCo Code'
+		dataType: string
+		lineageTag: 2bd18c23-147c-4c41-97d2-697e91da4ab4
+		summarizeBy: none
+		sourceColumn: OpCo Code
+
+		annotation SummarizationSetBy = User
+
+	column 'SC Function'
+		dataType: string
+		lineageTag: aacf788b-52d5-4096-ba8f-7e79623c0ccc
+		summarizeBy: none
+		sourceColumn: SC Function
+
+		annotation SummarizationSetBy = User
+
+	column Active
+		dataType: string
+		lineageTag: bdba628e-bdcf-49de-9c61-79203e259a8e
+		summarizeBy: none
+		sourceColumn: Active
+
+		annotation SummarizationSetBy = User
+
+	column 'Valid From'
+		dataType: dateTime
+		formatString: Short Date
+		lineageTag: 08af6a26-8897-44c9-8a1c-9de04e4bc13a
+		summarizeBy: none
+		sourceColumn: Valid From
+
+		annotation SummarizationSetBy = User
+
+		annotation UnderlyingDateTimeDataType = Date
+
+	column 'Valid To'
+		dataType: dateTime
+		formatString: Short Date
+		lineageTag: 1a1b3151-1b77-4ded-a12f-045ccab75f77
+		summarizeBy: none
+		sourceColumn: Valid To
+
+		annotation SummarizationSetBy = User
+
+		annotation UnderlyingDateTimeDataType = Date
+
+	partition User_Access = m
+		mode: import
+		source =
+				let
+				    Source = Excel.Workbook(File.Contents(SampleDataFile), null, true),
+				    Sheet = Source{[Item="User_Access",Kind="Sheet"]}[Data],
+				    Promoted = Table.PromoteHeaders(Sheet, [PromoteAllScalars=true]),
+				    Renamed = Table.RenameColumns(Promoted, {{"User Name / Role Title", "User Title"}}),
+				    Selected = Table.SelectColumns(Renamed, {"User Email", "User Title", "App Role", "Region", "OpCo Code", "SC Function", "Active", "Valid From", "Valid To"}),
+				    Result = Table.TransformColumnTypes(Selected, {{"User Email", type text}, {"User Title", type text}, {"App Role", type text}, {"Region", type text}, {"OpCo Code", type text}, {"SC Function", type text}, {"Active", type text}, {"Valid From", type date}, {"Valid To", type date}})
+				in
+				    Result
+
+	annotation PBI_ResultType = Table
+

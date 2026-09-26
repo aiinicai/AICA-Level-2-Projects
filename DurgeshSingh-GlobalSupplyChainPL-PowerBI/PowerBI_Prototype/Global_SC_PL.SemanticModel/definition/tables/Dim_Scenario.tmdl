@@ -1,0 +1,43 @@
+table Dim_Scenario
+	lineageTag: a0006d50-2054-4c88-a57e-ceb7cfb7feee
+
+	column Scenario
+		dataType: string
+		lineageTag: b4f8bcee-9726-4301-85ec-6b511e82631d
+		summarizeBy: none
+		sourceColumn: Scenario
+		sortByColumn: Sort
+
+		annotation SummarizationSetBy = User
+
+	column Sort
+		dataType: int64
+		isHidden
+		formatString: 0
+		lineageTag: d5f9353f-5f75-4dc7-9dcb-dae669efeed8
+		summarizeBy: none
+		sourceColumn: Sort
+
+		annotation SummarizationSetBy = User
+
+	column Description
+		dataType: string
+		lineageTag: 32e226f4-59a1-48fb-9b90-7c52303fa06e
+		summarizeBy: none
+		sourceColumn: Description
+
+		annotation SummarizationSetBy = User
+
+	partition Dim_Scenario = m
+		mode: import
+		source =
+				let
+				    Source = Excel.Workbook(File.Contents(SampleDataFile), null, true),
+				    Sheet = Source{[Item="Dim_Scenario",Kind="Sheet"]}[Data],
+				    Promoted = Table.PromoteHeaders(Sheet, [PromoteAllScalars=true]),
+				    Result = Table.TransformColumnTypes(Promoted, {{"Scenario", type text}, {"Sort", Int64.Type}, {"Description", type text}})
+				in
+				    Result
+
+	annotation PBI_ResultType = Table
+
