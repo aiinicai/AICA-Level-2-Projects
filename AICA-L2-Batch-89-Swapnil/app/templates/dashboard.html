@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+{% from "_macros.html" import head, band, tags, status, who with context %}
+{% block title %}Dashboard{% endblock %}
+{% block content %}
+<div class="page-head">{{ head("Firm dashboard", "Good day, " ~ current_user.full_name.split(' ')[0], "Position as on " ~ (today|dmy) ~ " — everything below respects your role and assignments.") }}
+  <div class="d-flex gap-2">
+    {% if can('edit_entity') %}<a class="btn btn-sm btn-gold" href="{{ url_for('wizard.onboard') }}">Onboard an entity</a>{% endif %}
+    <a class="btn btn-sm btn-brand" href="{{ url_for('obligations.queue') }}">My work queue</a>
+  </div></div>
+
+<div class="row g-3 mb-4">
+  {% for h in ['overdue', 'due7', 'due30', 'upcoming', 'closed'] %}
+  <div class="col-6 col-md-4 col-xl"><div class="kpi kpi-{{ h }}"><div class="kpi-label">{{ HEALTH_LABELS[h] }}</div><div class="kpi-value">{{ bands.get(h, 0) }}</div></div></div>
+  {% endfor %}
+  <div class="col-12 col-md-8 col-xl-3"><div class="kpi kpi-gold small">
+    <div class="kpi-label mb-1">Needs attention</div>
+    <div><a href="{{ url_for('rules.index') }}">{{ unverified }} unverified rules</a> <span class="small-muted">— fees shown as estimates</span></div>
+    <div>{{ stale }} item(s) on stale facts</div>
+    <div>{{ decisions|length }} partner decision(s) pending</div>
+    <div>{{ dsc|length }} DSC expiring within 30 days</div>
+  </div></div>
+</div>
+
+<div class="row g-4">
+  <div class="col-xl-7">
+    <div class="card mb-4"><div class="card-header d-flex justify-content-between"><span class="serif">Overdue — fee exposure if filed today</span><span class="small-muted">{{ n_overdue }} item(s)</span></div>
+      <div class="table-responsive"><table class="table table-sm table-hover mb-0">
+        <thead><tr><th>Due</th><th class="text-end">Days late</th><th>Form</th><th>Entity / person</th><th class="text-end">If filed today</th></tr></thead>
+        <tbody>
+        {% for o, fb in exposure %}
+          <tr><td class="nowrap">{{ o.due_date|dmy }}</td><td class="text-end">{{ (today - o.due_date).days }}</td>
+            <td><a href="{{ url_for('obligations.show', obl_id=o.id) }}">{{ o.form }}</a> <span class="small-muted">{{ o.period_key }}</span>{{ tags(o) }}</td>
+            <td>{{ who(o) }}</td>
+            <td class="text-end nowrap">{% if fb %}<strong>{{ fb.total|inr }}</strong>{% if fb.scheme %}<div class="small-muted">{{ fb.scheme }}</div>{% endif %}{% if not fb.verified %}<div><span class="tag tag-unverified">Estimate</span></div>{% endif %}{% else %}<span class="small-muted">no fee</span>{% endif %}</td></tr>
+        {% else %}<tr><td colspan="5" class="text-muted">Nothing overdue.</td></tr>{% endfor %}
+        </tbody></table></div>
+      <div class="card-footer small-muted bg-white">Penalties under s.454 (Companies Act) / s.76A (LLP Act) are adjudicated by the ROC and never computed.</div>
+    </div>
+    <div class="card"><div class="card-header"><span class="serif">Next 30 days</span></div>
+      <div class="table-responsive"><table class="table table-sm mb-0">
+        <thead><tr><th>Due</th><th>Health</th><th>Form</th><th>Entity / person</th><th>Status</th></tr></thead>
+        <tbody>{% for o in upcoming %}
+          <tr><td class="nowrap">{{ o.due_date|dmy }}</td><td>{{ band('due7' if (o.due_date - today).days <= 7 else 'due30') }}</td>
+            <td><a href="{{ url_for('obligations.show', obl_id=o.id) }}">{{ o.form }}</a>{{ tags(o) }}</td><td>{{ who(o) }}</td><td>{{ status(o.status) }}</td></tr>
+        {% else %}<tr><td colspan="5" class="text-muted">Nothing due in the next 30 days.</td></tr>{% endfor %}</tbody>
+      </table></div></div>
+  </div>
+  <div class="col-xl-5">
+    {% if can('approve') %}
+    <div class="card mb-4"><div class="card-header"><span class="serif">Waiting for my review</span> <span class="small-muted">({{ review|length }})</span></div>
+      <ul class="list-group list-group-flush">{% for o in review %}
+        <li class="list-group-item d-flex justify-content-between gap-2"><span><a href="{{ url_for('obligations.show', obl_id=o.id) }}">{{ o.form }}</a> — {{ who(o) }}</span><span class="small-muted nowrap">due {{ o.due_date|dmy }}</span></li>
+      {% else %}<li class="list-group-item text-muted">Nothing to review.</li>{% endfor %}</ul></div>
+    {% endif %}
+    <div class="card mb-4"><div class="card-header"><span class="serif">Assigned to me</span></div>
+      <ul class="list-group list-group-flush">{% for o in mine %}
+        <li class="list-group-item d-flex justify-content-between gap-2"><span><a href="{{ url_for('obligations.show', obl_id=o.id) }}">{{ o.form }}</a> — {{ who(o) }}</span><span class="small-muted nowrap">{{ o.due_date|dmy }}</span></li>
+      {% else %}<li class="list-group-item text-muted">Nothing assigned to you.</li>{% endfor %}</ul></div>
+    {% if decisions %}
+    <div class="card mb-4 border-danger"><div class="card-header"><span class="serif">Partner decisions needed</span></div>
+      <ul class="list-group list-group-flush">{% for o in decisions[:10] %}
+        <li class="list-group-item small">{{ who(o) }} — {{ o.form }} ({{ o.period_key }}) <span class="tag tag-decision">{{ o.needs_decision }}</span></li>{% endfor %}</ul></div>
+    {% endif %}
+    <div class="card"><div class="card-header"><span class="serif">DSC expiring within 30 days</span></div>
+      <ul class="list-group list-group-flush">{% for p in dsc %}
+        <li class="list-group-item d-flex justify-content-between"><span><a href="{{ url_for('people.show', person_id=p.id) }}">{{ p.name }}</a> <span class="small-muted">DIN {{ p.din }}</span></span><span class="nowrap">{{ p.dsc_expiry|dmy }} <span class="band band-{{ 'due7' if (p.dsc_expiry - today).days <= 7 else 'due30' }}">{{ (p.dsc_expiry - today).days }} d</span></span></li>
+      {% else %}<li class="list-group-item text-muted">None.</li>{% endfor %}</ul></div>
+  </div>
+</div>
+{% endblock %}

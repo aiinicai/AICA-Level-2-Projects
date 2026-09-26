@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+{% from "_macros.html" import head, tags with context %}
+{% block title %}Onboard an entity{% endblock %}
+{% block content %}
+<div class="page-head">{{ head("Onboarding", "Onboard a new client entity", "Five short steps — nothing is saved until you confirm the preview.") }}
+  <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('wizard.onboard', restart=1) }}">Start again</a></div>
+<div class="stepper">{% for s in steps %}<span class="step {{ 'now' if loop.index == step else ('done' if loop.index < step else '') }}">{{ loop.index }}. {{ s }}</span>{% endfor %}</div>
+
+<form method="post" action="{{ url_for('wizard.onboard', step=step) }}" class="card"><div class="card-body p-4">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+{% if step == 1 %}
+  <div class="row g-3">
+    <div class="col-md-6"><label class="form-label" for="name">Entity name</label><input class="form-control" id="name" name="name" value="{{ d.name or '' }}" required></div>
+    <div class="col-md-3"><label class="form-label" for="entity_type">Type</label><select class="form-select" id="entity_type" name="entity_type">{% for t in types %}<option {% if d.entity_type == t %}selected{% endif %}>{{ t }}</option>{% endfor %}</select></div>
+    <div class="col-md-3"><label class="form-label" for="incorporation_date">Incorporated on</label><input class="form-control" type="date" id="incorporation_date" name="incorporation_date" value="{{ d.incorporation_date or '' }}" required></div>
+    <div class="col-md-4"><label class="form-label" for="cin">CIN / LLPIN</label><input class="form-control mono" id="cin" name="cin" value="{{ d.cin or '' }}"></div>
+    <div class="col-md-3"><label class="form-label" for="pan">PAN</label><input class="form-control mono" id="pan" name="pan" maxlength="10"></div>
+    <div class="col-md-3"><label class="form-label" for="engagement_start">Firm took over on</label><input class="form-control" type="date" id="engagement_start" name="engagement_start" value="{{ d.engagement_start or '' }}"></div>
+    <div class="col-md-4"><label class="form-label" for="nominal_capital">Authorised capital ₹</label><input class="form-control" id="nominal_capital" name="nominal_capital" value="{{ d.nominal_capital or '' }}"></div>
+    <div class="col-md-4"><label class="form-label" for="paid_up_capital">Paid-up capital ₹</label><input class="form-control" id="paid_up_capital" name="paid_up_capital" value="{{ d.paid_up_capital or '' }}"></div>
+    <div class="col-md-4"><label class="form-label" for="llp_contribution">LLP contribution ₹</label><input class="form-control" id="llp_contribution" name="llp_contribution" value="{{ d.llp_contribution or '' }}"></div>
+    <div class="col-12">{% for f, label in [('has_share_capital','Has share capital'),('single_director','OPC with a single director'),('startup','DPIIT start-up'),('is_holding','Holding company'),('is_subsidiary','Subsidiary company'),('subsidiary_of_public','Subsidiary of a public company')] %}
+      <div class="form-check form-check-inline"><input class="form-check-input" type="checkbox" id="{{ f }}" name="{{ f }}" {% if d.get(f) %}checked{% endif %}><label class="form-check-label" for="{{ f }}">{{ label }}</label></div>{% endfor %}</div>
+  </div>
+  <p class="small-muted mt-3 mb-0">More flags (NBFC, Government company, listed subsidiary…) can be set on the entity's edit page afterwards.</p>
+{% elif step == 2 %}
+  <h2 class="h5">{{ ein.name }} — financial year</h2>
+  {% if llp_options %}
+    <p>An LLP registered after 30 September may close its first financial year on 31 March of the next year (s.2(1)(l), LLP Act). Both outcomes:</p>
+    <div class="row g-3 mb-3">
+      <div class="col-md-6"><div class="kpi kpi-upcoming"><div class="kpi-label">Shorter first FY (default)</div><div class="kpi-value">{{ llp_options[0]|dmy }}</div><div class="small-muted">Form 11 due {{ (llp_options[0].replace(month=5, day=30, year=llp_options[0].year))|dmy }}</div></div></div>
+      {% if llp_options[1] %}<div class="col-md-6"><div class="kpi kpi-gold"><div class="kpi-label">Longer first FY (election)</div><div class="kpi-value">{{ llp_options[1]|dmy }}</div><div class="small-muted">Form 11 due {{ (llp_options[1].replace(month=5, day=30))|dmy }}</div></div></div>{% endif %}
+    </div>
+    {% if llp_options[1] %}<div class="form-check"><input class="form-check-input" type="checkbox" id="elect_longer" name="elect_longer" {% if elect_longer %}checked{% endif %}><label class="form-check-label" for="elect_longer">The LLP has elected the longer first financial year</label></div>
+    {% else %}<p class="small-muted">Registered between April and September: the longer first year is not available.</p>{% endif %}
+  {% else %}
+    <div class="row g-3">
+      <div class="col-md-4"><div class="kpi kpi-gold"><div class="kpi-label">First FY</div><div class="kpi-value">{{ ein.incorporation_date|dmy }} → {{ first_end|dmy }}</div><div class="small-muted">s.2(41): ends 31 March of the year after incorporation</div></div></div>
+      {% if ein.entity_type != 'OPC' %}<div class="col-md-4"><div class="kpi kpi-upcoming"><div class="kpi-label">First AGM deadline</div><div class="kpi-value">{{ first_agm|dmy }}</div><div class="small-muted">s.96(1): within 9 months of the first FY's close</div></div></div>{% endif %}
+      <div class="col-md-4"><div class="kpi kpi-upcoming"><div class="kpi-label">Financial years to track</div><div class="kpi-value">{{ fys|length }}</div><div class="small-muted">{{ fys[0].key }} to {{ fys[-1].key }}</div></div></div>
+    </div>
+  {% endif %}
+{% elif step == 3 %}
+  <h2 class="h5">Directors / designated partners</h2>
+  <p class="small-muted">DINs already in the system are linked automatically. For a new DIN give the name and allotment date (drives the DIR-3 KYC cycle). Leave rows blank to skip.</p>
+  <div class="table-responsive"><table class="table table-sm"><thead><tr><th>DIN / DPIN</th><th>Name</th><th>DIN allotted on</th><th>Designation</th></tr></thead><tbody>
+  {% for i in range(6) %}{% set p = directors[i] if i < directors|length else {} %}
+    <tr><td><label class="visually-hidden" for="din{{ i }}">DIN row {{ i + 1 }}</label><input class="form-control form-control-sm mono" id="din{{ i }}" name="din{{ i }}" maxlength="8" value="{{ p.din or '' }}"></td>
+      <td><label class="visually-hidden" for="name{{ i }}">Name row {{ i + 1 }}</label><input class="form-control form-control-sm" id="name{{ i }}" name="name{{ i }}" value="{{ p.name or '' }}"></td>
+      <td><label class="visually-hidden" for="allot{{ i }}">Allotted row {{ i + 1 }}</label><input class="form-control form-control-sm" type="date" id="allot{{ i }}" name="allot{{ i }}" value="{{ p.allot or '' }}"></td>
+      <td><label class="visually-hidden" for="desig{{ i }}">Designation row {{ i + 1 }}</label><input class="form-control form-control-sm" id="desig{{ i }}" name="desig{{ i }}" value="{{ p.designation or ('Designated Partner' if ein.is_llp else 'Director') }}"></td></tr>
+  {% endfor %}</tbody></table></div>
+{% elif step == 4 %}
+  <h2 class="h5">Annual facts — {{ fy.key }} <span class="small-muted">({{ fy.start|dmy }} to {{ fy.end|dmy }})</span></h2>
+  <p class="small-muted">The latest financial year. These figures drive the classifications (small company, XBRL, MGT-8, CSR…). Leave blank if not known — later years use them with a "Facts stale" flag.</p>
+  <div class="row g-3">
+    {% if ein.is_llp %}
+      <div class="col-md-4"><label class="form-label" for="turnover">Turnover ₹</label><input class="form-control" id="turnover" name="turnover"></div>
+      <div class="col-md-4"><label class="form-label" for="llp_contribution_f">Contribution at FY end ₹</label><input class="form-control" id="llp_contribution_f" name="llp_contribution" value="{{ '%.0f'|format(ein.llp_contribution) }}"></div>
+    {% else %}
+      <div class="col-md-3"><label class="form-label" for="paid_up_capital_f">Paid-up at FY end ₹</label><input class="form-control" id="paid_up_capital_f" name="paid_up_capital" value="{{ '%.0f'|format(ein.paid_up_capital) }}"></div>
+      <div class="col-md-3"><label class="form-label" for="turnover">Turnover ₹</label><input class="form-control" id="turnover" name="turnover"></div>
+      <div class="col-md-3"><label class="form-label" for="net_worth">Net worth ₹</label><input class="form-control" id="net_worth" name="net_worth"></div>
+      <div class="col-md-3"><label class="form-label" for="net_profit">Net profit ₹</label><input class="form-control" id="net_profit" name="net_profit"></div>
+      {% if ein.entity_type != 'OPC' %}<div class="col-md-3"><label class="form-label" for="agm_date">AGM held on</label><input class="form-control" type="date" id="agm_date" name="agm_date"></div>
+      <div class="col-md-3"><label class="form-label" for="aaa">Auditor appointed at this AGM?</label><select class="form-select" id="aaa" name="auditor_appointed_at_agm"><option value="">—</option><option value="yes">Yes</option><option value="no">No</option></select></div>{% endif %}
+    {% endif %}
+    {% if prev %}<div class="col-md-3"><label class="form-label" for="prev_turnover">Turnover of {{ prev.key }} ₹</label><input class="form-control" id="prev_turnover" name="prev_turnover"><div class="small-muted">The small-company / small-LLP test uses the preceding year's turnover.</div></div>{% endif %}
+  </div>
+{% else %}
+  <h2 class="h5">Preview — {{ specs|length }} obligations will be created</h2>
+  {% if overdue %}<div class="alert alert-warning small">{{ overdue|length }} of them are already past their due date (after the engagement start). Mark those that were filed before the firm took over once the entity is saved.</div>{% endif %}
+  <div class="row g-3">{% for period, items in by_period.items() %}
+    <div class="col-md-6 col-xl-4"><div class="card h-100"><div class="card-header">{{ period }} <span class="small-muted">({{ items|length }})</span></div>
+      <ul class="list-group list-group-flush small">{% for s in items[:12] %}<li class="list-group-item d-flex justify-content-between gap-2"><span>{{ s.form }}{{ tags(s) }}</span><span class="nowrap {{ 'text-danger' if s.due_date < today and not s.pre_engagement }}">{{ s.due_date|dmy }}</span></li>{% endfor %}
+      {% if items|length > 12 %}<li class="list-group-item small-muted">… and {{ items|length - 12 }} more</li>{% endif %}</ul></div></div>
+  {% endfor %}</div>
+{% endif %}
+<div class="d-flex justify-content-between mt-4">
+  {% if step > 1 %}<a class="btn btn-outline-secondary" href="{{ url_for('wizard.onboard', step=step - 1) }}">Back</a>{% else %}<a class="btn btn-link" href="{{ url_for('entities.index') }}">Cancel</a>{% endif %}
+  <button class="btn {{ 'btn-gold' if step == 5 else 'btn-brand' }}">{{ 'Confirm and create' if step == 5 else 'Continue' }}</button>
+</div>
+</div></form>
+{% endblock %}

@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block title %}{{ 'Add entity' if new else 'Edit ' ~ e.name }}{% endblock %}
+{% block content %}
+<h1 class="h4 mb-3">{{ 'Add entity' if new else 'Edit ' ~ e.name }}</h1>
+<form method="post" class="card"><div class="card-body">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <div class="row g-3">
+    <div class="col-md-6"><label class="form-label" for="name">Name</label><input class="form-control" id="name" name="name" value="{{ d.name or '' }}" required></div>
+    <div class="col-md-3"><label class="form-label" for="entity_type">Entity type</label>
+      <select class="form-select" id="entity_type" name="entity_type">{% for t in types %}<option {% if d.entity_type == t %}selected{% endif %}>{{ t }}</option>{% endfor %}</select></div>
+    <div class="col-md-3"><label class="form-label" for="status">Status</label>
+      <select class="form-select" id="status" name="status">{% for s in ['ACTIVE','DORMANT','UNDER_STRIKE_OFF','STRUCK_OFF','AMALGAMATED'] %}<option {% if d.status == s %}selected{% endif %}>{{ s }}</option>{% endfor %}</select></div>
+    <div class="col-md-4"><label class="form-label" for="cin">CIN / LLPIN</label><input class="form-control mono" id="cin" name="cin" value="{{ d.cin or '' }}" placeholder="U62099DL2026PTC000101 or AAB-1234"></div>
+    <div class="col-md-3"><label class="form-label" for="pan">PAN {% if not new %}<span class="small-muted">(leave blank to keep)</span>{% endif %}</label><input class="form-control mono" id="pan" name="pan" value="{{ d.pan or '' }}" maxlength="10"></div>
+    <div class="col-md-2"><label class="form-label" for="incorporation_date">Incorporated on</label><input class="form-control" type="date" id="incorporation_date" name="incorporation_date" value="{{ d.incorporation_date or '' }}" required></div>
+    <div class="col-md-3"><label class="form-label" for="engagement_start">Engagement start</label><input class="form-control" type="date" id="engagement_start" name="engagement_start" value="{{ d.engagement_start or '' }}"></div>
+    <div class="col-md-3"><label class="form-label" for="nominal_capital">Authorised (nominal) capital ₹</label><input class="form-control" id="nominal_capital" name="nominal_capital" value="{{ d.nominal_capital or '' }}"></div>
+    <div class="col-md-3"><label class="form-label" for="paid_up_capital">Paid-up capital ₹</label><input class="form-control" id="paid_up_capital" name="paid_up_capital" value="{{ d.paid_up_capital or '' }}"></div>
+    <div class="col-md-3"><label class="form-label" for="llp_contribution">LLP contribution ₹</label><input class="form-control" id="llp_contribution" name="llp_contribution" value="{{ d.llp_contribution or '' }}"></div>
+    <div class="col-md-3"><label class="form-label" for="roc">ROC</label><input class="form-control" id="roc" name="roc" value="{{ d.roc or '' }}" placeholder="RoC-Delhi"></div>
+    <div class="col-md-6"><label class="form-label" for="registered_office">Registered office</label><input class="form-control" id="registered_office" name="registered_office" value="{{ d.registered_office or '' }}"></div>
+    <div class="col-md-3"><label class="form-label" for="rm_id">Relationship manager</label><select class="form-select" id="rm_id" name="rm_id"><option value="">—</option>{% for u in staff %}<option value="{{ u.id }}" {% if d.rm_id == u.id %}selected{% endif %}>{{ u.full_name }}</option>{% endfor %}</select></div>
+    <div class="col-md-3"><label class="form-label" for="preparer_id">Assigned preparer</label><select class="form-select" id="preparer_id" name="preparer_id"><option value="">—</option>{% for u in staff %}<option value="{{ u.id }}" {% if d.preparer_id == u.id %}selected{% endif %}>{{ u.full_name }}</option>{% endfor %}</select></div>
+  </div>
+  <fieldset class="mt-4"><legend class="h6">Flags</legend><div class="row">
+    {% for f, label in [('has_share_capital','Has share capital'),('is_holding','Holding company'),('is_subsidiary','Subsidiary company'),('subsidiary_of_public','Subsidiary of a public company'),('listed_subsidiary','Subsidiary of a listed company'),('nbfc','NBFC'),('hfc','Housing finance co.'),('banking','Banking company'),('excluded_sector','Insurance / power sector'),('government','Government company'),('special_act','Governed by a special Act'),('startup','DPIIT start-up'),('single_director','OPC with a single director'),('ro_furnished_at_incorporation','RO address given at incorporation'),('llp_elect_longer_first_fy','LLP elects longer first FY'),('ccfs_excluded','Excluded from CCFS (strike-off/dormancy applied)')] %}
+    <div class="col-md-4"><div class="form-check"><input class="form-check-input" type="checkbox" id="{{ f }}" name="{{ f }}" {% if d.get(f) %}checked{% endif %}><label class="form-check-label" for="{{ f }}">{{ label }}</label></div></div>
+    {% endfor %}
+  </div></fieldset>
+  <div class="mt-4"><button class="btn btn-brand">{{ 'Add and generate obligations' if new else 'Save and recompute' }}</button>
+  <a class="btn btn-link" href="{{ url_for('entities.index') if new else url_for('entities.show', entity_id=e.id) }}">Cancel</a></div>
+</div></form>
+{% endblock %}

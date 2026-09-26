@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+{% from "_macros.html" import flashes with context %}
+{% block title %}{{ {'login': 'Sign in', 'change': 'Change password', 'totp': 'Two-factor code', 'totp_setup': 'Set up two-factor sign-in'}[mode] }}{% endblock %}
+{% block page %}
+{% if mode == 'login' %}
+<div class="login-wrap">
+  <section class="login-hero">
+    <div class="d-flex align-items-center gap-3 mb-5">{% if logo_url %}<span class="monogram logo-badge lg"><img src="{{ logo_url }}" alt="{{ firm_name }} logo"></span>{% else %}<span class="monogram" aria-hidden="true">{{ firm_initials }}</span>{% endif %}
+      <span><span class="brand-name">{{ firm_name }}</span><span class="brand-sub">{{ firm_tagline }}</span></span></div>
+    <div class="eyebrow">MCA compliance mapper</div>
+    <h1>Every due date, <span class="gold">every entity</span>, every year.</h1>
+    <p class="mt-3">The firm's lifecycle ROC &amp; LLP compliance calendar — every client, every due date, every fee — built on a versioned, citation-backed rule pack. For firm staff only; nothing is filed on the MCA portal from here.</p>
+    <p class="small mt-4 mb-0">{{ firm_address }} · {{ firm_phone }} · {{ firm_email }}</p>
+  </section>
+  <section class="login-panel">
+    <div class="login-card">
+      <div class="eyebrow">Staff sign-in</div>
+      <h2 class="mb-4">Welcome back</h2>
+      {{ flashes() }}
+      <form method="post" action="{{ url_for('auth.login') }}" autocomplete="off">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div class="mb-3"><label class="form-label" for="username">Username</label>
+          <input class="form-control" id="username" name="username" value="{{ username or '' }}" required autofocus></div>
+        <div class="mb-4"><label class="form-label" for="password">Password</label>
+          <input class="form-control" id="password" name="password" type="password" required></div>
+        <button class="btn btn-brand w-100 py-2">Sign in</button>
+      </form>
+      <p class="small-muted mt-4 mb-0">Forgot your password? Ask the owner to reset it. Five wrong attempts lock the account for 15 minutes.</p>
+    </div>
+  </section>
+</div>
+{% else %}
+<main class="container py-5">
+  <div class="row justify-content-center"><div class="col-md-7 col-lg-5">
+    {{ flashes() }}
+    <div class="card"><div class="card-body p-4">
+    {% if mode == 'change' %}
+      <div class="eyebrow">Security</div><h2>Change your password</h2>
+      {% if current_user.must_change_password %}<p class="alert alert-info small">You must set your own password before continuing.</p>{% endif %}
+      <p class="small-muted">At least 12 characters, not a common password, and not containing your username.</p>
+      <form method="post">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div class="mb-3"><label class="form-label" for="current">Current password</label><input class="form-control" type="password" id="current" name="current" required></div>
+        <div class="mb-3"><label class="form-label" for="new">New password</label><input class="form-control" type="password" id="new" name="new" minlength="12" required></div>
+        <div class="mb-4"><label class="form-label" for="again">New password again</label><input class="form-control" type="password" id="again" name="again" minlength="12" required></div>
+        <button class="btn btn-brand">Save password</button>
+        {% if not current_user.must_change_password %}<a class="btn btn-link" href="{{ url_for('dashboard.index') }}">Cancel</a>{% endif %}
+      </form>
+    {% elif mode == 'totp' %}
+      <div class="eyebrow">Two-factor sign-in</div><h2>Enter your 6-digit code</h2>
+      <p class="small-muted">From your authenticator app.</p>
+      <form method="post">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <label class="form-label" for="code">Code</label>
+        <input class="form-control mb-3 mono" id="code" name="code" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" required autofocus>
+        <button class="btn btn-brand w-100">Verify</button>
+      </form>
+    {% else %}
+      <div class="eyebrow">Two-factor sign-in</div><h2>Set up your authenticator</h2>
+      {% if required %}<p class="alert alert-warning small">The firm requires two-factor sign-in for partners and the owner.</p>{% endif %}
+      <ol class="small">
+        <li>Open an authenticator app (Google or Microsoft Authenticator, etc.).</li>
+        <li>Add an account manually with this time-based key:<br><span class="mono fs-6 user-select-all">{{ secret }}</span></li>
+        <li>Enter the 6-digit code the app shows.</li>
+      </ol>
+      <p class="small-muted text-break">Setup URI: <span class="mono user-select-all">{{ uri }}</span></p>
+      <form method="post">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <label class="form-label" for="code">Code</label>
+        <input class="form-control mb-3 mono" id="code" name="code" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" required>
+        <button class="btn btn-brand">Turn on</button>
+      </form>
+    {% endif %}
+    </div></div>
+  </div></div>
+</main>
+{% endif %}
+{% endblock %}
