@@ -1,0 +1,599 @@
+{
+  "name": "AI Practice Watchdog (CA Firm)",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "424dce65-7a08-4f5a-bc2c-7290342f27a5",
+      "name": "Run Watchdog Now",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        208
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// =====================================================================\n//  PRACTICE WATCHDOG - SETTINGS  (the only node you normally edit)\n// =====================================================================\nconst CONFIG = {\n  // Date the checks run \"as of\". Keep '2026-09-23' for the capstone demo data.\n  // Set to '' for live use and the workflow will use today's date (IST).\n  asOfDate: '2026-09-23',\n\n  exportFileId: '11tt6-zHXSCNNexn3xpIRM82HF6wOdDs4',   // Google Drive file ID of the practice-software export\n  partnerEmail: 'tanvorashah@gmail.com',              // who receives the daily digest\n  firmName: 'Demo & Associates, Chartered Accountants',\n\n  thresholds: {\n    dueSoonDays: 7,            // look-ahead window for deadlines and workload\n    lowProgressPct: 50,        // due soon, but less than this % of budgeted hours logged\n    overrunTolerancePct: 10,   // flag when actual hours exceed budget by more than this %\n    longDayHrs: 11,            // flag anyone logging more than this in a single day\n    weeklyOffDays: [0],        // 0 = Sunday (CA offices usually work Saturdays)\n    completedStatuses: ['Completed', 'Done', 'Filed', 'Closed']\n  },\n\n  // ----- COLUMN MAPPING -----------------------------------------------\n  // Left side = field the watchdog uses. Right side = column header in YOUR export.\n  // To connect a different practice software, change only the right-hand values.\n  columnMap: {\n    staff:     { staff_id: 'staff_id', staff_name: 'staff_name', role: 'role', email: 'email',\n                 daily_capacity_hrs: 'daily_capacity_hrs' },\n    tasks:     { task_id: 'task_id', client_name: 'client_name', work_type: 'work_type',\n                 description: 'description', assignee_id: 'assignee_id', reviewer_id: 'reviewer_id',\n                 due_date: 'due_date', budget_hrs: 'budget_hrs', status: 'status', completed_on: 'completed_on' },\n    timesheet: { entry_id: 'entry_id', date: 'date', staff_id: 'staff_id', task_id: 'task_id',\n                 client_name: 'client_name', hours: 'hours', narration: 'narration' },\n    evidence:  { evidence_id: 'evidence_id', task_id: 'task_id', evidence_type: 'evidence_type',\n                 reference_no: 'reference_no', evidence_date: 'evidence_date', source: 'source' }\n  }\n};\n\nif (!CONFIG.asOfDate) CONFIG.asOfDate = $now.setZone('Asia/Kolkata').toFormat('yyyy-MM-dd');\nreturn [{ json: CONFIG }];\n"
+      },
+      "id": "583254b3-7717-49ee-91fb-68d3ca90ac93",
+      "name": "Watchdog Settings",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        240,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtHour": 19
+            }
+          ]
+        }
+      },
+      "id": "0fc0b942-efdf-48a1-8992-a7690569cb9c",
+      "name": "Every Day 7 PM",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.4,
+      "position": [
+        0,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "download",
+        "fileId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $json.exportFileId }}"
+        },
+        "options": {}
+      },
+      "id": "0c349c30-5dcf-48c1-bf7c-456cec205685",
+      "name": "Download Practice Export",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        480,
+        304
+      ],
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "vFCnpdPPy7JVXN9a",
+          "name": "Google Drive account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "xlsx",
+        "options": {
+          "headerRow": true,
+          "sheetName": "Staff"
+        }
+      },
+      "id": "12859d27-e8a9-47f4-9d2a-5228ff88572e",
+      "name": "Read Staff Sheet",
+      "type": "n8n-nodes-base.extractFromFile",
+      "typeVersion": 1.1,
+      "position": [
+        720,
+        64
+      ]
+    },
+    {
+      "parameters": {
+        "numberInputs": 4
+      },
+      "id": "52587f61-7f78-4569-83cc-86c742b0de1f",
+      "name": "Wait for All Sheets",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        960,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "xlsx",
+        "options": {
+          "headerRow": true,
+          "sheetName": "Tasks"
+        }
+      },
+      "id": "37c2e0a4-6909-41db-810f-5ec32c138db4",
+      "name": "Read Tasks Sheet",
+      "type": "n8n-nodes-base.extractFromFile",
+      "typeVersion": 1.1,
+      "position": [
+        720,
+        224
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "xlsx",
+        "options": {
+          "headerRow": true,
+          "sheetName": "Timesheet"
+        }
+      },
+      "id": "01adf37c-4e6d-4c80-a933-43f848ab702f",
+      "name": "Read Timesheet Sheet",
+      "type": "n8n-nodes-base.extractFromFile",
+      "typeVersion": 1.1,
+      "position": [
+        720,
+        384
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "xlsx",
+        "options": {
+          "headerRow": true,
+          "sheetName": "Evidence"
+        }
+      },
+      "id": "4abf67f7-1bbd-495d-87cf-60c5ac6d6224",
+      "name": "Read Evidence Sheet",
+      "type": "n8n-nodes-base.extractFromFile",
+      "typeVersion": 1.1,
+      "position": [
+        720,
+        544
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// ============================================================================\n// WATCHDOG RULE ENGINE - deterministic checks on the practice-software export\n// ============================================================================\nfunction runChecks(raw, cfg) {\n  // ---------- 1. remap columns from the practice-software export ----------\n  const remap = (rows, map) => rows.map(r => {\n    const o = {};\n    for (const [generic, source] of Object.entries(map)) o[generic] = r[source];\n    return o;\n  });\n  const parseDate = v => {\n    if (v === undefined || v === null || v === '') return null;\n    if (typeof v === 'number') {                               // Excel serial date\n      const d = new Date(Date.UTC(1899, 11, 30) + v * 86400000);\n      return d.toISOString().slice(0, 10);\n    }\n    const s = String(v).trim();\n    let m = s.match(/^(\\d{4})-(\\d{2})-(\\d{2})/);               // 2026-09-23\n    if (m) return `${m[1]}-${m[2]}-${m[3]}`;\n    m = s.match(/^(\\d{1,2})[\\/\\-.](\\d{1,2})[\\/\\-.](\\d{4})$/);  // 23/09/2026 or 23-09-2026 (Indian dd/mm)\n    if (m) return `${m[3]}-${m[2].padStart(2, '0')}-${m[1].padStart(2, '0')}`;\n    const d = new Date(s);\n    return isNaN(d) ? null : d.toISOString().slice(0, 10);\n  };\n  const num = v => { const n = parseFloat(String(v ?? '').replace(/,/g, '')); return isNaN(n) ? 0 : n; };\n  const str = v => (v === undefined || v === null) ? '' : String(v).trim();\n  const M = cfg.columnMap;\n\n  const staff = remap(raw.staff, M.staff).map(s => ({ ...s, staff_id: str(s.staff_id), daily_capacity_hrs: num(s.daily_capacity_hrs) || 8 }));\n  const tasks = remap(raw.tasks, M.tasks).map(t => ({\n    ...t, task_id: str(t.task_id), assignee_id: str(t.assignee_id), reviewer_id: str(t.reviewer_id),\n    due_date: parseDate(t.due_date), completed_on: parseDate(t.completed_on), budget_hrs: num(t.budget_hrs),\n    status: str(t.status) }));\n  const ts = remap(raw.timesheet, M.timesheet).map(e => ({\n    ...e, entry_id: str(e.entry_id), staff_id: str(e.staff_id), task_id: str(e.task_id),\n    date: parseDate(e.date), hours: num(e.hours), narration: str(e.narration) }));\n  const ev = remap(raw.evidence, M.evidence).map(e => ({ ...e, task_id: str(e.task_id) }));\n\n  // ---------- 2. helpers ----------\n  const T = cfg.thresholds;\n  const asOf = cfg.asOfDate;\n  const dayDiff = (a, b) => Math.round((Date.parse(a) - Date.parse(b)) / 86400000);\n  const isDone = t => T.completedStatuses.map(x => x.toLowerCase()).includes(t.status.toLowerCase());\n  const staffBy = Object.fromEntries(staff.map(s => [s.staff_id, s]));\n  const taskBy = Object.fromEntries(tasks.map(t => [t.task_id, t]));\n  const name = id => staffBy[id]?.staff_name || id || '-';\n  const logged = {};\n  ts.forEach(e => { logged[e.task_id] = (logged[e.task_id] || 0) + e.hours; });\n  const evBy = {};\n  ev.forEach(e => { (evBy[e.task_id] = evBy[e.task_id] || []).push(e); });\n\n  const findings = [];\n  const add = (rule, severity, f) => findings.push({ rule, severity, detector: 'Rule', ...f });\n  const tInfo = t => ({ task_id: t.task_id, client: t.client_name, task: `${t.work_type} - ${t.description}`,\n                        staff_id: t.assignee_id, staff: name(t.assignee_id), due_date: t.due_date });\n\n  // ---------- 3. task-level checks ----------\n  for (const t of tasks) {\n    const hrs = +(logged[t.task_id] || 0).toFixed(1);\n    const daysLeft = t.due_date ? dayDiff(t.due_date, asOf) : null;\n    const pct = t.budget_hrs ? Math.round(hrs / t.budget_hrs * 100) : 0;\n\n    if (!isDone(t) && !evBy[t.task_id] && daysLeft !== null && daysLeft < 0)\n      add('OVERDUE', 'High', { ...tInfo(t), detail: `Due ${t.due_date} (${-daysLeft} day(s) ago), status \"${t.status}\", ${hrs} hrs logged.` });\n\n    if (!isDone(t) && daysLeft !== null && daysLeft >= 0 && daysLeft <= T.dueSoonDays && pct < T.lowProgressPct)\n      add('DUE_SOON_LOW_PROGRESS', 'High', { ...tInfo(t), detail: `Due in ${daysLeft} day(s); only ${hrs} of ${t.budget_hrs} budgeted hrs logged (${pct}%).` });\n\n    if (t.budget_hrs && hrs > t.budget_hrs * (1 + T.overrunTolerancePct / 100))\n      add('BUDGET_OVERRUN', 'Medium', { ...tInfo(t), detail: `${hrs} hrs logged vs ${t.budget_hrs} budgeted (${pct}%).` });\n\n    if (isDone(t) && !evBy[t.task_id])\n      add('COMPLETED_NO_EVIDENCE', 'High', { ...tInfo(t), detail: `Marked \"${t.status}\" on ${t.completed_on || '?'} but no acknowledgement / ARN / UDIN found.` });\n\n    if (!isDone(t) && evBy[t.task_id])\n      add('EVIDENCE_BUT_OPEN', 'Low', { ...tInfo(t), detail: `Evidence ${evBy[t.task_id].map(e => `${e.evidence_type} ${e.reference_no}`).join(', ')} received, but task still \"${t.status}\". Update the status.` });\n  }\n\n  // ---------- 4. timesheet-level checks ----------\n  const seen = {};\n  const dayTotals = {};\n  for (const e of ts) {\n    const t = taskBy[e.task_id];\n    const base = { entry_id: e.entry_id, date: e.date, staff_id: e.staff_id, staff: name(e.staff_id),\n                   task_id: e.task_id, client: t ? t.client_name : (e.client_name || '-'),\n                   task: t ? `${t.work_type} - ${t.description}` : '-' };\n    if (!t) {\n      add('UNKNOWN_TASK', 'High', { ...base, detail: `${e.hours} hrs booked to task \"${e.task_id}\", which is not in the task master.` });\n    } else {\n      if (t.completed_on && e.date > t.completed_on)\n        add('HOURS_AFTER_COMPLETION', 'Medium', { ...base, detail: `${e.hours} hrs on ${e.date}, after the task was completed on ${t.completed_on}.` });\n      if (e.staff_id !== t.assignee_id && e.staff_id !== t.reviewer_id)\n        add('NOT_ASSIGNED', 'Medium', { ...base, detail: `${e.hours} hrs booked by ${name(e.staff_id)}; task is assigned to ${name(t.assignee_id)} (reviewer ${name(t.reviewer_id)}).` });\n    }\n    const k = [e.staff_id, e.date, e.task_id, e.hours, e.narration.toLowerCase()].join('|');\n    if (seen[k]) add('DUPLICATE_ENTRY', 'Medium', { ...base, detail: `Identical to entry ${seen[k]} (${e.hours} hrs, same narration).` });\n    else seen[k] = e.entry_id;\n    const dk = e.staff_id + '|' + e.date;\n    dayTotals[dk] = (dayTotals[dk] || 0) + e.hours;\n  }\n  for (const [dk, h] of Object.entries(dayTotals)) {\n    if (h > T.longDayHrs) {\n      const [sid, date] = dk.split('|');\n      add('LONG_DAY', 'Low', { staff_id: sid, staff: name(sid), date, detail: `${h} hrs logged in one day (limit ${T.longDayHrs}). Check for padding or burnout.` });\n    }\n  }\n\n  // ---------- 5. workload / capacity (next N days) ----------\n  const horizonEnd = new Date(Date.parse(asOf) + T.dueSoonDays * 86400000).toISOString().slice(0, 10);\n  let workdays = 0;\n  for (let d = 1; d <= T.dueSoonDays; d++) {\n    const wd = new Date(Date.parse(asOf) + d * 86400000).getUTCDay();\n    if (!T.weeklyOffDays.includes(wd)) workdays++;\n  }\n  const workload = staff.map(s => {\n    const open = tasks.filter(t => t.assignee_id === s.staff_id && !isDone(t) && t.due_date && t.due_date <= horizonEnd);\n    const remaining = open.reduce((a, t) => a + Math.max(t.budget_hrs - (logged[t.task_id] || 0), 0), 0);\n    const capacity = s.daily_capacity_hrs * workdays;\n    const periodHrs = ts.filter(e => e.staff_id === s.staff_id).reduce((a, e) => a + e.hours, 0);\n    return { staff_id: s.staff_id, staff: s.staff_name, role: s.role,\n             due_next_period_hrs: +remaining.toFixed(1), capacity_hrs: capacity,\n             utilisation_pct: capacity ? Math.round(remaining / capacity * 100) : 0,\n             spare_hrs: +Math.max(capacity - remaining, 0).toFixed(1),\n             hrs_logged_in_export: +periodHrs.toFixed(1),\n             open_tasks_due: open.map(t => `${t.task_id} ${t.client_name} (${t.work_type}, due ${t.due_date})`) };\n  });\n  for (const w of workload) {\n    if (w.due_next_period_hrs > w.capacity_hrs)\n      add('OVERLOAD', 'Medium', { staff_id: w.staff_id, staff: w.staff,\n        detail: `${w.due_next_period_hrs} hrs of work due by ${horizonEnd} vs ${w.capacity_hrs} hrs capacity (${w.utilisation_pct}%). Tasks: ${w.open_tasks_due.join('; ')}.` });\n  }\n\n  // ---------- 6. client budget vs actual ----------\n  const clients = {};\n  for (const t of tasks) {\n    const c = clients[t.client_name] = clients[t.client_name] || { client: t.client_name, budget_hrs: 0, actual_hrs: 0 };\n    c.budget_hrs += t.budget_hrs; c.actual_hrs += logged[t.task_id] || 0;\n  }\n  const clientSummary = Object.values(clients).map(c => ({ ...c, actual_hrs: +c.actual_hrs.toFixed(1),\n    pct: c.budget_hrs ? Math.round(c.actual_hrs / c.budget_hrs * 100) : 0 })).sort((a, b) => b.pct - a.pct);\n\n  // ---------- 7. payload for the AI narration reviewer ----------\n  const aiEntries = ts.filter(e => taskBy[e.task_id]).map(e => ({\n    entry_id: e.entry_id, staff: name(e.staff_id), hours: e.hours,\n    task_type: taskBy[e.task_id].work_type, task_description: taskBy[e.task_id].description,\n    narration: e.narration }));\n\n  return {\n    asOfDate: asOf, horizonEnd,\n    stats: { staff: staff.length, tasks: tasks.length, timesheetEntries: ts.length, evidence: ev.length,\n             totalHours: +ts.reduce((a, e) => a + e.hours, 0).toFixed(1),\n             openTasks: tasks.filter(t => !isDone(t)).length },\n    ruleFindings: findings, workload, clientSummary, aiEntries,\n    entryIndex: Object.fromEntries(ts.map(e => [e.entry_id, { date: e.date, staff_id: e.staff_id, staff: name(e.staff_id),\n      task_id: e.task_id, client: taskBy[e.task_id]?.client_name || e.client_name, hours: e.hours, narration: e.narration,\n      task: taskBy[e.task_id] ? `${taskBy[e.task_id].work_type} - ${taskBy[e.task_id].description}` : '-' }]))\n  };\n}\n\n// ---------- run ----------\nconst cfg = $('Watchdog Settings').first().json;\nconst raw = {\n  staff:     $('Read Staff Sheet').all().map(i => i.json),\n  tasks:     $('Read Tasks Sheet').all().map(i => i.json),\n  timesheet: $('Read Timesheet Sheet').all().map(i => i.json),\n  evidence:  $('Read Evidence Sheet').all().map(i => i.json)\n};\nreturn [{ json: runChecks(raw, cfg) }];\n"
+      },
+      "id": "6c8cda95-f676-4172-bac6-82cc20c38f0c",
+      "name": "Run Rule Checks",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1200,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Review each timesheet entry below. Each has the task type and description it was booked to, and the staff narration.\n\nFlag an entry ONLY in these two cases:\n1. VAGUE_NARRATION: the narration is too generic to tell what work was done (for example: \"misc work\", \"office work\", \"discussion\", \"meeting\", \"work done\", \"as discussed\"). A narration naming a specific activity is NOT vague, even if short.\n2. NARRATION_MISMATCH: the activity described clearly belongs to a DIFFERENT type of work than the task it is booked to (for example, statutory audit vouching booked to a GST return task, or an ITR computation booked to a TDS return task). Activities that are a normal part of the booked task type are NOT mismatches: e.g. checking TDS compliance, 40A(3) or depreciation is part of a tax audit; ITC reconciliation, RCM or e-invoice review is part of a GST return; following up with the client for documents for that task is fine.\n\nBe conservative: when in doubt, do not flag.\n\nRespond with ONLY a JSON object, no prose and no code fences, in exactly this shape:\n{\"flags\":[{\"entry_id\":\"TS0001\",\"issue\":\"VAGUE_NARRATION\",\"reason\":\"one short sentence\"}]}\nIf nothing needs flagging, respond {\"flags\":[]}.\n\nENTRIES:\n{{ JSON.stringify($json.aiEntries) }}",
+        "messages": {
+          "messageValues": [
+            {
+              "message": "You are a meticulous audit manager at a Chartered Accountancy firm in India, reviewing staff timesheet entries before they are billed. You understand Indian CA practice: GST returns (GSTR-1, GSTR-3B, GSTR-9, ITC reconciliation, RCM, e-invoice), tax audit (Form 3CA/3CB-3CD, clause 44, 40A(3), clause 34 TDS, depreciation), statutory audit (vouching, bank reconciliation, confirmations, fixed assets, management letter), ITR filing (computation, AIS/26AS), TDS returns (24Q/26Q, challans, PAN), and ROC compliance (AOC-4, MGT-7, DIR-3 KYC). You flag only clear problems and never invent data."
+            }
+          ]
+        },
+        "batching": {}
+      },
+      "id": "dcaac937-a5f8-4cbc-99c0-dcc98441c457",
+      "name": "AI Timesheet Reviewer",
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.9,
+      "position": [
+        1440,
+        304
+      ],
+      "retryOnFail": true,
+      "maxTries": 5,
+      "waitBetweenTries": 5000,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "modelName": "models/gemini-3.6-flash",
+        "options": {
+          "maxOutputTokens": 8192,
+          "temperature": 0
+        }
+      },
+      "id": "9f14d8dd-5079-49d0-89dd-7636016709b4",
+      "name": "Gemini (Reviewer)",
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1.2,
+      "position": [
+        1440,
+        528
+      ],
+      "credentials": {
+        "googlePalmApi": {
+          "id": "gjAGz44oYUJ5So1H",
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Merge the AI reviewer's flags with the rule-engine findings.\nconst base = $('Run Rule Checks').first().json;\nlet text = String($json.text ?? $json.output ?? '');\ntext = text.replace(/```(?:json)?/gi, '').trim();\nconst s = text.indexOf('{'), e = text.lastIndexOf('}');\nlet aiFlags = [], aiError = null;\ntry {\n  const parsed = JSON.parse(text.slice(s, e + 1));\n  aiFlags = Array.isArray(parsed.flags) ? parsed.flags : [];\n} catch (err) {\n  aiError = 'AI reviewer output could not be parsed; narration checks skipped this run.';\n}\n\nconst allowed = { VAGUE_NARRATION: 'Low', NARRATION_MISMATCH: 'Medium' };\nconst aiFindings = [];\nconst seen = new Set();\nfor (const f of aiFlags) {\n  const entry = base.entryIndex[f.entry_id];\n  const rule = String(f.issue || '').toUpperCase();\n  if (!entry || !allowed[rule] || seen.has(f.entry_id + rule)) continue;   // ignore hallucinated ids\n  seen.add(f.entry_id + rule);\n  aiFindings.push({\n    rule, severity: allowed[rule], detector: 'AI', entry_id: f.entry_id,\n    date: entry.date, staff_id: entry.staff_id, staff: entry.staff, task_id: entry.task_id,\n    client: entry.client, task: entry.task,\n    detail: `${entry.hours} hrs: \"${entry.narration}\". ${f.reason || ''}`.trim()\n  });\n}\n\nconst rank = { High: 0, Medium: 1, Low: 2 };\nconst findings = [...base.ruleFindings, ...aiFindings]\n  .sort((a, b) => rank[a.severity] - rank[b.severity] || a.rule.localeCompare(b.rule));\nconst count = sev => findings.filter(f => f.severity === sev).length;\nconst byRule = {};\nfindings.forEach(f => { byRule[f.rule] = (byRule[f.rule] || 0) + 1; });\n\nreturn [{ json: {\n  asOfDate: base.asOfDate, horizonEnd: base.horizonEnd, stats: base.stats,\n  findings, byRule, aiError,\n  counts: { total: findings.length, high: count('High'), medium: count('Medium'), low: count('Low'),\n            ai: aiFindings.length, rule: base.ruleFindings.length },\n  workload: base.workload, clientSummary: base.clientSummary\n} }];\n"
+      },
+      "id": "0fa15f8c-5c5e-4074-8a7c-53cc6c66a21a",
+      "name": "Combine Findings",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1712,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Today is {{ $json.asOfDate }}. Here is today's watchdog output.\n\nCOUNTS: {{ JSON.stringify($json.counts) }}\n\nFINDINGS: {{ JSON.stringify($json.findings.map(f => ({ priority: f.severity, issue: f.rule, client: f.client, task: f.task_id, staff: f.staff, detail: f.detail }))) }}\n\nWORKLOAD NEXT 7 DAYS: {{ JSON.stringify($json.workload.map(w => ({ staff: w.staff, role: w.role, hrs_due: w.due_next_period_hrs, capacity: w.capacity_hrs, load_pct: w.utilisation_pct, spare_hrs: w.spare_hrs, tasks_due: w.open_tasks_due }))) }}\n\nWrite the briefing as an HTML fragment using only <p>, <b>, <ul> and <li> tags (no markdown, no code fences, no <html> or <body>), max 220 words:\n1. <p> one sentence on overall status.\n2. <p><b>Act today</b></p> then a <ul> of the 3 to 5 most urgent actions, each naming the client, task and person responsible.\n3. <p><b>Suggested reassignments</b></p> then a <ul> of 1 to 3 concrete moves from overloaded staff to people with spare hours, matching work to seniority (article assistants suit GST, TDS and ITR work; semi-qualified and senior staff suit tax audit and statutory audit fieldwork).\n4. <p><b>Timesheet quality</b></p> then one sentence on vague or mismatched narrations, duplicates or unassigned bookings, naming the staff involved.",
+        "messages": {
+          "messageValues": [
+            {
+              "message": "You are the practice manager of an Indian CA firm writing a short daily briefing for the partner. Be specific, practical and calm. Use only the data provided; never invent numbers, names or deadlines."
+            }
+          ]
+        },
+        "batching": {}
+      },
+      "id": "bbc4aef7-e1b3-4fb0-94b1-95ec374b67be",
+      "name": "AI Partner Briefing",
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.9,
+      "position": [
+        1952,
+        304
+      ],
+      "retryOnFail": true,
+      "maxTries": 5,
+      "waitBetweenTries": 5000,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "modelName": "models/gemini-3.5-flash",
+        "options": {
+          "maxOutputTokens": 8192,
+          "temperature": 0.3
+        }
+      },
+      "id": "92621a16-f18e-40e3-a7e6-b16115722a38",
+      "name": "Gemini (Writer)",
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1.2,
+      "position": [
+        1952,
+        528
+      ],
+      "credentials": {
+        "googlePalmApi": {
+          "id": "gjAGz44oYUJ5So1H",
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Build the partner digest email (HTML).\nconst d = $('Combine Findings').first().json;\nconst cfg = $('Watchdog Settings').first().json;\nlet brief = String($json.text ?? $json.output ?? '').replace(/```(?:html)?/gi, '').trim();\nif (!brief) brief = '<p>(AI briefing unavailable this run. See the detailed findings below.)</p>';\n\nconst esc = s => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');\nconst label = r => r.replace(/_/g, ' ').toLowerCase().replace(/^./, c => c.toUpperCase());\nconst colour = { High: '#b42318', Medium: '#b54708', Low: '#475467' };\nconst bg = { High: '#fef3f2', Medium: '#fffaeb', Low: '#f2f4f7' };\nconst fmtDate = iso => { if (!iso) return ''; const [y, m, dd] = iso.split('-'); return `${dd}-${m}-${y}`; };\nconst td = 'padding:8px 10px;border-bottom:1px solid #eaecf0;vertical-align:top;font-size:13px;';\nconst th = 'padding:8px 10px;background:#f9fafb;border-bottom:1px solid #eaecf0;text-align:left;font-size:12px;color:#475467;';\n\nconst tile = (n, t, c) => `<td style=\"padding:12px 14px;border:1px solid #eaecf0;border-radius:8px;text-align:center;width:25%\">\n  <div style=\"font-size:24px;font-weight:700;color:${c}\">${n}</div><div style=\"font-size:12px;color:#475467\">${t}</div></td>`;\n\nconst rows = d.findings.map(f => `<tr>\n  <td style=\"${td}\"><span style=\"background:${bg[f.severity]};color:${colour[f.severity]};padding:2px 8px;border-radius:10px;font-size:12px;font-weight:600\">${f.severity}</span></td>\n  <td style=\"${td}\"><b>${esc(label(f.rule))}</b><br><span style=\"color:#667085;font-size:11px\">${f.detector === 'AI' ? 'AI review' : 'Rule check'}</span></td>\n  <td style=\"${td}\">${esc(f.client || '-')}<br><span style=\"color:#667085\">${esc(f.task_id || '')} ${esc(f.task || '')}</span></td>\n  <td style=\"${td}\">${esc(f.staff || '-')}${f.date ? '<br><span style=\"color:#667085\">' + fmtDate(f.date) + '</span>' : ''}</td>\n  <td style=\"${td}\">${esc(f.detail)}</td></tr>`).join('');\n\nconst wl = d.workload.map(w => {\n  const c = w.utilisation_pct > 100 ? '#b42318' : w.utilisation_pct < 30 ? '#067647' : '#344054';\n  return `<tr><td style=\"${td}\">${esc(w.staff)}<br><span style=\"color:#667085\">${esc(w.role)}</span></td>\n  <td style=\"${td}text-align:right\">${w.due_next_period_hrs}</td><td style=\"${td}text-align:right\">${w.capacity_hrs}</td>\n  <td style=\"${td}text-align:right;color:${c};font-weight:600\">${w.utilisation_pct}%</td>\n  <td style=\"${td}text-align:right\">${w.spare_hrs}</td></tr>`; }).join('');\n\nconst cl = d.clientSummary.map(c => `<tr><td style=\"${td}\">${esc(c.client)}</td>\n  <td style=\"${td}text-align:right\">${c.budget_hrs}</td><td style=\"${td}text-align:right\">${c.actual_hrs}</td>\n  <td style=\"${td}text-align:right;${c.pct > 100 ? 'color:#b42318;font-weight:600' : ''}\">${c.pct}%</td></tr>`).join('');\n\nconst html = `<div style=\"font-family:Arial,Helvetica,sans-serif;max-width:900px;margin:auto;color:#101828\">\n<div style=\"background:#1f4e78;color:#fff;padding:18px 22px;border-radius:8px 8px 0 0\">\n  <div style=\"font-size:20px;font-weight:700\">Practice Watchdog: Daily Partner Digest</div>\n  <div style=\"font-size:13px;opacity:.85\">${esc(cfg.firmName)} · as of ${fmtDate(d.asOfDate)} · look-ahead to ${fmtDate(d.horizonEnd)}</div>\n</div>\n<div style=\"padding:18px 22px;border:1px solid #eaecf0;border-top:0\">\n<table style=\"width:100%;border-collapse:separate;border-spacing:8px\"><tr>\n${tile(d.counts.high, 'High priority', '#b42318')}${tile(d.counts.medium, 'Medium', '#b54708')}${tile(d.counts.low, 'Low', '#475467')}${tile(d.stats.openTasks + ' / ' + d.stats.tasks, 'Open tasks', '#1f4e78')}\n</tr></table>\n<h3 style=\"margin:18px 0 6px\">AI briefing</h3>\n<div style=\"font-size:14px;line-height:1.5\">${brief}</div>\n${d.aiError ? `<p style=\"color:#b54708;font-size:13px\">${esc(d.aiError)}</p>` : ''}\n<h3 style=\"margin:22px 0 6px\">All findings (${d.counts.total}: ${d.counts.rule} rule checks, ${d.counts.ai} AI review)</h3>\n<table style=\"width:100%;border-collapse:collapse\"><tr><th style=\"${th}\">Priority</th><th style=\"${th}\">Issue</th><th style=\"${th}\">Client / task</th><th style=\"${th}\">Staff / date</th><th style=\"${th}\">Detail</th></tr>${rows}</table>\n<h3 style=\"margin:22px 0 6px\">Workload for the next ${cfg.thresholds.dueSoonDays} days</h3>\n<table style=\"width:100%;border-collapse:collapse\"><tr><th style=\"${th}\">Staff</th><th style=\"${th}text-align:right\">Hrs due</th><th style=\"${th}text-align:right\">Capacity</th><th style=\"${th}text-align:right\">Load</th><th style=\"${th}text-align:right\">Spare hrs</th></tr>${wl}</table>\n<h3 style=\"margin:22px 0 6px\">Client budget vs actual (hours)</h3>\n<table style=\"width:100%;border-collapse:collapse\"><tr><th style=\"${th}\">Client</th><th style=\"${th}text-align:right\">Budget</th><th style=\"${th}text-align:right\">Actual</th><th style=\"${th}text-align:right\">Used</th></tr>${cl}</table>\n<p style=\"font-size:11px;color:#667085;margin-top:22px;line-height:1.5\">\nGenerated automatically from the practice-software export (${d.stats.timesheetEntries} timesheet entries, ${d.stats.totalHours} hrs).\nRule checks are deterministic; items marked \"AI review\" and the briefing are AI-generated and must be verified by the partner before any action is taken.\nOnly work-related records (tasks, timesheets, filing acknowledgements) are processed. Staff are informed of this monitoring and can see their own data, in line with the Digital Personal Data Protection Act, 2023.</p>\n</div></div>`;\n\nconst subject = `Practice Watchdog ${fmtDate(d.asOfDate)}: ${d.counts.high} high-priority, ${d.counts.medium} medium issues`;\nreturn [{ json: { to: cfg.partnerEmail, subject, html } }];\n"
+      },
+      "id": "6206e65c-ec5f-46d9-a11a-47b01bcf2184",
+      "name": "Build Digest Email",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2208,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $json.to }}",
+        "subject": "={{ $json.subject }}",
+        "message": "={{ $json.html }}",
+        "options": {
+          "appendAttribution": false,
+          "senderName": "Practice Watchdog"
+        }
+      },
+      "id": "e542fbf5-27ce-460f-b937-3b7a9fd2ca83",
+      "name": "Email Partner Digest",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        2448,
+        304
+      ],
+      "webhookId": "d662c571-90e0-4b07-9fc8-4d90a64debfa",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "29hIUwvYAmqmkczw",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "content": "## AI Practice Watchdog\nCA-firm capstone (ICAI AICA).\n\n1. Reads the daily practice-software export (Staff, Tasks, Timesheet, Evidence) from Google Drive\n2. Runs deterministic rule checks: overdue, due-soon with low progress, budget overrun, completed without ARN/UDIN, hours after completion, unassigned bookings, duplicates, long days, overload\n3. Gemini reviews timesheet narrations (vague / mismatched)\n4. Gemini writes a partner briefing with reassignments\n5. Emails the digest\n\n**To remap for another software, edit only the Watchdog Settings node.**",
+        "color": 4
+      },
+      "id": "a2653277-c7f8-4bf1-b15e-5ec876a818ca",
+      "name": "Sticky Note 7bb75db7",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        112,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "content": "### Transparency & DPDP Act 2023\nOnly work records are processed (tasks, timesheets, filing acknowledgements). No screenshots, keystrokes or personal devices. Staff are told about the monitoring and can see their own data. AI output is advisory; the partner verifies before acting.",
+        "color": 6
+      },
+      "id": "3dfcffed-a376-4c8d-ba50-4914ea1eb121",
+      "name": "Sticky Note ab3fda4b",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        112,
+        560
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Run Watchdog Now": {
+      "main": [
+        [
+          {
+            "node": "Watchdog Settings",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Watchdog Settings": {
+      "main": [
+        [
+          {
+            "node": "Download Practice Export",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Every Day 7 PM": {
+      "main": [
+        [
+          {
+            "node": "Watchdog Settings",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download Practice Export": {
+      "main": [
+        [
+          {
+            "node": "Read Staff Sheet",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Read Tasks Sheet",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Read Timesheet Sheet",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Read Evidence Sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Staff Sheet": {
+      "main": [
+        [
+          {
+            "node": "Wait for All Sheets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait for All Sheets": {
+      "main": [
+        [
+          {
+            "node": "Run Rule Checks",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Tasks Sheet": {
+      "main": [
+        [
+          {
+            "node": "Wait for All Sheets",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Read Timesheet Sheet": {
+      "main": [
+        [
+          {
+            "node": "Wait for All Sheets",
+            "type": "main",
+            "index": 2
+          }
+        ]
+      ]
+    },
+    "Read Evidence Sheet": {
+      "main": [
+        [
+          {
+            "node": "Wait for All Sheets",
+            "type": "main",
+            "index": 3
+          }
+        ]
+      ]
+    },
+    "Run Rule Checks": {
+      "main": [
+        [
+          {
+            "node": "AI Timesheet Reviewer",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Timesheet Reviewer": {
+      "main": [
+        [
+          {
+            "node": "Combine Findings",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gemini (Reviewer)": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Timesheet Reviewer",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Combine Findings": {
+      "main": [
+        [
+          {
+            "node": "AI Partner Briefing",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Partner Briefing": {
+      "main": [
+        [
+          {
+            "node": "Build Digest Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gemini (Writer)": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Partner Briefing",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Digest Email": {
+      "main": [
+        [
+          {
+            "node": "Email Partner Digest",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": true,
+    "timezone": "Asia/Kolkata",
+    "timeSavedPerExecution": 90
+  },
+  "versionId": "9a32fa8c-0eb0-465f-a99b-cc4901a98f0f",
+  "meta": {
+    "aiBuilderAssisted": true,
+    "builderVariant": "mcp",
+    "instanceId": "3f11967d93589ecac54e17b0c7e336ac769ebf2d162e3a397ba39aa48339d4b0"
+  },
+  "nodeGroups": [
+    {
+      "id": "c3f91c45-4312-424b-9615-c3f5afca93d4",
+      "name": "Load practice export",
+      "nodeIds": [
+        "0c349c30-5dcf-48c1-bf7c-456cec205685",
+        "12859d27-e8a9-47f4-9d2a-5228ff88572e",
+        "37c2e0a4-6909-41db-810f-5ec32c138db4",
+        "01adf37c-4e6d-4c80-a933-43f848ab702f",
+        "4abf67f7-1bbd-495d-87cf-60c5ac6d6224",
+        "52587f61-7f78-4569-83cc-86c742b0de1f"
+      ],
+      "description": "Downloads the export from Drive and reads the Staff, Tasks, Timesheet and Evidence sheets"
+    },
+    {
+      "id": "e6f30ebb-f653-4d47-93b6-461edc91cf60",
+      "name": "Rule engine",
+      "nodeIds": [
+        "6c8cda95-f676-4172-bac6-82cc20c38f0c"
+      ],
+      "description": "Remaps columns and runs the deterministic deadline, budget, evidence, timesheet and workload checks"
+    },
+    {
+      "id": "2ef8f68f-8e03-424c-a4a9-eb4b1f666f74",
+      "name": "AI review",
+      "nodeIds": [
+        "dcaac937-a5f8-4cbc-99c0-dcc98441c457",
+        "9f14d8dd-5079-49d0-89dd-7636016709b4",
+        "0fa15f8c-5c5e-4074-8a7c-53cc6c66a21a"
+      ],
+      "description": "Gemini flags vague or mismatched narrations; results are merged with the rule findings"
+    },
+    {
+      "id": "e342a9ad-601c-472a-be92-4c16eb958fc4",
+      "name": "Partner digest",
+      "nodeIds": [
+        "bbc4aef7-e1b3-4fb0-94b1-95ec374b67be",
+        "92621a16-f18e-40e3-a7e6-b16115722a38",
+        "6206e65c-ec5f-46d9-a11a-47b01bcf2184",
+        "e542fbf5-27ce-460f-b937-3b7a9fd2ca83"
+      ],
+      "description": "Gemini writes the briefing and reassignments; the HTML digest is emailed to the partner"
+    }
+  ],
+  "id": "q9FltSmK2Q94KH1O",
+  "tags": []
+}
