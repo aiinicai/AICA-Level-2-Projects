@@ -13,9 +13,8 @@ Open one HTML file in Chrome or Edge – no installation, server or internet con
 |---|---|
 | `debtors-creditors-mis-outstanding-reconciliation.html` | The MIS application (everything in one file) |
 | `tally_bridge-full-outstanding-reconciliation.py` | TallyPrime bridge – Python source (standard library only) |
-| `dist/tally_bridge.exe` | TallyPrime bridge – ready-to-run Windows program (no Python needed) |
-| `bridge_config.json` | Bridge settings: Tally address, port, pairing token |
-| `tally_bridge.spec` | PyInstaller recipe used to build `tally_bridge.exe` |
+| `bridge_config.json` | Bridge settings: Tally address, port, pairing token (blank – a new token is created on first run) |
+| `tally_bridge.spec` | PyInstaller recipe to build a ready-to-run `tally_bridge.exe` (no Python needed on the Tally computer) |
 | `README.md` | This file |
 
 ---
@@ -118,7 +117,8 @@ TallyPrime (XML over HTTP)  ←  Tally bridge (127.0.0.1:9901)  ←  MIS HTML fi
 
 **One-time setup**
 1. TallyPrime: F1 (Help) → Settings → Connectivity → *TallyPrime acts as* = **Server** (or Both), port **9000**.
-2. Run `dist/tally_bridge.exe` (or `py tally_bridge-full-outstanding-reconciliation.py` if Python 3 is installed).
+2. Run `py tally_bridge-full-outstanding-reconciliation.py` (Python 3.8+, standard library only).
+   Optional: build a Windows program with `pip install pyinstaller` then `pyinstaller tally_bridge.spec` and run `dist/tally_bridge.exe`.
 3. In the MIS: **Tally Sync → Connection** – paste the pairing token, click *Save & test*.
 
 **Every sync**: open TallyPrime with the company loaded, start the bridge, then **Tally Sync → Sync**

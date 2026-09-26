@@ -2,7 +2,7 @@
 
 
 a = Analysis(
-    ['tally_bridge.py'],
+    ['tally_bridge-full-outstanding-reconciliation.py'],
     pathex=[],
     binaries=[],
     datas=[],
