@@ -1,0 +1,2519 @@
+table _Measures
+	lineageTag: 44679a24-68de-422b-a36a-7c16217b789b
+
+	measure 'Amount USD' =
+			IF (
+			    HASONEVALUE ( Dim_Scenario[Scenario] ),
+			    SUM ( Fact_SC_PL[Amount USD] ),
+			    CALCULATE ( SUM ( Fact_SC_PL[Amount USD] ), Dim_Scenario[Scenario] = "Actual" )
+			)
+		formatString: #,0
+		displayFolder: 1 Base
+		lineageTag: 4702c88d-bef8-4ad7-a93a-b4b5a6cf760d
+
+	measure Pairs =
+			IF (
+			    HASONEVALUE ( Dim_Scenario[Scenario] ),
+			    SUM ( Fact_SC_PL[Volume Pairs] ),
+			    CALCULATE ( SUM ( Fact_SC_PL[Volume Pairs] ), Dim_Scenario[Scenario] = "Actual" )
+			)
+		formatString: #,0
+		displayFolder: 1 Base
+		lineageTag: 042dbd3c-0924-42f7-aadb-1610c54e6645
+
+	measure 'Latest Published Period' = CALCULATE ( MAX ( Publish_Control[Period] ), Publish_Control[Status] = "Published", Publish_Control[Scenario] = "Actual" )
+		formatString: 0
+		displayFolder: 1 Base
+		lineageTag: 33a20172-20e3-4d61-a221-58e86bf83f5e
+
+	measure 'Reporting Period' =
+			VAR _lp = [Latest Published Period]
+			VAR _mx = MAX ( Dim_Date[Period] )
+			RETURN IF ( ISBLANK ( _lp ), _mx, MIN ( _lp, _mx ) )
+		formatString: 0
+		displayFolder: 1 Base
+		lineageTag: b2839b80-79c5-478a-978b-88edd1eaf774
+
+	measure 'Reporting Month' =
+			VAR _p = [Reporting Period]
+			RETURN FORMAT ( DATE ( INT ( _p / 100 ), MOD ( _p, 100 ), 1 ), "MMMM yyyy" )
+		displayFolder: 1 Base
+		lineageTag: 153dbf62-d61e-489c-9328-bf427c12c701
+
+	measure 'Report Subtitle' =
+			VAR _scope =
+			    SWITCH (
+			        TRUE (),
+			        ISFILTERED ( Dim_OpCo[OpCo Name] ), CONCATENATEX ( VALUES ( Dim_OpCo[OpCo Name] ), Dim_OpCo[OpCo Name], ", " ),
+			        ISFILTERED ( Dim_OpCo[Country] ), CONCATENATEX ( VALUES ( Dim_OpCo[Country] ), Dim_OpCo[Country], ", " ),
+			        ISFILTERED ( Dim_OpCo[Region] ), CONCATENATEX ( VALUES ( Dim_OpCo[Region] ), Dim_OpCo[Region], ", " ),
+			        "Group - Total Business Unit"
+			    )
+			RETURN _scope & " - " & [Reporting Month] & "   |   All financial values in USD   |   SAMPLE DATA"
+		displayFolder: 1 Base
+		lineageTag: bb8e09f2-7391-4250-a3d1-50e58fd513d9
+
+	measure 'Purchase Pairs' = CALCULATE ( [Pairs], Dim_Account[Account Code] = "PURCH_PAIRS" )
+		formatString: #,0
+		displayFolder: 2 P&L Lines
+		lineageTag: d4b51386-d5b2-4553-bd49-696eac9e573d
+
+	measure 'Production Pairs' = CALCULATE ( [Pairs], Dim_Account[Account Code] = "PROD_PAIRS" )
+		formatString: #,0
+		displayFolder: 2 P&L Lines
+		lineageTag: ce4985cb-6be1-4ab9-ba35-64f3af70cbff
+
+	measure 'Total Pairs' = [Purchase Pairs] + [Production Pairs]
+		formatString: #,0
+		displayFolder: 2 P&L Lines
+		lineageTag: 4248f777-0548-4eb4-a241-a9bb37a104a5
+
+	measure 'Turnover SC' = CALCULATE ( [Amount USD], Dim_Account[Account Code] = "PL_119001I" )
+		formatString: #,0
+		displayFolder: 2 P&L Lines
+		lineageTag: 3d79c07e-cd33-4c44-80f3-4f2732eeefee
+
+	measure 'Turnover SC Markup' = CALCULATE ( [Amount USD], Dim_Account[Account Code] = "PL_119002I" )
+		formatString: #,0
+		displayFolder: 2 P&L Lines
+		lineageTag: b5b2cfa2-1adb-4dff-ad73-156d83633a3a
+
+	measure 'Net Turnover SC' = CALCULATE ( [Amount USD], Dim_Account[Account Code] = "PL_119000T" )
+		formatString: #,0
+		displayFolder: 2 P&L Lines
+		lineageTag: f0b20bec-fab8-49b2-8e05-47bc51ade681
+
+	measure 'COGS SC' = CALCULATE ( [Amount USD], Dim_Account[Account Code] = "PL_219000T" )
+		formatString: #,0
+		displayFolder: 2 P&L Lines
+		lineageTag: 8a301d7f-dc9c-4235-bdfc-c390d732dc38
+
+	measure 'Inventory Valuation' = CALCULATE ( [Amount USD], Dim_Account[Account Code] = "PL_222000I" )
+		formatString: #,0
+		displayFolder: 2 P&L Lines
+		lineageTag: 9dd80ff3-1c0c-4e9f-8ef9-1108abfd17c2
+
+	measure 'Factory Personnel' = CALCULATE ( [Amount USD], Dim_Account[Account Code] = "PL_227100I" )
+		formatString: #,0
+		displayFolder: 2 P&L Lines
+		lineageTag: 1d084594-875b-40a9-ac00-6ee9714a5742
+
+	measure 'Other Factory Costs' = CALCULATE ( [Amount USD], Dim_Account[Account Code] = "PL_227200I" )
+		formatString: #,0
+		displayFolder: 2 P&L Lines
+		lineageTag: 12918d3c-d78c-4a0b-8e09-e5ef73e395f1
+
+	measure 'Factory Costs' = CALCULATE ( [Amount USD], Dim_Account[Account Code] = "PL_227100T" )
+		formatString: #,0
+		displayFolder: 2 P&L Lines
+		lineageTag: c6059869-3225-4c93-8ea1-62645ab23f66
+
+	measure 'Recoveries of Factory' = CALCULATE ( [Amount USD], Dim_Account[Account Code] = "PL_227600I" )
+		formatString: #,0
+		displayFolder: 2 P&L Lines
+		lineageTag: 8316a681-39bb-422e-8be1-9c3c38fe2c58
+
+	measure 'Factory Under Over Recovery' = CALCULATE ( [Amount USD], Dim_Account[Account Code] = "PL_227000T" )
+		formatString: #,0
+		displayFolder: 2 P&L Lines
+		lineageTag: ca51cef1-6475-4efd-a132-747d2e4eb144
+
+	measure 'Freight Costs' = CALCULATE ( [Amount USD], Dim_Account[Account Code] = "PL_225000I" )
+		formatString: #,0
+		displayFolder: 2 P&L Lines
+		lineageTag: 6b42137a-3ffa-4828-ba85-d3e36e4f1763
+
+	measure PPV = CALCULATE ( [Amount USD], Dim_Account[Account Code] = "PL_224000I" )
+		formatString: #,0
+		displayFolder: 2 P&L Lines
+		lineageTag: c920878f-6eaf-4b16-841b-0dbd3378195e
+
+	measure 'Cost of Sales' = CALCULATE ( [Amount USD], Dim_Account[Account Code] = "PL_200000T" )
+		formatString: #,0
+		displayFolder: 2 P&L Lines
+		lineageTag: e1d164d5-42c7-4a06-adfd-7a9502187d42
+
+	measure 'Intercompany GP' = CALCULATE ( [Amount USD], Dim_Account[Account Code] = "PL_IC0000T" )
+		formatString: #,0
+		displayFolder: 2 P&L Lines
+		lineageTag: 068c7b3a-9ee7-4bc3-bd75-d2f3159ae546
+
+	measure 'Gross Profit' = CALCULATE ( [Amount USD], Dim_Account[Account Code] = "PL_920000T" )
+		formatString: #,0
+		displayFolder: 2 P&L Lines
+		lineageTag: e4358566-57c6-4a8c-9212-7ad6ea48e2e6
+
+	measure 'Marketing Expenses' = CALCULATE ( [Amount USD], Dim_Account[Account Code] = "PL_310000T" )
+		formatString: #,0
+		displayFolder: 2 P&L Lines
+		lineageTag: 5ae4c9a5-bc9d-46d1-b5f4-16793c833501
+
+	measure 'Four Walls Expenses' = CALCULATE ( [Amount USD], Dim_Account[Account Code] = "PL_4W0000T" )
+		formatString: #,0
+		displayFolder: 2 P&L Lines
+		lineageTag: d3c68eb9-87da-4b2f-a1ce-23fe8a4e0999
+
+	measure 'Channel Expenses' = CALCULATE ( [Amount USD], Dim_Account[Account Code] = "PL_CH0000T" )
+		formatString: #,0
+		displayFolder: 2 P&L Lines
+		lineageTag: d48e081c-026e-4909-b028-86abf7dd03eb
+
+	measure 'Channel Operating Profit' = CALCULATE ( [Amount USD], Dim_Account[Account Code] = "PL_CP0000T" )
+		formatString: #,0
+		displayFolder: 2 P&L Lines
+		lineageTag: c3d5272a-0c27-4b7a-8806-cbd2dde9aa37
+
+	measure 'Enabling Functions Expenses' = CALCULATE ( [Amount USD], Dim_Account[Account Code] = "PL_OH0000T" )
+		formatString: #,0
+		displayFolder: 2 P&L Lines
+		lineageTag: 665f5e2f-f733-4570-b3b9-ba6c0d847fe2
+
+	measure 'Non Recurring Items' = CALCULATE ( [Amount USD], Dim_Account[Account Code] = "PL_380000I" )
+		formatString: #,0
+		displayFolder: 2 P&L Lines
+		lineageTag: fe2c9a94-f16f-4dce-9039-ecba74eca518
+
+	measure EBITDA = [Channel Operating Profit] + [Enabling Functions Expenses]
+		formatString: #,0
+		displayFolder: 2 P&L Lines
+		lineageTag: 742bedfa-086b-4382-87c2-ce13f3e3a2ca
+
+	measure 'EBIT BNRI' = [EBITDA]
+		formatString: #,0
+		displayFolder: 2 P&L Lines
+		lineageTag: d2b264e0-67fb-4926-b47d-26c39eb56543
+
+	measure EBIT = [EBIT BNRI] + [Non Recurring Items]
+		formatString: #,0
+		displayFolder: 2 P&L Lines
+		lineageTag: 3329d22c-3fb4-4aca-a6bf-604f05bc488b
+
+	measure 'Turnover SC Markup %' = DIVIDE ( [Turnover SC Markup], [Turnover SC] )
+		formatString: 0.0%
+		displayFolder: 3 KPI Ratios
+		lineageTag: f8af2a45-9579-44cb-88e8-90fa9cd8c630
+
+	measure 'Gross Margin %' = DIVIDE ( [Gross Profit], [Net Turnover SC] )
+		formatString: 0.0%
+		displayFolder: 3 KPI Ratios
+		lineageTag: 5ff3d21d-d42d-4f70-95c1-2eabc13dea39
+
+	measure 'EBITDA Margin %' = DIVIDE ( [EBITDA], [Net Turnover SC] )
+		formatString: 0.00%
+		displayFolder: 3 KPI Ratios
+		lineageTag: e12b101d-e6a5-451b-884d-3ba07d7ab655
+
+	measure 'EBIT BNRI Margin %' = DIVIDE ( [EBIT BNRI], [Net Turnover SC] )
+		formatString: 0.00%
+		displayFolder: 3 KPI Ratios
+		lineageTag: 231628b2-401f-4e5e-ac1a-6ddbdde791c9
+
+	measure 'EBIT Margin %' = DIVIDE ( [EBIT], [Net Turnover SC] )
+		formatString: 0.00%
+		displayFolder: 3 KPI Ratios
+		lineageTag: cfb47737-475b-4aa1-bd6c-ca49d5791cc8
+
+	measure 'Channel Operating Margin %' = DIVIDE ( [Channel Operating Profit], [Net Turnover SC] )
+		formatString: 0.00%
+		displayFolder: 3 KPI Ratios
+		lineageTag: 007488fa-f976-4361-843d-1ebdc127a7ec
+
+	measure 'Cost of Sales %' = DIVIDE ( - [Cost of Sales], [Net Turnover SC] )
+		formatString: 0.0%
+		displayFolder: 3 KPI Ratios
+		lineageTag: ee62a126-e10e-4042-b5db-125be316fb3c
+
+	measure 'Channel Cost %' = DIVIDE ( - [Channel Expenses], [Net Turnover SC] )
+		formatString: 0.0%
+		displayFolder: 3 KPI Ratios
+		lineageTag: bd19e01d-6090-4e21-8295-833011fe51f7
+
+	measure 'Freight Cost per Pair' = DIVIDE ( - [Freight Costs], [Total Pairs] )
+		formatString: 0.000
+		displayFolder: 3 KPI Ratios
+		lineageTag: 26136a6a-9e55-4ebd-938a-122aa20a819d
+
+	measure 'Factory Cost per Pair' = DIVIDE ( - [Factory Costs], [Production Pairs] )
+		formatString: 0.000
+		displayFolder: 3 KPI Ratios
+		lineageTag: e2cead58-faa9-4fbf-90a2-5918deec6ab7
+
+	measure 'Recovery per Pair' = DIVIDE ( [Recoveries of Factory], [Production Pairs] )
+		formatString: 0.000
+		displayFolder: 3 KPI Ratios
+		lineageTag: 75f82283-4e94-408c-bd64-8320ec859c3b
+
+	measure 'Channel Expenses per Pair' = DIVIDE ( - [Channel Expenses], [Total Pairs] )
+		formatString: 0.000
+		displayFolder: 3 KPI Ratios
+		lineageTag: 4e748081-472c-4028-ba09-2cb304b9db0d
+
+	measure 'Factory Personnel Cost %' = CALCULATE ( DIVIDE ( - [Factory Personnel], [Turnover SC] ), KEEPFILTERS ( Dim_SC_Function[SC Function] = "Manufacturing" ) )
+		formatString: 0.00%
+		displayFolder: 3 KPI Ratios
+		lineageTag: 8df1dc9b-2c05-43c4-9301-f916706b36d4
+
+	measure 'Other Factory Cost %' = CALCULATE ( DIVIDE ( - [Other Factory Costs], [Turnover SC] ), KEEPFILTERS ( Dim_SC_Function[SC Function] = "Manufacturing" ) )
+		formatString: 0.00%
+		displayFolder: 3 KPI Ratios
+		lineageTag: 71d199ea-0613-403a-be6a-8ff6c2f8d440
+
+	measure 'PPV %' = CALCULATE ( DIVIDE ( [PPV], [Turnover SC] ), KEEPFILTERS ( Dim_SC_Function[SC Function] IN { "Imports", "Local Sourcing" } ) )
+		formatString: 0.00%
+		displayFolder: 3 KPI Ratios
+		lineageTag: bd5b28a5-1e63-4a46-a92f-6b8f12fd2afb
+
+	measure 'Import Mix %' = DIVIDE ( CALCULATE ( [Purchase Pairs], KEEPFILTERS ( Dim_SC_Function[SC Function] = "Imports" ) ), CALCULATE ( [Purchase Pairs], KEEPFILTERS ( Dim_SC_Function[SC Function] IN { "Imports", "Local Sourcing" } ) ) )
+		formatString: 0.0%
+		displayFolder: 3 KPI Ratios
+		lineageTag: 5a64bd18-5f6b-42d3-a9b2-a52c370709c4
+
+	measure 'Local Sourcing Mix %' = DIVIDE ( CALCULATE ( [Purchase Pairs], KEEPFILTERS ( Dim_SC_Function[SC Function] = "Local Sourcing" ) ), CALCULATE ( [Purchase Pairs], KEEPFILTERS ( Dim_SC_Function[SC Function] IN { "Imports", "Local Sourcing" } ) ) )
+		formatString: 0.0%
+		displayFolder: 3 KPI Ratios
+		lineageTag: 1aedc78f-bd06-418a-ad1f-2e11203724bc
+
+	measure 'Average Cost per Pair' = DIVIDE ( - [COGS SC], [Total Pairs] )
+		formatString: 0.000
+		displayFolder: 3 KPI Ratios
+		lineageTag: ec63e833-564e-4b5e-8a87-ebb29c60d796
+
+	measure 'Average Cost per Pair Import' = CALCULATE ( DIVIDE ( - [COGS SC], [Purchase Pairs] ), KEEPFILTERS ( Dim_SC_Function[SC Function] = "Imports" ) )
+		formatString: 0.000
+		displayFolder: 3 KPI Ratios
+		lineageTag: 0a462aea-d093-4cfc-966a-0abe16c4f2ed
+
+	measure 'Average Cost per Pair LS' = CALCULATE ( DIVIDE ( - [COGS SC], [Purchase Pairs] ), KEEPFILTERS ( Dim_SC_Function[SC Function] = "Local Sourcing" ) )
+		formatString: 0.000
+		displayFolder: 3 KPI Ratios
+		lineageTag: 5aa405e9-834e-4e99-901e-65602934265e
+
+	measure 'Average Cost per Pair IHM' = CALCULATE ( DIVIDE ( - [COGS SC], [Production Pairs] ), KEEPFILTERS ( Dim_SC_Function[SC Function] = "Manufacturing" ) )
+		formatString: 0.000
+		displayFolder: 3 KPI Ratios
+		lineageTag: 1008a5c7-e526-4f82-b734-cb5eb75c0f10
+
+	measure 'NT | Monthly' =
+			VAR _p = [Reporting Period]
+			RETURN
+			    CALCULATE (
+			        [Net Turnover SC],
+			        'CG Scenario'[Comparison] = "Actual",
+			        'CG Period'[Period] = "Monthly",
+			        FILTER ( ALL ( Dim_Date ), Dim_Date[Period] = _p )
+			    )
+		formatString: #,0.00
+		displayFolder: 4 Summary Cards
+		lineageTag: 95c6df5b-3a18-4e69-ad46-efc835e75e46
+
+	measure 'NT | vs Bud' =
+			VAR _p = [Reporting Period]
+			RETURN
+			    CALCULATE (
+			        [Net Turnover SC],
+			        'CG Scenario'[Comparison] = "Var vs Bud %",
+			        'CG Period'[Period] = "Monthly",
+			        FILTER ( ALL ( Dim_Date ), Dim_Date[Period] = _p )
+			    )
+		formatString: +0.0%;-0.0%;0.0%
+		displayFolder: 4 Summary Cards
+		lineageTag: 24e51e10-c946-4356-8215-49d2bb654ddf
+
+	measure 'NT | vs LY' =
+			VAR _p = [Reporting Period]
+			RETURN
+			    CALCULATE (
+			        [Net Turnover SC],
+			        'CG Scenario'[Comparison] = "Var vs LY %",
+			        'CG Period'[Period] = "Monthly",
+			        FILTER ( ALL ( Dim_Date ), Dim_Date[Period] = _p )
+			    )
+		formatString: +0.0%;-0.0%;0.0%
+		displayFolder: 4 Summary Cards
+		lineageTag: 2d15de83-ec76-4ba3-8425-dab10487fa47
+
+	measure 'NT | YTD' =
+			VAR _p = [Reporting Period]
+			RETURN
+			    CALCULATE (
+			        [Net Turnover SC],
+			        'CG Scenario'[Comparison] = "Actual",
+			        'CG Period'[Period] = "YTD",
+			        FILTER ( ALL ( Dim_Date ), Dim_Date[Period] = _p )
+			    )
+		formatString: #,0.00
+		displayFolder: 4 Summary Cards
+		lineageTag: 7f2771ce-0cbd-4887-9f17-d836e3faf6b4
+
+	measure 'NT | YTD vs Bud' =
+			VAR _p = [Reporting Period]
+			RETURN
+			    CALCULATE (
+			        [Net Turnover SC],
+			        'CG Scenario'[Comparison] = "Var vs Bud %",
+			        'CG Period'[Period] = "YTD",
+			        FILTER ( ALL ( Dim_Date ), Dim_Date[Period] = _p )
+			    )
+		formatString: +0.0%;-0.0%;0.0%
+		displayFolder: 4 Summary Cards
+		lineageTag: 64bfc3ca-4046-4e1a-9310-6252a9ba08a5
+
+	measure 'NT | YTD vs LY' =
+			VAR _p = [Reporting Period]
+			RETURN
+			    CALCULATE (
+			        [Net Turnover SC],
+			        'CG Scenario'[Comparison] = "Var vs LY %",
+			        'CG Period'[Period] = "YTD",
+			        FILTER ( ALL ( Dim_Date ), Dim_Date[Period] = _p )
+			    )
+		formatString: +0.0%;-0.0%;0.0%
+		displayFolder: 4 Summary Cards
+		lineageTag: b973a754-1053-4a3b-8085-77e23a05a9c0
+
+	measure 'GP | Monthly' =
+			VAR _p = [Reporting Period]
+			RETURN
+			    CALCULATE (
+			        [Gross Profit],
+			        'CG Scenario'[Comparison] = "Actual",
+			        'CG Period'[Period] = "Monthly",
+			        FILTER ( ALL ( Dim_Date ), Dim_Date[Period] = _p )
+			    )
+		formatString: #,0.00
+		displayFolder: 4 Summary Cards
+		lineageTag: 57efe838-b954-48ac-ac60-3d4b7a5cae37
+
+	measure 'GP | vs Bud' =
+			VAR _p = [Reporting Period]
+			RETURN
+			    CALCULATE (
+			        [Gross Profit],
+			        'CG Scenario'[Comparison] = "Var vs Bud %",
+			        'CG Period'[Period] = "Monthly",
+			        FILTER ( ALL ( Dim_Date ), Dim_Date[Period] = _p )
+			    )
+		formatString: +0.0%;-0.0%;0.0%
+		displayFolder: 4 Summary Cards
+		lineageTag: ba6f4503-ed12-4926-97ae-0ba9ae515374
+
+	measure 'GP | vs LY' =
+			VAR _p = [Reporting Period]
+			RETURN
+			    CALCULATE (
+			        [Gross Profit],
+			        'CG Scenario'[Comparison] = "Var vs LY %",
+			        'CG Period'[Period] = "Monthly",
+			        FILTER ( ALL ( Dim_Date ), Dim_Date[Period] = _p )
+			    )
+		formatString: +0.0%;-0.0%;0.0%
+		displayFolder: 4 Summary Cards
+		lineageTag: 3da9cc8f-80ec-47c5-9266-6b31828e0531
+
+	measure 'GP | YTD' =
+			VAR _p = [Reporting Period]
+			RETURN
+			    CALCULATE (
+			        [Gross Profit],
+			        'CG Scenario'[Comparison] = "Actual",
+			        'CG Period'[Period] = "YTD",
+			        FILTER ( ALL ( Dim_Date ), Dim_Date[Period] = _p )
+			    )
+		formatString: #,0.00
+		displayFolder: 4 Summary Cards
+		lineageTag: dff25d34-92be-4249-9a3e-11d9deceea06
+
+	measure 'GP | YTD vs Bud' =
+			VAR _p = [Reporting Period]
+			RETURN
+			    CALCULATE (
+			        [Gross Profit],
+			        'CG Scenario'[Comparison] = "Var vs Bud %",
+			        'CG Period'[Period] = "YTD",
+			        FILTER ( ALL ( Dim_Date ), Dim_Date[Period] = _p )
+			    )
+		formatString: +0.0%;-0.0%;0.0%
+		displayFolder: 4 Summary Cards
+		lineageTag: 829ce9b9-af7c-416c-af58-867fd1443009
+
+	measure 'GP | YTD vs LY' =
+			VAR _p = [Reporting Period]
+			RETURN
+			    CALCULATE (
+			        [Gross Profit],
+			        'CG Scenario'[Comparison] = "Var vs LY %",
+			        'CG Period'[Period] = "YTD",
+			        FILTER ( ALL ( Dim_Date ), Dim_Date[Period] = _p )
+			    )
+		formatString: +0.0%;-0.0%;0.0%
+		displayFolder: 4 Summary Cards
+		lineageTag: dd80ecf9-015f-437d-b631-7ecaf7b0cbfe
+
+	measure 'EBITDA | Monthly' =
+			VAR _p = [Reporting Period]
+			RETURN
+			    CALCULATE (
+			        [EBITDA],
+			        'CG Scenario'[Comparison] = "Actual",
+			        'CG Period'[Period] = "Monthly",
+			        FILTER ( ALL ( Dim_Date ), Dim_Date[Period] = _p )
+			    )
+		formatString: #,0.00
+		displayFolder: 4 Summary Cards
+		lineageTag: c52a4740-612c-431e-a61d-005e841ed449
+
+	measure 'EBITDA | vs Bud' =
+			VAR _p = [Reporting Period]
+			RETURN
+			    CALCULATE (
+			        [EBITDA],
+			        'CG Scenario'[Comparison] = "Var vs Bud %",
+			        'CG Period'[Period] = "Monthly",
+			        FILTER ( ALL ( Dim_Date ), Dim_Date[Period] = _p )
+			    )
+		formatString: +0.0%;-0.0%;0.0%
+		displayFolder: 4 Summary Cards
+		lineageTag: 0af41f81-2fe1-4021-aaaf-f06d6588b1ba
+
+	measure 'EBITDA | vs LY' =
+			VAR _p = [Reporting Period]
+			RETURN
+			    CALCULATE (
+			        [EBITDA],
+			        'CG Scenario'[Comparison] = "Var vs LY %",
+			        'CG Period'[Period] = "Monthly",
+			        FILTER ( ALL ( Dim_Date ), Dim_Date[Period] = _p )
+			    )
+		formatString: +0.0%;-0.0%;0.0%
+		displayFolder: 4 Summary Cards
+		lineageTag: d479355a-c133-470b-9735-1a21b5c5f2a3
+
+	measure 'EBITDA | YTD' =
+			VAR _p = [Reporting Period]
+			RETURN
+			    CALCULATE (
+			        [EBITDA],
+			        'CG Scenario'[Comparison] = "Actual",
+			        'CG Period'[Period] = "YTD",
+			        FILTER ( ALL ( Dim_Date ), Dim_Date[Period] = _p )
+			    )
+		formatString: #,0.00
+		displayFolder: 4 Summary Cards
+		lineageTag: 64695110-5c1e-4979-ac11-cf834a6f4c54
+
+	measure 'EBITDA | YTD vs Bud' =
+			VAR _p = [Reporting Period]
+			RETURN
+			    CALCULATE (
+			        [EBITDA],
+			        'CG Scenario'[Comparison] = "Var vs Bud %",
+			        'CG Period'[Period] = "YTD",
+			        FILTER ( ALL ( Dim_Date ), Dim_Date[Period] = _p )
+			    )
+		formatString: +0.0%;-0.0%;0.0%
+		displayFolder: 4 Summary Cards
+		lineageTag: e439af59-2ff9-4fd1-adad-d1f11f4719f8
+
+	measure 'EBITDA | YTD vs LY' =
+			VAR _p = [Reporting Period]
+			RETURN
+			    CALCULATE (
+			        [EBITDA],
+			        'CG Scenario'[Comparison] = "Var vs LY %",
+			        'CG Period'[Period] = "YTD",
+			        FILTER ( ALL ( Dim_Date ), Dim_Date[Period] = _p )
+			    )
+		formatString: +0.0%;-0.0%;0.0%
+		displayFolder: 4 Summary Cards
+		lineageTag: a550b4e6-1b98-4751-a910-b2f2a52cd169
+
+	measure 'PurchP | Monthly' =
+			VAR _p = [Reporting Period]
+			RETURN
+			    CALCULATE (
+			        [Purchase Pairs],
+			        'CG Scenario'[Comparison] = "Actual",
+			        'CG Period'[Period] = "Monthly",
+			        FILTER ( ALL ( Dim_Date ), Dim_Date[Period] = _p )
+			    )
+		formatString: #,0.00
+		displayFolder: 4 Summary Cards
+		lineageTag: a5f69e4d-9668-401e-b3fb-3f321b0ac7f5
+
+	measure 'PurchP | vs Bud' =
+			VAR _p = [Reporting Period]
+			RETURN
+			    CALCULATE (
+			        [Purchase Pairs],
+			        'CG Scenario'[Comparison] = "Var vs Bud %",
+			        'CG Period'[Period] = "Monthly",
+			        FILTER ( ALL ( Dim_Date ), Dim_Date[Period] = _p )
+			    )
+		formatString: +0.0%;-0.0%;0.0%
+		displayFolder: 4 Summary Cards
+		lineageTag: ea20039e-cfce-4073-9efa-5cf4db4e77af
+
+	measure 'PurchP | vs LY' =
+			VAR _p = [Reporting Period]
+			RETURN
+			    CALCULATE (
+			        [Purchase Pairs],
+			        'CG Scenario'[Comparison] = "Var vs LY %",
+			        'CG Period'[Period] = "Monthly",
+			        FILTER ( ALL ( Dim_Date ), Dim_Date[Period] = _p )
+			    )
+		formatString: +0.0%;-0.0%;0.0%
+		displayFolder: 4 Summary Cards
+		lineageTag: 063645dc-d226-47af-b8cb-ab06dde02330
+
+	measure 'PurchP | YTD' =
+			VAR _p = [Reporting Period]
+			RETURN
+			    CALCULATE (
+			        [Purchase Pairs],
+			        'CG Scenario'[Comparison] = "Actual",
+			        'CG Period'[Period] = "YTD",
+			        FILTER ( ALL ( Dim_Date ), Dim_Date[Period] = _p )
+			    )
+		formatString: #,0.00
+		displayFolder: 4 Summary Cards
+		lineageTag: 7507762e-42ba-4a58-a54d-cb2ba326e515
+
+	measure 'PurchP | YTD vs Bud' =
+			VAR _p = [Reporting Period]
+			RETURN
+			    CALCULATE (
+			        [Purchase Pairs],
+			        'CG Scenario'[Comparison] = "Var vs Bud %",
+			        'CG Period'[Period] = "YTD",
+			        FILTER ( ALL ( Dim_Date ), Dim_Date[Period] = _p )
+			    )
+		formatString: +0.0%;-0.0%;0.0%
+		displayFolder: 4 Summary Cards
+		lineageTag: f6f2eee1-4f50-48de-8e50-5f1d06dc0d67
+
+	measure 'PurchP | YTD vs LY' =
+			VAR _p = [Reporting Period]
+			RETURN
+			    CALCULATE (
+			        [Purchase Pairs],
+			        'CG Scenario'[Comparison] = "Var vs LY %",
+			        'CG Period'[Period] = "YTD",
+			        FILTER ( ALL ( Dim_Date ), Dim_Date[Period] = _p )
+			    )
+		formatString: +0.0%;-0.0%;0.0%
+		displayFolder: 4 Summary Cards
+		lineageTag: c5eb085a-7416-4c3b-b2be-b0a9e4ac1413
+
+	measure 'ProdP | Monthly' =
+			VAR _p = [Reporting Period]
+			RETURN
+			    CALCULATE (
+			        [Production Pairs],
+			        'CG Scenario'[Comparison] = "Actual",
+			        'CG Period'[Period] = "Monthly",
+			        FILTER ( ALL ( Dim_Date ), Dim_Date[Period] = _p )
+			    )
+		formatString: #,0.00
+		displayFolder: 4 Summary Cards
+		lineageTag: a9a32057-2d67-4e75-b03c-e4d237c9a990
+
+	measure 'ProdP | vs Bud' =
+			VAR _p = [Reporting Period]
+			RETURN
+			    CALCULATE (
+			        [Production Pairs],
+			        'CG Scenario'[Comparison] = "Var vs Bud %",
+			        'CG Period'[Period] = "Monthly",
+			        FILTER ( ALL ( Dim_Date ), Dim_Date[Period] = _p )
+			    )
+		formatString: +0.0%;-0.0%;0.0%
+		displayFolder: 4 Summary Cards
+		lineageTag: 61588ea6-5a86-4d0a-a873-9d9511fe7069
+
+	measure 'ProdP | vs LY' =
+			VAR _p = [Reporting Period]
+			RETURN
+			    CALCULATE (
+			        [Production Pairs],
+			        'CG Scenario'[Comparison] = "Var vs LY %",
+			        'CG Period'[Period] = "Monthly",
+			        FILTER ( ALL ( Dim_Date ), Dim_Date[Period] = _p )
+			    )
+		formatString: +0.0%;-0.0%;0.0%
+		displayFolder: 4 Summary Cards
+		lineageTag: fbbc6a2c-c310-4b0c-9174-3ab7967109c6
+
+	measure 'ProdP | YTD' =
+			VAR _p = [Reporting Period]
+			RETURN
+			    CALCULATE (
+			        [Production Pairs],
+			        'CG Scenario'[Comparison] = "Actual",
+			        'CG Period'[Period] = "YTD",
+			        FILTER ( ALL ( Dim_Date ), Dim_Date[Period] = _p )
+			    )
+		formatString: #,0.00
+		displayFolder: 4 Summary Cards
+		lineageTag: de65f1ad-2045-4128-b56b-de25c2662517
+
+	measure 'ProdP | YTD vs Bud' =
+			VAR _p = [Reporting Period]
+			RETURN
+			    CALCULATE (
+			        [Production Pairs],
+			        'CG Scenario'[Comparison] = "Var vs Bud %",
+			        'CG Period'[Period] = "YTD",
+			        FILTER ( ALL ( Dim_Date ), Dim_Date[Period] = _p )
+			    )
+		formatString: +0.0%;-0.0%;0.0%
+		displayFolder: 4 Summary Cards
+		lineageTag: 70098efd-0c27-4889-9d42-2f067f1ef39a
+
+	measure 'ProdP | YTD vs LY' =
+			VAR _p = [Reporting Period]
+			RETURN
+			    CALCULATE (
+			        [Production Pairs],
+			        'CG Scenario'[Comparison] = "Var vs LY %",
+			        'CG Period'[Period] = "YTD",
+			        FILTER ( ALL ( Dim_Date ), Dim_Date[Period] = _p )
+			    )
+		formatString: +0.0%;-0.0%;0.0%
+		displayFolder: 4 Summary Cards
+		lineageTag: e78db5e9-512c-46a6-886d-0e8d31df690e
+
+	measure 'TotP | Monthly' =
+			VAR _p = [Reporting Period]
+			RETURN
+			    CALCULATE (
+			        [Total Pairs],
+			        'CG Scenario'[Comparison] = "Actual",
+			        'CG Period'[Period] = "Monthly",
+			        FILTER ( ALL ( Dim_Date ), Dim_Date[Period] = _p )
+			    )
+		formatString: #,0.00
+		displayFolder: 4 Summary Cards
+		lineageTag: b4bef499-6565-410e-8feb-9132d2c00e56
+
+	measure 'TotP | vs Bud' =
+			VAR _p = [Reporting Period]
+			RETURN
+			    CALCULATE (
+			        [Total Pairs],
+			        'CG Scenario'[Comparison] = "Var vs Bud %",
+			        'CG Period'[Period] = "Monthly",
+			        FILTER ( ALL ( Dim_Date ), Dim_Date[Period] = _p )
+			    )
+		formatString: +0.0%;-0.0%;0.0%
+		displayFolder: 4 Summary Cards
+		lineageTag: 0d30d35a-df5e-4d73-a3d6-d207499489ab
+
+	measure 'TotP | vs LY' =
+			VAR _p = [Reporting Period]
+			RETURN
+			    CALCULATE (
+			        [Total Pairs],
+			        'CG Scenario'[Comparison] = "Var vs LY %",
+			        'CG Period'[Period] = "Monthly",
+			        FILTER ( ALL ( Dim_Date ), Dim_Date[Period] = _p )
+			    )
+		formatString: +0.0%;-0.0%;0.0%
+		displayFolder: 4 Summary Cards
+		lineageTag: c001fd70-f7e4-44c0-8f2a-2f6053dc074e
+
+	measure 'TotP | YTD' =
+			VAR _p = [Reporting Period]
+			RETURN
+			    CALCULATE (
+			        [Total Pairs],
+			        'CG Scenario'[Comparison] = "Actual",
+			        'CG Period'[Period] = "YTD",
+			        FILTER ( ALL ( Dim_Date ), Dim_Date[Period] = _p )
+			    )
+		formatString: #,0.00
+		displayFolder: 4 Summary Cards
+		lineageTag: 7c246f55-1ecd-4411-9acd-02faa6118db5
+
+	measure 'TotP | YTD vs Bud' =
+			VAR _p = [Reporting Period]
+			RETURN
+			    CALCULATE (
+			        [Total Pairs],
+			        'CG Scenario'[Comparison] = "Var vs Bud %",
+			        'CG Period'[Period] = "YTD",
+			        FILTER ( ALL ( Dim_Date ), Dim_Date[Period] = _p )
+			    )
+		formatString: +0.0%;-0.0%;0.0%
+		displayFolder: 4 Summary Cards
+		lineageTag: f9b68827-529b-4d84-bc62-203cef15e5d2
+
+	measure 'TotP | YTD vs LY' =
+			VAR _p = [Reporting Period]
+			RETURN
+			    CALCULATE (
+			        [Total Pairs],
+			        'CG Scenario'[Comparison] = "Var vs LY %",
+			        'CG Period'[Period] = "YTD",
+			        FILTER ( ALL ( Dim_Date ), Dim_Date[Period] = _p )
+			    )
+		formatString: +0.0%;-0.0%;0.0%
+		displayFolder: 4 Summary Cards
+		lineageTag: a4bee920-d2d9-48c2-8083-728bbba6ebd7
+
+	measure 'CoS% | Monthly' =
+			VAR _p = [Reporting Period]
+			RETURN
+			    CALCULATE (
+			        [Cost of Sales %],
+			        'CG Scenario'[Comparison] = "Actual",
+			        'CG Period'[Period] = "Monthly",
+			        FILTER ( ALL ( Dim_Date ), Dim_Date[Period] = _p )
+			    )
+		formatString: 0.0%
+		displayFolder: 4 Summary Cards
+		lineageTag: bd9f1619-507a-4678-8a2d-8887ff00b103
+
+	measure 'CoS% | vs Bud' =
+			VAR _p = [Reporting Period]
+			RETURN
+			    CALCULATE (
+			        [Cost of Sales %],
+			        'CG Scenario'[Comparison] = "Var vs Bud %",
+			        'CG Period'[Period] = "Monthly",
+			        FILTER ( ALL ( Dim_Date ), Dim_Date[Period] = _p )
+			    )
+		formatString: +0.00" pp";-0.00" pp";0.00" pp"
+		displayFolder: 4 Summary Cards
+		lineageTag: 9dbdd13e-4479-44be-abe5-a3cdf5d71397
+
+	measure 'CoS% | vs LY' =
+			VAR _p = [Reporting Period]
+			RETURN
+			    CALCULATE (
+			        [Cost of Sales %],
+			        'CG Scenario'[Comparison] = "Var vs LY %",
+			        'CG Period'[Period] = "Monthly",
+			        FILTER ( ALL ( Dim_Date ), Dim_Date[Period] = _p )
+			    )
+		formatString: +0.00" pp";-0.00" pp";0.00" pp"
+		displayFolder: 4 Summary Cards
+		lineageTag: ef0cccee-0d82-43e4-9e64-8e0a95389554
+
+	measure 'CoS% | YTD' =
+			VAR _p = [Reporting Period]
+			RETURN
+			    CALCULATE (
+			        [Cost of Sales %],
+			        'CG Scenario'[Comparison] = "Actual",
+			        'CG Period'[Period] = "YTD",
+			        FILTER ( ALL ( Dim_Date ), Dim_Date[Period] = _p )
+			    )
+		formatString: 0.0%
+		displayFolder: 4 Summary Cards
+		lineageTag: ea9c28e9-05ce-45d3-81a9-8d04a97d4772
+
+	measure 'CoS% | YTD vs Bud' =
+			VAR _p = [Reporting Period]
+			RETURN
+			    CALCULATE (
+			        [Cost of Sales %],
+			        'CG Scenario'[Comparison] = "Var vs Bud %",
+			        'CG Period'[Period] = "YTD",
+			        FILTER ( ALL ( Dim_Date ), Dim_Date[Period] = _p )
+			    )
+		formatString: +0.00" pp";-0.00" pp";0.00" pp"
+		displayFolder: 4 Summary Cards
+		lineageTag: 98ec8da2-85db-4cc2-aeda-493d852157d9
+
+	measure 'CoS% | YTD vs LY' =
+			VAR _p = [Reporting Period]
+			RETURN
+			    CALCULATE (
+			        [Cost of Sales %],
+			        'CG Scenario'[Comparison] = "Var vs LY %",
+			        'CG Period'[Period] = "YTD",
+			        FILTER ( ALL ( Dim_Date ), Dim_Date[Period] = _p )
+			    )
+		formatString: +0.00" pp";-0.00" pp";0.00" pp"
+		displayFolder: 4 Summary Cards
+		lineageTag: dcbb44b8-5d54-4e98-b13e-148ff424dbf1
+
+	measure 'FrPP | Monthly' =
+			VAR _p = [Reporting Period]
+			RETURN
+			    CALCULATE (
+			        [Freight Cost per Pair],
+			        'CG Scenario'[Comparison] = "Actual",
+			        'CG Period'[Period] = "Monthly",
+			        FILTER ( ALL ( Dim_Date ), Dim_Date[Period] = _p )
+			    )
+		formatString: 0.000
+		displayFolder: 4 Summary Cards
+		lineageTag: 8215948f-a104-4438-8fa3-1fe090a41a23
+
+	measure 'FrPP | vs Bud' =
+			VAR _p = [Reporting Period]
+			RETURN
+			    CALCULATE (
+			        [Freight Cost per Pair],
+			        'CG Scenario'[Comparison] = "Var vs Bud %",
+			        'CG Period'[Period] = "Monthly",
+			        FILTER ( ALL ( Dim_Date ), Dim_Date[Period] = _p )
+			    )
+		formatString: +0.0%;-0.0%;0.0%
+		displayFolder: 4 Summary Cards
+		lineageTag: a647137a-c6b1-4718-ae46-62780dd3a5e7
+
+	measure 'FrPP | vs LY' =
+			VAR _p = [Reporting Period]
+			RETURN
+			    CALCULATE (
+			        [Freight Cost per Pair],
+			        'CG Scenario'[Comparison] = "Var vs LY %",
+			        'CG Period'[Period] = "Monthly",
+			        FILTER ( ALL ( Dim_Date ), Dim_Date[Period] = _p )
+			    )
+		formatString: +0.0%;-0.0%;0.0%
+		displayFolder: 4 Summary Cards
+		lineageTag: 48ddd860-d871-4a62-b4c9-84fe77adc304
+
+	measure 'FrPP | YTD' =
+			VAR _p = [Reporting Period]
+			RETURN
+			    CALCULATE (
+			        [Freight Cost per Pair],
+			        'CG Scenario'[Comparison] = "Actual",
+			        'CG Period'[Period] = "YTD",
+			        FILTER ( ALL ( Dim_Date ), Dim_Date[Period] = _p )
+			    )
+		formatString: 0.000
+		displayFolder: 4 Summary Cards
+		lineageTag: 27aa845d-5abf-4238-a172-1f83afb9958f
+
+	measure 'FrPP | YTD vs Bud' =
+			VAR _p = [Reporting Period]
+			RETURN
+			    CALCULATE (
+			        [Freight Cost per Pair],
+			        'CG Scenario'[Comparison] = "Var vs Bud %",
+			        'CG Period'[Period] = "YTD",
+			        FILTER ( ALL ( Dim_Date ), Dim_Date[Period] = _p )
+			    )
+		formatString: +0.0%;-0.0%;0.0%
+		displayFolder: 4 Summary Cards
+		lineageTag: 27e09f72-4906-424b-9f79-15996b32cdbc
+
+	measure 'FrPP | YTD vs LY' =
+			VAR _p = [Reporting Period]
+			RETURN
+			    CALCULATE (
+			        [Freight Cost per Pair],
+			        'CG Scenario'[Comparison] = "Var vs LY %",
+			        'CG Period'[Period] = "YTD",
+			        FILTER ( ALL ( Dim_Date ), Dim_Date[Period] = _p )
+			    )
+		formatString: +0.0%;-0.0%;0.0%
+		displayFolder: 4 Summary Cards
+		lineageTag: d00eef52-ca78-4321-afba-5ccf01195b18
+
+	measure 'ChPP | Monthly' =
+			VAR _p = [Reporting Period]
+			RETURN
+			    CALCULATE (
+			        [Channel Expenses per Pair],
+			        'CG Scenario'[Comparison] = "Actual",
+			        'CG Period'[Period] = "Monthly",
+			        FILTER ( ALL ( Dim_Date ), Dim_Date[Period] = _p )
+			    )
+		formatString: 0.000
+		displayFolder: 4 Summary Cards
+		lineageTag: 8448d625-c88b-4602-929e-3810a640888c
+
+	measure 'ChPP | vs Bud' =
+			VAR _p = [Reporting Period]
+			RETURN
+			    CALCULATE (
+			        [Channel Expenses per Pair],
+			        'CG Scenario'[Comparison] = "Var vs Bud %",
+			        'CG Period'[Period] = "Monthly",
+			        FILTER ( ALL ( Dim_Date ), Dim_Date[Period] = _p )
+			    )
+		formatString: +0.0%;-0.0%;0.0%
+		displayFolder: 4 Summary Cards
+		lineageTag: 3f3a4430-2aef-43ed-aee1-ebbbd88fe5fc
+
+	measure 'ChPP | vs LY' =
+			VAR _p = [Reporting Period]
+			RETURN
+			    CALCULATE (
+			        [Channel Expenses per Pair],
+			        'CG Scenario'[Comparison] = "Var vs LY %",
+			        'CG Period'[Period] = "Monthly",
+			        FILTER ( ALL ( Dim_Date ), Dim_Date[Period] = _p )
+			    )
+		formatString: +0.0%;-0.0%;0.0%
+		displayFolder: 4 Summary Cards
+		lineageTag: c7a683bf-e188-43b9-b1fc-64cf0e733598
+
+	measure 'ChPP | YTD' =
+			VAR _p = [Reporting Period]
+			RETURN
+			    CALCULATE (
+			        [Channel Expenses per Pair],
+			        'CG Scenario'[Comparison] = "Actual",
+			        'CG Period'[Period] = "YTD",
+			        FILTER ( ALL ( Dim_Date ), Dim_Date[Period] = _p )
+			    )
+		formatString: 0.000
+		displayFolder: 4 Summary Cards
+		lineageTag: 5a2af1cd-303f-47c5-8bae-290a18e1d5f1
+
+	measure 'ChPP | YTD vs Bud' =
+			VAR _p = [Reporting Period]
+			RETURN
+			    CALCULATE (
+			        [Channel Expenses per Pair],
+			        'CG Scenario'[Comparison] = "Var vs Bud %",
+			        'CG Period'[Period] = "YTD",
+			        FILTER ( ALL ( Dim_Date ), Dim_Date[Period] = _p )
+			    )
+		formatString: +0.0%;-0.0%;0.0%
+		displayFolder: 4 Summary Cards
+		lineageTag: 1d52deaa-3ed4-4753-85d4-62ba47637d48
+
+	measure 'ChPP | YTD vs LY' =
+			VAR _p = [Reporting Period]
+			RETURN
+			    CALCULATE (
+			        [Channel Expenses per Pair],
+			        'CG Scenario'[Comparison] = "Var vs LY %",
+			        'CG Period'[Period] = "YTD",
+			        FILTER ( ALL ( Dim_Date ), Dim_Date[Period] = _p )
+			    )
+		formatString: +0.0%;-0.0%;0.0%
+		displayFolder: 4 Summary Cards
+		lineageTag: 184c0648-b7c2-4848-b807-debeae8023ff
+
+	measure 'FcPP | Monthly' =
+			VAR _p = [Reporting Period]
+			RETURN
+			    CALCULATE (
+			        [Factory Cost per Pair],
+			        'CG Scenario'[Comparison] = "Actual",
+			        'CG Period'[Period] = "Monthly",
+			        FILTER ( ALL ( Dim_Date ), Dim_Date[Period] = _p )
+			    )
+		formatString: 0.000
+		displayFolder: 4 Summary Cards
+		lineageTag: b2a22681-028c-40db-bd60-0d39ac5cc1cf
+
+	measure 'FcPP | vs Bud' =
+			VAR _p = [Reporting Period]
+			RETURN
+			    CALCULATE (
+			        [Factory Cost per Pair],
+			        'CG Scenario'[Comparison] = "Var vs Bud %",
+			        'CG Period'[Period] = "Monthly",
+			        FILTER ( ALL ( Dim_Date ), Dim_Date[Period] = _p )
+			    )
+		formatString: +0.0%;-0.0%;0.0%
+		displayFolder: 4 Summary Cards
+		lineageTag: e962acee-0232-445a-8e82-2536b77f3d44
+
+	measure 'FcPP | vs LY' =
+			VAR _p = [Reporting Period]
+			RETURN
+			    CALCULATE (
+			        [Factory Cost per Pair],
+			        'CG Scenario'[Comparison] = "Var vs LY %",
+			        'CG Period'[Period] = "Monthly",
+			        FILTER ( ALL ( Dim_Date ), Dim_Date[Period] = _p )
+			    )
+		formatString: +0.0%;-0.0%;0.0%
+		displayFolder: 4 Summary Cards
+		lineageTag: 03ee469e-41ef-4940-bc3f-63892a8dedc7
+
+	measure 'FcPP | YTD' =
+			VAR _p = [Reporting Period]
+			RETURN
+			    CALCULATE (
+			        [Factory Cost per Pair],
+			        'CG Scenario'[Comparison] = "Actual",
+			        'CG Period'[Period] = "YTD",
+			        FILTER ( ALL ( Dim_Date ), Dim_Date[Period] = _p )
+			    )
+		formatString: 0.000
+		displayFolder: 4 Summary Cards
+		lineageTag: 7901bbfb-5d87-467e-a561-386dd55be540
+
+	measure 'FcPP | YTD vs Bud' =
+			VAR _p = [Reporting Period]
+			RETURN
+			    CALCULATE (
+			        [Factory Cost per Pair],
+			        'CG Scenario'[Comparison] = "Var vs Bud %",
+			        'CG Period'[Period] = "YTD",
+			        FILTER ( ALL ( Dim_Date ), Dim_Date[Period] = _p )
+			    )
+		formatString: +0.0%;-0.0%;0.0%
+		displayFolder: 4 Summary Cards
+		lineageTag: 156a9548-2689-462d-b8a3-7caa361a686c
+
+	measure 'FcPP | YTD vs LY' =
+			VAR _p = [Reporting Period]
+			RETURN
+			    CALCULATE (
+			        [Factory Cost per Pair],
+			        'CG Scenario'[Comparison] = "Var vs LY %",
+			        'CG Period'[Period] = "YTD",
+			        FILTER ( ALL ( Dim_Date ), Dim_Date[Period] = _p )
+			    )
+		formatString: +0.0%;-0.0%;0.0%
+		displayFolder: 4 Summary Cards
+		lineageTag: a3e89f96-b835-4739-b9a7-0783cfba0036
+
+	measure 'UO | Monthly' =
+			VAR _p = [Reporting Period]
+			RETURN
+			    CALCULATE (
+			        [Factory Under Over Recovery],
+			        'CG Scenario'[Comparison] = "Actual",
+			        'CG Period'[Period] = "Monthly",
+			        FILTER ( ALL ( Dim_Date ), Dim_Date[Period] = _p )
+			    )
+		formatString: #,0.0
+		displayFolder: 4 Summary Cards
+		lineageTag: 6b878805-d5aa-4ba6-be30-d8bc70911f08
+
+	measure 'UO | vs Bud' =
+			VAR _p = [Reporting Period]
+			RETURN
+			    CALCULATE (
+			        [Factory Under Over Recovery],
+			        'CG Scenario'[Comparison] = "Var vs Bud %",
+			        'CG Period'[Period] = "Monthly",
+			        FILTER ( ALL ( Dim_Date ), Dim_Date[Period] = _p )
+			    )
+		formatString: +0.0%;-0.0%;0.0%
+		displayFolder: 4 Summary Cards
+		lineageTag: 4dcb74ca-bb73-4ee7-a2fc-dd9baa4fc134
+
+	measure 'UO | vs LY' =
+			VAR _p = [Reporting Period]
+			RETURN
+			    CALCULATE (
+			        [Factory Under Over Recovery],
+			        'CG Scenario'[Comparison] = "Var vs LY %",
+			        'CG Period'[Period] = "Monthly",
+			        FILTER ( ALL ( Dim_Date ), Dim_Date[Period] = _p )
+			    )
+		formatString: +0.0%;-0.0%;0.0%
+		displayFolder: 4 Summary Cards
+		lineageTag: 02c37c75-3a52-4e52-87e8-c7fd841c733e
+
+	measure 'UO | YTD' =
+			VAR _p = [Reporting Period]
+			RETURN
+			    CALCULATE (
+			        [Factory Under Over Recovery],
+			        'CG Scenario'[Comparison] = "Actual",
+			        'CG Period'[Period] = "YTD",
+			        FILTER ( ALL ( Dim_Date ), Dim_Date[Period] = _p )
+			    )
+		formatString: #,0.0
+		displayFolder: 4 Summary Cards
+		lineageTag: 096d0f6e-5653-4b0a-bb23-ca0892ed5bbf
+
+	measure 'UO | YTD vs Bud' =
+			VAR _p = [Reporting Period]
+			RETURN
+			    CALCULATE (
+			        [Factory Under Over Recovery],
+			        'CG Scenario'[Comparison] = "Var vs Bud %",
+			        'CG Period'[Period] = "YTD",
+			        FILTER ( ALL ( Dim_Date ), Dim_Date[Period] = _p )
+			    )
+		formatString: +0.0%;-0.0%;0.0%
+		displayFolder: 4 Summary Cards
+		lineageTag: f3fbd4ae-3638-4708-a972-54b8b03a2ea9
+
+	measure 'UO | YTD vs LY' =
+			VAR _p = [Reporting Period]
+			RETURN
+			    CALCULATE (
+			        [Factory Under Over Recovery],
+			        'CG Scenario'[Comparison] = "Var vs LY %",
+			        'CG Period'[Period] = "YTD",
+			        FILTER ( ALL ( Dim_Date ), Dim_Date[Period] = _p )
+			    )
+		formatString: +0.0%;-0.0%;0.0%
+		displayFolder: 4 Summary Cards
+		lineageTag: a1225d54-f694-4065-87ed-2b0ce34ef37e
+
+	measure 'PPV% | Monthly' =
+			VAR _p = [Reporting Period]
+			RETURN
+			    CALCULATE (
+			        [PPV %],
+			        'CG Scenario'[Comparison] = "Actual",
+			        'CG Period'[Period] = "Monthly",
+			        FILTER ( ALL ( Dim_Date ), Dim_Date[Period] = _p )
+			    )
+		formatString: 0.00%
+		displayFolder: 4 Summary Cards
+		lineageTag: f5ec7d81-8f1b-45e3-8974-d01bf38a4e0a
+
+	measure 'PPV% | vs Bud' =
+			VAR _p = [Reporting Period]
+			RETURN
+			    CALCULATE (
+			        [PPV %],
+			        'CG Scenario'[Comparison] = "Var vs Bud %",
+			        'CG Period'[Period] = "Monthly",
+			        FILTER ( ALL ( Dim_Date ), Dim_Date[Period] = _p )
+			    )
+		formatString: +0.00" pp";-0.00" pp";0.00" pp"
+		displayFolder: 4 Summary Cards
+		lineageTag: 950b442a-4ae1-4d14-ac63-b88147040fcd
+
+	measure 'PPV% | vs LY' =
+			VAR _p = [Reporting Period]
+			RETURN
+			    CALCULATE (
+			        [PPV %],
+			        'CG Scenario'[Comparison] = "Var vs LY %",
+			        'CG Period'[Period] = "Monthly",
+			        FILTER ( ALL ( Dim_Date ), Dim_Date[Period] = _p )
+			    )
+		formatString: +0.00" pp";-0.00" pp";0.00" pp"
+		displayFolder: 4 Summary Cards
+		lineageTag: 2d79069d-64db-4d6c-b6dd-8574ca37e5fe
+
+	measure 'PPV% | YTD' =
+			VAR _p = [Reporting Period]
+			RETURN
+			    CALCULATE (
+			        [PPV %],
+			        'CG Scenario'[Comparison] = "Actual",
+			        'CG Period'[Period] = "YTD",
+			        FILTER ( ALL ( Dim_Date ), Dim_Date[Period] = _p )
+			    )
+		formatString: 0.00%
+		displayFolder: 4 Summary Cards
+		lineageTag: 103f2cc4-a7c7-450e-a47a-a9740dfde7a8
+
+	measure 'PPV% | YTD vs Bud' =
+			VAR _p = [Reporting Period]
+			RETURN
+			    CALCULATE (
+			        [PPV %],
+			        'CG Scenario'[Comparison] = "Var vs Bud %",
+			        'CG Period'[Period] = "YTD",
+			        FILTER ( ALL ( Dim_Date ), Dim_Date[Period] = _p )
+			    )
+		formatString: +0.00" pp";-0.00" pp";0.00" pp"
+		displayFolder: 4 Summary Cards
+		lineageTag: a514e094-6083-4dc8-ac6a-fbff02e115a9
+
+	measure 'PPV% | YTD vs LY' =
+			VAR _p = [Reporting Period]
+			RETURN
+			    CALCULATE (
+			        [PPV %],
+			        'CG Scenario'[Comparison] = "Var vs LY %",
+			        'CG Period'[Period] = "YTD",
+			        FILTER ( ALL ( Dim_Date ), Dim_Date[Period] = _p )
+			    )
+		formatString: +0.00" pp";-0.00" pp";0.00" pp"
+		displayFolder: 4 Summary Cards
+		lineageTag: fd526fc4-25d6-4215-ac68-1b55b08e6106
+
+	measure 'P&L Row Value' =
+			VAR _type = SELECTEDVALUE ( PL_Layout[Row Type] )
+			VAR _key = SELECTEDVALUE ( PL_Layout[Key] )
+			RETURN
+			    SWITCH (
+			        TRUE (),
+			        _type = "Account" && _key IN { "PURCH_PAIRS", "PROD_PAIRS" }, CALCULATE ( [Pairs], Dim_Account[Account Code] = _key ),
+			        _type = "Account", CALCULATE ( [Amount USD], Dim_Account[Account Code] = _key ),
+			        _key = "Total Pairs", [Total Pairs],
+			        _key = "Gross Margin %", [Gross Margin %],
+			        _key = "Channel Cost %", [Channel Cost %],
+			        _key = "Channel Operating Margin %", [Channel Operating Margin %],
+			        _key = "EBITDA", [EBITDA],
+			        _key = "EBITDA Margin %", [EBITDA Margin %],
+			        _key = "EBIT BNRI", [EBIT BNRI],
+			        _key = "EBIT BNRI Margin %", [EBIT BNRI Margin %],
+			        _key = "EBIT", [EBIT],
+			        _key = "EBIT Margin %", [EBIT Margin %]
+			    )
+		displayFolder: 5 Detailed P&L
+		lineageTag: 6c2c3238-6fdd-42da-9b80-90084c087542
+
+		formatStringDefinition = IF ( SELECTEDVALUE ( PL_Layout[Format] ) = "%", "0.0%", "#,0" )
+
+	measure 'P&L Actual' =
+			VAR _p = [Reporting Period]
+			VAR _per = SELECTEDVALUE ( 'Period Mode'[Period], "Monthly" )
+			RETURN
+			    CALCULATE (
+			        [P&L Row Value],
+			        'CG Scenario'[Comparison] = "Actual",
+			        'CG Period'[Period] = _per,
+			        FILTER ( ALL ( Dim_Date ), Dim_Date[Period] = _p )
+			    )
+		displayFolder: 5 Detailed P&L
+		lineageTag: 05c9d6e0-29dd-4713-929f-225112717128
+
+		formatStringDefinition = IF ( SELECTEDVALUE ( PL_Layout[Format] ) = "%", "0.0%", "#,0" )
+
+	measure 'P&L Budget' =
+			VAR _p = [Reporting Period]
+			VAR _per = SELECTEDVALUE ( 'Period Mode'[Period], "Monthly" )
+			RETURN
+			    CALCULATE (
+			        [P&L Row Value],
+			        'CG Scenario'[Comparison] = "Budget",
+			        'CG Period'[Period] = _per,
+			        FILTER ( ALL ( Dim_Date ), Dim_Date[Period] = _p )
+			    )
+		displayFolder: 5 Detailed P&L
+		lineageTag: a4952ba6-4d61-4c81-b93b-67b31ee0b346
+
+		formatStringDefinition = IF ( SELECTEDVALUE ( PL_Layout[Format] ) = "%", "0.0%", "#,0" )
+
+	measure 'P&L LY' =
+			VAR _p = [Reporting Period]
+			VAR _per = SELECTEDVALUE ( 'Period Mode'[Period], "Monthly" )
+			RETURN
+			    CALCULATE (
+			        [P&L Row Value],
+			        'CG Scenario'[Comparison] = "LY",
+			        'CG Period'[Period] = _per,
+			        FILTER ( ALL ( Dim_Date ), Dim_Date[Period] = _p )
+			    )
+		displayFolder: 5 Detailed P&L
+		lineageTag: 25e03fd5-de83-4eb7-a31d-8579cf4fdc03
+
+		formatStringDefinition = IF ( SELECTEDVALUE ( PL_Layout[Format] ) = "%", "0.0%", "#,0" )
+
+	measure 'P&L vs Bud %' =
+			VAR _p = [Reporting Period]
+			VAR _per = SELECTEDVALUE ( 'Period Mode'[Period], "Monthly" )
+			VAR _a = CALCULATE (
+			        [P&L Row Value],
+			        'CG Scenario'[Comparison] = "Actual",
+			        'CG Period'[Period] = _per,
+			        FILTER ( ALL ( Dim_Date ), Dim_Date[Period] = _p )
+			    )
+			VAR _b = CALCULATE (
+			        [P&L Row Value],
+			        'CG Scenario'[Comparison] = "Budget",
+			        'CG Period'[Period] = _per,
+			        FILTER ( ALL ( Dim_Date ), Dim_Date[Period] = _p )
+			    )
+			RETURN
+			    IF (
+			        ISBLANK ( _a ) || ISBLANK ( _b ), BLANK (),
+			        IF ( SELECTEDVALUE ( PL_Layout[Format] ) = "%", ( _a - _b ) * 100, DIVIDE ( _a - _b, ABS ( _b ) ) )
+			    )
+		displayFolder: 5 Detailed P&L
+		lineageTag: 438a4640-e04e-44b6-b511-629eab8013d9
+
+		formatStringDefinition = IF ( SELECTEDVALUE ( PL_Layout[Format] ) = "%", "+0.00"" pp"";-0.00"" pp""", "+0.0%;-0.0%;0.0%" )
+
+	measure 'P&L vs LY %' =
+			VAR _p = [Reporting Period]
+			VAR _per = SELECTEDVALUE ( 'Period Mode'[Period], "Monthly" )
+			VAR _a = CALCULATE (
+			        [P&L Row Value],
+			        'CG Scenario'[Comparison] = "Actual",
+			        'CG Period'[Period] = _per,
+			        FILTER ( ALL ( Dim_Date ), Dim_Date[Period] = _p )
+			    )
+			VAR _b = CALCULATE (
+			        [P&L Row Value],
+			        'CG Scenario'[Comparison] = "LY",
+			        'CG Period'[Period] = _per,
+			        FILTER ( ALL ( Dim_Date ), Dim_Date[Period] = _p )
+			    )
+			RETURN
+			    IF (
+			        ISBLANK ( _a ) || ISBLANK ( _b ), BLANK (),
+			        IF ( SELECTEDVALUE ( PL_Layout[Format] ) = "%", ( _a - _b ) * 100, DIVIDE ( _a - _b, ABS ( _b ) ) )
+			    )
+		displayFolder: 5 Detailed P&L
+		lineageTag: 72f5eeaf-8209-42e4-89b5-9d38315b4b0b
+
+		formatStringDefinition = IF ( SELECTEDVALUE ( PL_Layout[Format] ) = "%", "+0.00"" pp"";-0.00"" pp""", "+0.0%;-0.0%;0.0%" )
+
+	measure 'Trend Net Turnover Actual' =
+			VAR _y = INT ( [Reporting Period] / 100 )
+			RETURN DIVIDE ( CALCULATE ( [Net Turnover SC], 'CG Scenario'[Comparison] = "Actual", Dim_Date[Year] = _y ), 1000000 )
+		formatString: #,0.00
+		displayFolder: 6 Trend
+		lineageTag: f254456f-f873-4480-9f94-0cd4681df288
+
+	measure 'Trend Net Turnover Budget' =
+			VAR _y = INT ( [Reporting Period] / 100 )
+			RETURN DIVIDE ( CALCULATE ( [Net Turnover SC], 'CG Scenario'[Comparison] = "Budget", Dim_Date[Year] = _y ), 1000000 )
+		formatString: #,0.00
+		displayFolder: 6 Trend
+		lineageTag: 77ba7ac9-ab61-4e6f-9d60-cfd297647310
+
+	measure 'Trend Net Turnover LY' =
+			VAR _y = INT ( [Reporting Period] / 100 )
+			RETURN DIVIDE ( CALCULATE ( [Net Turnover SC], 'CG Scenario'[Comparison] = "LY", Dim_Date[Year] = _y ), 1000000 )
+		formatString: #,0.00
+		displayFolder: 6 Trend
+		lineageTag: e67e7674-1ebe-44ad-b102-d46f3cd45221
+
+	measure 'Trend GM % Actual' =
+			VAR _y = INT ( [Reporting Period] / 100 )
+			RETURN CALCULATE ( [Gross Margin %], 'CG Scenario'[Comparison] = "Actual", Dim_Date[Year] = _y )
+		formatString: 0.0%
+		displayFolder: 6 Trend
+		lineageTag: 35f97af9-9f2e-4635-88cf-a21afbfdf720
+
+	measure 'Trend GM % Budget' =
+			VAR _y = INT ( [Reporting Period] / 100 )
+			RETURN CALCULATE ( [Gross Margin %], 'CG Scenario'[Comparison] = "Budget", Dim_Date[Year] = _y )
+		formatString: 0.0%
+		displayFolder: 6 Trend
+		lineageTag: 6dad753b-2819-4eda-a295-c1a8af97259b
+
+	measure 'Trend Freight per Pair Actual' =
+			VAR _y = INT ( [Reporting Period] / 100 )
+			RETURN CALCULATE ( [Freight Cost per Pair], 'CG Scenario'[Comparison] = "Actual", Dim_Date[Year] = _y )
+		formatString: 0.000
+		displayFolder: 6 Trend
+		lineageTag: 8303f44c-bed8-4522-91cd-fb91eb94b5a1
+
+	measure 'Trend Factory Cost per Pair Actual' =
+			VAR _y = INT ( [Reporting Period] / 100 )
+			RETURN CALCULATE ( [Factory Cost per Pair], 'CG Scenario'[Comparison] = "Actual", Dim_Date[Year] = _y )
+		formatString: 0.000
+		displayFolder: 6 Trend
+		lineageTag: 89b519b9-5ea7-4faf-b4bf-7b35c32348c0
+
+	measure 'Trend Channel Exp per Pair Actual' =
+			VAR _y = INT ( [Reporting Period] / 100 )
+			RETURN CALCULATE ( [Channel Expenses per Pair], 'CG Scenario'[Comparison] = "Actual", Dim_Date[Year] = _y )
+		formatString: 0.000
+		displayFolder: 6 Trend
+		lineageTag: eeeabf53-8604-4c84-b860-14daafbffb1a
+
+	measure 'Alert GP Margin' =
+			VAR _a = [Gross Margin %]
+			VAR _b = CALCULATE ( [Gross Margin %], 'CG Scenario'[Comparison] = "Budget" )
+			VAR _ly = CALCULATE ( [Gross Margin %], 'CG Scenario'[Comparison] = "LY" )
+			RETURN
+			    IF ( ISBLANK ( _a ), BLANK (),
+			        IF ( ( NOT ISBLANK ( _b ) && _a - _b < -0.01 ) || ( NOT ISBLANK ( _ly ) && _a - _ly < -0.01 ), "Red", "Green" ) )
+		displayFolder: 7 Alerts & OpCo
+		lineageTag: 37e0046e-04f6-42d1-9fe7-0dd61b4b555e
+
+	measure 'Alert EBITDA' = IF ( ISBLANK ( [Net Turnover SC] ), BLANK (), IF ( [EBITDA] < 0, "Red", "Green" ) )
+		displayFolder: 7 Alerts & OpCo
+		lineageTag: 535984e4-3134-4279-a344-64997b3125a6
+
+	measure 'Alert Freight' =
+			VAR _a = [Freight Cost per Pair]
+			VAR _ly = CALCULATE ( [Freight Cost per Pair], 'CG Scenario'[Comparison] = "LY" )
+			RETURN IF ( ISBLANK ( _a ), BLANK (), IF ( DIVIDE ( _a - _ly, _ly ) > 0.10, "Amber", "Green" ) )
+		displayFolder: 7 Alerts & OpCo
+		lineageTag: 6c590ba5-1084-4aa0-8af3-fd7fdb4f9ec4
+
+	measure 'Alert PPV' =
+			VAR _a = [PPV]
+			VAR _b = CALCULATE ( [PPV], 'CG Scenario'[Comparison] = "Budget" )
+			RETURN IF ( ISBLANK ( _b ), BLANK (), IF ( DIVIDE ( _a - _b, ABS ( _b ) ) < -0.05, "Amber", "Green" ) )
+		displayFolder: 7 Alerts & OpCo
+		lineageTag: 4d224eab-9200-4de5-90a8-ed6995d72b7a
+
+	measure 'Alert Recovery' =
+			VAR _a = [Recoveries of Factory]
+			VAR _b = CALCULATE ( [Recoveries of Factory], 'CG Scenario'[Comparison] = "Budget" )
+			RETURN IF ( ISBLANK ( _b ), BLANK (), IF ( ABS ( DIVIDE ( _a - _b, _b ) ) > 0.10, "Red", "Green" ) )
+		displayFolder: 7 Alerts & OpCo
+		lineageTag: f922ecf1-907d-4fe5-ac0b-bf87774c26e1
+
+	measure 'OpCo Net Turnover (USD M)' =
+			VAR _p = [Reporting Period]
+			RETURN DIVIDE ( CALCULATE ( [Net Turnover SC], FILTER ( ALL ( Dim_Date ), Dim_Date[Period] = _p ) ), 1000000 )
+		formatString: #,0.00
+		displayFolder: 7 Alerts & OpCo
+		lineageTag: ed97cbea-54de-4107-aa42-88ce4bf8afc4
+
+	measure 'OpCo Gross Profit (USD M)' =
+			VAR _p = [Reporting Period]
+			RETURN DIVIDE ( CALCULATE ( [Gross Profit], FILTER ( ALL ( Dim_Date ), Dim_Date[Period] = _p ) ), 1000000 )
+		formatString: #,0.00
+		displayFolder: 7 Alerts & OpCo
+		lineageTag: 2a53107a-3412-4f28-b859-1e35a5ecbadc
+
+	measure 'OpCo Gross Margin %' =
+			VAR _p = [Reporting Period]
+			RETURN CALCULATE ( [Gross Margin %], FILTER ( ALL ( Dim_Date ), Dim_Date[Period] = _p ) )
+		formatString: 0.0%
+		displayFolder: 7 Alerts & OpCo
+		lineageTag: 489439fd-f9d5-4f26-a28a-cbb0ffe2938f
+
+	measure 'OpCo GM % vs Bud (pp)' =
+			VAR _p = [Reporting Period]
+			RETURN CALCULATE ( ( [Gross Margin %] - CALCULATE ( [Gross Margin %], 'CG Scenario'[Comparison] = "Budget" ) ) * 100, FILTER ( ALL ( Dim_Date ), Dim_Date[Period] = _p ) )
+		formatString: +0.00" pp";-0.00" pp";0.00" pp"
+		displayFolder: 7 Alerts & OpCo
+		lineageTag: b76911b5-bc09-446a-8f65-22f4a1aace6f
+
+	measure 'OpCo EBITDA (USD M)' =
+			VAR _p = [Reporting Period]
+			RETURN DIVIDE ( CALCULATE ( [EBITDA], FILTER ( ALL ( Dim_Date ), Dim_Date[Period] = _p ) ), 1000000 )
+		formatString: #,0.00
+		displayFolder: 7 Alerts & OpCo
+		lineageTag: 245d0cf2-5760-4958-bc61-25810d73c264
+
+	measure 'OpCo Freight per Pair' =
+			VAR _p = [Reporting Period]
+			RETURN CALCULATE ( [Freight Cost per Pair], FILTER ( ALL ( Dim_Date ), Dim_Date[Period] = _p ) )
+		formatString: 0.000
+		displayFolder: 7 Alerts & OpCo
+		lineageTag: 455c1c3e-36ad-4ca6-ac3b-4423e7ee9399
+
+	measure 'OpCo PPV %' =
+			VAR _p = [Reporting Period]
+			RETURN CALCULATE ( [PPV %], FILTER ( ALL ( Dim_Date ), Dim_Date[Period] = _p ) )
+		formatString: 0.00%
+		displayFolder: 7 Alerts & OpCo
+		lineageTag: 8c8510fb-7dbb-4600-bc42-79010c3e37fb
+
+	measure 'GP Margin Alert' =
+			VAR _p = [Reporting Period]
+			RETURN CALCULATE ( [Alert GP Margin], FILTER ( ALL ( Dim_Date ), Dim_Date[Period] = _p ) )
+		displayFolder: 7 Alerts & OpCo
+		lineageTag: 34f17ad7-bae7-4eda-ad43-a2d432088b77
+
+	measure 'EBITDA Alert' =
+			VAR _p = [Reporting Period]
+			RETURN CALCULATE ( [Alert EBITDA], FILTER ( ALL ( Dim_Date ), Dim_Date[Period] = _p ) )
+		displayFolder: 7 Alerts & OpCo
+		lineageTag: 841e1ad3-8311-410e-ba13-3a743a92a02b
+
+	measure 'Freight Alert' =
+			VAR _p = [Reporting Period]
+			RETURN CALCULATE ( [Alert Freight], FILTER ( ALL ( Dim_Date ), Dim_Date[Period] = _p ) )
+		displayFolder: 7 Alerts & OpCo
+		lineageTag: e36d38de-a791-4ba1-bf05-0ec84beff54c
+
+	measure 'PPV Alert' =
+			VAR _p = [Reporting Period]
+			RETURN CALCULATE ( [Alert PPV], FILTER ( ALL ( Dim_Date ), Dim_Date[Period] = _p ) )
+		displayFolder: 7 Alerts & OpCo
+		lineageTag: 7bfd813a-fc10-4f79-9ecf-9ba4bdf5c4f1
+
+	measure 'Recovery Alert' =
+			VAR _p = [Reporting Period]
+			RETURN CALCULATE ( [Alert Recovery], FILTER ( ALL ( Dim_Date ), Dim_Date[Period] = _p ) )
+		displayFolder: 7 Alerts & OpCo
+		lineageTag: be833a9d-fbde-4ce3-87b4-4974f5ccfc2a
+
+	measure 'Last Refresh (UTC)' = MAX ( Refresh_Stamp[Refreshed At (UTC)] )
+		formatString: dd-mmm-yyyy hh:nn
+		displayFolder: 8 Data Quality
+		lineageTag: ed5b6816-6c19-44ec-9b0f-8c4c54ac9d12
+
+	measure 'Last Refresh Text' = "Refreshed " & FORMAT ( [Last Refresh (UTC)], "dd-MMM-yy hh:mm" ) & " UTC"
+		displayFolder: 8 Data Quality
+		lineageTag: 95bcde71-9f92-478c-b072-a0c296b3ad8e
+
+	measure 'Records Loaded (Latest)' =
+			VAR _p = [Latest Published Period]
+			RETURN CALCULATE ( COUNTROWS ( Fact_SC_PL ), Dim_Date[Period] = _p, REMOVEFILTERS ( Dim_Scenario ) )
+		formatString: #,0
+		displayFolder: 8 Data Quality
+		lineageTag: 1bfe9370-5d0e-44e9-b3ef-553feb2c4c99
+
+	measure 'OpCos Loaded' =
+			VAR _p = [Latest Published Period]
+			RETURN CALCULATE ( DISTINCTCOUNT ( Fact_SC_PL[OpCo Code] ), Dim_Date[Period] = _p, Dim_Scenario[Scenario] = "Actual" )
+		formatString: 0
+		displayFolder: 8 Data Quality
+		lineageTag: 669577d2-c0fb-41de-b115-e9d82c42efd2
+
+	measure 'OpCos Expected' = CALCULATE ( COUNTROWS ( Dim_OpCo ), Dim_OpCo[Active] = "Y" )
+		formatString: 0
+		displayFolder: 8 Data Quality
+		lineageTag: 8fa185bc-8173-4ec6-ab52-672549d96eaf
+
+	measure 'Data Completeness %' = DIVIDE ( [OpCos Loaded], [OpCos Expected] )
+		formatString: 0.0%
+		displayFolder: 8 Data Quality
+		lineageTag: cec05296-02d7-4279-acaa-77d610016047
+
+	measure 'Critical Errors' = CALCULATE ( COUNTROWS ( DQ_Exceptions ), DQ_Exceptions[Severity] = "Critical", DQ_Exceptions[Status] = "Open" ) + 0
+		formatString: 0
+		displayFolder: 8 Data Quality
+		lineageTag: d2252d51-8622-40ba-a62d-d54f2dc91945
+
+	measure Warnings = CALCULATE ( COUNTROWS ( DQ_Exceptions ), DQ_Exceptions[Severity] IN { "High", "Medium", "Low" }, DQ_Exceptions[Status] = "Open" ) + 0
+		formatString: 0
+		displayFolder: 8 Data Quality
+		lineageTag: c3d057b7-0f29-4f33-a0f3-f980d661aa07
+
+	measure 'Validation Status' = SWITCH ( TRUE (), [Critical Errors] > 0, "FAILED", [Warnings] > 0, "PASSED WITH WARNINGS", "PASSED" )
+		displayFolder: 8 Data Quality
+		lineageTag: 865c291e-b987-49da-8246-3857973c5da4
+
+	measure 'Latest Month Published' =
+			VAR _p = [Latest Published Period]
+			RETURN FORMAT ( DATE ( INT ( _p / 100 ), MOD ( _p, 100 ), 1 ), "MMM-yyyy" )
+		displayFolder: 8 Data Quality
+		lineageTag: 4760a70b-a692-4928-9059-a1c1d08d5858
+
+	measure 'Recon Diff Net Turnover' = [Net Turnover SC] - ( [Turnover SC] + [Turnover SC Markup] )
+		formatString: #,0
+		displayFolder: 8 Data Quality
+		lineageTag: 6772304a-5afb-40fc-8812-a8a79ab7e828
+
+	measure 'Recon Diff Gross Profit' = [Gross Profit] - ( [Net Turnover SC] + [Cost of Sales] + [Intercompany GP] )
+		formatString: #,0
+		displayFolder: 8 Data Quality
+		lineageTag: 74f8192e-1e95-4fa3-90fe-a487cf95b31f
+
+	measure 'SC GM % A' =
+			VAR _p = [Reporting Period]
+			RETURN CALCULATE ( [Gross Margin %], 'CG Scenario'[Comparison] = "Actual", FILTER ( ALL ( Dim_Date ), Dim_Date[Period] = _p ) )
+		displayFolder: 9 SVG Visuals
+		lineageTag: 4ee90d4e-a333-4940-9dfd-9fc128eda6cb
+
+	measure 'SC GM % B' =
+			VAR _p = [Reporting Period]
+			RETURN CALCULATE ( [Gross Margin %], 'CG Scenario'[Comparison] = "Budget", FILTER ( ALL ( Dim_Date ), Dim_Date[Period] = _p ) )
+		displayFolder: 9 SVG Visuals
+		lineageTag: be7de003-f083-440b-9751-35c814c4046c
+
+	measure 'SC EBITDA % A' =
+			VAR _p = [Reporting Period]
+			RETURN CALCULATE ( [EBITDA Margin %], 'CG Scenario'[Comparison] = "Actual", FILTER ( ALL ( Dim_Date ), Dim_Date[Period] = _p ) )
+		displayFolder: 9 SVG Visuals
+		lineageTag: 6e914e0b-1262-4832-b034-34bb1a780d70
+
+	measure 'SC EBITDA % B' =
+			VAR _p = [Reporting Period]
+			RETURN CALCULATE ( [EBITDA Margin %], 'CG Scenario'[Comparison] = "Budget", FILTER ( ALL ( Dim_Date ), Dim_Date[Period] = _p ) )
+		displayFolder: 9 SVG Visuals
+		lineageTag: 8b53fc90-6653-4192-aabc-9b95ef468c85
+
+	measure 'SC CoS A' =
+			VAR _p = [Reporting Period]
+			RETURN CALCULATE ( [Cost of Sales], 'CG Scenario'[Comparison] = "Actual", FILTER ( ALL ( Dim_Date ), Dim_Date[Period] = _p ) )
+		displayFolder: 9 SVG Visuals
+		lineageTag: bb443795-b557-4423-b407-e7715606920f
+
+	measure 'SC ChCost % A' =
+			VAR _p = [Reporting Period]
+			RETURN CALCULATE ( [Channel Cost %], 'CG Scenario'[Comparison] = "Actual", FILTER ( ALL ( Dim_Date ), Dim_Date[Period] = _p ) )
+		displayFolder: 9 SVG Visuals
+		lineageTag: 1882b888-e4a8-4bfd-a7f2-fa7555f12059
+
+	measure 'SC RecPP A' =
+			VAR _p = [Reporting Period]
+			RETURN CALCULATE ( [Recovery per Pair], 'CG Scenario'[Comparison] = "Actual", FILTER ( ALL ( Dim_Date ), Dim_Date[Period] = _p ) )
+		displayFolder: 9 SVG Visuals
+		lineageTag: d9d6db88-d2ea-4305-9b7f-76177b5f48fc
+
+	measure 'SVG Row A' =
+			VAR _c0div = SELECTEDVALUE ( 'Display Unit'[Divisor], 1000000 )
+			VAR _c0unit = "USD" & SWITCH ( _c0div, 1000000, " M", 1000, " K", "" )
+			VAR _c0f = SWITCH ( _c0div, 1, "#,0", 1000, "#,0.0", "#,0.0" )
+			VAR _c0mv = [NT | Monthly]
+			VAR _c0mvt = IF ( ISBLANK ( _c0mv ), "n.a", SUBSTITUTE ( FORMAT ( _c0mv / _c0div, _c0f ), "%", "%25" ) )
+			VAR _c0yv = [NT | YTD]
+			VAR _c0yvt = IF ( ISBLANK ( _c0yv ), "n.a", SUBSTITUTE ( FORMAT ( _c0yv / _c0div, _c0f ), "%", "%25" ) )
+			VAR _c0mb = [NT | vs Bud]
+			VAR _c0mbt = IF ( ISBLANK ( _c0mb ), "n.a", IF ( _c0mb >= 0, "▲ ", "▼ " ) & SUBSTITUTE ( FORMAT ( _c0mb, "+0.0%;-0.0%;0.0%" ), "%", "%25" ) )
+			VAR _c0mbc = IF ( ISBLANK ( _c0mb ), "%236B7280", IF ( _c0mb * 1 >= 0, "%231E8E3E", "%23C62828" ) )
+			VAR _c0ml = [NT | vs LY]
+			VAR _c0mlt = IF ( ISBLANK ( _c0ml ), "n.a", IF ( _c0ml >= 0, "▲ ", "▼ " ) & SUBSTITUTE ( FORMAT ( _c0ml, "+0.0%;-0.0%;0.0%" ), "%", "%25" ) )
+			VAR _c0mlc = IF ( ISBLANK ( _c0ml ), "%236B7280", IF ( _c0ml * 1 >= 0, "%231E8E3E", "%23C62828" ) )
+			VAR _c0yb = [NT | YTD vs Bud]
+			VAR _c0ybt = IF ( ISBLANK ( _c0yb ), "n.a", IF ( _c0yb >= 0, "▲ ", "▼ " ) & SUBSTITUTE ( FORMAT ( _c0yb, "+0.0%;-0.0%;0.0%" ), "%", "%25" ) )
+			VAR _c0ybc = IF ( ISBLANK ( _c0yb ), "%236B7280", IF ( _c0yb * 1 >= 0, "%231E8E3E", "%23C62828" ) )
+			VAR _c0yl = [NT | YTD vs LY]
+			VAR _c0ylt = IF ( ISBLANK ( _c0yl ), "n.a", IF ( _c0yl >= 0, "▲ ", "▼ " ) & SUBSTITUTE ( FORMAT ( _c0yl, "+0.0%;-0.0%;0.0%" ), "%", "%25" ) )
+			VAR _c0ylc = IF ( ISBLANK ( _c0yl ), "%236B7280", IF ( _c0yl * 1 >= 0, "%231E8E3E", "%23C62828" ) )
+			VAR _c0sub = ""
+			VAR _c1div = SELECTEDVALUE ( 'Display Unit'[Divisor], 1000000 )
+			VAR _c1unit = "USD" & SWITCH ( _c1div, 1000000, " M", 1000, " K", "" )
+			VAR _c1f = SWITCH ( _c1div, 1, "#,0", 1000, "#,0.0", "#,0.00" )
+			VAR _c1mv = [GP | Monthly]
+			VAR _c1mvt = IF ( ISBLANK ( _c1mv ), "n.a", SUBSTITUTE ( FORMAT ( _c1mv / _c1div, _c1f ), "%", "%25" ) )
+			VAR _c1yv = [GP | YTD]
+			VAR _c1yvt = IF ( ISBLANK ( _c1yv ), "n.a", SUBSTITUTE ( FORMAT ( _c1yv / _c1div, _c1f ), "%", "%25" ) )
+			VAR _c1mb = [GP | vs Bud]
+			VAR _c1mbt = IF ( ISBLANK ( _c1mb ), "n.a", IF ( _c1mb >= 0, "▲ ", "▼ " ) & SUBSTITUTE ( FORMAT ( _c1mb, "+0.0%;-0.0%;0.0%" ), "%", "%25" ) )
+			VAR _c1mbc = IF ( ISBLANK ( _c1mb ), "%236B7280", IF ( _c1mb * 1 >= 0, "%231E8E3E", "%23C62828" ) )
+			VAR _c1ml = [GP | vs LY]
+			VAR _c1mlt = IF ( ISBLANK ( _c1ml ), "n.a", IF ( _c1ml >= 0, "▲ ", "▼ " ) & SUBSTITUTE ( FORMAT ( _c1ml, "+0.0%;-0.0%;0.0%" ), "%", "%25" ) )
+			VAR _c1mlc = IF ( ISBLANK ( _c1ml ), "%236B7280", IF ( _c1ml * 1 >= 0, "%231E8E3E", "%23C62828" ) )
+			VAR _c1yb = [GP | YTD vs Bud]
+			VAR _c1ybt = IF ( ISBLANK ( _c1yb ), "n.a", IF ( _c1yb >= 0, "▲ ", "▼ " ) & SUBSTITUTE ( FORMAT ( _c1yb, "+0.0%;-0.0%;0.0%" ), "%", "%25" ) )
+			VAR _c1ybc = IF ( ISBLANK ( _c1yb ), "%236B7280", IF ( _c1yb * 1 >= 0, "%231E8E3E", "%23C62828" ) )
+			VAR _c1yl = [GP | YTD vs LY]
+			VAR _c1ylt = IF ( ISBLANK ( _c1yl ), "n.a", IF ( _c1yl >= 0, "▲ ", "▼ " ) & SUBSTITUTE ( FORMAT ( _c1yl, "+0.0%;-0.0%;0.0%" ), "%", "%25" ) )
+			VAR _c1ylc = IF ( ISBLANK ( _c1yl ), "%236B7280", IF ( _c1yl * 1 >= 0, "%231E8E3E", "%23C62828" ) )
+			VAR _c1sub = SUBSTITUTE ( "Gross Margin %  " & FORMAT ( [SC GM % A], "0.0%" ) & "  (Bud " & FORMAT ( [SC GM % B], "0.0%" ) & ")", "%", "%25" )
+			VAR _c2div = SELECTEDVALUE ( 'Display Unit'[Divisor], 1000000 )
+			VAR _c2unit = "USD" & SWITCH ( _c2div, 1000000, " M", 1000, " K", "" )
+			VAR _c2f = SWITCH ( _c2div, 1, "#,0", 1000, "#,0.0", "#,0.00" )
+			VAR _c2mv = [EBITDA | Monthly]
+			VAR _c2mvt = IF ( ISBLANK ( _c2mv ), "n.a", SUBSTITUTE ( FORMAT ( _c2mv / _c2div, _c2f ), "%", "%25" ) )
+			VAR _c2yv = [EBITDA | YTD]
+			VAR _c2yvt = IF ( ISBLANK ( _c2yv ), "n.a", SUBSTITUTE ( FORMAT ( _c2yv / _c2div, _c2f ), "%", "%25" ) )
+			VAR _c2mb = [EBITDA | vs Bud]
+			VAR _c2mbt = IF ( ISBLANK ( _c2mb ), "n.a", IF ( _c2mb >= 0, "▲ ", "▼ " ) & SUBSTITUTE ( FORMAT ( _c2mb, "+0.0%;-0.0%;0.0%" ), "%", "%25" ) )
+			VAR _c2mbc = IF ( ISBLANK ( _c2mb ), "%236B7280", IF ( _c2mb * 1 >= 0, "%231E8E3E", "%23C62828" ) )
+			VAR _c2ml = [EBITDA | vs LY]
+			VAR _c2mlt = IF ( ISBLANK ( _c2ml ), "n.a", IF ( _c2ml >= 0, "▲ ", "▼ " ) & SUBSTITUTE ( FORMAT ( _c2ml, "+0.0%;-0.0%;0.0%" ), "%", "%25" ) )
+			VAR _c2mlc = IF ( ISBLANK ( _c2ml ), "%236B7280", IF ( _c2ml * 1 >= 0, "%231E8E3E", "%23C62828" ) )
+			VAR _c2yb = [EBITDA | YTD vs Bud]
+			VAR _c2ybt = IF ( ISBLANK ( _c2yb ), "n.a", IF ( _c2yb >= 0, "▲ ", "▼ " ) & SUBSTITUTE ( FORMAT ( _c2yb, "+0.0%;-0.0%;0.0%" ), "%", "%25" ) )
+			VAR _c2ybc = IF ( ISBLANK ( _c2yb ), "%236B7280", IF ( _c2yb * 1 >= 0, "%231E8E3E", "%23C62828" ) )
+			VAR _c2yl = [EBITDA | YTD vs LY]
+			VAR _c2ylt = IF ( ISBLANK ( _c2yl ), "n.a", IF ( _c2yl >= 0, "▲ ", "▼ " ) & SUBSTITUTE ( FORMAT ( _c2yl, "+0.0%;-0.0%;0.0%" ), "%", "%25" ) )
+			VAR _c2ylc = IF ( ISBLANK ( _c2yl ), "%236B7280", IF ( _c2yl * 1 >= 0, "%231E8E3E", "%23C62828" ) )
+			VAR _c2sub = SUBSTITUTE ( "EBITDA Margin %  " & FORMAT ( [SC EBITDA % A], "0.00%" ) & "  (Bud " & FORMAT ( [SC EBITDA % B], "0.00%" ) & ")", "%", "%25" )
+			RETURN
+			    "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='1374' height='190' viewBox='0 0 1374 190' font-family='Segoe UI, Arial, sans-serif'><text x='0' y='16' font-size='14' font-weight='700' fill='%23008F94'>Section A  |  Financial Performance</text><line x1='330' y1='10' x2='1374' y2='10' stroke='%23D0D7DE' stroke-width='1'/>"
+			    & "<g transform='translate(0,26)'>"
+			    & "<rect x='0.5' y='0.5' width='449' height='163' rx='10' fill='white' stroke='%23D0D7DE'/><rect x='0' y='10' width='4' height='144' fill='%23008F94'/>"
+			    & "<text x='16' y='25' font-size='13.5' font-weight='700' fill='%23333333'>Net Turnover Supply Chain</text><text x='438' y='24' text-anchor='end' font-size='10.5' font-weight='600' fill='%236B7280'>"
+			    & _c0unit
+			    & "</text>"
+			    & "<text x='14' y='46' font-size='10.5' font-weight='600' fill='%236B7280'>Monthly</text><text x='14' y='73' font-size='22' font-weight='700' fill='%23333333'>"
+			    & _c0mvt
+			    & "</text><text x='14' y='97' font-size='10.5' fill='%236B7280'>vs Bud</text><text x='62' y='97' font-size='11' font-weight='700' fill='"
+			    & _c0mbc
+			    & "'>"
+			    & _c0mbt
+			    & "</text><text x='14' y='117' font-size='10.5' fill='%236B7280'>vs LY</text><text x='62' y='117' font-size='11' font-weight='700' fill='"
+			    & _c0mlc
+			    & "'>"
+			    & _c0mlt
+			    & "</text>"
+			    & "<text x='231' y='46' font-size='10.5' font-weight='600' fill='%236B7280'>YTD</text><text x='231' y='73' font-size='22' font-weight='700' fill='%23333333'>"
+			    & _c0yvt
+			    & "</text><text x='231' y='97' font-size='10.5' fill='%236B7280'>vs Bud</text><text x='279' y='97' font-size='11' font-weight='700' fill='"
+			    & _c0ybc
+			    & "'>"
+			    & _c0ybt
+			    & "</text><text x='231' y='117' font-size='10.5' fill='%236B7280'>vs LY</text><text x='279' y='117' font-size='11' font-weight='700' fill='"
+			    & _c0ylc
+			    & "'>"
+			    & _c0ylt
+			    & "</text>"
+			    & "<text x='16' y='154' font-size='10' fill='%236B7280'>"
+			    & _c0sub
+			    & "</text>"
+			    & "</g>"
+			    & "<g transform='translate(462,26)'>"
+			    & "<rect x='0.5' y='0.5' width='449' height='163' rx='10' fill='white' stroke='%23D0D7DE'/><rect x='0' y='10' width='4' height='144' fill='%23008F94'/>"
+			    & "<text x='16' y='25' font-size='13.5' font-weight='700' fill='%23333333'>Gross Profit</text><text x='438' y='24' text-anchor='end' font-size='10.5' font-weight='600' fill='%236B7280'>"
+			    & _c1unit
+			    & "</text>"
+			    & "<text x='14' y='46' font-size='10.5' font-weight='600' fill='%236B7280'>Monthly</text><text x='14' y='73' font-size='22' font-weight='700' fill='%23333333'>"
+			    & _c1mvt
+			    & "</text><text x='14' y='97' font-size='10.5' fill='%236B7280'>vs Bud</text><text x='62' y='97' font-size='11' font-weight='700' fill='"
+			    & _c1mbc
+			    & "'>"
+			    & _c1mbt
+			    & "</text><text x='14' y='117' font-size='10.5' fill='%236B7280'>vs LY</text><text x='62' y='117' font-size='11' font-weight='700' fill='"
+			    & _c1mlc
+			    & "'>"
+			    & _c1mlt
+			    & "</text>"
+			    & "<text x='231' y='46' font-size='10.5' font-weight='600' fill='%236B7280'>YTD</text><text x='231' y='73' font-size='22' font-weight='700' fill='%23333333'>"
+			    & _c1yvt
+			    & "</text><text x='231' y='97' font-size='10.5' fill='%236B7280'>vs Bud</text><text x='279' y='97' font-size='11' font-weight='700' fill='"
+			    & _c1ybc
+			    & "'>"
+			    & _c1ybt
+			    & "</text><text x='231' y='117' font-size='10.5' fill='%236B7280'>vs LY</text><text x='279' y='117' font-size='11' font-weight='700' fill='"
+			    & _c1ylc
+			    & "'>"
+			    & _c1ylt
+			    & "</text>"
+			    & "<text x='16' y='154' font-size='10' fill='%236B7280'>"
+			    & _c1sub
+			    & "</text>"
+			    & "</g>"
+			    & "<g transform='translate(924,26)'>"
+			    & "<rect x='0.5' y='0.5' width='449' height='163' rx='10' fill='white' stroke='%23D0D7DE'/><rect x='0' y='10' width='4' height='144' fill='%23008F94'/>"
+			    & "<text x='16' y='25' font-size='13.5' font-weight='700' fill='%23333333'>EBITDA</text><text x='438' y='24' text-anchor='end' font-size='10.5' font-weight='600' fill='%236B7280'>"
+			    & _c2unit
+			    & "</text>"
+			    & "<text x='14' y='46' font-size='10.5' font-weight='600' fill='%236B7280'>Monthly</text><text x='14' y='73' font-size='22' font-weight='700' fill='%23333333'>"
+			    & _c2mvt
+			    & "</text><text x='14' y='97' font-size='10.5' fill='%236B7280'>vs Bud</text><text x='62' y='97' font-size='11' font-weight='700' fill='"
+			    & _c2mbc
+			    & "'>"
+			    & _c2mbt
+			    & "</text><text x='14' y='117' font-size='10.5' fill='%236B7280'>vs LY</text><text x='62' y='117' font-size='11' font-weight='700' fill='"
+			    & _c2mlc
+			    & "'>"
+			    & _c2mlt
+			    & "</text>"
+			    & "<text x='231' y='46' font-size='10.5' font-weight='600' fill='%236B7280'>YTD</text><text x='231' y='73' font-size='22' font-weight='700' fill='%23333333'>"
+			    & _c2yvt
+			    & "</text><text x='231' y='97' font-size='10.5' fill='%236B7280'>vs Bud</text><text x='279' y='97' font-size='11' font-weight='700' fill='"
+			    & _c2ybc
+			    & "'>"
+			    & _c2ybt
+			    & "</text><text x='231' y='117' font-size='10.5' fill='%236B7280'>vs LY</text><text x='279' y='117' font-size='11' font-weight='700' fill='"
+			    & _c2ylc
+			    & "'>"
+			    & _c2ylt
+			    & "</text>"
+			    & "<text x='16' y='154' font-size='10' fill='%236B7280'>"
+			    & _c2sub
+			    & "</text>"
+			    & "</g>"
+			    & "</svg>"
+		displayFolder: 9 SVG Visuals
+		lineageTag: 7f64b2ab-4a6c-48b3-8aee-e675cd72ffcd
+		dataCategory: ImageUrl
+
+	measure 'SVG Row B' =
+			VAR _c0div = SELECTEDVALUE ( 'Display Unit'[Divisor], 1000000 )
+			VAR _c0unit = "Pairs" & SWITCH ( _c0div, 1000000, " M", 1000, " K", "" )
+			VAR _c0f = SWITCH ( _c0div, 1, "#,0", 1000, "#,0.0", "#,0.00" )
+			VAR _c0mv = [PurchP | Monthly]
+			VAR _c0mvt = IF ( ISBLANK ( _c0mv ), "n.a", SUBSTITUTE ( FORMAT ( _c0mv / _c0div, _c0f ), "%", "%25" ) )
+			VAR _c0yv = [PurchP | YTD]
+			VAR _c0yvt = IF ( ISBLANK ( _c0yv ), "n.a", SUBSTITUTE ( FORMAT ( _c0yv / _c0div, _c0f ), "%", "%25" ) )
+			VAR _c0mb = [PurchP | vs Bud]
+			VAR _c0mbt = IF ( ISBLANK ( _c0mb ), "n.a", IF ( _c0mb >= 0, "▲ ", "▼ " ) & SUBSTITUTE ( FORMAT ( _c0mb, "+0.0%;-0.0%;0.0%" ), "%", "%25" ) )
+			VAR _c0mbc = IF ( ISBLANK ( _c0mb ), "%236B7280", IF ( _c0mb * 1 >= 0, "%231E8E3E", "%23C62828" ) )
+			VAR _c0ml = [PurchP | vs LY]
+			VAR _c0mlt = IF ( ISBLANK ( _c0ml ), "n.a", IF ( _c0ml >= 0, "▲ ", "▼ " ) & SUBSTITUTE ( FORMAT ( _c0ml, "+0.0%;-0.0%;0.0%" ), "%", "%25" ) )
+			VAR _c0mlc = IF ( ISBLANK ( _c0ml ), "%236B7280", IF ( _c0ml * 1 >= 0, "%231E8E3E", "%23C62828" ) )
+			VAR _c0yb = [PurchP | YTD vs Bud]
+			VAR _c0ybt = IF ( ISBLANK ( _c0yb ), "n.a", IF ( _c0yb >= 0, "▲ ", "▼ " ) & SUBSTITUTE ( FORMAT ( _c0yb, "+0.0%;-0.0%;0.0%" ), "%", "%25" ) )
+			VAR _c0ybc = IF ( ISBLANK ( _c0yb ), "%236B7280", IF ( _c0yb * 1 >= 0, "%231E8E3E", "%23C62828" ) )
+			VAR _c0yl = [PurchP | YTD vs LY]
+			VAR _c0ylt = IF ( ISBLANK ( _c0yl ), "n.a", IF ( _c0yl >= 0, "▲ ", "▼ " ) & SUBSTITUTE ( FORMAT ( _c0yl, "+0.0%;-0.0%;0.0%" ), "%", "%25" ) )
+			VAR _c0ylc = IF ( ISBLANK ( _c0yl ), "%236B7280", IF ( _c0yl * 1 >= 0, "%231E8E3E", "%23C62828" ) )
+			VAR _c0sub = ""
+			VAR _c1div = SELECTEDVALUE ( 'Display Unit'[Divisor], 1000000 )
+			VAR _c1unit = "Pairs" & SWITCH ( _c1div, 1000000, " M", 1000, " K", "" )
+			VAR _c1f = SWITCH ( _c1div, 1, "#,0", 1000, "#,0.0", "#,0.00" )
+			VAR _c1mv = [ProdP | Monthly]
+			VAR _c1mvt = IF ( ISBLANK ( _c1mv ), "n.a", SUBSTITUTE ( FORMAT ( _c1mv / _c1div, _c1f ), "%", "%25" ) )
+			VAR _c1yv = [ProdP | YTD]
+			VAR _c1yvt = IF ( ISBLANK ( _c1yv ), "n.a", SUBSTITUTE ( FORMAT ( _c1yv / _c1div, _c1f ), "%", "%25" ) )
+			VAR _c1mb = [ProdP | vs Bud]
+			VAR _c1mbt = IF ( ISBLANK ( _c1mb ), "n.a", IF ( _c1mb >= 0, "▲ ", "▼ " ) & SUBSTITUTE ( FORMAT ( _c1mb, "+0.0%;-0.0%;0.0%" ), "%", "%25" ) )
+			VAR _c1mbc = IF ( ISBLANK ( _c1mb ), "%236B7280", IF ( _c1mb * 1 >= 0, "%231E8E3E", "%23C62828" ) )
+			VAR _c1ml = [ProdP | vs LY]
+			VAR _c1mlt = IF ( ISBLANK ( _c1ml ), "n.a", IF ( _c1ml >= 0, "▲ ", "▼ " ) & SUBSTITUTE ( FORMAT ( _c1ml, "+0.0%;-0.0%;0.0%" ), "%", "%25" ) )
+			VAR _c1mlc = IF ( ISBLANK ( _c1ml ), "%236B7280", IF ( _c1ml * 1 >= 0, "%231E8E3E", "%23C62828" ) )
+			VAR _c1yb = [ProdP | YTD vs Bud]
+			VAR _c1ybt = IF ( ISBLANK ( _c1yb ), "n.a", IF ( _c1yb >= 0, "▲ ", "▼ " ) & SUBSTITUTE ( FORMAT ( _c1yb, "+0.0%;-0.0%;0.0%" ), "%", "%25" ) )
+			VAR _c1ybc = IF ( ISBLANK ( _c1yb ), "%236B7280", IF ( _c1yb * 1 >= 0, "%231E8E3E", "%23C62828" ) )
+			VAR _c1yl = [ProdP | YTD vs LY]
+			VAR _c1ylt = IF ( ISBLANK ( _c1yl ), "n.a", IF ( _c1yl >= 0, "▲ ", "▼ " ) & SUBSTITUTE ( FORMAT ( _c1yl, "+0.0%;-0.0%;0.0%" ), "%", "%25" ) )
+			VAR _c1ylc = IF ( ISBLANK ( _c1yl ), "%236B7280", IF ( _c1yl * 1 >= 0, "%231E8E3E", "%23C62828" ) )
+			VAR _c1sub = ""
+			VAR _c2div = SELECTEDVALUE ( 'Display Unit'[Divisor], 1000000 )
+			VAR _c2unit = "Pairs" & SWITCH ( _c2div, 1000000, " M", 1000, " K", "" )
+			VAR _c2f = SWITCH ( _c2div, 1, "#,0", 1000, "#,0.0", "#,0.00" )
+			VAR _c2mv = [TotP | Monthly]
+			VAR _c2mvt = IF ( ISBLANK ( _c2mv ), "n.a", SUBSTITUTE ( FORMAT ( _c2mv / _c2div, _c2f ), "%", "%25" ) )
+			VAR _c2yv = [TotP | YTD]
+			VAR _c2yvt = IF ( ISBLANK ( _c2yv ), "n.a", SUBSTITUTE ( FORMAT ( _c2yv / _c2div, _c2f ), "%", "%25" ) )
+			VAR _c2mb = [TotP | vs Bud]
+			VAR _c2mbt = IF ( ISBLANK ( _c2mb ), "n.a", IF ( _c2mb >= 0, "▲ ", "▼ " ) & SUBSTITUTE ( FORMAT ( _c2mb, "+0.0%;-0.0%;0.0%" ), "%", "%25" ) )
+			VAR _c2mbc = IF ( ISBLANK ( _c2mb ), "%236B7280", IF ( _c2mb * 1 >= 0, "%231E8E3E", "%23C62828" ) )
+			VAR _c2ml = [TotP | vs LY]
+			VAR _c2mlt = IF ( ISBLANK ( _c2ml ), "n.a", IF ( _c2ml >= 0, "▲ ", "▼ " ) & SUBSTITUTE ( FORMAT ( _c2ml, "+0.0%;-0.0%;0.0%" ), "%", "%25" ) )
+			VAR _c2mlc = IF ( ISBLANK ( _c2ml ), "%236B7280", IF ( _c2ml * 1 >= 0, "%231E8E3E", "%23C62828" ) )
+			VAR _c2yb = [TotP | YTD vs Bud]
+			VAR _c2ybt = IF ( ISBLANK ( _c2yb ), "n.a", IF ( _c2yb >= 0, "▲ ", "▼ " ) & SUBSTITUTE ( FORMAT ( _c2yb, "+0.0%;-0.0%;0.0%" ), "%", "%25" ) )
+			VAR _c2ybc = IF ( ISBLANK ( _c2yb ), "%236B7280", IF ( _c2yb * 1 >= 0, "%231E8E3E", "%23C62828" ) )
+			VAR _c2yl = [TotP | YTD vs LY]
+			VAR _c2ylt = IF ( ISBLANK ( _c2yl ), "n.a", IF ( _c2yl >= 0, "▲ ", "▼ " ) & SUBSTITUTE ( FORMAT ( _c2yl, "+0.0%;-0.0%;0.0%" ), "%", "%25" ) )
+			VAR _c2ylc = IF ( ISBLANK ( _c2yl ), "%236B7280", IF ( _c2yl * 1 >= 0, "%231E8E3E", "%23C62828" ) )
+			VAR _c2sub = ""
+			RETURN
+			    "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='1374' height='190' viewBox='0 0 1374 190' font-family='Segoe UI, Arial, sans-serif'><text x='0' y='16' font-size='14' font-weight='700' fill='%23008F94'>Section B  |  Volume</text><line x1='330' y1='10' x2='1374' y2='10' stroke='%23D0D7DE' stroke-width='1'/>"
+			    & "<g transform='translate(0,26)'>"
+			    & "<rect x='0.5' y='0.5' width='449' height='163' rx='10' fill='white' stroke='%23D0D7DE'/><rect x='0' y='10' width='4' height='144' fill='%23008F94'/>"
+			    & "<text x='16' y='25' font-size='13.5' font-weight='700' fill='%23333333'>Purchase Pairs</text><text x='438' y='24' text-anchor='end' font-size='10.5' font-weight='600' fill='%236B7280'>"
+			    & _c0unit
+			    & "</text>"
+			    & "<text x='14' y='46' font-size='10.5' font-weight='600' fill='%236B7280'>Monthly</text><text x='14' y='73' font-size='22' font-weight='700' fill='%23333333'>"
+			    & _c0mvt
+			    & "</text><text x='14' y='97' font-size='10.5' fill='%236B7280'>vs Bud</text><text x='62' y='97' font-size='11' font-weight='700' fill='"
+			    & _c0mbc
+			    & "'>"
+			    & _c0mbt
+			    & "</text><text x='14' y='117' font-size='10.5' fill='%236B7280'>vs LY</text><text x='62' y='117' font-size='11' font-weight='700' fill='"
+			    & _c0mlc
+			    & "'>"
+			    & _c0mlt
+			    & "</text>"
+			    & "<text x='231' y='46' font-size='10.5' font-weight='600' fill='%236B7280'>YTD</text><text x='231' y='73' font-size='22' font-weight='700' fill='%23333333'>"
+			    & _c0yvt
+			    & "</text><text x='231' y='97' font-size='10.5' fill='%236B7280'>vs Bud</text><text x='279' y='97' font-size='11' font-weight='700' fill='"
+			    & _c0ybc
+			    & "'>"
+			    & _c0ybt
+			    & "</text><text x='231' y='117' font-size='10.5' fill='%236B7280'>vs LY</text><text x='279' y='117' font-size='11' font-weight='700' fill='"
+			    & _c0ylc
+			    & "'>"
+			    & _c0ylt
+			    & "</text>"
+			    & "<text x='16' y='154' font-size='10' fill='%236B7280'>"
+			    & _c0sub
+			    & "</text>"
+			    & "</g>"
+			    & "<g transform='translate(462,26)'>"
+			    & "<rect x='0.5' y='0.5' width='449' height='163' rx='10' fill='white' stroke='%23D0D7DE'/><rect x='0' y='10' width='4' height='144' fill='%23008F94'/>"
+			    & "<text x='16' y='25' font-size='13.5' font-weight='700' fill='%23333333'>Production Pairs</text><text x='438' y='24' text-anchor='end' font-size='10.5' font-weight='600' fill='%236B7280'>"
+			    & _c1unit
+			    & "</text>"
+			    & "<text x='14' y='46' font-size='10.5' font-weight='600' fill='%236B7280'>Monthly</text><text x='14' y='73' font-size='22' font-weight='700' fill='%23333333'>"
+			    & _c1mvt
+			    & "</text><text x='14' y='97' font-size='10.5' fill='%236B7280'>vs Bud</text><text x='62' y='97' font-size='11' font-weight='700' fill='"
+			    & _c1mbc
+			    & "'>"
+			    & _c1mbt
+			    & "</text><text x='14' y='117' font-size='10.5' fill='%236B7280'>vs LY</text><text x='62' y='117' font-size='11' font-weight='700' fill='"
+			    & _c1mlc
+			    & "'>"
+			    & _c1mlt
+			    & "</text>"
+			    & "<text x='231' y='46' font-size='10.5' font-weight='600' fill='%236B7280'>YTD</text><text x='231' y='73' font-size='22' font-weight='700' fill='%23333333'>"
+			    & _c1yvt
+			    & "</text><text x='231' y='97' font-size='10.5' fill='%236B7280'>vs Bud</text><text x='279' y='97' font-size='11' font-weight='700' fill='"
+			    & _c1ybc
+			    & "'>"
+			    & _c1ybt
+			    & "</text><text x='231' y='117' font-size='10.5' fill='%236B7280'>vs LY</text><text x='279' y='117' font-size='11' font-weight='700' fill='"
+			    & _c1ylc
+			    & "'>"
+			    & _c1ylt
+			    & "</text>"
+			    & "<text x='16' y='154' font-size='10' fill='%236B7280'>"
+			    & _c1sub
+			    & "</text>"
+			    & "</g>"
+			    & "<g transform='translate(924,26)'>"
+			    & "<rect x='0.5' y='0.5' width='449' height='163' rx='10' fill='white' stroke='%23D0D7DE'/><rect x='0' y='10' width='4' height='144' fill='%23008F94'/>"
+			    & "<text x='16' y='25' font-size='13.5' font-weight='700' fill='%23333333'>Total Pairs</text><text x='438' y='24' text-anchor='end' font-size='10.5' font-weight='600' fill='%236B7280'>"
+			    & _c2unit
+			    & "</text>"
+			    & "<text x='14' y='46' font-size='10.5' font-weight='600' fill='%236B7280'>Monthly</text><text x='14' y='73' font-size='22' font-weight='700' fill='%23333333'>"
+			    & _c2mvt
+			    & "</text><text x='14' y='97' font-size='10.5' fill='%236B7280'>vs Bud</text><text x='62' y='97' font-size='11' font-weight='700' fill='"
+			    & _c2mbc
+			    & "'>"
+			    & _c2mbt
+			    & "</text><text x='14' y='117' font-size='10.5' fill='%236B7280'>vs LY</text><text x='62' y='117' font-size='11' font-weight='700' fill='"
+			    & _c2mlc
+			    & "'>"
+			    & _c2mlt
+			    & "</text>"
+			    & "<text x='231' y='46' font-size='10.5' font-weight='600' fill='%236B7280'>YTD</text><text x='231' y='73' font-size='22' font-weight='700' fill='%23333333'>"
+			    & _c2yvt
+			    & "</text><text x='231' y='97' font-size='10.5' fill='%236B7280'>vs Bud</text><text x='279' y='97' font-size='11' font-weight='700' fill='"
+			    & _c2ybc
+			    & "'>"
+			    & _c2ybt
+			    & "</text><text x='231' y='117' font-size='10.5' fill='%236B7280'>vs LY</text><text x='279' y='117' font-size='11' font-weight='700' fill='"
+			    & _c2ylc
+			    & "'>"
+			    & _c2ylt
+			    & "</text>"
+			    & "<text x='16' y='154' font-size='10' fill='%236B7280'>"
+			    & _c2sub
+			    & "</text>"
+			    & "</g>"
+			    & "</svg>"
+		displayFolder: 9 SVG Visuals
+		lineageTag: 29fcca1e-151f-490a-9ab5-dce65e40eb55
+		dataCategory: ImageUrl
+
+	measure 'SVG Row C' =
+			VAR _c0div = 1
+			VAR _c0unit = "%25 of Net Turnover"
+			VAR _c0f = "0.0%"
+			VAR _c0mv = [CoS% | Monthly]
+			VAR _c0mvt = IF ( ISBLANK ( _c0mv ), "n.a", SUBSTITUTE ( FORMAT ( _c0mv / _c0div, _c0f ), "%", "%25" ) )
+			VAR _c0yv = [CoS% | YTD]
+			VAR _c0yvt = IF ( ISBLANK ( _c0yv ), "n.a", SUBSTITUTE ( FORMAT ( _c0yv / _c0div, _c0f ), "%", "%25" ) )
+			VAR _c0mb = [CoS% | vs Bud]
+			VAR _c0mbt = IF ( ISBLANK ( _c0mb ), "n.a", IF ( _c0mb >= 0, "▲ ", "▼ " ) & FORMAT ( _c0mb, "+0.0;-0.0;0.0" ) & " pp" )
+			VAR _c0mbc = IF ( ISBLANK ( _c0mb ), "%236B7280", IF ( _c0mb * -1 >= 0, "%231E8E3E", "%23C62828" ) )
+			VAR _c0ml = [CoS% | vs LY]
+			VAR _c0mlt = IF ( ISBLANK ( _c0ml ), "n.a", IF ( _c0ml >= 0, "▲ ", "▼ " ) & FORMAT ( _c0ml, "+0.0;-0.0;0.0" ) & " pp" )
+			VAR _c0mlc = IF ( ISBLANK ( _c0ml ), "%236B7280", IF ( _c0ml * -1 >= 0, "%231E8E3E", "%23C62828" ) )
+			VAR _c0yb = [CoS% | YTD vs Bud]
+			VAR _c0ybt = IF ( ISBLANK ( _c0yb ), "n.a", IF ( _c0yb >= 0, "▲ ", "▼ " ) & FORMAT ( _c0yb, "+0.0;-0.0;0.0" ) & " pp" )
+			VAR _c0ybc = IF ( ISBLANK ( _c0yb ), "%236B7280", IF ( _c0yb * -1 >= 0, "%231E8E3E", "%23C62828" ) )
+			VAR _c0yl = [CoS% | YTD vs LY]
+			VAR _c0ylt = IF ( ISBLANK ( _c0yl ), "n.a", IF ( _c0yl >= 0, "▲ ", "▼ " ) & FORMAT ( _c0yl, "+0.0;-0.0;0.0" ) & " pp" )
+			VAR _c0ylc = IF ( ISBLANK ( _c0yl ), "%236B7280", IF ( _c0yl * -1 >= 0, "%231E8E3E", "%23C62828" ) )
+			VAR _c0sub = SUBSTITUTE ( "Cost of Sales  USD " & FORMAT ( [SC CoS A] / 1000000, "#,0.0" ) & " M", "%", "%25" )
+			VAR _c1div = 1
+			VAR _c1unit = "USD / pair"
+			VAR _c1f = "0.000"
+			VAR _c1mv = [FrPP | Monthly]
+			VAR _c1mvt = IF ( ISBLANK ( _c1mv ), "n.a", SUBSTITUTE ( FORMAT ( _c1mv / _c1div, _c1f ), "%", "%25" ) )
+			VAR _c1yv = [FrPP | YTD]
+			VAR _c1yvt = IF ( ISBLANK ( _c1yv ), "n.a", SUBSTITUTE ( FORMAT ( _c1yv / _c1div, _c1f ), "%", "%25" ) )
+			VAR _c1mb = [FrPP | vs Bud]
+			VAR _c1mbt = IF ( ISBLANK ( _c1mb ), "n.a", IF ( _c1mb >= 0, "▲ ", "▼ " ) & SUBSTITUTE ( FORMAT ( _c1mb, "+0.0%;-0.0%;0.0%" ), "%", "%25" ) )
+			VAR _c1mbc = IF ( ISBLANK ( _c1mb ), "%236B7280", IF ( _c1mb * -1 >= 0, "%231E8E3E", "%23C62828" ) )
+			VAR _c1ml = [FrPP | vs LY]
+			VAR _c1mlt = IF ( ISBLANK ( _c1ml ), "n.a", IF ( _c1ml >= 0, "▲ ", "▼ " ) & SUBSTITUTE ( FORMAT ( _c1ml, "+0.0%;-0.0%;0.0%" ), "%", "%25" ) )
+			VAR _c1mlc = IF ( ISBLANK ( _c1ml ), "%236B7280", IF ( _c1ml * -1 >= 0, "%231E8E3E", "%23C62828" ) )
+			VAR _c1yb = [FrPP | YTD vs Bud]
+			VAR _c1ybt = IF ( ISBLANK ( _c1yb ), "n.a", IF ( _c1yb >= 0, "▲ ", "▼ " ) & SUBSTITUTE ( FORMAT ( _c1yb, "+0.0%;-0.0%;0.0%" ), "%", "%25" ) )
+			VAR _c1ybc = IF ( ISBLANK ( _c1yb ), "%236B7280", IF ( _c1yb * -1 >= 0, "%231E8E3E", "%23C62828" ) )
+			VAR _c1yl = [FrPP | YTD vs LY]
+			VAR _c1ylt = IF ( ISBLANK ( _c1yl ), "n.a", IF ( _c1yl >= 0, "▲ ", "▼ " ) & SUBSTITUTE ( FORMAT ( _c1yl, "+0.0%;-0.0%;0.0%" ), "%", "%25" ) )
+			VAR _c1ylc = IF ( ISBLANK ( _c1yl ), "%236B7280", IF ( _c1yl * -1 >= 0, "%231E8E3E", "%23C62828" ) )
+			VAR _c1sub = ""
+			VAR _c2div = 1
+			VAR _c2unit = "USD / pair"
+			VAR _c2f = "0.000"
+			VAR _c2mv = [ChPP | Monthly]
+			VAR _c2mvt = IF ( ISBLANK ( _c2mv ), "n.a", SUBSTITUTE ( FORMAT ( _c2mv / _c2div, _c2f ), "%", "%25" ) )
+			VAR _c2yv = [ChPP | YTD]
+			VAR _c2yvt = IF ( ISBLANK ( _c2yv ), "n.a", SUBSTITUTE ( FORMAT ( _c2yv / _c2div, _c2f ), "%", "%25" ) )
+			VAR _c2mb = [ChPP | vs Bud]
+			VAR _c2mbt = IF ( ISBLANK ( _c2mb ), "n.a", IF ( _c2mb >= 0, "▲ ", "▼ " ) & SUBSTITUTE ( FORMAT ( _c2mb, "+0.0%;-0.0%;0.0%" ), "%", "%25" ) )
+			VAR _c2mbc = IF ( ISBLANK ( _c2mb ), "%236B7280", IF ( _c2mb * -1 >= 0, "%231E8E3E", "%23C62828" ) )
+			VAR _c2ml = [ChPP | vs LY]
+			VAR _c2mlt = IF ( ISBLANK ( _c2ml ), "n.a", IF ( _c2ml >= 0, "▲ ", "▼ " ) & SUBSTITUTE ( FORMAT ( _c2ml, "+0.0%;-0.0%;0.0%" ), "%", "%25" ) )
+			VAR _c2mlc = IF ( ISBLANK ( _c2ml ), "%236B7280", IF ( _c2ml * -1 >= 0, "%231E8E3E", "%23C62828" ) )
+			VAR _c2yb = [ChPP | YTD vs Bud]
+			VAR _c2ybt = IF ( ISBLANK ( _c2yb ), "n.a", IF ( _c2yb >= 0, "▲ ", "▼ " ) & SUBSTITUTE ( FORMAT ( _c2yb, "+0.0%;-0.0%;0.0%" ), "%", "%25" ) )
+			VAR _c2ybc = IF ( ISBLANK ( _c2yb ), "%236B7280", IF ( _c2yb * -1 >= 0, "%231E8E3E", "%23C62828" ) )
+			VAR _c2yl = [ChPP | YTD vs LY]
+			VAR _c2ylt = IF ( ISBLANK ( _c2yl ), "n.a", IF ( _c2yl >= 0, "▲ ", "▼ " ) & SUBSTITUTE ( FORMAT ( _c2yl, "+0.0%;-0.0%;0.0%" ), "%", "%25" ) )
+			VAR _c2ylc = IF ( ISBLANK ( _c2yl ), "%236B7280", IF ( _c2yl * -1 >= 0, "%231E8E3E", "%23C62828" ) )
+			VAR _c2sub = SUBSTITUTE ( "Channel Cost %  " & FORMAT ( [SC ChCost % A], "0.0%" ), "%", "%25" )
+			RETURN
+			    "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='1374' height='190' viewBox='0 0 1374 190' font-family='Segoe UI, Arial, sans-serif'><text x='0' y='16' font-size='14' font-weight='700' fill='%23008F94'>Section C  |  Cost Analytics</text><line x1='330' y1='10' x2='1374' y2='10' stroke='%23D0D7DE' stroke-width='1'/>"
+			    & "<g transform='translate(0,26)'>"
+			    & "<rect x='0.5' y='0.5' width='449' height='163' rx='10' fill='white' stroke='%23D0D7DE'/><rect x='0' y='10' width='4' height='144' fill='%23008F94'/>"
+			    & "<text x='16' y='25' font-size='13.5' font-weight='700' fill='%23333333'>Cost of Sales %25</text><text x='438' y='24' text-anchor='end' font-size='10.5' font-weight='600' fill='%236B7280'>"
+			    & _c0unit
+			    & "</text>"
+			    & "<text x='14' y='46' font-size='10.5' font-weight='600' fill='%236B7280'>Monthly</text><text x='14' y='73' font-size='22' font-weight='700' fill='%23333333'>"
+			    & _c0mvt
+			    & "</text><text x='14' y='97' font-size='10.5' fill='%236B7280'>vs Bud</text><text x='62' y='97' font-size='11' font-weight='700' fill='"
+			    & _c0mbc
+			    & "'>"
+			    & _c0mbt
+			    & "</text><text x='14' y='117' font-size='10.5' fill='%236B7280'>vs LY</text><text x='62' y='117' font-size='11' font-weight='700' fill='"
+			    & _c0mlc
+			    & "'>"
+			    & _c0mlt
+			    & "</text>"
+			    & "<text x='231' y='46' font-size='10.5' font-weight='600' fill='%236B7280'>YTD</text><text x='231' y='73' font-size='22' font-weight='700' fill='%23333333'>"
+			    & _c0yvt
+			    & "</text><text x='231' y='97' font-size='10.5' fill='%236B7280'>vs Bud</text><text x='279' y='97' font-size='11' font-weight='700' fill='"
+			    & _c0ybc
+			    & "'>"
+			    & _c0ybt
+			    & "</text><text x='231' y='117' font-size='10.5' fill='%236B7280'>vs LY</text><text x='279' y='117' font-size='11' font-weight='700' fill='"
+			    & _c0ylc
+			    & "'>"
+			    & _c0ylt
+			    & "</text>"
+			    & "<text x='16' y='154' font-size='10' fill='%236B7280'>"
+			    & _c0sub
+			    & "</text>"
+			    & "</g>"
+			    & "<g transform='translate(462,26)'>"
+			    & "<rect x='0.5' y='0.5' width='449' height='163' rx='10' fill='white' stroke='%23D0D7DE'/><rect x='0' y='10' width='4' height='144' fill='%23008F94'/>"
+			    & "<text x='16' y='25' font-size='13.5' font-weight='700' fill='%23333333'>Freight (Inbound) Cost per Pair</text><text x='438' y='24' text-anchor='end' font-size='10.5' font-weight='600' fill='%236B7280'>"
+			    & _c1unit
+			    & "</text>"
+			    & "<text x='14' y='46' font-size='10.5' font-weight='600' fill='%236B7280'>Monthly</text><text x='14' y='73' font-size='22' font-weight='700' fill='%23333333'>"
+			    & _c1mvt
+			    & "</text><text x='14' y='97' font-size='10.5' fill='%236B7280'>vs Bud</text><text x='62' y='97' font-size='11' font-weight='700' fill='"
+			    & _c1mbc
+			    & "'>"
+			    & _c1mbt
+			    & "</text><text x='14' y='117' font-size='10.5' fill='%236B7280'>vs LY</text><text x='62' y='117' font-size='11' font-weight='700' fill='"
+			    & _c1mlc
+			    & "'>"
+			    & _c1mlt
+			    & "</text>"
+			    & "<text x='231' y='46' font-size='10.5' font-weight='600' fill='%236B7280'>YTD</text><text x='231' y='73' font-size='22' font-weight='700' fill='%23333333'>"
+			    & _c1yvt
+			    & "</text><text x='231' y='97' font-size='10.5' fill='%236B7280'>vs Bud</text><text x='279' y='97' font-size='11' font-weight='700' fill='"
+			    & _c1ybc
+			    & "'>"
+			    & _c1ybt
+			    & "</text><text x='231' y='117' font-size='10.5' fill='%236B7280'>vs LY</text><text x='279' y='117' font-size='11' font-weight='700' fill='"
+			    & _c1ylc
+			    & "'>"
+			    & _c1ylt
+			    & "</text>"
+			    & "<text x='16' y='154' font-size='10' fill='%236B7280'>"
+			    & _c1sub
+			    & "</text>"
+			    & "</g>"
+			    & "<g transform='translate(924,26)'>"
+			    & "<rect x='0.5' y='0.5' width='449' height='163' rx='10' fill='white' stroke='%23D0D7DE'/><rect x='0' y='10' width='4' height='144' fill='%23008F94'/>"
+			    & "<text x='16' y='25' font-size='13.5' font-weight='700' fill='%23333333'>Channel Expenses per Pair</text><text x='438' y='24' text-anchor='end' font-size='10.5' font-weight='600' fill='%236B7280'>"
+			    & _c2unit
+			    & "</text>"
+			    & "<text x='14' y='46' font-size='10.5' font-weight='600' fill='%236B7280'>Monthly</text><text x='14' y='73' font-size='22' font-weight='700' fill='%23333333'>"
+			    & _c2mvt
+			    & "</text><text x='14' y='97' font-size='10.5' fill='%236B7280'>vs Bud</text><text x='62' y='97' font-size='11' font-weight='700' fill='"
+			    & _c2mbc
+			    & "'>"
+			    & _c2mbt
+			    & "</text><text x='14' y='117' font-size='10.5' fill='%236B7280'>vs LY</text><text x='62' y='117' font-size='11' font-weight='700' fill='"
+			    & _c2mlc
+			    & "'>"
+			    & _c2mlt
+			    & "</text>"
+			    & "<text x='231' y='46' font-size='10.5' font-weight='600' fill='%236B7280'>YTD</text><text x='231' y='73' font-size='22' font-weight='700' fill='%23333333'>"
+			    & _c2yvt
+			    & "</text><text x='231' y='97' font-size='10.5' fill='%236B7280'>vs Bud</text><text x='279' y='97' font-size='11' font-weight='700' fill='"
+			    & _c2ybc
+			    & "'>"
+			    & _c2ybt
+			    & "</text><text x='231' y='117' font-size='10.5' fill='%236B7280'>vs LY</text><text x='279' y='117' font-size='11' font-weight='700' fill='"
+			    & _c2ylc
+			    & "'>"
+			    & _c2ylt
+			    & "</text>"
+			    & "<text x='16' y='154' font-size='10' fill='%236B7280'>"
+			    & _c2sub
+			    & "</text>"
+			    & "</g>"
+			    & "</svg>"
+		displayFolder: 9 SVG Visuals
+		lineageTag: 6a96344a-6a75-4b30-8c05-3aa831a6ec49
+		dataCategory: ImageUrl
+
+	measure 'SVG Row D' =
+			VAR _c0div = 1
+			VAR _c0unit = "USD / pair"
+			VAR _c0f = "0.000"
+			VAR _c0mv = [FcPP | Monthly]
+			VAR _c0mvt = IF ( ISBLANK ( _c0mv ), "n.a", SUBSTITUTE ( FORMAT ( _c0mv / _c0div, _c0f ), "%", "%25" ) )
+			VAR _c0yv = [FcPP | YTD]
+			VAR _c0yvt = IF ( ISBLANK ( _c0yv ), "n.a", SUBSTITUTE ( FORMAT ( _c0yv / _c0div, _c0f ), "%", "%25" ) )
+			VAR _c0mb = [FcPP | vs Bud]
+			VAR _c0mbt = IF ( ISBLANK ( _c0mb ), "n.a", IF ( _c0mb >= 0, "▲ ", "▼ " ) & SUBSTITUTE ( FORMAT ( _c0mb, "+0.0%;-0.0%;0.0%" ), "%", "%25" ) )
+			VAR _c0mbc = IF ( ISBLANK ( _c0mb ), "%236B7280", IF ( _c0mb * -1 >= 0, "%231E8E3E", "%23C62828" ) )
+			VAR _c0ml = [FcPP | vs LY]
+			VAR _c0mlt = IF ( ISBLANK ( _c0ml ), "n.a", IF ( _c0ml >= 0, "▲ ", "▼ " ) & SUBSTITUTE ( FORMAT ( _c0ml, "+0.0%;-0.0%;0.0%" ), "%", "%25" ) )
+			VAR _c0mlc = IF ( ISBLANK ( _c0ml ), "%236B7280", IF ( _c0ml * -1 >= 0, "%231E8E3E", "%23C62828" ) )
+			VAR _c0yb = [FcPP | YTD vs Bud]
+			VAR _c0ybt = IF ( ISBLANK ( _c0yb ), "n.a", IF ( _c0yb >= 0, "▲ ", "▼ " ) & SUBSTITUTE ( FORMAT ( _c0yb, "+0.0%;-0.0%;0.0%" ), "%", "%25" ) )
+			VAR _c0ybc = IF ( ISBLANK ( _c0yb ), "%236B7280", IF ( _c0yb * -1 >= 0, "%231E8E3E", "%23C62828" ) )
+			VAR _c0yl = [FcPP | YTD vs LY]
+			VAR _c0ylt = IF ( ISBLANK ( _c0yl ), "n.a", IF ( _c0yl >= 0, "▲ ", "▼ " ) & SUBSTITUTE ( FORMAT ( _c0yl, "+0.0%;-0.0%;0.0%" ), "%", "%25" ) )
+			VAR _c0ylc = IF ( ISBLANK ( _c0yl ), "%236B7280", IF ( _c0yl * -1 >= 0, "%231E8E3E", "%23C62828" ) )
+			VAR _c0sub = ""
+			VAR _c1div = 1000
+			VAR _c1unit = "USD K"
+			VAR _c1f = "#,0.0"
+			VAR _c1mv = [UO | Monthly]
+			VAR _c1mvt = IF ( ISBLANK ( _c1mv ), "n.a", SUBSTITUTE ( FORMAT ( _c1mv / _c1div, _c1f ), "%", "%25" ) )
+			VAR _c1yv = [UO | YTD]
+			VAR _c1yvt = IF ( ISBLANK ( _c1yv ), "n.a", SUBSTITUTE ( FORMAT ( _c1yv / _c1div, _c1f ), "%", "%25" ) )
+			VAR _c1mb = [UO | vs Bud]
+			VAR _c1mbt = IF ( ISBLANK ( _c1mb ), "n.a", IF ( _c1mb >= 0, "▲ ", "▼ " ) & SUBSTITUTE ( FORMAT ( _c1mb, "+0.0%;-0.0%;0.0%" ), "%", "%25" ) )
+			VAR _c1mbc = IF ( ISBLANK ( _c1mb ), "%236B7280", IF ( _c1mb * 1 >= 0, "%231E8E3E", "%23C62828" ) )
+			VAR _c1ml = [UO | vs LY]
+			VAR _c1mlt = IF ( ISBLANK ( _c1ml ), "n.a", IF ( _c1ml >= 0, "▲ ", "▼ " ) & SUBSTITUTE ( FORMAT ( _c1ml, "+0.0%;-0.0%;0.0%" ), "%", "%25" ) )
+			VAR _c1mlc = IF ( ISBLANK ( _c1ml ), "%236B7280", IF ( _c1ml * 1 >= 0, "%231E8E3E", "%23C62828" ) )
+			VAR _c1yb = [UO | YTD vs Bud]
+			VAR _c1ybt = IF ( ISBLANK ( _c1yb ), "n.a", IF ( _c1yb >= 0, "▲ ", "▼ " ) & SUBSTITUTE ( FORMAT ( _c1yb, "+0.0%;-0.0%;0.0%" ), "%", "%25" ) )
+			VAR _c1ybc = IF ( ISBLANK ( _c1yb ), "%236B7280", IF ( _c1yb * 1 >= 0, "%231E8E3E", "%23C62828" ) )
+			VAR _c1yl = [UO | YTD vs LY]
+			VAR _c1ylt = IF ( ISBLANK ( _c1yl ), "n.a", IF ( _c1yl >= 0, "▲ ", "▼ " ) & SUBSTITUTE ( FORMAT ( _c1yl, "+0.0%;-0.0%;0.0%" ), "%", "%25" ) )
+			VAR _c1ylc = IF ( ISBLANK ( _c1yl ), "%236B7280", IF ( _c1yl * 1 >= 0, "%231E8E3E", "%23C62828" ) )
+			VAR _c1sub = SUBSTITUTE ( "Recovery per Pair  USD " & FORMAT ( [SC RecPP A], "0.000" ), "%", "%25" )
+			VAR _c2div = 1
+			VAR _c2unit = "%25 of Turnover SC (Import+LS)"
+			VAR _c2f = "0.00%"
+			VAR _c2mv = [PPV% | Monthly]
+			VAR _c2mvt = IF ( ISBLANK ( _c2mv ), "n.a", SUBSTITUTE ( FORMAT ( _c2mv / _c2div, _c2f ), "%", "%25" ) )
+			VAR _c2yv = [PPV% | YTD]
+			VAR _c2yvt = IF ( ISBLANK ( _c2yv ), "n.a", SUBSTITUTE ( FORMAT ( _c2yv / _c2div, _c2f ), "%", "%25" ) )
+			VAR _c2mb = [PPV% | vs Bud]
+			VAR _c2mbt = IF ( ISBLANK ( _c2mb ), "n.a", IF ( _c2mb >= 0, "▲ ", "▼ " ) & FORMAT ( _c2mb, "+0.0;-0.0;0.0" ) & " pp" )
+			VAR _c2mbc = IF ( ISBLANK ( _c2mb ), "%236B7280", IF ( _c2mb * 1 >= 0, "%231E8E3E", "%23C62828" ) )
+			VAR _c2ml = [PPV% | vs LY]
+			VAR _c2mlt = IF ( ISBLANK ( _c2ml ), "n.a", IF ( _c2ml >= 0, "▲ ", "▼ " ) & FORMAT ( _c2ml, "+0.0;-0.0;0.0" ) & " pp" )
+			VAR _c2mlc = IF ( ISBLANK ( _c2ml ), "%236B7280", IF ( _c2ml * 1 >= 0, "%231E8E3E", "%23C62828" ) )
+			VAR _c2yb = [PPV% | YTD vs Bud]
+			VAR _c2ybt = IF ( ISBLANK ( _c2yb ), "n.a", IF ( _c2yb >= 0, "▲ ", "▼ " ) & FORMAT ( _c2yb, "+0.0;-0.0;0.0" ) & " pp" )
+			VAR _c2ybc = IF ( ISBLANK ( _c2yb ), "%236B7280", IF ( _c2yb * 1 >= 0, "%231E8E3E", "%23C62828" ) )
+			VAR _c2yl = [PPV% | YTD vs LY]
+			VAR _c2ylt = IF ( ISBLANK ( _c2yl ), "n.a", IF ( _c2yl >= 0, "▲ ", "▼ " ) & FORMAT ( _c2yl, "+0.0;-0.0;0.0" ) & " pp" )
+			VAR _c2ylc = IF ( ISBLANK ( _c2yl ), "%236B7280", IF ( _c2yl * 1 >= 0, "%231E8E3E", "%23C62828" ) )
+			VAR _c2sub = ""
+			RETURN
+			    "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='1374' height='190' viewBox='0 0 1374 190' font-family='Segoe UI, Arial, sans-serif'><text x='0' y='16' font-size='14' font-weight='700' fill='%23008F94'>Section D  |  Factory &%2338; Sourcing</text><line x1='330' y1='10' x2='1374' y2='10' stroke='%23D0D7DE' stroke-width='1'/>"
+			    & "<g transform='translate(0,26)'>"
+			    & "<rect x='0.5' y='0.5' width='449' height='163' rx='10' fill='white' stroke='%23D0D7DE'/><rect x='0' y='10' width='4' height='144' fill='%23008F94'/>"
+			    & "<text x='16' y='25' font-size='13.5' font-weight='700' fill='%23333333'>Factory Cost per Pair</text><text x='438' y='24' text-anchor='end' font-size='10.5' font-weight='600' fill='%236B7280'>"
+			    & _c0unit
+			    & "</text>"
+			    & "<text x='14' y='46' font-size='10.5' font-weight='600' fill='%236B7280'>Monthly</text><text x='14' y='73' font-size='22' font-weight='700' fill='%23333333'>"
+			    & _c0mvt
+			    & "</text><text x='14' y='97' font-size='10.5' fill='%236B7280'>vs Bud</text><text x='62' y='97' font-size='11' font-weight='700' fill='"
+			    & _c0mbc
+			    & "'>"
+			    & _c0mbt
+			    & "</text><text x='14' y='117' font-size='10.5' fill='%236B7280'>vs LY</text><text x='62' y='117' font-size='11' font-weight='700' fill='"
+			    & _c0mlc
+			    & "'>"
+			    & _c0mlt
+			    & "</text>"
+			    & "<text x='231' y='46' font-size='10.5' font-weight='600' fill='%236B7280'>YTD</text><text x='231' y='73' font-size='22' font-weight='700' fill='%23333333'>"
+			    & _c0yvt
+			    & "</text><text x='231' y='97' font-size='10.5' fill='%236B7280'>vs Bud</text><text x='279' y='97' font-size='11' font-weight='700' fill='"
+			    & _c0ybc
+			    & "'>"
+			    & _c0ybt
+			    & "</text><text x='231' y='117' font-size='10.5' fill='%236B7280'>vs LY</text><text x='279' y='117' font-size='11' font-weight='700' fill='"
+			    & _c0ylc
+			    & "'>"
+			    & _c0ylt
+			    & "</text>"
+			    & "<text x='16' y='154' font-size='10' fill='%236B7280'>"
+			    & _c0sub
+			    & "</text>"
+			    & "</g>"
+			    & "<g transform='translate(462,26)'>"
+			    & "<rect x='0.5' y='0.5' width='449' height='163' rx='10' fill='white' stroke='%23D0D7DE'/><rect x='0' y='10' width='4' height='144' fill='%23008F94'/>"
+			    & "<text x='16' y='25' font-size='13.5' font-weight='700' fill='%23333333'>Factory (under)/over recovery</text><text x='438' y='24' text-anchor='end' font-size='10.5' font-weight='600' fill='%236B7280'>"
+			    & _c1unit
+			    & "</text>"
+			    & "<text x='14' y='46' font-size='10.5' font-weight='600' fill='%236B7280'>Monthly</text><text x='14' y='73' font-size='22' font-weight='700' fill='%23333333'>"
+			    & _c1mvt
+			    & "</text><text x='14' y='97' font-size='10.5' fill='%236B7280'>vs Bud</text><text x='62' y='97' font-size='11' font-weight='700' fill='"
+			    & _c1mbc
+			    & "'>"
+			    & _c1mbt
+			    & "</text><text x='14' y='117' font-size='10.5' fill='%236B7280'>vs LY</text><text x='62' y='117' font-size='11' font-weight='700' fill='"
+			    & _c1mlc
+			    & "'>"
+			    & _c1mlt
+			    & "</text>"
+			    & "<text x='231' y='46' font-size='10.5' font-weight='600' fill='%236B7280'>YTD</text><text x='231' y='73' font-size='22' font-weight='700' fill='%23333333'>"
+			    & _c1yvt
+			    & "</text><text x='231' y='97' font-size='10.5' fill='%236B7280'>vs Bud</text><text x='279' y='97' font-size='11' font-weight='700' fill='"
+			    & _c1ybc
+			    & "'>"
+			    & _c1ybt
+			    & "</text><text x='231' y='117' font-size='10.5' fill='%236B7280'>vs LY</text><text x='279' y='117' font-size='11' font-weight='700' fill='"
+			    & _c1ylc
+			    & "'>"
+			    & _c1ylt
+			    & "</text>"
+			    & "<text x='16' y='154' font-size='10' fill='%236B7280'>"
+			    & _c1sub
+			    & "</text>"
+			    & "</g>"
+			    & "<g transform='translate(924,26)'>"
+			    & "<rect x='0.5' y='0.5' width='449' height='163' rx='10' fill='white' stroke='%23D0D7DE'/><rect x='0' y='10' width='4' height='144' fill='%23008F94'/>"
+			    & "<text x='16' y='25' font-size='13.5' font-weight='700' fill='%23333333'>PPV %25</text><text x='438' y='24' text-anchor='end' font-size='10.5' font-weight='600' fill='%236B7280'>"
+			    & _c2unit
+			    & "</text>"
+			    & "<text x='14' y='46' font-size='10.5' font-weight='600' fill='%236B7280'>Monthly</text><text x='14' y='73' font-size='22' font-weight='700' fill='%23333333'>"
+			    & _c2mvt
+			    & "</text><text x='14' y='97' font-size='10.5' fill='%236B7280'>vs Bud</text><text x='62' y='97' font-size='11' font-weight='700' fill='"
+			    & _c2mbc
+			    & "'>"
+			    & _c2mbt
+			    & "</text><text x='14' y='117' font-size='10.5' fill='%236B7280'>vs LY</text><text x='62' y='117' font-size='11' font-weight='700' fill='"
+			    & _c2mlc
+			    & "'>"
+			    & _c2mlt
+			    & "</text>"
+			    & "<text x='231' y='46' font-size='10.5' font-weight='600' fill='%236B7280'>YTD</text><text x='231' y='73' font-size='22' font-weight='700' fill='%23333333'>"
+			    & _c2yvt
+			    & "</text><text x='231' y='97' font-size='10.5' fill='%236B7280'>vs Bud</text><text x='279' y='97' font-size='11' font-weight='700' fill='"
+			    & _c2ybc
+			    & "'>"
+			    & _c2ybt
+			    & "</text><text x='231' y='117' font-size='10.5' fill='%236B7280'>vs LY</text><text x='279' y='117' font-size='11' font-weight='700' fill='"
+			    & _c2ylc
+			    & "'>"
+			    & _c2ylt
+			    & "</text>"
+			    & "<text x='16' y='154' font-size='10' fill='%236B7280'>"
+			    & _c2sub
+			    & "</text>"
+			    & "</g>"
+			    & "</svg>"
+		displayFolder: 9 SVG Visuals
+		lineageTag: 21db58a9-25dc-4af3-b34c-71abdc13d86d
+		dataCategory: ImageUrl
+
+	measure 'SVG Page Title' =
+			VAR _t = SUBSTITUTE ( [Report Subtitle], "%", "%25" )
+			RETURN
+			    "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='660' height='58' viewBox='0 0 660 58' font-family='Segoe UI, Arial, sans-serif'><text x='0' y='26' font-size='24' font-weight='700' fill='%23333333'>Supply Chain P&%2338;L  |  Summary</text><text x='0' y='52' font-size='14' fill='%236B7280'>"
+			    & _t
+			    & "</text></svg>"
+		displayFolder: 9 SVG Visuals
+		lineageTag: 5c985023-5c87-4913-a89b-189eae1c7ef4
+		dataCategory: ImageUrl
+
+	measure 'SVG Refresh' =
+			VAR _t = FORMAT ( [Last Refresh (UTC)], "dd-MMM-yyyy  hh:mm" ) & " UTC"
+			RETURN
+			    "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='200' height='48' viewBox='0 0 200 48' font-family='Segoe UI, Arial, sans-serif'><text x='0' y='14' font-size='11' font-weight='600' fill='%236B7280'>Last Refresh Time:</text><text x='0' y='38' font-size='13' font-weight='700' fill='%23333333'>"
+			    & _t
+			    & "</text></svg>"
+		displayFolder: 9 SVG Visuals
+		lineageTag: 1e449398-4c5e-461a-9be4-72d5cd832993
+		dataCategory: ImageUrl
+
+	measure 'Flag GP' = COUNTROWS ( FILTER ( VALUES ( Dim_OpCo[OpCo Code] ), [GP Margin Alert] = "Red" ) ) + 0
+		formatString: 0
+		displayFolder: 9 SVG Visuals
+		lineageTag: fea6ce60-424d-4968-8420-669d30b111e3
+
+	measure 'Flag EBITDA' = COUNTROWS ( FILTER ( VALUES ( Dim_OpCo[OpCo Code] ), [EBITDA Alert] = "Red" ) ) + 0
+		formatString: 0
+		displayFolder: 9 SVG Visuals
+		lineageTag: 3c59061b-52c6-4936-97ff-bf879f69595d
+
+	measure 'Flag Freight' = COUNTROWS ( FILTER ( VALUES ( Dim_OpCo[OpCo Code] ), [Freight Alert] = "Amber" ) ) + 0
+		formatString: 0
+		displayFolder: 9 SVG Visuals
+		lineageTag: 054a45e9-4df6-45a8-9f4b-db76792f6f15
+
+	measure 'Flag PPV' = COUNTROWS ( FILTER ( VALUES ( Dim_OpCo[OpCo Code] ), [PPV Alert] = "Amber" ) ) + 0
+		formatString: 0
+		displayFolder: 9 SVG Visuals
+		lineageTag: e18cc8a6-cd77-4934-821a-740431f2ea1e
+
+	measure 'Flag Recovery' = COUNTROWS ( FILTER ( VALUES ( Dim_OpCo[OpCo Code] ), [Recovery Alert] = "Red" ) ) + 0
+		formatString: 0
+		displayFolder: 9 SVG Visuals
+		lineageTag: f0a14625-a8b9-4416-98d6-8822fbc2e6c8
+
+	measure 'SVG Alert Strip' =
+			VAR _0 = [Flag GP]
+			VAR _0c = IF ( _0 = 0, "%231E8E3E", "%23C62828" )
+			VAR _1 = [Flag EBITDA]
+			VAR _1c = IF ( _1 = 0, "%231E8E3E", "%23C62828" )
+			VAR _2 = [Flag Freight]
+			VAR _2c = IF ( _2 = 0, "%231E8E3E", "%23E0A100" )
+			VAR _3 = [Flag PPV]
+			VAR _3c = IF ( _3 = 0, "%231E8E3E", "%23E0A100" )
+			VAR _4 = [Flag Recovery]
+			VAR _4c = IF ( _4 = 0, "%231E8E3E", "%23C62828" )
+			RETURN
+			    "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='1374' height='34' viewBox='0 0 1374 34' font-family='Segoe UI, Arial, sans-serif'><rect x='0.5' y='0.5' width='1373' height='33' rx='8' fill='white' stroke='%23D0D7DE'/><text x='12' y='22' font-size='12' font-weight='700' fill='%23333333'>Alerts (OpCos flagged):</text>"
+			    & "<circle cx='206' cy='17' r='6' fill='"
+			    & _0c
+			    & "'/><text x='218' y='22' font-size='11.5' fill='%23333333'>GP Margin decline &gt;1%25: "
+			    & _0
+			    & "</text>"
+			    & "<circle cx='406' cy='17' r='6' fill='"
+			    & _1c
+			    & "'/><text x='418' y='22' font-size='11.5' fill='%23333333'>EBITDA negative: "
+			    & _1
+			    & "</text>"
+			    & "<circle cx='566' cy='17' r='6' fill='"
+			    & _2c
+			    & "'/><text x='578' y='22' font-size='11.5' fill='%23333333'>Freight increase &gt;10%25: "
+			    & _2
+			    & "</text>"
+			    & "<circle cx='766' cy='17' r='6' fill='"
+			    & _3c
+			    & "'/><text x='778' y='22' font-size='11.5' fill='%23333333'>PPV adverse &gt;5%25: "
+			    & _3
+			    & "</text>"
+			    & "<circle cx='936' cy='17' r='6' fill='"
+			    & _4c
+			    & "'/><text x='948' y='22' font-size='11.5' fill='%23333333'>Recovery variance &gt;10%25: "
+			    & _4
+			    & "</text>"
+			    & "<text x='1362' y='22' text-anchor='end' font-size='11' font-weight='700' fill='%23C62828'>SAMPLE DATA - illustrative</text></svg>"
+		displayFolder: 9 SVG Visuals
+		lineageTag: 645a7697-519f-460a-b327-c9d1250df2a8
+		dataCategory: ImageUrl
+
+	measure 'Latest Run ID' = MAX ( Refresh_Log[Run ID] )
+		displayFolder: 8 Data Quality
+		lineageTag: 211aad27-e32f-4160-ab9e-efb33a6260c5
+
+	measure 'Critical Latest Run' =
+			VAR _run = [Latest Run ID]
+			RETURN CALCULATE ( COUNTROWS ( DQ_Exceptions ), DQ_Exceptions[Run ID] = _run, DQ_Exceptions[Severity] = "Critical" ) + 0
+		formatString: 0
+		displayFolder: 8 Data Quality
+		lineageTag: ac36d495-463b-4f2f-ba63-db37c22b4824
+
+	measure 'Warnings Latest Run' =
+			VAR _run = [Latest Run ID]
+			RETURN CALCULATE ( COUNTROWS ( DQ_Exceptions ), DQ_Exceptions[Run ID] = _run, DQ_Exceptions[Severity] <> "Critical" ) + 0
+		formatString: 0
+		displayFolder: 8 Data Quality
+		lineageTag: 32cc78dd-8461-4759-83d8-b879f791c088
+
+	measure 'Published On Latest' =
+			VAR _p = [Latest Published Period]
+			RETURN CALCULATE ( MAX ( Publish_Control[Approved On] ), Publish_Control[Period] = _p )
+		formatString: dd-mmm hh:nn
+		displayFolder: 8 Data Quality
+		lineageTag: dda1a9b7-806d-4164-8c10-d72a76fd2d00
+
+	measure 'Missing OpCos Text' =
+			VAR _p = [Latest Published Period]
+			VAR _t =
+			    CONCATENATEX (
+			        FILTER ( Dim_OpCo, Dim_OpCo[Active] = "Y" && ISBLANK ( CALCULATE ( COUNTROWS ( Fact_SC_PL ), Dim_Date[Period] = _p, Dim_Scenario[Scenario] = "Actual" ) ) ),
+			        Dim_OpCo[OpCo Code] & " " & Dim_OpCo[Country], ", " )
+			RETURN IF ( _t = "", "None", _t )
+		displayFolder: 8 Data Quality
+		lineageTag: 4b475246-e7b1-4d0c-b972-c6665fdac785
+
+	measure 'Actual Loaded' =
+			VAR _p = [Latest Published Period]
+			RETURN IF ( ISBLANK ( CALCULATE ( COUNTROWS ( Fact_SC_PL ), Dim_Date[Period] = _p, Dim_Scenario[Scenario] = "Actual" ) ), "✗", "✓" )
+		displayFolder: 8 Data Quality
+		lineageTag: bcde3995-f239-4cb4-945e-2ed97a755cc2
+
+	measure 'Budget Loaded' =
+			VAR _p = [Latest Published Period]
+			RETURN IF ( ISBLANK ( CALCULATE ( COUNTROWS ( Fact_SC_PL ), Dim_Date[Period] = _p, Dim_Scenario[Scenario] = "Budget" ) ), "✗", "✓" )
+		displayFolder: 8 Data Quality
+		lineageTag: bc70cb5a-f275-4518-aa4b-c8e97762ba71
+
+	measure 'Rows Latest' =
+			VAR _p = [Latest Published Period]
+			RETURN CALCULATE ( COUNTROWS ( Fact_SC_PL ), Dim_Date[Period] = _p, REMOVEFILTERS ( Dim_Scenario ) ) + 0
+		formatString: #,0
+		displayFolder: 8 Data Quality
+		lineageTag: 40fd66ee-c632-4db3-91f1-d497d2200523
+
+	measure 'Load Status' = IF ( [Actual Loaded] = "✓", "Loaded", "Missing" )
+		displayFolder: 8 Data Quality
+		lineageTag: f242ae8c-0c3a-457a-a3a5-cd5d0d65f709
+
+	measure 'Rule Status' =
+			VAR _r = SELECTEDVALUE ( DQ_Rules[Rule ID] )
+			VAR _run = [Latest Run ID]
+			VAR _n = CALCULATE ( COUNTROWS ( DQ_Exceptions ), DQ_Exceptions[Rule ID] = _r, DQ_Exceptions[Run ID] = _run )
+			VAR _c = CALCULATE ( COUNTROWS ( DQ_Exceptions ), DQ_Exceptions[Rule ID] = _r, DQ_Exceptions[Run ID] = _run, DQ_Exceptions[Severity] = "Critical" )
+			RETURN IF ( ISBLANK ( _r ), BLANK (), IF ( _c > 0, "✗ Fail", IF ( _n > 0, "● Warning", "● Pass" ) ) )
+		displayFolder: 8 Data Quality
+		lineageTag: a8e20b11-9fb4-47ae-b39c-3e1939b32db2
+
+	measure 'Rule Exceptions' =
+			VAR _r = SELECTEDVALUE ( DQ_Rules[Rule ID] )
+			VAR _run = [Latest Run ID]
+			RETURN IF ( ISBLANK ( _r ), BLANK (), CALCULATE ( COUNTROWS ( DQ_Exceptions ), DQ_Exceptions[Rule ID] = _r, DQ_Exceptions[Run ID] = _run ) + 0 )
+		formatString: 0
+		displayFolder: 8 Data Quality
+		lineageTag: a007c65c-feb0-4735-a123-8c21f6877a8f
+
+	measure 'SVG DQ Tiles' =
+			VAR _v0 = SUBSTITUTE ( FORMAT ( [Last Refresh (UTC)], "dd-MMM-yyyy hh:mm" ), "%", "%25" )
+			VAR _s0 = SUBSTITUTE ( "UTC  |  Run " & [Latest Run ID], "%", "%25" )
+			VAR _c0 = "%231E8E3E"
+			VAR _v1 = SUBSTITUTE ( [Latest Month Published], "%", "%25" )
+			VAR _s1 = SUBSTITUTE ( "Published by Admin " & FORMAT ( [Published On Latest], "dd-MMM hh:mm" ), "%", "%25" )
+			VAR _c1 = "%23008F94"
+			VAR _v2 = SUBSTITUTE ( IF ( [Critical Latest Run] > 0, "FAILED", "PASSED" ), "%", "%25" )
+			VAR _s2 = SUBSTITUTE ( [Critical Latest Run] & " critical  |  " & [Warnings Latest Run] & " warnings reviewed", "%", "%25" )
+			VAR _c2 = IF ( [Critical Latest Run] > 0, "%23C62828", IF ( [Warnings Latest Run] > 0, "%23E0A100", "%231E8E3E" ) )
+			VAR _v3 = SUBSTITUTE ( [OpCos Loaded] & " / " & [OpCos Expected], "%", "%25" )
+			VAR _s3 = SUBSTITUTE ( "Missing: " & [Missing OpCos Text], "%", "%25" )
+			VAR _c3 = IF ( [OpCos Loaded] < [OpCos Expected], "%23E0A100", "%231E8E3E" )
+			VAR _v4 = SUBSTITUTE ( FORMAT ( [Records Loaded (Latest)], "#,0" ), "%", "%25" )
+			VAR _s4 = SUBSTITUTE ( "Actual + Budget  |  " & [Latest Month Published], "%", "%25" )
+			VAR _c4 = "%23008F94"
+			VAR _v5 = SUBSTITUTE ( FORMAT ( [Data Completeness %], "0.0%" ), "%", "%25" )
+			VAR _s5 = SUBSTITUTE ( "Target 100% of active OpCos", "%", "%25" )
+			VAR _c5 = IF ( [Data Completeness %] < 1, "%23E0A100", "%231E8E3E" )
+			RETURN
+			    "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='1608' height='110' viewBox='0 0 1608 110' font-family='Segoe UI, Arial, sans-serif'>"
+			    & "<rect x='0.5' y='0.5' width='257' height='109' rx='10' fill='white' stroke='%23D0D7DE'/><rect x='4' y='0.5' width='250' height='6' fill='"
+			    & _c0
+			    & "'/><text x='14' y='30' font-size='12' font-weight='600' fill='%236B7280'>Last successful refresh</text><text x='14' y='66' font-size='24' font-weight='700' fill='%23333333'>"
+			    & _v0
+			    & "</text><text x='14' y='94' font-size='11' fill='%236B7280'>"
+			    & _s0
+			    & "</text>"
+			    & "<rect x='270.5' y='0.5' width='257' height='109' rx='10' fill='white' stroke='%23D0D7DE'/><rect x='274' y='0.5' width='250' height='6' fill='"
+			    & _c1
+			    & "'/><text x='284' y='30' font-size='12' font-weight='600' fill='%236B7280'>Reporting month</text><text x='284' y='66' font-size='24' font-weight='700' fill='%23333333'>"
+			    & _v1
+			    & "</text><text x='284' y='94' font-size='11' fill='%236B7280'>"
+			    & _s1
+			    & "</text>"
+			    & "<rect x='540.5' y='0.5' width='257' height='109' rx='10' fill='white' stroke='%23D0D7DE'/><rect x='544' y='0.5' width='250' height='6' fill='"
+			    & _c2
+			    & "'/><text x='554' y='30' font-size='12' font-weight='600' fill='%236B7280'>Validation status</text><text x='554' y='66' font-size='24' font-weight='700' fill='%23333333'>"
+			    & _v2
+			    & "</text><text x='554' y='94' font-size='11' fill='%236B7280'>"
+			    & _s2
+			    & "</text>"
+			    & "<rect x='810.5' y='0.5' width='257' height='109' rx='10' fill='white' stroke='%23D0D7DE'/><rect x='814' y='0.5' width='250' height='6' fill='"
+			    & _c3
+			    & "'/><text x='824' y='30' font-size='12' font-weight='600' fill='%236B7280'>OpCos loaded</text><text x='824' y='66' font-size='24' font-weight='700' fill='%23333333'>"
+			    & _v3
+			    & "</text><text x='824' y='94' font-size='11' fill='%236B7280'>"
+			    & _s3
+			    & "</text>"
+			    & "<rect x='1080.5' y='0.5' width='257' height='109' rx='10' fill='white' stroke='%23D0D7DE'/><rect x='1084' y='0.5' width='250' height='6' fill='"
+			    & _c4
+			    & "'/><text x='1094' y='30' font-size='12' font-weight='600' fill='%236B7280'>Records loaded</text><text x='1094' y='66' font-size='24' font-weight='700' fill='%23333333'>"
+			    & _v4
+			    & "</text><text x='1094' y='94' font-size='11' fill='%236B7280'>"
+			    & _s4
+			    & "</text>"
+			    & "<rect x='1350.5' y='0.5' width='257' height='109' rx='10' fill='white' stroke='%23D0D7DE'/><rect x='1354' y='0.5' width='250' height='6' fill='"
+			    & _c5
+			    & "'/><text x='1364' y='30' font-size='12' font-weight='600' fill='%236B7280'>Data completeness</text><text x='1364' y='66' font-size='24' font-weight='700' fill='%23333333'>"
+			    & _v5
+			    & "</text><text x='1364' y='94' font-size='11' fill='%236B7280'>"
+			    & _s5
+			    & "</text>"
+			    & "</svg>"
+		displayFolder: 9 SVG Visuals
+		lineageTag: 2ce948d4-2ae6-4f1e-b4c2-2bbec8773384
+		dataCategory: ImageUrl
+
+	column Dummy
+		dataType: string
+		isHidden
+		lineageTag: 142970c9-abbe-47ba-ae1d-91e99ecf5559
+		summarizeBy: none
+		sourceColumn: Dummy
+
+		annotation SummarizationSetBy = User
+
+	partition _Measures = m
+		mode: import
+		source =
+				let
+				    Source = #table(type table [Dummy = text], {})
+				in
+				    Source
+
+	annotation PBI_ResultType = Table
+

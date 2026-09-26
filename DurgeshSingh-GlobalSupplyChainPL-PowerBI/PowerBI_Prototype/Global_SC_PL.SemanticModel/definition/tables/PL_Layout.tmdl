@@ -1,0 +1,69 @@
+table PL_Layout
+	lineageTag: 9fc90d5f-a84f-4859-9c20-3adeeb02d827
+
+	column Sort
+		dataType: int64
+		isHidden
+		formatString: 0
+		lineageTag: 90250101-480f-4c37-ad02-0a95d84d3289
+		summarizeBy: none
+		sourceColumn: Sort
+
+		annotation SummarizationSetBy = User
+
+	column 'Row Label'
+		dataType: string
+		lineageTag: c081a341-0b77-4199-9039-bacfae8b2e18
+		summarizeBy: none
+		sourceColumn: Row Label
+		sortByColumn: Sort
+
+		annotation SummarizationSetBy = User
+
+	column 'Row Type'
+		dataType: string
+		lineageTag: 5715bb1a-5a25-4ad8-b8d2-d9617aaa3b09
+		summarizeBy: none
+		sourceColumn: Row Type
+
+		annotation SummarizationSetBy = User
+
+	column Key
+		dataType: string
+		lineageTag: ddc245f0-e431-4143-9d5b-dae63997f052
+		summarizeBy: none
+		sourceColumn: Key
+
+		annotation SummarizationSetBy = User
+
+	column Format
+		dataType: string
+		lineageTag: 7d6f8a44-5a52-41aa-838a-33491b16aa31
+		summarizeBy: none
+		sourceColumn: Format
+
+		annotation SummarizationSetBy = User
+
+	column Bold
+		dataType: int64
+		formatString: 0
+		lineageTag: a3671e95-efc6-470c-8b20-dbdf11d4ec17
+		summarizeBy: none
+		sourceColumn: Bold
+
+		annotation SummarizationSetBy = User
+
+	partition PL_Layout = m
+		mode: import
+		source =
+				let
+				    Source = Excel.Workbook(File.Contents(SampleDataFile), null, true),
+				    Sheet = Source{[Item="PL_Layout",Kind="Sheet"]}[Data],
+				    Promoted = Table.PromoteHeaders(Sheet, [PromoteAllScalars=true]),
+				    Renamed = Table.RenameColumns(Promoted, {{"Account Code / Measure", "Key"}}),
+				    Result = Table.TransformColumnTypes(Renamed, {{"Sort", Int64.Type}, {"Row Label", type text}, {"Row Type", type text}, {"Key", type text}, {"Format", type text}, {"Bold", Int64.Type}})
+				in
+				    Result
+
+	annotation PBI_ResultType = Table
+

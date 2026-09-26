@@ -1,0 +1,93 @@
+table Refresh_Log
+	lineageTag: 8ae63575-c050-4efe-aec7-e82fc94e2764
+
+	column 'Run ID'
+		dataType: string
+		lineageTag: 03bf8dd5-29bc-4a61-bffe-f29c3cca29de
+		summarizeBy: none
+		sourceColumn: Run ID
+
+		annotation SummarizationSetBy = User
+
+	column 'Start (UTC)'
+		dataType: dateTime
+		formatString: General Date
+		lineageTag: 1fe4820f-b479-4a58-aed0-b5da6eebab9b
+		summarizeBy: none
+		sourceColumn: Start (UTC)
+
+		annotation SummarizationSetBy = User
+
+	column 'End (UTC)'
+		dataType: dateTime
+		formatString: General Date
+		lineageTag: 50e26944-81b4-4bac-b0f0-021f8fc5dfe3
+		summarizeBy: none
+		sourceColumn: End (UTC)
+
+		annotation SummarizationSetBy = User
+
+	column Trigger
+		dataType: string
+		lineageTag: cfac1c0e-c658-458c-9482-81f9ea4e12cc
+		summarizeBy: none
+		sourceColumn: Trigger
+
+		annotation SummarizationSetBy = User
+
+	column Period
+		dataType: int64
+		formatString: 0
+		lineageTag: c376db89-c123-460c-b847-e24b669ab3b2
+		summarizeBy: none
+		sourceColumn: Period
+
+		annotation SummarizationSetBy = User
+
+	column Status
+		dataType: string
+		lineageTag: dbd7f4ae-0f72-4039-80b9-f2c77514974a
+		summarizeBy: none
+		sourceColumn: Status
+
+		annotation SummarizationSetBy = User
+
+	column Rows
+		dataType: int64
+		formatString: #,0
+		lineageTag: 9b4f99e9-6e91-4ea2-8993-2b18f988c8d4
+		summarizeBy: none
+		sourceColumn: Rows
+
+		annotation SummarizationSetBy = User
+
+	column OpCos
+		dataType: int64
+		formatString: 0
+		lineageTag: 1c39cc5d-7c31-42f4-b4c3-dba48cab2957
+		summarizeBy: none
+		sourceColumn: OpCos
+
+		annotation SummarizationSetBy = User
+
+	column Message
+		dataType: string
+		lineageTag: 99444b08-935d-4e02-bf02-3662a518c353
+		summarizeBy: none
+		sourceColumn: Message
+
+		annotation SummarizationSetBy = User
+
+	partition Refresh_Log = m
+		mode: import
+		source =
+				let
+				    Source = Excel.Workbook(File.Contents(SampleDataFile), null, true),
+				    Sheet = Source{[Item="Refresh_Log_Sample",Kind="Sheet"]}[Data],
+				    Promoted = Table.PromoteHeaders(Sheet, [PromoteAllScalars=true]),
+				    Result = Table.TransformColumnTypes(Promoted, {{"Run ID", type text}, {"Start (UTC)", type datetime}, {"End (UTC)", type datetime}, {"Trigger", type text}, {"Period", Int64.Type}, {"Status", type text}, {"Rows", Int64.Type}, {"OpCos", Int64.Type}, {"Message", type text}})
+				in
+				    Result
+
+	annotation PBI_ResultType = Table
+
