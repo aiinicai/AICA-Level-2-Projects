@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="htmx-config" content='{"includeIndicatorStyles": false, "allowEval": false, "responseHandling": [{"code": "204", "swap": false}, {"code": "[23]..", "swap": true}, {"code": "[45]..", "swap": true, "error": true}]}'>
+  <title>{% block title %}MCA Compliance Mapper{% endblock %} · {{ firm_name }}</title>
+  <link rel="icon" type="image/png" href="{{ url_for('static', filename='logo.png') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='bootstrap.min.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='fonts.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='app.css', v=asset_version) }}">
+  <style nonce="{{ csp_nonce }}">:root { --brand: {{ brand_primary }}; --accent: {{ brand_accent }}; }</style>
+</head>
+<body hx-headers='{"X-CSRFToken": "{{ csrf_token() }}"}'>
+{% set ep = request.endpoint or '' %}
+{% from "_macros.html" import flashes with context %}
+{% if current_user.is_authenticated and not bare %}
+<nav class="navbar navbar-expand-xl topbar no-print" aria-label="Main">
+  <div class="container-fluid px-4">
+    <a class="navbar-brand" href="{{ url_for('dashboard.index') }}">
+      {% if logo_url %}<span class="monogram logo-badge"><img src="{{ logo_url }}" alt="{{ firm_name }} logo"></span>{% else %}<span class="monogram" aria-hidden="true">{{ firm_initials }}</span>{% endif %}
+      <span><span class="brand-name">{{ firm_name }}</span><span class="brand-sub">{{ firm_tagline }}</span></span>
+    </a>
+    <button class="navbar-toggler bg-light" type="button" data-bs-toggle="collapse" data-bs-target="#nav" aria-controls="nav" aria-expanded="false" aria-label="Toggle navigation"><span class="navbar-toggler-icon"></span></button>
+    <div class="collapse navbar-collapse" id="nav">
+      <ul class="navbar-nav ms-3 me-auto">
+        <li class="nav-item"><a class="nav-link {{ 'active' if ep == 'dashboard.index' }}" href="{{ url_for('dashboard.index') }}">Dashboard</a></li>
+        <li class="nav-item"><a class="nav-link {{ 'active' if ep == 'obligations.queue' }}" href="{{ url_for('obligations.queue') }}">My work</a></li>
+        <li class="nav-item"><a class="nav-link {{ 'active' if ep.startswith('entities.') or ep.startswith('wizard.') }}" href="{{ url_for('entities.index') }}">Entities</a></li>
+        <li class="nav-item"><a class="nav-link {{ 'active' if ep.startswith('people.') }}" href="{{ url_for('people.index') }}">Directors</a></li>
+        <li class="nav-item"><a class="nav-link {{ 'active' if ep == 'reports.calendar' }}" href="{{ url_for('reports.calendar') }}">Calendar</a></li>
+        <li class="nav-item"><a class="nav-link {{ 'active' if ep in ('reports.index', 'reports.letter') }}" href="{{ url_for('reports.index') }}">Reports</a></li>
+        <li class="nav-item dropdown"><a class="nav-link dropdown-toggle {{ 'active' if ep.startswith('tools.') }}" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">Tools</a>
+          <ul class="dropdown-menu">
+            <li><a class="dropdown-item" href="{{ url_for('tools.fees') }}">Fee calculator</a></li>
+            <li><a class="dropdown-item" href="{{ url_for('tools.board') }}">Board-meeting planner</a></li>
+          </ul></li>
+        <li class="nav-item dropdown"><a class="nav-link dropdown-toggle {{ 'active' if ep.startswith('rules.') }}" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">Rule pack</a>
+          <ul class="dropdown-menu">
+            <li><a class="dropdown-item" href="{{ url_for('rules.index') }}">Rules &amp; sign-off</a></li>
+            <li><a class="dropdown-item" href="{{ url_for('rules.versions') }}">Versions &amp; diff</a></li>
+            <li><a class="dropdown-item" href="{{ url_for('rules.updates') }}">Regulatory update log</a></li>
+          </ul></li>
+        {% if can('read_audit') or can('manage_users') %}
+        <li class="nav-item dropdown"><a class="nav-link dropdown-toggle {{ 'active' if ep.startswith('admin.') }}" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">Admin</a>
+          <ul class="dropdown-menu">
+            {% if can('read_audit') %}<li><a class="dropdown-item" href="{{ url_for('admin.audit_trail') }}">Audit trail</a></li>{% endif %}
+            {% if can('manage_users') %}<li><a class="dropdown-item" href="{{ url_for('admin.users') }}">Users &amp; sessions</a></li>{% endif %}
+            {% if can('settings') %}<li><a class="dropdown-item" href="{{ url_for('admin.settings') }}">Firm settings</a></li>{% endif %}
+          </ul></li>
+        {% endif %}
+      </ul>
+      <a class="nav-link bell me-2" href="{{ url_for('reports.notifications') }}" aria-label="Notifications ({{ unread }} unread)">&#128276;{% if unread %}<span class="count">{{ unread }}</span>{% endif %}</a>
+      <div class="dropdown">
+        <button class="btn btn-sm btn-outline-gold dropdown-toggle nowrap" type="button" data-bs-toggle="dropdown" aria-expanded="false">{{ current_user.full_name.split(' ')[0] }} · {{ current_user.role|title }}</button>
+        <ul class="dropdown-menu dropdown-menu-end">
+          <li><span class="dropdown-item-text small-muted">{{ current_user.full_name }}<br>Today {{ today|dmy }}</span></li>
+          <li><a class="dropdown-item" href="{{ url_for('reports.notifications') }}">Notifications{% if unread %} ({{ unread }}){% endif %}</a></li>
+          <li><a class="dropdown-item" href="{{ url_for('auth.change_password') }}">Change password</a></li>
+          <li><hr class="dropdown-divider"></li>
+          <li><form method="post" action="{{ url_for('auth.logout') }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="dropdown-item">Sign out</button></form></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</nav>
+{% endif %}
+{% block page %}
+<main class="container-fluid py-4 px-4">
+  {{ flashes() }}
+  <div id="htmx-alerts" aria-live="polite"></div>
+  {% block content %}{% endblock %}
+</main>
+{% endblock %}
+<footer class="footer text-center py-3 no-print">{{ firm_name }}, {{ firm_tagline }} · {{ firm_address }} · Internal MCA compliance tool — files nothing on the MCA portal · Rule pack {{ rulepack_version }} · Client names in demo data are fictitious</footer>
+<script src="{{ url_for('static', filename='bootstrap.bundle.min.js') }}"></script>
+<script src="{{ url_for('static', filename='htmx.min.js') }}"></script>
+</body>
+</html>

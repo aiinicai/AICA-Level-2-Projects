@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+{% from "_macros.html" import head, band, tags, status with context %}
+{% block title %}{{ person.name if person else 'Directors' }}{% endblock %}
+{% block content %}
+{% if not person %}
+<div class="page-head">{{ head("Director-centric view", "Directors & designated partners", "Every DIN, the entities it sits on, the next DIR-3 KYC date and DSC expiry.") }}
+  <form class="d-flex gap-1" method="get"><label class="visually-hidden" for="dq">Search</label><input class="form-control form-control-sm" id="dq" name="q" value="{{ term }}" placeholder="Name or DIN"><button class="btn btn-sm btn-outline-secondary">Search</button></form></div>
+<div class="card"><div class="table-responsive"><table class="table table-hover mb-0">
+  <thead><tr><th>Name</th><th>DIN</th><th>Entities</th><th>Next DIR-3 KYC</th><th>DSC expiry</th><th>DIN status</th></tr></thead>
+  <tbody>{% for p in persons %}{% set k = next_kyc(p) %}
+    <tr><td><a href="{{ url_for('people.show', person_id=p.id) }}">{{ p.name }}</a></td><td class="mono">{{ p.din }}</td>
+      <td class="small">{% for l in p.links if not l.ceased_on %}<div><a href="{{ url_for('entities.show', entity_id=l.entity_id) }}">{{ l.entity.name }}</a> <span class="small-muted">{{ l.designation }}</span></div>{% endfor %}
+        {% set gone = p.links|selectattr('ceased_on')|list %}{% if gone %}<div class="small-muted">+ {{ gone|length }} former</div>{% endif %}</td>
+      <td class="nowrap">{% if k %}{{ k.due_date|dmy }} {% if k.due_date < today %}<span class="band band-overdue">Overdue</span>{% endif %}<div class="small-muted">{{ k.period_key }}</div>{% else %}—{% endif %}</td>
+      <td class="nowrap">{% if p.dsc_expiry %}{% set dd = (p.dsc_expiry - today).days %}{{ p.dsc_expiry|dmy }}
+        {% if dd < 0 %}<span class="band band-overdue">Expired</span>{% elif dd <= 7 %}<span class="band band-due7">{{ dd }} days</span>{% elif dd <= 30 %}<span class="band band-due30">{{ dd }} days</span>{% endif %}{% else %}—{% endif %}</td>
+      <td>{% if p.din_status == 'APPROVED' %}<span class="badge text-bg-success">Approved</span>{% else %}<span class="badge text-bg-danger">{{ p.din_status|title }}</span>{% endif %}</td></tr>
+  {% else %}<tr><td colspan="6" class="text-muted">No directors{% if not can('view_all') %} on your assigned entities{% endif %}.</td></tr>{% endfor %}</tbody>
+</table></div></div>
+<p class="small-muted mt-2">DSC reminders at 30 and 7 days are practical, not statutory.</p>
+{% else %}
+<div class="page-head">{{ head("DIN " ~ person.din, person.name, "DIN allotted " ~ (person.din_allotment_date|dmy) ~ " · PAN " ~ masked_pan) }}
+  <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('people.index') }}">All directors</a></div>
+<div class="row g-4">
+<div class="col-xl-7">
+  <div class="card mb-4"><div class="card-header">DIR-3 KYC cycle</div><div class="card-body">
+    <p class="mb-2">Computed first triennial due date: <strong>{{ computed|dmy }}</strong>
+      <span class="tag tag-interp">Interpretation</span></p>
+    <p class="small-muted mb-2">{% if legacy %}DIN held on or before 31-03-2025: next KYC is due by 30-06-2028 (MCA illustration), then every three years.{% else %}The three-year cycle runs from the FY in which the DIN was allotted (MCA illustration; partner decision Q1). Updates for a change in mobile, e-mail or address are due within 30 days and do not reset the cycle.{% endif %}</p>
+    {% if person.kyc_override_first_due %}<p class="alert alert-warning small mb-2">Partner override in force: first due {{ person.kyc_override_first_due|dmy }}.</p>{% endif %}
+    {% if can('decide') %}
+    <form method="post" action="{{ url_for('people.kyc_override', person_id=person.id) }}" class="row g-2 align-items-end">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div class="col-md-4"><label class="form-label small" for="first_due">Override first due (30 June)</label><input class="form-control form-control-sm" type="date" id="first_due" name="first_due" value="{{ person.kyc_override_first_due or '' }}"></div>
+      <div class="col-md-6"><label class="form-label small" for="ko_reason">Reason (≥ 20 characters)</label><input class="form-control form-control-sm" id="ko_reason" name="reason"></div>
+      <div class="col-md-2"><button class="btn btn-sm btn-outline-secondary w-100">Save</button></div>
+    </form>{% endif %}
+  </div></div>
+  <div class="card mb-4"><div class="card-header">DIN obligations</div><div class="table-responsive"><table class="table table-sm mb-0">
+    <thead><tr><th>Due</th><th>Health</th><th>Form</th><th>Period</th><th>Status</th></tr></thead><tbody>
+    {% for o in obls %}<tr><td>{{ o.due_date|dmy }}</td><td>{{ band(health(o)) }}</td><td><a href="{{ url_for('obligations.show', obl_id=o.id) }}">{{ o.form }}</a>{{ tags(o) }}</td><td class="small">{{ o.period_key }}</td><td>{{ status(o.status) }}</td></tr>
+    {% else %}<tr><td colspan="5" class="text-muted">None.</td></tr>{% endfor %}</tbody></table></div></div>
+  <div class="card"><div class="card-header">Entities</div><ul class="list-group list-group-flush">
+    {% for l in person.links %}<li class="list-group-item small"><a href="{{ url_for('entities.show', entity_id=l.entity_id) }}">{{ l.entity.name }}</a> — {{ l.designation }} · from {{ l.appointed_on|dmy }}{% if l.ceased_on %} to {{ l.ceased_on|dmy }} <span class="badge text-bg-secondary">Ceased</span>{% endif %}</li>{% endfor %}
+  </ul></div>
+</div>
+<div class="col-xl-5">
+  {% if can('record_event') %}
+  <div class="card mb-4"><div class="card-header">Record a change of personal details</div><div class="card-body">
+    <form method="post" action="{{ url_for('people.detail_change', person_id=person.id) }}" class="row g-2">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div class="col-6"><label class="form-label small" for="dc_date">Date of change</label><input class="form-control form-control-sm" type="date" id="dc_date" name="event_date" required></div>
+      <div class="col-6"><label class="form-label small" for="dc_what">What changed</label><select class="form-select form-select-sm" id="dc_what" name="changed"><option value="mobile">Mobile number</option><option value="email">E-mail address</option><option value="address">Residential address</option></select></div>
+      <div class="col-12"><button class="btn btn-sm btn-brand">Record — creates DIR-3 KYC Web (+30 days, ₹500)</button></div>
+    </form>
+    {% for c in changes %}<div class="small-muted mt-2">{{ c.event_date|dmy }} — {{ (c.attrs or {}).get('changed', c.type) }}</div>{% endfor %}
+  </div></div>
+  {% endif %}
+  <div class="card"><div class="card-header">Contact, DSC &amp; DIN status</div><div class="card-body">
+    {% if can('edit_entity') %}
+    <form method="post" action="{{ url_for('people.edit', person_id=person.id) }}" class="row g-2">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div class="col-md-6"><label class="form-label small" for="pe">E-mail</label><input class="form-control form-control-sm" id="pe" name="email" value="{{ person.email or '' }}"></div>
+      <div class="col-md-6"><label class="form-label small" for="pm">Mobile</label><input class="form-control form-control-sm" id="pm" name="mobile" value="{{ person.mobile or '' }}"></div>
+      <div class="col-md-6"><label class="form-label small" for="pd">DSC expiry</label><input class="form-control form-control-sm" type="date" id="pd" name="dsc_expiry" value="{{ person.dsc_expiry or '' }}"></div>
+      <div class="col-md-6"><label class="form-label small" for="ps">DIN status</label><select class="form-select form-select-sm" id="ps" name="din_status">{% for s in ['APPROVED', 'DEACTIVATED'] %}<option {% if person.din_status == s %}selected{% endif %}>{{ s }}</option>{% endfor %}</select></div>
+      <div class="col-12"><button class="btn btn-sm btn-outline-secondary">Save</button></div>
+    </form>
+    {% else %}<p class="small mb-0">DSC expiry {{ person.dsc_expiry|dmy }} · DIN {{ person.din_status|title }}</p>{% endif %}
+  </div></div>
+</div>
+</div>
+{% endif %}
+{% endblock %}

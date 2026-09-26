@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% from "_macros.html" import head with context %}
+{% block title %}{{ 'Users & sessions' if mode == 'users' else 'Firm settings' }}{% endblock %}
+{% block content %}
+{% if mode == 'users' %}
+<div class="page-head">{{ head("Administration", "Users & sessions", "Staff are deactivated, never deleted — their names stay in the audit trail.") }}</div>
+<div class="card mb-4"><div class="table-responsive"><table class="table table-sm mb-0 align-middle">
+  <thead><tr><th>Name</th><th>Username</th><th>Role</th><th>State</th><th>Last sign-in (UTC)</th><th class="text-end">Actions</th></tr></thead>
+  <tbody>{% for u in users %}
+  <tr class="{{ '' if u.is_active_flag else 'text-muted' }}"><td>{{ u.full_name }}</td><td class="mono">{{ u.username }}</td>
+    <td><form method="post" action="{{ url_for('admin.user_action', user_id=u.id, action='role') }}" class="d-flex gap-1"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><label class="visually-hidden" for="role-{{ u.id }}">Role</label><select class="form-select form-select-sm" id="role-{{ u.id }}" name="role">{% for r in roles %}<option {% if r == u.role %}selected{% endif %}>{{ r }}</option>{% endfor %}</select><button class="btn btn-sm btn-outline-secondary">Set</button></form></td>
+    <td class="small">{% if not u.is_active_flag %}Deactivated{% elif u.locked_until and u.locked_until > now %}<span class="band band-overdue">Locked</span>{% else %}Active{% endif %}{% if u.must_change_password %} · must change password{% endif %}{% if u.totp_enabled %} · 2FA on{% endif %}</td>
+    <td class="small nowrap">{{ u.last_login_at.strftime('%d-%m-%Y %H:%M') if u.last_login_at else '—' }}</td>
+    <td class="text-end">{% for act, label in [('unlock','Unlock'),('reset','Reset password'),('reset_totp','Reset 2FA'),('deactivate' if u.is_active_flag else 'activate', 'Deactivate' if u.is_active_flag else 'Re-activate')] %}
+      <form method="post" action="{{ url_for('admin.user_action', user_id=u.id, action=act) }}" class="d-inline"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn btn-sm btn-outline-secondary mb-1">{{ label }}</button></form>{% endfor %}</td></tr>
+  {% endfor %}</tbody></table></div></div>
+<div class="row g-4">
+<div class="col-lg-5"><div class="card"><div class="card-header"><span class="serif">Add a user</span></div><div class="card-body">
+  <form method="post"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <div class="mb-2"><label class="form-label small" for="nu">Username</label><input class="form-control form-control-sm" id="nu" name="username" required></div>
+    <div class="mb-2"><label class="form-label small" for="nf">Full name</label><input class="form-control form-control-sm" id="nf" name="full_name" required></div>
+    <div class="mb-2"><label class="form-label small" for="ne">E-mail</label><input class="form-control form-control-sm" id="ne" name="email" type="email"></div>
+    <div class="mb-3"><label class="form-label small" for="nr">Role</label><select class="form-select form-select-sm" id="nr" name="role">{% for r in roles %}<option>{{ r }}</option>{% endfor %}</select></div>
+    <button class="btn btn-sm btn-brand">Create — temporary password shown once</button></form></div></div></div>
+<div class="col-lg-7"><div class="card"><div class="card-header"><span class="serif">Active sessions</span></div>
+  <div class="table-responsive"><table class="table table-sm mb-0 small"><thead><tr><th>User</th><th>Started (UTC)</th><th>Last seen</th><th>IP</th><th></th></tr></thead>
+  <tbody>{% for s in sessions %}<tr><td>{{ s.user.full_name }}</td><td>{{ s.created_at.strftime('%d-%m %H:%M') }}</td><td>{{ s.last_seen_at.strftime('%d-%m %H:%M') }}</td><td>{{ s.ip }}</td>
+    <td class="text-end"><form method="post" action="{{ url_for('admin.revoke_session', sid=s.id) }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn btn-sm btn-outline-danger">Revoke</button></form></td></tr>
+  {% else %}<tr><td colspan="5" class="text-muted">No active sessions.</td></tr>{% endfor %}</tbody></table></div></div></div>
+</div>
+{% else %}
+<div class="page-head">{{ head("Administration", "Firm settings") }}</div>
+<form method="post" class="card"><div class="card-body">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <div class="row g-3">
+  {% for k, v in values.items() %}
+    <div class="col-md-6">
+    {% if defaults[k] is sameas true or defaults[k] is sameas false %}
+      <div class="form-check mt-4"><input class="form-check-input" type="checkbox" id="{{ k }}" name="{{ k }}" {% if v %}checked{% endif %}><label class="form-check-label" for="{{ k }}">{{ k.replace('_', ' ')|capitalize }}</label></div>
+    {% else %}
+      <label class="form-label" for="{{ k }}">{{ k.replace('_', ' ')|capitalize }}</label>
+      <input class="form-control{% if k == 'srn_regex' %} mono{% endif %}" id="{{ k }}" name="{{ k }}" value="{{ v|lower if k.startswith('brand_') else v }}" {% if k.startswith('brand_') %}type="color"{% endif %}>
+    {% endif %}
+    </div>
+  {% endfor %}
+  </div>
+  <p class="small-muted mt-3">"TOTP required for partners" makes partners and the owner set up two-factor sign-in at their next sign-in. "ADT-1 for first auditor" is the firm's interpretation policy (LEGAL_NOTES I3). Brand colours default to the firm's navy and gold.</p>
+  <button class="btn btn-brand">Save settings</button>
+</div></form>
+{% endif %}
+{% endblock %}

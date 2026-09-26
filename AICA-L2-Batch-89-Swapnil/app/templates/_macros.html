@@ -1,0 +1,96 @@
+{% macro flashes() -%}
+{% with msgs = get_flashed_messages(with_categories=true) %}
+  {% for cat, m in msgs %}<div class="alert alert-{{ cat }} alert-dismissible fade show" role="alert">{{ m }}<button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button></div>{% endfor %}
+{% endwith %}
+{%- endmacro %}
+
+{% macro head(eyebrow, title, sub=None) -%}
+<div><div class="eyebrow">{{ eyebrow }}</div><h1>{{ title }}</h1>{% if sub %}<div class="small-muted mt-1">{{ sub }}</div>{% endif %}</div>
+{%- endmacro %}
+
+{% macro band(h) -%}
+<span class="band band-{{ h }}">{{ HEALTH_LABELS[h] }}</span>
+{%- endmacro %}
+
+{% macro tags(o, verified=None) -%}
+{% if o.provisional %}<span class="tag tag-provisional" title="Anchor date not yet known — computed from the last permissible date">Provisional</span>{% endif %}
+{% if o.facts_stale %}<span class="tag tag-stale" title="Facts for this FY not entered — previous year's facts used">Facts stale</span>{% endif %}
+{% if o.needs_decision %}<span class="tag tag-decision" title="Partner decision required">Decision: {{ o.needs_decision }}</span>{% endif %}
+{% if o.interpretation %}<span class="tag tag-interp" title="Seed interpretation awaiting partner sign-off (LEGAL_NOTES)">Interpretation</span>{% endif %}
+{% if o.pre_engagement %}<span class="tag tag-pre" title="Due before the firm's engagement start — excluded from KPIs">Pre-engagement</span>{% endif %}
+{% if o.agm_not_held %}<span class="tag tag-stale" title="No AGM date recorded after the deadline — due date runs from the deadline">AGM not held</span>{% endif %}
+{% if verified is not none and not verified %}<span class="tag tag-unverified">Unverified rule</span>{% endif %}
+{%- endmacro %}
+
+{% macro status(s) -%}
+<span class="badge text-bg-{{ {'NOT_STARTED':'light','IN_PROGRESS':'info','READY_FOR_REVIEW':'primary','APPROVED_FOR_FILING':'warning','FILED':'success','ROC_APPROVED':'success','RESUBMISSION_REQUIRED':'danger','NOT_APPLICABLE':'secondary','WAIVED':'secondary'}[s] }} border">{{ STATUS_LABELS[s] }}</span>
+{%- endmacro %}
+
+{% macro who(o) -%}
+{% if o.entity %}<a href="{{ url_for('entities.show', entity_id=o.entity.id) }}">{{ o.entity.name }}</a>{% elif o.person %}{{ o.person.name }} <span class="small-muted">DIN {{ o.person.din }}</span>{% endif %}
+{%- endmacro %}
+
+{% macro row(o, h, acts, can_assign, staff) %}
+<tr id="obl-{{ o.id }}">
+  {% if can_assign %}<td><input class="form-check-input" type="checkbox" name="ids" value="{{ o.id }}" form="bulk" aria-label="Select {{ o.form }}"></td>{% endif %}
+  <td class="nowrap">{{ o.due_date.strftime('%d-%m-%Y') }}</td>
+  <td><span class="band band-{{ h }}">{{ {'overdue':'Overdue','due7':'Due ≤ 7 days','due30':'Due ≤ 30 days','upcoming':'Upcoming','closed':'Filed / closed','superseded':'Superseded'}[h] }}</span></td>
+  <td><a href="{{ url_for('obligations.show', obl_id=o.id) }}">{{ o.form }}</a> <span class="small-muted">{{ o.period_key }}</span>
+    {% if o.provisional %}<span class="tag tag-provisional">Provisional</span>{% endif %}{% if o.facts_stale %}<span class="tag tag-stale">Facts stale</span>{% endif %}{% if o.needs_decision %}<span class="tag tag-decision">Decision</span>{% endif %}</td>
+  <td>{% if o.entity %}<a href="{{ url_for('entities.show', entity_id=o.entity.id) }}">{{ o.entity.name }}</a>{% elif o.person %}{{ o.person.name }} <span class="small-muted">DIN {{ o.person.din }}</span>{% endif %}</td>
+  <td class="small">{{ o.status.replace('_', ' ')|capitalize }}</td>
+  <td class="small">{{ o.assignee.full_name if o.assignee else '—' }}</td>
+  <td class="text-end nowrap">{% for s in acts %}
+    <button class="btn btn-sm {{ 'btn-gold' if s == 'APPROVED_FOR_FILING' else 'btn-outline-secondary' }} mb-1" hx-post="{{ url_for('obligations.set_status', obl_id=o.id) }}" hx-vals='{"status": "{{ s }}"}' hx-target="#obl-{{ o.id }}" hx-swap="outerHTML">{{ {'IN_PROGRESS':'Start' if o.status == 'NOT_STARTED' else 'Send back','READY_FOR_REVIEW':'Ready for review','APPROVED_FOR_FILING':'Approve','ROC_APPROVED':'ROC approved','RESUBMISSION_REQUIRED':'Resubmission'}.get(s, s) }}</button>
+  {% endfor %}{% if o.status in ('APPROVED_FOR_FILING', 'RESUBMISSION_REQUIRED') %}<a class="btn btn-sm btn-brand mb-1" href="{{ url_for('obligations.show', obl_id=o.id) }}#file">File…</a>{% endif %}</td>
+</tr>
+{% endmacro %}
+
+{% macro fields_block(etype, spec, creates, links) %}
+<div id="event-fields">
+  <input type="hidden" name="type" value="{{ etype }}">
+  <h2 class="h5 mb-3">{{ spec.label }}</h2>
+  <div class="row g-3">
+    <div class="col-md-4"><label class="form-label" for="event_date">Date of the event</label><input class="form-control" type="date" id="event_date" name="event_date" required></div>
+    {% for f in spec.fields %}
+      <div class="col-md-4"><label class="form-label" for="ef-{{ f[0] }}">{{ f[1] }}</label>
+      {% if f[2] == 'select' %}<select class="form-select" id="ef-{{ f[0] }}" name="{{ f[0] }}">{% for o in f[3] %}<option value="{{ o }}">{{ o.replace('_', ' ')|capitalize }}</option>{% endfor %}</select>
+      {% elif f[2] == 'din' %}<input class="form-control mono" id="ef-{{ f[0] }}" name="{{ f[0] }}" maxlength="8" list="dins" required>
+      {% elif f[2] == 'date' %}<input class="form-control" type="date" id="ef-{{ f[0] }}" name="{{ f[0] }}">
+      {% else %}<input class="form-control" id="ef-{{ f[0] }}" name="{{ f[0] }}" {% if f[2] == 'money' %}inputmode="decimal" placeholder="₹"{% endif %}>{% endif %}
+      </div>
+    {% endfor %}
+    <div class="col-md-8"><label class="form-label" for="reference">Reference</label><input class="form-control" id="reference" name="reference" placeholder="Board / general meeting resolution no., SRN, letter date…"></div>
+  </div>
+  <datalist id="dins">{% for l in links %}<option value="{{ l.person.din }}">{{ l.person.name }}</option>{% endfor %}</datalist>
+  <div class="mt-4 p-3 rounded border bg-white">
+    <div class="eyebrow">This will create</div>
+    {% for r in creates %}<div class="small"><strong>{{ r.form }}</strong> — {{ r.title }} · due {% if r.offset.months %}{{ r.offset.months }} month(s) {% endif %}{% if r.offset.days %}{{ r.offset.days }} days {% endif %}from the event <span class="small-muted">({{ r.law }})</span></div>
+    {% else %}<div class="small-muted">No ROC filing — recorded for the calendar{% if etype == 'BOARD_MEETING' %} and the board-meeting planner{% endif %}.</div>{% endfor %}
+    {% if etype in ('DIRECTOR_APPOINTED', 'PARTNER_CHANGE') %}<div class="small-muted mt-1">The director / partner is also linked to the entity (their DIR-3 KYC cycle starts to show here).</div>{% endif %}
+    {% if etype in ('DIRECTOR_RESIGNED', 'DIRECTOR_CESSATION') %}<div class="small-muted mt-1">The director's link is closed on the event date.</div>{% endif %}
+  </div>
+</div>
+{% endmacro %}
+
+{% macro fee_result(result, err) %}
+<div id="fee-result">
+{% if result %}
+  <div class="card"><div class="card-header d-flex justify-content-between"><span class="serif">Fee breakdown</span>{% if not result.verified %}<span class="tag tag-unverified">Estimate — unverified</span>{% endif %}</div>
+  <div class="card-body">
+    <div class="row g-3 mb-3">
+      <div class="col-6 col-md-3"><div class="kpi kpi-upcoming"><div class="kpi-label">Normal fee</div><div class="kpi-value">{{ result.normal|inr }}</div></div></div>
+      <div class="col-6 col-md-3"><div class="kpi kpi-overdue"><div class="kpi-label">Additional fee</div><div class="kpi-value">{{ result.additional|inr }}</div></div></div>
+      <div class="col-6 col-md-3"><div class="kpi kpi-closed"><div class="kpi-label">Scheme relief</div><div class="kpi-value">{{ result.scheme_relief|inr }}</div></div></div>
+      <div class="col-6 col-md-3"><div class="kpi kpi-gold"><div class="kpi-label">Total payable</div><div class="kpi-value">{{ result.total|inr }}</div></div></div>
+    </div>
+    <div class="small mb-2">Delay: <strong>{{ result.delay_days }} day(s)</strong>{% if result.slab %} · slab {{ result.slab }}{% endif %}{% if result.scheme %} · scheme {{ result.scheme }}{% endif %}</div>
+    {% if result.blocked %}<div class="alert alert-warning small">{{ result.blocked }}</div>{% endif %}
+    <div class="fee-lines small-muted">{{ result.explanation }}</div>
+    <div class="small-muted mt-2">Rule versions: <span class="mono">{{ result.rule_versions|join(', ') }}</span></div>
+    <div class="small-muted mt-1">Penalties (s.454 Companies Act / s.76A LLP Act) are adjudicated by the ROC and are never computed here.</div>
+  </div></div>
+{% elif err %}<div class="alert alert-info">{{ err }}</div>{% endif %}
+</div>
+{% endmacro %}
+

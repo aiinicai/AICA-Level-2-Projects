@@ -1,0 +1,335 @@
+# Company — recurring obligations (annual / half-yearly / calendar) and the
+# classification thresholds they depend on. Evidence: RULEPACK_VERIFICATION.md §3, §9.
+domain: companies_annual
+
+thresholds:
+  # s.2(85) small company — history needed for back-year classification (C19)
+  - code: SMALL_COMPANY
+    values: {paid_up: 5000000, turnover: 20000000}
+    effective_from: 2014-04-01
+    effective_to: 2021-03-31
+    law: "s.2(85) Companies Act 2013 (original limits ₹50 lakh / ₹2 crore)"
+  - code: SMALL_COMPANY
+    values: {paid_up: 20000000, turnover: 200000000}
+    effective_from: 2021-04-01
+    effective_to: 2022-09-14
+    law: "Companies (Specification of Definition Details) Amendment Rules 2021, G.S.R. 92(E) — number unverified"
+  - code: SMALL_COMPANY
+    values: {paid_up: 40000000, turnover: 400000000}
+    effective_from: 2022-09-15
+    effective_to: 2025-11-30
+    law: "Companies (Specification of Definition Details) Amendment Rules 2022, G.S.R. 700(E) — number unverified"
+  - code: SMALL_COMPANY
+    values: {paid_up: 100000000, turnover: 1000000000}
+    effective_from: 2025-12-01
+    law: "Companies (Specification of Definition Details) Amendment Rules 2025, G.S.R. 880(E) dt 01-12-2025"
+  - code: XBRL
+    values: {paid_up: 50000000, turnover: 1000000000}
+    effective_from: 2014-04-01
+    law: "Rule 3, Companies (Filing of Documents and Forms in XBRL) Rules 2015"
+  - code: MGT8
+    values: {paid_up: 100000000, turnover: 500000000}
+    effective_from: 2014-04-01
+    law: "Rule 11(2), Companies (Management and Administration) Rules 2014"
+  - code: CSR
+    values: {net_worth: 5000000000, turnover: 10000000000, net_profit: 50000000}
+    effective_from: 2014-04-01
+    law: "s.135(1), Companies Act 2013"
+  - code: SEC_AUDIT
+    values: {public_paid_up: 500000000, public_turnover: 2500000000, borrowings: 1000000000}
+    effective_from: 2014-04-01
+    law: "s.204; Rule 9, Companies (Appointment and Remuneration of Managerial Personnel) Rules 2014"
+  - code: INTERNAL_AUDIT
+    values: {public_paid_up: 500000000, turnover: 2000000000, borrowings: 1000000000, public_deposits: 250000000}
+    effective_from: 2014-04-01
+    law: "s.138; Rule 13, Companies (Accounts) Rules 2014"
+
+rules:
+  - code: BOARD_MTGS
+    form: "Board meetings (no e-form)"
+    title: "Board meetings for the year (see planner for regime and gaps)"
+    entity_types: &companies [PRIVATE, OPC, PUBLIC_UNLISTED, PUBLIC_LISTED, SECTION8, NIDHI, PRODUCER]
+    applicability: [not_single_director_opc]
+    anchor: FY_END
+    recurrence: annual
+    law: "s.173(1), s.173(5), Companies Act 2013"
+    penalty_summary: "s.173(4)"
+    effective_from: 2014-04-01
+
+  - code: MBP1_ANNUAL
+    form: "MBP-1 (kept by company)"
+    title: "MBP-1 disclosure at first Board meeting of the FY"
+    entity_types: *companies
+    applicability: [not_first_fy, not_single_director_opc]
+    anchor: FY_START
+    offset: {days: 120}
+    recurrence: annual
+    provisional: true
+    law: "s.184(1), Companies Act 2013; Rule 9(1), Meetings of Board Rules"
+    penalty_summary: "s.184(4)"
+    effective_from: 2014-04-01
+    notes: "Practical date: latest possible first meeting under the 120-day gap rule."
+
+  - code: AGM
+    form: "Annual General Meeting"
+    title: "Hold the AGM"
+    entity_types: [PRIVATE, PUBLIC_UNLISTED, PUBLIC_LISTED, SECTION8, NIDHI, PRODUCER]
+    anchor: AGM_DEADLINE
+    recurrence: annual
+    law: "s.96(1), Companies Act 2013"
+    penalty_summary: "s.99"
+    effective_from: 2014-04-01
+    notes: "OPC exempt. ROC may extend a non-first AGM by up to 3 months."
+
+  - code: AOC4
+    form: "AOC-4 / AOC-4 XBRL / AOC-4 NBFC (Ind AS)"
+    title: "Filing of financial statements"
+    entity_types: [PRIVATE, PUBLIC_UNLISTED, PUBLIC_LISTED, SECTION8, NIDHI, PRODUCER]
+    anchor: AGM_ACTUAL_OR_DEADLINE
+    offset: {days: 30}
+    recurrence: annual
+    variant: aoc4_variant
+    fee_regime: PER_DAY_100
+    law: "s.137(1), Companies Act 2013; Rule 12, Companies (Accounts) Rules 2014"
+    penalty_summary: "s.137(3) — company and officers in default"
+    sources: ["https://www.indiacode.nic.in/handle/123456789/2114?locale=en"]
+    effective_from: 2014-04-01
+
+  - code: AOC4_CFS
+    form: "AOC-4 CFS"
+    title: "Filing of consolidated financial statements"
+    entity_types: [PRIVATE, PUBLIC_UNLISTED, PUBLIC_LISTED, SECTION8, NIDHI, PRODUCER]
+    applicability: [has_subs_assoc_jv]
+    anchor: AGM_ACTUAL_OR_DEADLINE
+    offset: {days: 30}
+    recurrence: annual
+    fee_regime: PER_DAY_100
+    law: "s.129(3), s.137(1), Companies Act 2013"
+    penalty_summary: "s.137(3)"
+    effective_from: 2014-04-01
+
+  - code: AOC4_OPC
+    form: "AOC-4 (OPC)"
+    title: "Filing of financial statements (OPC)"
+    entity_types: [OPC]
+    anchor: FY_END
+    offset: {days: 180}
+    recurrence: annual
+    variant: aoc4_variant
+    fee_regime: PER_DAY_100
+    law: "s.137(1) first proviso, Companies Act 2013"
+    penalty_summary: "s.137(3)"
+    effective_from: 2014-04-01
+
+  - code: MGT7
+    form: "MGT-7 / MGT-7A"
+    title: "Annual return"
+    entity_types: [PRIVATE, PUBLIC_UNLISTED, PUBLIC_LISTED, SECTION8, NIDHI, PRODUCER]
+    anchor: AGM_ACTUAL_OR_DEADLINE
+    offset: {days: 60}
+    recurrence: annual
+    variant: mgt7_variant
+    fee_regime: PER_DAY_100
+    law: "s.92(4), Companies Act 2013; Rule 11(1), Companies (Management and Administration) Rules 2014"
+    penalty_summary: "s.92(5)"
+    effective_from: 2014-04-01
+
+  - code: MGT7_OPC
+    form: "MGT-7A"
+    title: "Annual return (OPC)"
+    entity_types: [OPC]
+    anchor: FY_END
+    offset: {months: 6, days: 60}
+    recurrence: annual
+    interpretation: true
+    variant: mgt7_variant
+    fee_regime: PER_DAY_100
+    law: "s.92(4), Companies Act 2013"
+    penalty_summary: "s.92(5)"
+    effective_from: 2014-04-01
+    notes: "Interpretation I4: 60 days from the date the AGM would have been due (FY end + 6 months)."
+
+  - code: MGT8
+    form: "MGT-8 (PCS certificate attached to annual return)"
+    title: "Certification of annual return by a practising CS"
+    entity_types: [PRIVATE, PUBLIC_UNLISTED, PUBLIC_LISTED, SECTION8, NIDHI, PRODUCER]
+    applicability: [mgt8_required]
+    anchor: AGM_ACTUAL_OR_DEADLINE
+    offset: {days: 60}
+    recurrence: annual
+    law: "s.92(2), Companies Act 2013; Rule 11(2), Companies (Management and Administration) Rules 2014"
+    penalty_summary: "s.92(6)"
+    effective_from: 2014-04-01
+    notes: "Can apply to a small company filing MGT-7A (turnover ≥ ₹50 cr) — open question Q4."
+
+  - code: ADT1
+    form: "ADT-1"
+    title: "Notice of appointment of auditor at AGM"
+    entity_types: [PRIVATE, PUBLIC_UNLISTED, PUBLIC_LISTED, SECTION8, NIDHI, PRODUCER]
+    applicability: [auditor_appointed_at_agm]
+    anchor: AGM_ACTUAL_OR_DEADLINE
+    offset: {days: 15}
+    recurrence: annual
+    fee_regime: MULTIPLIER
+    fee_slab: S139
+    law: "s.139(1), Companies Act 2013; Rule 4(2), Companies (Audit and Auditors) Rules 2014"
+    penalty_summary: "s.147"
+    effective_from: 2014-04-01
+
+  - code: DPT3
+    form: "DPT-3"
+    title: "Return of deposits / exempted receipts (position at 31 March)"
+    entity_types: *companies
+    applicability: [deposit_rules_apply, deposits_outstanding]
+    anchor: CALENDAR_FIXED
+    fixed: {month: 6, day: 30}
+    recurrence: march31
+    fee_regime: MULTIPLIER
+    law: "Rule 16, Companies (Acceptance of Deposits) Rules 2014"
+    penalty_summary: "Rule 21 (Deposits Rules) / s.450"
+    effective_from: 2014-04-01
+    notes: "Calendar-anchored: can fall before the company's first FY closes."
+
+  - code: MSME1_H1
+    form: "MSME-1 (Apr–Sep)"
+    title: "Half-yearly return of dues to micro/small suppliers > 45 days"
+    entity_types: *companies
+    applicability: [msme_dues_over_45]
+    anchor: CALENDAR_FIXED
+    fixed: {month: 10, day: 31}
+    half: 1
+    recurrence: half_yearly
+    law: "s.405, Companies Act 2013; Specified Companies (Furnishing of information about payment to micro and small enterprise suppliers) Order 2019, as amended 15-07-2024"
+    penalty_summary: "s.405(4)"
+    effective_from: 2019-01-22
+    notes: "No nil return; no filing fee."
+
+  - code: MSME1_H2
+    form: "MSME-1 (Oct–Mar)"
+    title: "Half-yearly return of dues to micro/small suppliers > 45 days"
+    entity_types: *companies
+    applicability: [msme_dues_over_45]
+    anchor: CALENDAR_FIXED
+    fixed: {month: 4, day: 30}
+    half: 2
+    recurrence: half_yearly
+    law: "s.405, Companies Act 2013; Specified Companies Order 2019, as amended 15-07-2024"
+    penalty_summary: "s.405(4)"
+    effective_from: 2019-01-22
+
+  - code: PAS6
+    form: "PAS-6"
+    title: "Reconciliation of share capital audit report (half-yearly)"
+    entity_types: [PRIVATE, PUBLIC_UNLISTED]
+    applicability: [pas6_applicable]
+    anchor: HALF_YEAR_END
+    offset: {days: 60}
+    recurrence: half_yearly
+    fee_regime: MULTIPLIER
+    law: "Rule 9A(8) and Rule 9B, Companies (Prospectus and Allotment of Securities) Rules 2014"
+    penalty_summary: "s.450"
+    effective_from: 2018-10-02
+
+  - code: DEMAT_9B
+    form: "ISIN + dematerialisation (no e-form)"
+    title: "Complete dematerialisation of securities (Rule 9B)"
+    entity_types: [PRIVATE]
+    applicability: [rule_9b_trigger]
+    anchor: FY_END
+    offset: {months: 18}
+    recurrence: first_trigger
+    law: "Rule 9B, Companies (Prospectus and Allotment of Securities) Rules 2014 (G.S.R. 802(E), 2023)"
+    penalty_summary: "s.450"
+    effective_from: 2023-03-31
+    notes: "Producer companies have a separate timeline (31-03-2028) — flag only."
+
+  - code: CSR2
+    form: "CSR-2 (addendum to AOC-4)"
+    title: "Report on Corporate Social Responsibility"
+    entity_types: [PRIVATE, PUBLIC_UNLISTED, PUBLIC_LISTED, SECTION8, NIDHI, PRODUCER]
+    applicability: [csr_applicable]
+    anchor: AGM_ACTUAL_OR_DEADLINE
+    offset: {days: 30}
+    recurrence: annual
+    law: "s.135, Companies Act 2013; Rule 12(1B), Companies (Accounts) Rules 2014"
+    penalty_summary: "s.135(7)"
+    effective_from: 2020-04-01
+    notes: "Filed with AOC-4 (correction C13)."
+
+  - code: MGT14_FS
+    form: "MGT-14"
+    title: "Board resolutions approving financial statements and Board report"
+    entity_types: [PRIVATE, PUBLIC_UNLISTED, PUBLIC_LISTED]
+    applicability: [public_or_private_sub_of_public]
+    anchor: BOARD_APPROVAL_OR_AGM
+    offset: {days: 30}
+    recurrence: annual
+    fee_regime: MULTIPLIER
+    law: "s.117(3)(g), s.179(3), Companies Act 2013; private companies exempt — G.S.R. 464(E) dt 05-06-2015"
+    penalty_summary: "s.117(2)"
+    effective_from: 2014-04-01
+
+  - code: CRA2
+    form: "CRA-2"
+    title: "Intimation of appointment of cost auditor"
+    entity_types: *companies
+    applicability: [cost_audit_applicable]
+    anchor: FY_START
+    offset: {days: 180}
+    recurrence: annual
+    provisional: true
+    fee_regime: MULTIPLIER
+    law: "s.148(3); Rule 6(2), Companies (Cost Records and Audit) Rules 2014"
+    penalty_summary: "s.148(8)"
+    effective_from: 2014-04-01
+    notes: "Earlier of Board meeting + 30 days or FY start + 180 days."
+
+  - code: CRA4
+    form: "CRA-4"
+    title: "Filing of cost audit report"
+    entity_types: *companies
+    applicability: [cost_audit_applicable]
+    anchor: FY_END
+    offset: {days: 210}
+    recurrence: annual
+    provisional: true
+    fee_regime: MULTIPLIER
+    law: "Rule 6(5) and 6(6), Companies (Cost Records and Audit) Rules 2014"
+    penalty_summary: "s.148(8)"
+    effective_from: 2014-04-01
+    notes: "Receipt of report + 30 days; provisional anchor = report due FY end + 180 days."
+
+  - code: SEC_AUDIT
+    form: "MR-3 (annexed to Board report)"
+    title: "Secretarial audit report"
+    entity_types: [PRIVATE, PUBLIC_UNLISTED, PUBLIC_LISTED, SECTION8, NIDHI, PRODUCER]
+    applicability: [secretarial_audit_required]
+    anchor: AGM_ACTUAL_OR_DEADLINE
+    offset: {days: -21}
+    recurrence: annual
+    law: "s.204, Companies Act 2013; Rule 9, Appointment and Remuneration Rules 2014"
+    penalty_summary: "s.204(4)"
+    effective_from: 2014-04-01
+    notes: "Must be ready before the AGM notice (21 clear days)."
+
+  - code: INTERNAL_AUDIT
+    form: "Internal audit (no e-form)"
+    title: "Internal audit for the year"
+    entity_types: *companies
+    applicability: [internal_audit_required]
+    anchor: FY_END
+    recurrence: annual
+    law: "s.138, Companies Act 2013; Rule 13, Companies (Accounts) Rules 2014"
+    effective_from: 2014-04-01
+
+  - code: MSC3
+    form: "MSC-3"
+    title: "Return of dormant company"
+    entity_types: *companies
+    applicability: [is_dormant]
+    anchor: FY_END
+    offset: {days: 30}
+    recurrence: annual
+    fee_regime: MULTIPLIER
+    law: "s.455, Companies Act 2013; Companies (Miscellaneous) Rules 2014"
+    effective_from: 2014-04-01

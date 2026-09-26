@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% from "_macros.html" import head, band, tags, status, who, row with context %}
+{% block title %}My work{% endblock %}
+{% block content %}
+<div class="page-head">{{ head("Work queue", "Assigned to me" if scope == 'mine' else ("Unassigned" if scope == 'unassigned' else "Team queue"), total ~ " open item(s)") }}
+  <form class="d-flex flex-wrap gap-2 align-items-end" method="get">
+    {% if can('assign') %}<div><label class="form-label small mb-0" for="scope">Show</label><select class="form-select form-select-sm" id="scope" name="scope">{% for k, v in [('mine','Assigned to me'),('team','All visible'),('unassigned','Unassigned')] %}<option value="{{ k }}" {% if scope == k %}selected{% endif %}>{{ v }}</option>{% endfor %}</select></div>{% endif %}
+    <div><label class="form-label small mb-0" for="sort">Sort by</label><select class="form-select form-select-sm" id="sort" name="sort">{% for k, v in [('due','Due date'),('entity','Entity'),('form','Form'),('status','Status')] %}<option value="{{ k }}" {% if sort == k %}selected{% endif %}>{{ v }}</option>{% endfor %}</select></div>
+    <div><label class="form-label small mb-0" for="until">Due on or before</label><input class="form-control form-control-sm" type="date" id="until" name="until" value="{{ until }}"></div>
+    <button class="btn btn-sm btn-outline-secondary">Apply</button>
+  </form></div>
+{% if can('assign') %}
+<form id="bulk" method="post" action="{{ url_for('obligations.bulk_assign') }}" class="d-flex gap-2 align-items-end mb-3">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <div><label class="form-label small mb-0" for="bulk_assignee">Assign ticked items to</label><select class="form-select form-select-sm" id="bulk_assignee" name="assignee_id"><option value="">— nobody —</option>{% for u in staff %}<option value="{{ u.id }}">{{ u.full_name }} ({{ u.role|title }})</option>{% endfor %}</select></div>
+  <button class="btn btn-sm btn-brand">Bulk assign</button>
+</form>
+{% endif %}
+<div class="card"><div class="table-responsive"><table class="table table-sm table-hover mb-0 align-middle">
+  <thead><tr>{% if can('assign') %}<th></th>{% endif %}<th>Due</th><th>Health</th><th>Form</th><th>Entity / person</th><th>Status</th><th>Assignee</th><th class="text-end">Next step</th></tr></thead>
+  <tbody>{% for o in obls %}{{ row(o, health(o), actions(o), can('assign'), staff) }}
+  {% else %}<tr><td colspan="8" class="text-muted">Nothing here.</td></tr>{% endfor %}</tbody>
+</table></div></div>
+<p class="small-muted mt-2">One-click steps respect maker–checker: you never see “Approve” on an item you marked Ready yourself, and the server re-checks every click.</p>
+{% endblock %}

@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% from "_macros.html" import head with context %}
+{% block title %}Entities{% endblock %}
+{% block content %}
+<div class="page-head">{{ head("Client portfolio", "Entities", entities|length ~ " shown") }}
+  {% if can('edit_entity') %}<div class="d-flex gap-2"><a class="btn btn-sm btn-gold" href="{{ url_for('wizard.onboard') }}">Onboard (wizard)</a><a class="btn btn-sm btn-outline-secondary" href="{{ url_for('entities.create') }}">Quick add</a></div>{% endif %}</div>
+<form class="row g-2 mb-3 align-items-end" method="get">
+  <div class="col-md-3"><label class="form-label small mb-0" for="q">Search</label><input class="form-control form-control-sm" id="q" name="q" value="{{ term }}" placeholder="Name, CIN or LLPIN"></div>
+  <div class="col-md-2"><label class="form-label small mb-0" for="type">Type</label><select class="form-select form-select-sm" id="type" name="type"><option value="">All</option>{% for t in types %}<option {% if a.get('type') == t %}selected{% endif %}>{{ t }}</option>{% endfor %}</select></div>
+  <div class="col-md-2"><label class="form-label small mb-0" for="rm">Relationship manager</label><select class="form-select form-select-sm" id="rm" name="rm"><option value="">All</option>{% for u in rms %}<option value="{{ u.id }}" {% if a.get('rm') == u.id|string %}selected{% endif %}>{{ u.full_name }}</option>{% endfor %}</select></div>
+  <div class="col-md-2"><label class="form-label small mb-0" for="roc">ROC</label><select class="form-select form-select-sm" id="roc" name="roc"><option value="">All</option>{% for r in rocs %}<option {% if a.get('roc') == r %}selected{% endif %}>{{ r }}</option>{% endfor %}</select></div>
+  <div class="col-md-2"><label class="form-label small mb-0" for="health">Health</label><select class="form-select form-select-sm" id="health" name="health">{% for k, v in [('','All'),('overdue','Has overdue items'),('due30','Due within 30 days'),('clear','Nothing pending soon')] %}<option value="{{ k }}" {% if a.get('health', '') == k %}selected{% endif %}>{{ v }}</option>{% endfor %}</select></div>
+  <div class="col-md-1"><button class="btn btn-sm btn-brand w-100">Filter</button></div>
+</form>
+<div class="card"><div class="table-responsive"><table class="table table-hover mb-0 align-middle">
+  <thead><tr><th>Name</th><th>Type</th><th>CIN / LLPIN</th><th>Incorporated</th><th>ROC</th><th>RM / preparer</th><th class="text-end">Overdue</th><th class="text-end">Due ≤ 30 d</th></tr></thead>
+  <tbody>{% for e in entities %}
+    <tr><td><a class="fw-semibold" href="{{ url_for('entities.show', entity_id=e.id) }}">{{ e.name }}</a>{% if e.status != 'ACTIVE' %} <span class="badge text-bg-secondary">{{ e.status|title }}</span>{% endif %}</td>
+      <td class="small">{{ e.entity_type.replace('_', ' ')|title }}</td><td class="mono small">{{ e.cin or '—' }}</td>
+      <td class="nowrap">{{ e.incorporation_date|dmy }}</td><td class="small">{{ e.roc or '—' }}</td>
+      <td class="small">{{ e.rm.full_name if e.rm else '—' }}<div class="small-muted">{{ e.preparer.full_name if e.preparer else '' }}</div></td>
+      <td class="text-end">{% if summary[e.id].overdue %}<span class="band band-overdue">{{ summary[e.id].overdue }}</span>{% else %}<span class="small-muted">0</span>{% endif %}</td>
+      <td class="text-end">{% if summary[e.id].due30 %}<span class="band band-due30">{{ summary[e.id].due30 }}</span>{% else %}<span class="small-muted">0</span>{% endif %}</td></tr>
+  {% else %}<tr><td colspan="8" class="text-muted">No entities{% if not can('view_all') %} assigned to you{% endif %}.</td></tr>{% endfor %}</tbody>
+</table></div></div>
+{% endblock %}

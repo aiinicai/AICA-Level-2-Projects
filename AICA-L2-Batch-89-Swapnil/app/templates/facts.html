@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% from "_macros.html" import head with context %}
+{% block title %}Annual facts — {{ e.name }}{% endblock %}
+{% block content %}
+<div class="page-head">{{ head("Annual facts", e.name, "One row per financial year. Missing years fall back to the nearest entered year and the obligations they drive are flagged “Facts stale”.") }}
+  <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('entities.show', entity_id=e.id) }}">Back to entity</a></div>
+<div class="card mb-4"><div class="table-responsive"><table class="table table-sm table-hover mb-0">
+  <thead><tr><th>FY</th><th>Period</th>{% if e.entity_type == 'LLP' %}<th class="text-end">Contribution</th>{% else %}<th class="text-end">Paid-up</th>{% endif %}<th class="text-end">Turnover</th>
+    {% if e.entity_type != 'LLP' %}<th class="text-end">Net worth</th><th class="text-end">Net profit</th><th>AGM</th>{% endif %}<th>State</th><th></th></tr></thead>
+  <tbody>{% for f in fys %}{% set r = rows.get(f.key) %}
+    <tr class="{{ 'table-light' if f.key == fy.key }}"><td class="fw-semibold">{{ f.key }}</td><td class="small-muted nowrap">{{ f.start|dmy }} – {{ f.end|dmy }}</td>
+      {% if e.entity_type == 'LLP' %}<td class="text-end">{{ r.llp_contribution|inr if r else '—' }}</td>{% else %}<td class="text-end">{{ r.paid_up_capital|inr if r else '—' }}</td>{% endif %}
+      <td class="text-end">{{ r.turnover|inr if r else '—' }}</td>
+      {% if e.entity_type != 'LLP' %}<td class="text-end">{{ r.net_worth|inr if r else '—' }}</td><td class="text-end">{{ r.net_profit|inr if r else '—' }}</td><td>{{ r.agm_date|dmy if r else '—' }}</td>{% endif %}
+      <td>{% if r %}<span class="badge text-bg-success">Entered</span>{% else %}<span class="tag tag-stale">Not entered</span>{% endif %}{% if stale_counts.get(f.key) %} <span class="small-muted">{{ stale_counts[f.key] }} stale item(s)</span>{% endif %}</td>
+      <td><a class="small" href="{{ url_for('entities.facts_screen', entity_id=e.id, fy=f.key) }}">{{ 'Edit' if r else 'Enter' }}</a></td></tr>
+  {% endfor %}</tbody></table></div></div>
+
+<div class="card"><div class="card-header"><span class="serif">{{ fy.key }}</span> <span class="small-muted">{{ fy.start|dmy }} to {{ fy.end|dmy }}{% if fy.is_long %} · long first FY{% endif %}</span></div>
+<div class="card-body">
+  {% if can('edit_entity') %}
+  <form method="post" action="{{ url_for('entities.save_facts', entity_id=e.id) }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="fy_key" value="{{ fy.key }}">
+    <div class="table-responsive"><table class="table table-sm align-middle mb-3">
+      <thead><tr><th class="w-25">Fact</th><th class="w-25">Value</th><th>Drives</th></tr></thead><tbody>
+      {% for name in fields %}{% set v = current[name] if current else None %}{% set label, uses = info[name] %}
+        <tr><td><label for="f-{{ name }}">{{ label }}</label></td><td>
+        {% if name in ['deposits_outstanding_31mar','has_subs_assoc_jv','ind_as','cost_audit_applicable','csr_override','auditor_appointed_at_agm'] %}
+          <select class="form-select form-select-sm" id="f-{{ name }}" name="{{ name }}"><option value="">—</option><option value="yes" {% if v is sameas true %}selected{% endif %}>Yes</option><option value="no" {% if v is sameas false %}selected{% endif %}>No</option></select>
+        {% elif name in ['agm_date','board_approval_date','isin_obtained_date'] %}
+          <input class="form-control form-control-sm" type="date" id="f-{{ name }}" name="{{ name }}" value="{{ v or '' }}">
+        {% else %}
+          <input class="form-control form-control-sm" id="f-{{ name }}" name="{{ name }}" inputmode="decimal" value="{{ '%.0f'|format(v) if v is not none else '' }}" placeholder="₹ (commas allowed)">
+        {% endif %}</td><td class="small-muted">{{ uses }}</td></tr>
+      {% endfor %}</tbody></table></div>
+    <button class="btn btn-brand">Save facts &amp; recompute</button>
+  </form>
+  {% else %}<p class="small-muted mb-0">Your role can view but not edit annual facts.</p>{% endif %}
+</div></div>
+{% endblock %}
