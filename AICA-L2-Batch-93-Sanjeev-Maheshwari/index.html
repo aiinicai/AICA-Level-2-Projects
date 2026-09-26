@@ -1,0 +1,861 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Expense Settlement — GMJ</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
+<style>
+  :root{
+    --ink:#1D2430;--ivory:#F6F4EF;--card:#FFFFFF;--border:#E4E0D8;
+    --accent:#2B4C4A;--high:#B4443B;--med:#C08A2E;--low:#4A5163;--good:#3E7A57;--hover:#FBFAF7;
+    --input:#FFF7DC;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--ivory);color:var(--ink);font-family:'IBM Plex Sans',-apple-system,sans-serif;}
+  h1,h2,h3{font-family:'Fraunces',serif;font-weight:600;margin:0;}
+  .mono{font-family:'IBM Plex Mono',monospace;}
+  button{font-family:inherit;cursor:pointer;}
+  input,select,textarea{font-family:inherit;}
+  a{color:var(--accent);}
+
+  /* Layout */
+  #app{display:flex;min-height:100vh;}
+  #sidebar{width:220px;flex:0 0 220px;background:var(--ink);color:var(--ivory);padding:24px 18px;display:flex;flex-direction:column;gap:28px;}
+  #sidebar .wordmark{font-family:'Fraunces',serif;font-size:19px;font-weight:600;}
+  #sidebar .sub{font-size:11px;color:#8A93A6;margin-top:2px;}
+  #sidebar nav{display:flex;flex-direction:column;gap:3px;}
+  #sidebar nav a{display:block;padding:9px 10px;border-radius:6px;color:#C7CCD6;text-decoration:none;font-size:13.5px;font-weight:500;}
+  #sidebar nav a.active{background:var(--accent);color:#fff;}
+  #sidebar .whoami{margin-top:auto;font-size:12px;color:#8A93A6;border-top:1px solid #2E3646;padding-top:14px;}
+  #sidebar .signout{background:none;border:1px solid #2E3646;color:#C7CCD6;padding:8px;border-radius:6px;font-size:12px;margin-top:8px;}
+  #main{flex:1;padding:30px 36px;max-width:980px;}
+
+  /* Cards / tiles */
+  .tiles{display:flex;gap:12px;margin-bottom:20px;flex-wrap:wrap;}
+  .tile{flex:1;min-width:120px;background:var(--card);border:1px solid var(--border);border-radius:10px;padding:13px 16px;}
+  .card{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:20px;}
+  .badge{display:inline-block;padding:3px 10px;border-radius:99px;font-size:11.5px;font-weight:600;}
+  .b-draft{background:#EDF1EF;color:var(--low);}
+  .b-submitted{background:#FBF3E4;color:var(--med);}
+  .b-approved{background:#E4EEEA;color:var(--accent);}
+  .b-settled{background:#EAF2EE;color:var(--good);}
+  .b-high{background:#FBEEEC;color:var(--high);}
+  .b-medium{background:#FBF3E4;color:var(--med);}
+
+  /* Tables */
+  table{width:100%;border-collapse:collapse;font-size:13px;}
+  th{text-align:left;font-size:10.5px;text-transform:uppercase;color:var(--low);padding:8px 6px;border-bottom:1px solid var(--border);}
+  td{padding:7px 6px;border-bottom:1px solid #EFEBE2;vertical-align:middle;}
+  td input, td select{width:100%;padding:5px 6px;border:1px solid var(--border);border-radius:5px;font-size:12.5px;background:var(--input);}
+  tr.readonly td{background:none;}
+
+  /* Buttons */
+  .btn{background:var(--accent);color:#fff;border:none;border-radius:7px;padding:9px 16px;font-size:13px;font-weight:500;}
+  .btn.secondary{background:#fff;color:var(--ink);border:1px solid var(--border);}
+  .btn.danger{background:var(--high);color:#fff;border:none;}
+  .btn:disabled{opacity:.5;cursor:not-allowed;}
+  .btn-row{display:flex;gap:8px;margin-top:14px;}
+
+  .row-list{display:flex;flex-direction:column;gap:8px;}
+  .row-item{display:flex;align-items:center;gap:14px;padding:13px 16px;background:var(--card);border:1px solid var(--border);border-radius:10px;cursor:pointer;text-decoration:none;color:var(--ink);}
+  .row-item:hover{background:var(--hover);}
+  .row-item .name{font-weight:600;font-size:13.5px;flex:1;}
+  .row-item .meta{font-size:12px;color:var(--low);}
+
+  .msg{padding:10px 14px;border-radius:8px;font-size:13px;margin-bottom:14px;}
+  .msg.error{background:#FBEEEC;color:var(--high);}
+  .msg.info{background:#FBF3E4;color:var(--med);}
+
+  .authbox{max-width:380px;margin:80px auto;background:var(--card);border:1px solid var(--border);border-radius:12px;padding:28px;}
+  .authbox h1{font-size:22px;margin-bottom:4px;}
+  .authbox .sub{color:var(--low);font-size:13px;margin-bottom:20px;}
+  .field{margin-bottom:12px;}
+  .field label{display:block;font-size:12px;color:var(--low);margin-bottom:4px;}
+  .field input{width:100%;padding:9px 10px;border:1px solid var(--border);border-radius:7px;font-size:13.5px;}
+  .toggle{font-size:12.5px;text-align:center;margin-top:14px;}
+  .toggle a{cursor:pointer;}
+
+  .empty{color:var(--low);font-size:13px;padding:30px;text-align:center;background:var(--card);border:1px solid var(--border);border-radius:10px;}
+</style>
+</head>
+<body>
+<div id="app"></div>
+
+<script>
+/* ================= CONFIG ================= */
+// Publishable key is meant to be public client-side (Supabase's model —
+// real access control is RLS, not key secrecy). Fill this in with the
+// actual key from Project Settings -> API Keys before hosting. If left
+// as the placeholder, the app prompts for it once and remembers it in
+// this browser only (localStorage), so it still works without editing
+// the file.
+const SUPABASE_URL = "https://wmxkvciaftjzzevwpssv.supabase.co";
+const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_YNFk7yq1PXOcK-W1Mdtqyw_JNqOg3gB";
+
+const CATEGORY_LABELS = {
+  conveyance: "Conveyance",
+  out_of_station: "Out-of-station travel",
+  boarding_lodging: "Boarding & lodging",
+  other: "Other",
+};
+const RECEIPT_CATEGORIES = ["out_of_station", "boarding_lodging"];
+const STATUS_COLORS = { draft: '#8A93A6', submitted: '#C08A2E', approved: '#2B4C4A', settled: '#3E7A57' };
+const CATEGORY_COLORS = { conveyance: '#5B8DEF', out_of_station: '#E08E45', boarding_lodging: '#9B6BCC', other: '#D65D7A' };
+let activeCharts = [];
+function clearCharts() { activeCharts.forEach(c => c.destroy()); activeCharts = []; }
+
+/* ================= BOOTSTRAP ================= */
+let sb = null;
+let state = {
+  session: null,
+  employee: null,
+  isHead: false,
+  isAccounts: false,
+  view: "dashboard",
+  claimId: null,
+};
+
+function getKey() {
+  let k = localStorage.getItem("expense_tool_key");
+  if (k) return k;
+  if (SUPABASE_PUBLISHABLE_KEY && SUPABASE_PUBLISHABLE_KEY !== "REPLACE_WITH_PUBLISHABLE_KEY") return SUPABASE_PUBLISHABLE_KEY;
+  const entered = prompt("Enter the Supabase publishable key for this project (saved in this browser only):");
+  if (entered) localStorage.setItem("expense_tool_key", entered);
+  return entered;
+}
+
+async function boot() {
+  const key = getKey();
+  if (!key) { document.getElementById("app").innerHTML = "<div class='empty'>A publishable key is required to run this app.</div>"; return; }
+  sb = supabase.createClient(SUPABASE_URL, key);
+
+  const { data: { session } } = await sb.auth.getSession();
+  state.session = session;
+  if (session) await loadEmployee();
+  render();
+
+  sb.auth.onAuthStateChange(async (_event, session) => {
+    state.session = session;
+    if (session) { await loadEmployee(); } else { state.employee = null; }
+    render();
+  });
+}
+
+async function loadEmployee() {
+  const { data: emp } = await sb.from("employees").select("*").eq("auth_user_id", state.session.user.id).single();
+  state.employee = emp || null;
+  if (!emp) return;
+  const { data: heads } = await sb.from("teams").select("team_id").or(`head_employee_id.eq.${emp.employee_id},backup_approver_id.eq.${emp.employee_id}`);
+  state.isHead = (heads || []).length > 0;
+  state.isAccounts = !!emp.is_accounts;
+  state.isAdmin = !!emp.is_admin;
+}
+
+function esc(s) { return String(s ?? "").replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function fmtMoney(n) { return Number(n || 0).toLocaleString("en-IN", { minimumFractionDigits: 2 }); }
+function statusBadge(s) { return `<span class="badge b-${s}">${s.charAt(0).toUpperCase()+s.slice(1)}</span>`; }
+
+/* ================= RENDER ROOT ================= */
+function render() {
+  const app = document.getElementById("app");
+  if (!state.session) { app.innerHTML = renderAuth(); wireAuth(); return; }
+  if (!state.employee) { app.innerHTML = `<div class="empty">Signed in, but no employee record is linked to this account. Contact your admin.<br><button class="btn secondary" style="margin-top:12px" onclick="signOut()">Sign out</button></div>`; return; }
+
+  app.innerHTML = `
+    <div id="sidebar">
+      <div><div class="wordmark">GMJ</div><div class="sub">Expense Settlement</div></div>
+      <nav>
+        <a href="#" class="${state.view==='dashboard'?'active':''}" onclick="setView('dashboard');return false;">Dashboard</a>
+        ${state.isHead ? `<a href="#" class="${state.view==='approvals'?'active':''}" onclick="setView('approvals');return false;">Approvals</a>` : ""}
+        ${state.isAccounts ? `<a href="#" class="${state.view==='settlement'?'active':''}" onclick="setView('settlement');return false;">Settlement</a>` : ""}
+        ${state.isAdmin ? `<a href="#" class="${state.view==='admin'?'active':''}" onclick="setView('admin');return false;">Admin</a>` : ""}
+        <a href="#" class="${state.view==='claims'?'active':''}" onclick="setView('claims');return false;">${(state.isHead||state.isAccounts||state.isAdmin) ? 'My Own Expenses' : 'My Claims'}</a>
+      </nav>
+      <div class="whoami">
+        ${esc(state.employee.name)}<br>${esc(state.employee.employee_code)}
+        <button class="signout" onclick="showChangePassword()" style="margin-top:8px;">Change password</button>
+        <button class="signout" onclick="signOut()">Sign out</button>
+      </div>
+    </div>
+    <div id="main"><div class="empty">Loading…</div></div>
+    <div id="pwModal" style="display:none;position:fixed;inset:0;background:rgba(29,36,48,.4);align-items:center;justify-content:center;z-index:50;">
+      <div class="card" style="width:320px;background:#fff;">
+        <h2 style="margin-bottom:12px;">Change password</h2>
+        <div id="pwMsg"></div>
+        <div class="field"><label>New password</label><input id="pw_new" type="password"></div>
+        <div class="field"><label>Confirm new password</label><input id="pw_confirm" type="password"></div>
+        <div class="btn-row">
+          <button class="btn" onclick="doChangePassword()">Update</button>
+          <button class="btn secondary" onclick="document.getElementById('pwModal').style.display='none';">Cancel</button>
+        </div>
+      </div>
+    </div>
+  `;
+  renderView();
+}
+
+function showChangePassword() {
+  document.getElementById("pwMsg").innerHTML = "";
+  document.getElementById("pw_new").value = "";
+  document.getElementById("pw_confirm").value = "";
+  document.getElementById("pwModal").style.display = "flex";
+}
+
+async function doChangePassword() {
+  const pw = document.getElementById("pw_new").value;
+  const confirm = document.getElementById("pw_confirm").value;
+  const msgEl = document.getElementById("pwMsg");
+  if (pw.length < 8) { msgEl.innerHTML = `<div class="msg error">Password must be at least 8 characters.</div>`; return; }
+  if (pw !== confirm) { msgEl.innerHTML = `<div class="msg error">Passwords don't match.</div>`; return; }
+  const { error } = await sb.auth.updateUser({ password: pw });
+  if (error) { msgEl.innerHTML = `<div class="msg error">${esc(error.message)}</div>`; return; }
+  msgEl.innerHTML = `<div class="msg info">Password updated.</div>`;
+  setTimeout(() => { document.getElementById("pwModal").style.display = "none"; }, 1000);
+}
+
+function setView(v, id) { state.view = v; state.claimId = id || null; render(); }
+async function signOut() { await sb.auth.signOut(); state = { ...state, session: null, employee: null }; render(); }
+
+/* ================= AUTH ================= */
+let authMode = "login";
+function renderAuth() {
+  return `
+    <div class="authbox">
+      <h1>GMJ Expense Settlement</h1>
+      <div class="sub">Sign in to your account</div>
+      <div id="authMsg"></div>
+      <div class="field"><label>Email</label><input id="a_email" type="email"></div>
+      <div class="field"><label>Password</label><input id="a_pass" type="password"></div>
+      <button class="btn" style="width:100%" onclick="doAuth()">Sign in</button>
+      <div class="toggle">Don't have access yet? Contact your admin to be set up.</div>
+    </div>
+  `;
+}
+function wireAuth() {}
+
+async function doAuth() {
+  const email = document.getElementById("a_email").value.trim();
+  const pass = document.getElementById("a_pass").value;
+  const msgEl = document.getElementById("authMsg");
+  msgEl.innerHTML = "";
+  const { error } = await sb.auth.signInWithPassword({ email, password: pass });
+  if (error) msgEl.innerHTML = `<div class="msg error">${esc(error.message)}</div>`;
+}
+
+/* ================= VIEW ROUTER ================= */
+async function renderView() {
+  if (state.view === "dashboard") return renderDashboard();
+  if (state.view === "claims") return renderClaimsList();
+  if (state.view === "claimDetail") return renderClaimDetail();
+  if (state.view === "approvals") return renderApprovals();
+  if (state.view === "approvalDetail") return renderApprovalDetail();
+  if (state.view === "settlement") return renderSettlement();
+  if (state.view === "settlementDetail") return renderSettlementDetail();
+  if (state.view === "admin") return renderAdmin();
+}
+
+/* ================= DASHBOARD ================= */
+async function renderDashboard() {
+  const main = document.getElementById("main");
+  main.innerHTML = `<div class="empty">Loading…</div>`;
+
+  const isManager = state.isHead || state.isAccounts || state.isAdmin;
+
+  // ---- Pure employee: personal dashboard only ----
+  if (!isManager) {
+    const { data: myClaims } = await sb.from("claims").select("*").eq("employee_id", state.employee.employee_id);
+    const myTotals = await totalsFor((myClaims||[]).map(c=>c.claim_id));
+    const myTotal = Object.values(myTotals).reduce((a,b)=>a+b,0);
+    const myByStatus = { draft:0, submitted:0, approved:0, settled:0 };
+    (myClaims||[]).forEach(c => myByStatus[c.status] = (myByStatus[c.status]||0) + 1);
+
+    const months = [];
+    const now = new Date();
+    for (let i=5;i>=0;i--){
+      const d = new Date(now.getFullYear(), now.getMonth()-i, 1);
+      months.push({ key: d.toISOString().slice(0,7), label: d.toLocaleString(undefined,{month:'short'}), amount: 0 });
+    }
+    (myClaims||[]).forEach(c => {
+      const m = months.find(m=>m.key===c.month);
+      if (m) m.amount += myTotals[c.claim_id] || 0;
+    });
+
+    const recent = (myClaims||[]).slice().sort((a,b)=>new Date(b.created_at)-new Date(a.created_at)).slice(0,5);
+
+    main.innerHTML = `
+      <h1 style="margin-bottom:4px;">My Claims</h1>
+      <div style="color:var(--low);font-size:13px;margin-bottom:18px;">${esc(state.employee.name)} &middot; ${esc(state.employee.employee_code)}</div>
+
+      <div class="tiles">
+        <div class="tile"><div class="n">₹${fmtMoney(myTotal)}</div><div class="l">Total claimed</div></div>
+        <div class="tile"><div class="n" style="color:${STATUS_COLORS.submitted}">${myByStatus.submitted}</div><div class="l">Pending approval</div></div>
+        <div class="tile"><div class="n" style="color:${STATUS_COLORS.settled}">${myByStatus.settled}</div><div class="l">Settled</div></div>
+      </div>
+
+      <div class="grid2" style="display:grid;grid-template-columns:0.8fr 1.2fr 1fr;gap:16px;">
+        <div class="card">
+          <h2 style="margin-bottom:12px;">My status</h2>
+          <div style="height:150px;"><canvas id="myStatusChart"></canvas></div>
+        </div>
+        <div class="card">
+          <h2 style="margin-bottom:14px;">My claims, last 6 months</h2>
+          <div style="height:150px;"><canvas id="myMonthlyChart"></canvas></div>
+        </div>
+        <div class="card">
+          <h2 style="margin-bottom:12px;">Recent activity</h2>
+          ${recent.length ? recent.map(c => `
+            <div style="display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--border);font-size:13px;">
+              <span>${esc(c.month)}</span>${statusBadge(c.status)}
+            </div>
+          `).join("") : `<div style="color:var(--low);font-size:12.5px;">No claims yet.</div>`}
+        </div>
+      </div>
+    `;
+
+    clearCharts();
+    const myStatusEntries = Object.entries(myByStatus).filter(([,v]) => v > 0);
+    if (myStatusEntries.length) {
+      activeCharts.push(new Chart(document.getElementById('myStatusChart'), {
+        type: 'doughnut',
+        data: { labels: myStatusEntries.map(([k])=>k.charAt(0).toUpperCase()+k.slice(1)), datasets: [{ data: myStatusEntries.map(([,v])=>v), backgroundColor: myStatusEntries.map(([k])=>STATUS_COLORS[k]), borderWidth: 0 }] },
+        options: { plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 11 } } } }, maintainAspectRatio: false }
+      }));
+    }
+    activeCharts.push(new Chart(document.getElementById('myMonthlyChart'), {
+      type: 'bar',
+      data: { labels: months.map(m=>m.label), datasets: [{ data: months.map(m=>m.amount), backgroundColor: '#2B4C4A', borderRadius: 4 }] },
+      options: { plugins: { legend: { display: false } }, maintainAspectRatio: false, scales: { y: { beginAtZero: true, ticks: { font: { size: 10 } } }, x: { ticks: { font: { size: 10 } } } } }
+    }));
+    return;
+  }
+
+  // ---- Manager roles (head / accounts / admin): role report only, no personal section ----
+  const { data: stats, error: statsErr } = await sb.rpc("get_dashboard_stats");
+  if (statsErr || !stats) {
+    main.innerHTML = `<div class="empty">Could not load dashboard: ${esc(statsErr ? statsErr.message : 'unknown error')}</div>`;
+    return;
+  }
+
+  const roleLabel = { admin: 'Firm Overview', accounts: 'Firm Overview', team: 'My Team Overview' }[stats.role] || 'Overview';
+  const roleSub = stats.role === 'team'
+    ? "Aggregate across the team(s) you head — individual claim detail stays restricted to who's already allowed to see it"
+    : "Aggregate across all teams — individual claim detail stays restricted to who's already allowed to see it";
+  const trendLabel = stats.role === 'team' ? 'My team' : 'Firm-wide';
+  const activityLabel = stats.role === 'team' ? ', my team' : ', firm-wide';
+
+  const byStatus = stats.by_status || {};
+  const amtByStatus = stats.amount_by_status || {};
+  const catTotals = stats.category_totals || {};
+  const breakdown = stats.employee_breakdown || [];
+
+  const adminTiles = stats.role === 'admin' ? `
+    <div class="tile"><div class="n">${stats.employee_count}</div><div class="l">Employees (${stats.linked_employee_count} linked)</div></div>
+    <div class="tile"><div class="n">${stats.team_count}</div><div class="l">Teams</div></div>
+  ` : "";
+
+  main.innerHTML = `
+    <h1 style="margin-bottom:4px;">${roleLabel}</h1>
+    <div style="color:var(--low);font-size:13px;margin-bottom:18px;">${roleSub}</div>
+
+    <div class="tiles">
+      <div class="tile"><div class="n">${stats.total_claims}</div><div class="l">Total claims</div></div>
+      <div class="tile"><div class="n" style="color:${STATUS_COLORS.submitted}">${byStatus.submitted||0}</div><div class="l">Awaiting approval &middot; ₹${fmtMoney(amtByStatus.submitted)}</div></div>
+      <div class="tile"><div class="n" style="color:${STATUS_COLORS.approved}">${byStatus.approved||0}</div><div class="l">Awaiting settlement &middot; ₹${fmtMoney(amtByStatus.approved)}</div></div>
+      <div class="tile"><div class="n" style="color:${STATUS_COLORS.settled}">${byStatus.settled||0}</div><div class="l">Settled &middot; ₹${fmtMoney(amtByStatus.settled)}</div></div>
+      <div class="tile"><div class="n" style="color:${STATUS_COLORS.draft}">${stats.rejected_count||0}</div><div class="l">Rejected (returned) &middot; ₹${fmtMoney(stats.rejected_amount)}</div></div>
+      ${adminTiles}
+    </div>
+
+    <div class="grid2" style="display:grid;grid-template-columns:0.8fr 1.2fr;gap:16px;margin-bottom:16px;">
+      <div class="card">
+        <h2 style="margin-bottom:12px;">Claims by status</h2>
+        <div style="height:180px;"><canvas id="ovStatusChart"></canvas></div>
+      </div>
+      <div class="card">
+        <h2 style="margin-bottom:12px;">Spend by category</h2>
+        <div style="height:180px;"><canvas id="ovCategoryChart"></canvas></div>
+      </div>
+    </div>
+
+    <div class="grid2" style="display:grid;grid-template-columns:1fr 1.4fr;gap:16px;margin-bottom:16px;">
+      <div class="card">
+        <h2 style="margin-bottom:12px;">${trendLabel}, last 6 months</h2>
+        <div style="height:160px;"><canvas id="ovMonthlyChart"></canvas></div>
+      </div>
+      <div class="card">
+        <h2 style="margin-bottom:12px;">By person${activityLabel}</h2>
+        <table>
+          <thead><tr><th>Name</th><th>Pending</th><th>Approved</th><th>Settled</th><th>Total</th></tr></thead>
+          <tbody>
+            ${breakdown.map(t => `
+              <tr class="readonly">
+                <td>${esc(t.name)} <span class="mono" style="color:var(--low);font-size:10.5px;">${esc(t.employee_code)}</span></td>
+                <td>${t.pending_count}</td><td>${t.approved_count}</td><td>${t.settled_count}</td>
+                <td class="mono" style="font-weight:600;">₹${fmtMoney(t.total_amount)}</td>
+              </tr>
+            `).join("") || `<tr><td colspan="5" class="empty">No data yet.</td></tr>`}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2 style="margin-bottom:12px;">Recent activity${activityLabel}</h2>
+      ${(stats.recent_activity||[]).slice(0,5).map(r => `
+        <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border);font-size:12.5px;">
+          <span>${esc(r.name)} &middot; ${esc(r.month)}</span>${statusBadge(r.status)}
+        </div>
+      `).join("") || `<div class="empty">No activity yet.</div>`}
+    </div>
+  `;
+
+  clearCharts();
+  const statusEntries = Object.entries(byStatus).filter(([,v]) => v > 0);
+  if (statusEntries.length) {
+    activeCharts.push(new Chart(document.getElementById('ovStatusChart'), {
+      type: 'doughnut',
+      data: { labels: statusEntries.map(([k])=>k.charAt(0).toUpperCase()+k.slice(1)), datasets: [{ data: statusEntries.map(([,v])=>v), backgroundColor: statusEntries.map(([k])=>STATUS_COLORS[k]), borderWidth: 0 }] },
+      options: { plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 11 } } } }, maintainAspectRatio: false }
+    }));
+  }
+  const catEntries = Object.entries(catTotals);
+  if (catEntries.length) {
+    activeCharts.push(new Chart(document.getElementById('ovCategoryChart'), {
+      type: 'bar',
+      data: { labels: catEntries.map(([k])=>CATEGORY_LABELS[k]||k), datasets: [{ data: catEntries.map(([,v])=>v), backgroundColor: catEntries.map(([k])=>CATEGORY_COLORS[k]||'#8A93A6'), borderRadius: 4 }] },
+      options: { indexAxis: 'y', plugins: { legend: { display: false } }, maintainAspectRatio: false, scales: { x: { beginAtZero: true, ticks: { font: { size: 10 } } }, y: { ticks: { font: { size: 11 } } } } }
+    }));
+  }
+  const monthly = (stats.monthly_totals || []).slice().reverse();
+  activeCharts.push(new Chart(document.getElementById('ovMonthlyChart'), {
+    type: 'bar',
+    data: { labels: monthly.map(m=>m.month), datasets: [{ data: monthly.map(m=>Number(m.total)), backgroundColor: '#5B8DEF', borderRadius: 4 }] },
+    options: { plugins: { legend: { display: false } }, maintainAspectRatio: false, scales: { y: { beginAtZero: true, ticks: { font: { size: 10 } } }, x: { ticks: { font: { size: 10 } } } } }
+  }));
+}
+
+/* ================= MY CLAIMS ================= */
+async function renderClaimsList() {
+  const main = document.getElementById("main");
+  const { data: claims } = await sb.from("claims").select("*").eq("employee_id", state.employee.employee_id).order("month", { ascending: false });
+  const totals = await totalsFor((claims || []).map(c => c.claim_id));
+
+  main.innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px;">
+      <h1>${(state.isHead||state.isAccounts||state.isAdmin) ? 'My Own Expenses' : 'My Claims'}</h1>
+      <button class="btn" onclick="newClaim()">New Claim</button>
+    </div>
+    <div class="row-list">
+      ${(claims && claims.length) ? claims.map(c => `
+        <a class="row-item" href="#" onclick="setView('claimDetail','${c.claim_id}');return false;">
+          <div class="name">${esc(c.month)}</div>
+          <div class="meta mono">₹${fmtMoney(totals[c.claim_id] || 0)}</div>
+          ${statusBadge(c.status)}
+        </a>
+      `).join("") : `<div class="empty">No claims yet. Click "New Claim" to start this month's.</div>`}
+    </div>
+  `;
+}
+
+async function totalsFor(claimIds) {
+  if (!claimIds.length) return {};
+  const { data: lines } = await sb.from("claim_lines").select("claim_id, amount").in("claim_id", claimIds);
+  const totals = {};
+  (lines || []).forEach(l => { totals[l.claim_id] = (totals[l.claim_id] || 0) + Number(l.amount); });
+  return totals;
+}
+
+async function newClaim() {
+  const month = new Date().toISOString().slice(0, 7);
+  const { data, error } = await sb.from("claims").insert({ employee_id: state.employee.employee_id, month }).select().single();
+  if (error) {
+    if (error.code === "23505") {
+      const { data: existing } = await sb.from("claims").select("claim_id, status").eq("employee_id", state.employee.employee_id).eq("month", month).single();
+      if (existing) {
+        alert(`You already have a ${month} claim (status: ${existing.status}). Opening it instead of starting a new one — only one claim per month is allowed. ${existing.status !== 'draft' ? "It's no longer editable since it has moved past Draft." : ""}`);
+        setView("claimDetail", existing.claim_id);
+        return;
+      }
+    }
+    alert("Could not create claim: " + error.message);
+    return;
+  }
+  setView("claimDetail", data.claim_id);
+}
+
+/* ================= CLAIM DETAIL (employee) ================= */
+async function renderClaimDetail() {
+  const main = document.getElementById("main");
+  const { data: claim } = await sb.from("claims").select("*").eq("claim_id", state.claimId).single();
+  const { data: lines } = await sb.from("claim_lines").select("*").eq("claim_id", state.claimId).order("expense_date");
+  const total = (lines || []).reduce((s, l) => s + Number(l.amount), 0);
+  const editable = claim.status === "draft";
+
+  main.innerHTML = `
+    <a href="#" onclick="setView('claims');return false;" style="font-size:12.5px;color:var(--low);">&larr; All claims</a>
+    <div style="display:flex;justify-content:space-between;align-items:baseline;margin:10px 0 18px;">
+      <div><h1>${esc(claim.month)}</h1><div style="color:var(--low);font-size:13px;">${statusBadge(claim.status)} &middot; Total ₹${fmtMoney(total)}</div></div>
+      <div>
+        ${editable ? `<input type="file" id="excelFile" accept=".xlsx,.xls" style="display:none" onchange="handleExcelUpload(this)">
+          <button class="btn secondary" onclick="document.getElementById('excelFile').click()">Upload Excel</button>` : ""}
+      </div>
+    </div>
+    ${claim.rejection_reason ? `<div class="msg error">Returned: ${esc(claim.rejection_reason)}</div>` : ""}
+    <div class="card">
+      <table>
+        <thead><tr><th>Date</th><th>Category</th><th>Client</th><th>From</th><th>To</th><th>Mode</th><th>Amount</th><th>Other label</th><th>Description</th>${editable ? "<th></th>" : ""}</tr></thead>
+        <tbody>
+          ${(lines || []).map(l => renderLineRow(l, editable)).join("")}
+        </tbody>
+      </table>
+      ${editable ? `<div class="btn-row"><button class="btn secondary" onclick="addBlankRow()">+ Add row</button><button class="btn secondary" onclick="copyPreviousRow()">Copy previous row</button></div>` : ""}
+    </div>
+    <div class="btn-row">
+      ${claim.status === "draft" ? `<button class="btn" onclick="doSubmitClaim()">Submit</button>` : ""}
+      ${claim.status === "submitted" ? `<button class="btn secondary" onclick="doWithdrawClaim()">Withdraw</button>` : ""}
+      ${claim.status === "settled" ? `<div class="msg info">Settled. Payment reference: ${esc(claim.payment_reference || "—")}</div>` : ""}
+    </div>
+  `;
+}
+
+function renderLineRow(l, editable) {
+  const needsReceipt = RECEIPT_CATEGORIES.includes(l.category);
+  if (!editable) {
+    return `<tr class="readonly">
+      <td>${esc(l.expense_date)}</td><td>${esc(CATEGORY_LABELS[l.category] || l.category)}</td>
+      <td>${esc(l.client_code)}</td><td>${esc(l.from_location)}</td><td>${esc(l.to_location)}</td>
+      <td>${esc(l.mode_of_transport)}</td><td class="mono">${fmtMoney(l.amount)}</td>
+      <td>${esc(l.other_label)}</td><td>${esc(l.description)}${l.rejection_flag ? `<br><span class="badge b-high">Flagged: ${esc(l.rejection_note||"")}</span>` : ""}</td>
+    </tr>`;
+  }
+  return `<tr data-line-id="${l.line_id}">
+    <td><input type="date" value="${esc(l.expense_date)}" onchange="updateLine('${l.line_id}','expense_date',this.value)"></td>
+    <td><select onchange="updateLine('${l.line_id}','category',this.value)">
+      ${Object.entries(CATEGORY_LABELS).map(([v,label]) => `<option value="${v}" ${l.category===v?"selected":""}>${label}</option>`).join("")}
+    </select></td>
+    <td><input value="${esc(l.client_code)}" placeholder="GMJ" onchange="updateLine('${l.line_id}','client_code',this.value)"></td>
+    <td><input value="${esc(l.from_location)}" onchange="updateLine('${l.line_id}','from_location',this.value)"></td>
+    <td><input value="${esc(l.to_location)}" onchange="updateLine('${l.line_id}','to_location',this.value)"></td>
+    <td><input value="${esc(l.mode_of_transport)}" onchange="updateLine('${l.line_id}','mode_of_transport',this.value)"></td>
+    <td><input type="number" step="0.01" value="${l.amount}" onchange="updateLine('${l.line_id}','amount',this.value)"></td>
+    <td><input value="${esc(l.other_label)}" onchange="updateLine('${l.line_id}','other_label',this.value)"></td>
+    <td><input value="${esc(l.description)}" onchange="updateLine('${l.line_id}','description',this.value)">
+      ${needsReceipt ? `<input type="file" style="margin-top:4px;font-size:10px;" onchange="uploadReceipt('${l.line_id}', this)">` : ""}
+    </td>
+    <td><button class="btn danger" style="padding:5px 9px;font-size:11px;" onclick="deleteLine('${l.line_id}')">×</button></td>
+  </tr>`;
+}
+
+async function addBlankRow() {
+  await sb.from("claim_lines").insert({ claim_id: state.claimId, expense_date: new Date().toISOString().slice(0,10), category: "conveyance", client_code: "GMJ", amount: 1 });
+  renderClaimDetail();
+}
+async function copyPreviousRow() {
+  const { data: lines } = await sb.from("claim_lines").select("*").eq("claim_id", state.claimId).order("created_at", { ascending: false }).limit(1);
+  const last = (lines || [])[0];
+  await sb.from("claim_lines").insert({
+    claim_id: state.claimId, expense_date: new Date().toISOString().slice(0,10),
+    category: last ? last.category : "conveyance", client_code: last ? last.client_code : "GMJ",
+    from_location: last?.from_location, to_location: last?.to_location, mode_of_transport: last?.mode_of_transport,
+    amount: 1,
+  });
+  renderClaimDetail();
+}
+async function updateLine(lineId, field, value) {
+  const payload = {}; payload[field] = field === "amount" ? Number(value) : value;
+  const { error } = await sb.from("claim_lines").update(payload).eq("line_id", lineId);
+  if (error) { alert("Could not save: " + error.message); renderClaimDetail(); }
+}
+async function deleteLine(lineId) { await sb.from("claim_lines").delete().eq("line_id", lineId); renderClaimDetail(); }
+
+async function uploadReceipt(lineId, input) {
+  const file = input.files[0]; if (!file) return;
+  const path = `${state.claimId}/${lineId}-${file.name}`;
+  const { error } = await sb.storage.from("receipts").upload(path, file, { upsert: true });
+  if (error) { alert("Upload failed: " + error.message); return; }
+  await sb.from("claim_lines").update({ receipt_file_ref: path }).eq("line_id", lineId);
+}
+
+async function handleExcelUpload(input) {
+  const file = input.files[0]; if (!file) return;
+  const buf = await file.arrayBuffer();
+  const wb = XLSX.read(buf, { type: "array" });
+  const sheet = wb.Sheets["Expense Entry"] || wb.Sheets[wb.SheetNames[0]];
+  const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, raw: false });
+  const dataRows = rows.slice(1).filter(r => r && r[0]);
+  const catMap = { "conveyance": "conveyance", "out-of-station travel": "out_of_station", "boarding & lodging": "boarding_lodging", "other": "other" };
+  for (const r of dataRows) {
+    const [date, category, client, from, to, mode, amount, otherLabel, description] = r;
+    if (!amount) continue;
+    await sb.from("claim_lines").insert({
+      claim_id: state.claimId,
+      expense_date: parseExcelDate(date),
+      category: catMap[String(category).toLowerCase().trim()] || "other",
+      client_code: client || "GMJ", from_location: from, to_location: to, mode_of_transport: mode,
+      amount: Number(amount), other_label: otherLabel, description: description,
+    });
+  }
+  renderClaimDetail();
+}
+function parseExcelDate(v) {
+  const d = new Date(v);
+  if (!isNaN(d)) return d.toISOString().slice(0,10);
+  return new Date().toISOString().slice(0,10);
+}
+
+async function doSubmitClaim() {
+  const { error } = await sb.rpc("submit_claim", { p_claim_id: state.claimId });
+  if (error) { alert(error.message); return; }
+  renderClaimDetail();
+}
+async function doWithdrawClaim() {
+  const { error } = await sb.rpc("withdraw_claim", { p_claim_id: state.claimId });
+  if (error) { alert(error.message); return; }
+  renderClaimDetail();
+}
+
+/* ================= APPROVALS (team head) ================= */
+async function renderApprovals() {
+  const main = document.getElementById("main");
+  const { data: claims } = await sb.from("claims").select("*, employees!claims_employee_id_fkey(name)").eq("status", "submitted").order("submitted_at");
+  main.innerHTML = `
+    <h1 style="margin-bottom:18px;">Approvals</h1>
+    <div class="row-list">
+      ${(claims && claims.length) ? claims.map(c => `
+        <a class="row-item" href="#" onclick="setView('approvalDetail','${c.claim_id}');return false;">
+          <div class="name">${esc(c.employees.name)}</div>
+          <div class="meta">${esc(c.month)}</div>
+        </a>
+      `).join("") : `<div class="empty">Nothing awaiting your approval.</div>`}
+    </div>
+  `;
+}
+
+async function renderApprovalDetail() {
+  const main = document.getElementById("main");
+  const { data: claim } = await sb.from("claims").select("*, employees!claims_employee_id_fkey(name)").eq("claim_id", state.claimId).single();
+  const { data: lines } = await sb.from("claim_lines").select("*").eq("claim_id", state.claimId).order("expense_date");
+  const total = (lines || []).reduce((s, l) => s + Number(l.amount), 0);
+
+  main.innerHTML = `
+    <a href="#" onclick="setView('approvals');return false;" style="font-size:12.5px;color:var(--low);">&larr; All approvals</a>
+    <h1 style="margin:10px 0 4px;">${esc(claim.employees.name)} — ${esc(claim.month)}</h1>
+    <div style="color:var(--low);font-size:13px;margin-bottom:18px;">Total ₹${fmtMoney(total)}</div>
+    <div class="card">
+      <table>
+        <thead><tr><th></th><th>Date</th><th>Category</th><th>Client</th><th>Amount</th><th>Description</th></tr></thead>
+        <tbody>
+          ${(lines || []).map(l => `
+            <tr>
+              <td><input type="checkbox" class="flagbox" data-line="${l.line_id}"></td>
+              <td>${esc(l.expense_date)}</td><td>${esc(CATEGORY_LABELS[l.category]||l.category)}</td>
+              <td>${esc(l.client_code)}</td><td class="mono">${fmtMoney(l.amount)}</td><td>${esc(l.description)}</td>
+            </tr>
+          `).join("")}
+        </tbody>
+      </table>
+    </div>
+    <div class="field" style="margin-top:14px;"><label>Reason (required if rejecting)</label><textarea id="rejectReason" rows="2" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:7px;"></textarea></div>
+    <div class="btn-row">
+      <button class="btn" onclick="doApprove()">Approve</button>
+      <button class="btn danger" onclick="doReject()">Reject</button>
+    </div>
+  `;
+}
+
+async function doApprove() {
+  const { error } = await sb.rpc("approve_claim", { p_claim_id: state.claimId });
+  if (error) { alert(error.message); return; }
+  setView("approvals");
+}
+async function doReject() {
+  const reason = document.getElementById("rejectReason").value.trim();
+  if (!reason) { alert("A reason is required to reject."); return; }
+  const flagged = Array.from(document.querySelectorAll(".flagbox:checked")).map(el => el.dataset.line);
+  for (const lineId of flagged) {
+    await sb.from("claim_lines").update({ rejection_flag: true, rejection_note: reason }).eq("line_id", lineId);
+  }
+  const { error } = await sb.rpc("reject_claim", { p_claim_id: state.claimId, p_reason: reason });
+  if (error) { alert(error.message); return; }
+  setView("approvals");
+}
+
+/* ================= SETTLEMENT (accounts) ================= */
+async function renderSettlement() {
+  const main = document.getElementById("main");
+  const { data: claims } = await sb.from("claims").select("*, employees!claims_employee_id_fkey(name)").eq("status", "approved").order("approved_at");
+  main.innerHTML = `
+    <h1 style="margin-bottom:18px;">Settlement</h1>
+    <div class="row-list">
+      ${(claims && claims.length) ? claims.map(c => `
+        <a class="row-item" href="#" onclick="setView('settlementDetail','${c.claim_id}');return false;">
+          <div class="name">${esc(c.employees.name)}</div>
+          <div class="meta">${esc(c.month)}</div>
+        </a>
+      `).join("") : `<div class="empty">Nothing awaiting settlement.</div>`}
+    </div>
+  `;
+}
+
+async function renderSettlementDetail() {
+  const main = document.getElementById("main");
+  const { data: claim } = await sb.from("claims").select("*, employees!claims_employee_id_fkey(name)").eq("claim_id", state.claimId).single();
+  const { data: lines } = await sb.from("claim_lines").select("*").eq("claim_id", state.claimId).order("expense_date");
+  const { data: openUnlock } = await sb.from("unlock_log").select("*").eq("claim_id", state.claimId).is("relocked_at", null).maybeSingle();
+  const total = (lines || []).reduce((s, l) => s + Number(l.amount), 0);
+  const unlocked = !!openUnlock;
+
+  main.innerHTML = `
+    <a href="#" onclick="setView('settlement');return false;" style="font-size:12.5px;color:var(--low);">&larr; All settlements</a>
+    <h1 style="margin:10px 0 4px;">${esc(claim.employees.name)} — ${esc(claim.month)}</h1>
+    <div style="color:var(--low);font-size:13px;margin-bottom:18px;">Total ₹${fmtMoney(total)}</div>
+    ${unlocked ? `<div class="msg info">Unlocked for correction. Reason: ${esc(openUnlock.reason)}</div>` : ""}
+    <div class="card">
+      <table>
+        <thead><tr><th>Date</th><th>Category</th><th>Client</th><th>Amount</th><th>Description</th></tr></thead>
+        <tbody>
+          ${(lines || []).map(l => unlocked ? renderLineRow(l, true) : `
+            <tr class="readonly"><td>${esc(l.expense_date)}</td><td>${esc(CATEGORY_LABELS[l.category]||l.category)}</td>
+              <td>${esc(l.client_code)}</td><td class="mono">${fmtMoney(l.amount)}</td><td>${esc(l.description)}</td></tr>
+          `).join("")}
+        </tbody>
+      </table>
+    </div>
+    <div class="btn-row">
+      ${!unlocked ? `<button class="btn" onclick="doSettle()">Settle</button>
+        <button class="btn secondary" onclick="doUnlock()">Request unlock</button>` : `
+        <button class="btn secondary" onclick="doRelock()">Relock</button>`}
+    </div>
+  `;
+}
+
+async function doSettle() {
+  const ref = prompt("Payment reference:");
+  if (!ref) return;
+  const { error } = await sb.rpc("settle_claim", { p_claim_id: state.claimId, p_payment_reference: ref });
+  if (error) { alert(error.message); return; }
+  setView("settlement");
+}
+async function doUnlock() {
+  const reason = prompt("Reason for unlocking:");
+  if (!reason) return;
+  const { error } = await sb.rpc("unlock_claim", { p_claim_id: state.claimId, p_reason: reason });
+  if (error) { alert(error.message); return; }
+  renderView();
+}
+async function doRelock() {
+  const { error } = await sb.rpc("relock_claim", { p_claim_id: state.claimId });
+  if (error) { alert(error.message); return; }
+  setView("settlement");
+}
+
+/* ================= ADMIN ================= */
+async function renderAdmin() {
+  const main = document.getElementById("main");
+  const { data: teams } = await sb.from("teams").select("*").order("team_name");
+  const { data: employees } = await sb.from("employees").select("*").order("name");
+
+  main.innerHTML = `
+    <h1 style="margin-bottom:18px;">Admin</h1>
+
+    <div class="grid2" style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px;">
+      <div class="card">
+        <h2 style="margin-bottom:12px;">New team</h2>
+        <div class="field"><label>Team name</label><input id="adm_team_name" placeholder="e.g. Audit &amp; Assurance"></div>
+        <button class="btn" onclick="adminCreateTeam()">Create team</button>
+      </div>
+      <div class="card">
+        <h2 style="margin-bottom:12px;">New employee</h2>
+        <div class="field"><label>Employee code</label><input id="adm_emp_code" placeholder="e.g. EMP-014"></div>
+        <div class="field"><label>Name</label><input id="adm_emp_name"></div>
+        <div class="field"><label>Designation</label>
+          <select id="adm_emp_designation" style="width:100%;padding:9px 10px;border:1px solid var(--border);border-radius:7px;">
+            <option value="article">Article</option><option value="qualified">Qualified</option><option value="staff">Staff</option>
+          </select>
+        </div>
+        <div class="field"><label>Team</label>
+          <select id="adm_emp_team" style="width:100%;padding:9px 10px;border:1px solid var(--border);border-radius:7px;">
+            <option value="">— none —</option>
+            ${(teams||[]).map(t=>`<option value="${t.team_id}">${esc(t.team_name)}</option>`).join("")}
+          </select>
+        </div>
+        <div class="field"><label><input type="checkbox" id="adm_emp_accounts"> Accounts role</label></div>
+        <div class="field"><label><input type="checkbox" id="adm_emp_admin"> Admin role</label></div>
+        <button class="btn" onclick="adminCreateEmployee()">Create employee</button>
+      </div>
+    </div>
+
+    <div class="card" style="margin-bottom:20px;">
+      <h2 style="margin-bottom:12px;">Link a login</h2>
+      <div style="color:var(--low);font-size:12.5px;margin-bottom:10px;">
+        First create the person's login in Supabase Dashboard &rarr; Authentication &rarr; Add user
+        (check "Auto Confirm User"). Then link it here by email — no UUID needed.
+      </div>
+      <div style="display:flex;gap:10px;align-items:flex-end;">
+        <div class="field" style="flex:1;margin-bottom:0;"><label>Employee code</label><input id="adm_link_code" placeholder="e.g. EMP-014"></div>
+        <div class="field" style="flex:1;margin-bottom:0;"><label>Login email</label><input id="adm_link_email" type="email"></div>
+        <button class="btn" onclick="adminLinkLogin()">Link</button>
+      </div>
+      <div id="adm_link_msg"></div>
+    </div>
+
+    <div class="card">
+      <h2 style="margin-bottom:12px;">Employees</h2>
+      <table>
+        <thead><tr><th>Code</th><th>Name</th><th>Team</th><th>Roles</th><th>Login</th></tr></thead>
+        <tbody>
+          ${(employees||[]).map(e => {
+            const team = (teams||[]).find(t=>t.team_id===e.team_id);
+            const roles = [e.is_accounts?"Accounts":null, e.is_admin?"Admin":null].filter(Boolean).join(", ") || "—";
+            return `<tr class="readonly">
+              <td class="mono">${esc(e.employee_code)}</td><td>${esc(e.name)}</td>
+              <td>${team?esc(team.team_name):"—"}</td><td>${roles}</td>
+              <td>${e.auth_user_id ? `<span class="badge b-settled">Linked</span>` : `<span class="badge b-submitted">Not linked</span>`}</td>
+            </tr>`;
+          }).join("")}
+        </tbody>
+      </table>
+    </div>
+  `;
+}
+
+async function adminCreateTeam() {
+  const team_name = document.getElementById("adm_team_name").value.trim();
+  if (!team_name) return;
+  const { error } = await sb.from("teams").insert({ team_name });
+  if (error) { alert(error.message); return; }
+  renderAdmin();
+}
+
+async function adminCreateEmployee() {
+  const employee_code = document.getElementById("adm_emp_code").value.trim();
+  const name = document.getElementById("adm_emp_name").value.trim();
+  const designation = document.getElementById("adm_emp_designation").value;
+  const team_id = document.getElementById("adm_emp_team").value || null;
+  const is_accounts = document.getElementById("adm_emp_accounts").checked;
+  const is_admin = document.getElementById("adm_emp_admin").checked;
+  if (!employee_code || !name) { alert("Employee code and name are required."); return; }
+  const { error } = await sb.from("employees").insert({ employee_code, name, designation, team_id, is_accounts, is_admin });
+  if (error) { alert(error.message); return; }
+  renderAdmin();
+}
+
+async function adminLinkLogin() {
+  const code = document.getElementById("adm_link_code").value.trim();
+  const email = document.getElementById("adm_link_email").value.trim();
+  const msgEl = document.getElementById("adm_link_msg");
+  const { error } = await sb.rpc("link_employee_by_email", { p_employee_code: code, p_email: email });
+  if (error) { msgEl.innerHTML = `<div class="msg error">${esc(error.message)}</div>`; return; }
+  msgEl.innerHTML = `<div class="msg info">Linked successfully.</div>`;
+  setTimeout(renderAdmin, 800);
+}
+
+boot();
+</script>
+</body>
+</html>
