@@ -1,0 +1,324 @@
+{
+  "name": "NRI Advisory First-Response Grounded Orchestrator",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "nri-advisory",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "node-webhook-in",
+      "name": "Webhook Ingest",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [100, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// 1. Validate incoming payload\nconst body = $input.item.json.body || $input.item.json;\nconst question = (body.question || '').trim();\nconst sessionId = body.session_id || 'sess_' + Date.now();\nconst channel = body.channel || 'pwa';\n\nif (!question) {\n  throw new Error('Missing parameter: question is required');\n}\n\n// 2. Check for Prompt Injection\nconst injectionRegex = /ignore\\s+(previous|prior|above|all)\\s+(instructions|rules|prompts|guidelines)|disregard\\s+the\\s+(database|rules)|tell\\s+me\\s+what\\s+the\\s+tax\\s+law\\s+really\\s+is/i;\nconst isInjection = injectionRegex.test(question);\n\nreturn {\n  json: {\n    sessionId,\n    question,\n    channel,\n    isInjection,\n    timestamp: new Date().toISOString()\n  }\n};"
+      },
+      "id": "node-validate-request",
+      "name": "Validate & Detect Injection",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [320, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ $json.isInjection }}",
+              "value2": true
+            }
+          ]
+        }
+      },
+      "id": "node-if-injection",
+      "name": "Is Injection?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [540, 300]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\n  \"answer\": \"I cannot comply with requests to ignore or bypass verified advisory guidelines and the authoritative database.\\n\\nConsult your CA for a case-specific position.\",\n  \"sources\": [],\n  \"topic\": \"Security / Compliance Refusal\",\n  \"matched_faq_ids\": [],\n  \"out_of_scope\": true,\n  \"escalation_required\": true,\n  \"disclaimer\": \"Consult your CA for a case-specific position.\"\n}",
+        "options": {}
+      },
+      "id": "node-respond-injection",
+      "name": "Reject Injection",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [780, 160]
+    },
+    {
+      "parameters": {
+        "operation": "readRows",
+        "authentication": "serviceAccount",
+        "documentId": {
+          "__rl": true,
+          "value": "={{ $env.GOOGLE_SHEET_DATABASE_ID || 'AUTHORITATIVE_NRI_FAQ_SHEET' }}",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "FAQ_KNOWLEDGE_BASE",
+          "mode": "name"
+        },
+        "options": {}
+      },
+      "id": "node-gsheets-search",
+      "name": "Search Google Sheet KB",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4,
+      "position": [780, 420]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Calculate vector cosine similarity and fuzzy string matching\nconst question = $('Validate & Detect Injection').first().json.question.toLowerCase().trim();\nconst allRows = $input.all().map(item => item.json);\n\nfunction calculateCosineSimilarity(str1, str2) {\n  const stopWords = new Set(['is', 'a', 'the', 'am', 'i', 'to', 'for', 'in', 'of', 'on', 'at', 'what', 'how', 'check', 'if', 'my', 'are', 'you', 'we', 'they', 'he', 'she', 'it', 'and', 'or', 'but', 'can', 'do', 'does', 'did', 'about', 'with', 'by']);\n  const getTokens = (text) => text.toLowerCase().replace(/[.,\\/#!$%\\^&\\*;:{}=\\-_`~()?]/g, '').split(/\\s+/).filter(t => t.length > 2 && !stopWords.has(t));\n  const tokens1 = getTokens(str1);\n  const tokens2 = getTokens(str2);\n  if (tokens1.length === 0 || tokens2.length === 0) return 0;\n  const map1 = {}, map2 = {};\n  tokens1.forEach(t => map1[t] = (map1[t] || 0) + 1);\n  tokens2.forEach(t => map2[t] = (map2[t] || 0) + 1);\n  let dotProduct = 0;\n  const allWords = new Set([...Object.keys(map1), ...Object.keys(map2)]);\n  for (const word of allWords) {\n    if (map1[word] && map2[word]) dotProduct += map1[word] * map2[word];\n  }\n  const mag1 = Math.sqrt(Object.values(map1).reduce((s, v) => s + v * v, 0));\n  const mag2 = Math.sqrt(Object.values(map2).reduce((s, v) => s + v * v, 0));\n  if (mag1 === 0 || mag2 === 0) return 0;\n  return dotProduct / (mag1 * mag2);\n}\n\nfunction calculateFuzzySimilarity(q, target) {\n  if (!q || !target) return 0;\n  q = q.toLowerCase().trim();\n  target = target.toLowerCase().trim();\n  if (q === target) return 100;\n  if (target.includes(q) || q.includes(target)) return 85;\n  const cosine = calculateCosineSimilarity(q, target);\n  return Math.round(cosine * 100);\n}\n\nconst scoredRows = allRows.map(row => {\n  const rowQ = row.user_question || '';\n  const variations = (row.question_variations || '').split('|');\n  const keywords = (row.keywords || '').split(',');\n  const candidates = [rowQ, ...variations, keywords.join(' '), row.category || ''];\n  \n  let bestScore = 0;\n  for (const c of candidates) {\n    const s = calculateFuzzySimilarity(question, c);\n    if (s > bestScore) bestScore = s;\n  }\n  return { row, score: bestScore };\n});\n\nscoredRows.sort((a, b) => b.score - a.score);\n\n// Enforce strict 70% (0.70) similarity threshold requirement\nconst SIMILARITY_THRESHOLD = 70;\nconst validMatches = scoredRows.filter(r => r.score >= SIMILARITY_THRESHOLD).map(r => r.row);\nconst topScore = scoredRows[0]?.score || 0;\nconst isOutOfScope = validMatches.length === 0 || topScore < SIMILARITY_THRESHOLD;\n\nreturn {\n  json: {\n    question: $('Validate & Detect Injection').first().json.question,\n    sessionId: $('Validate & Detect Injection').first().json.sessionId,\n    channel: $('Validate & Detect Injection').first().json.channel,\n    matches: validMatches.slice(0, 3),\n    confidence: isOutOfScope ? 0 : Math.min(1.0, topScore / 100),\n    isOutOfScope\n  }\n};"
+      },
+      "id": "node-rank-matches",
+      "name": "Rank & Filter Matches",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1000, 420]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ $json.isOutOfScope }}",
+              "value2": true
+            }
+          ]
+        }
+      },
+      "id": "node-if-out-of-scope",
+      "name": "Is Out of Scope?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [1220, 420]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\n  \"answer\": \"I don't currently have this query covered in my verified NRI advisory knowledge base.\\n\\nFor assistance with this specific matter, please get in touch with me at:\\n\\ncanamratad.ai@gmail.com\\n\\nConsult your CA for a case-specific position.\",\n  \"sources\": [],\n  \"topic\": \"Out of Scope Query\",\n  \"matched_faq_ids\": [],\n  \"out_of_scope\": true,\n  \"escalation_required\": true,\n  \"disclaimer\": \"Consult your CA for a case-specific position.\"\n}",
+        "options": {}
+      },
+      "id": "node-respond-out-of-scope",
+      "name": "Return Out of Scope",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [1460, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-goog-api-key",
+              "value": "={{ $env.GEMINI_API_KEY }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "User-Agent",
+              "value": "aistudio-build"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"systemInstruction\": {\n    \"parts\": [{\n      \"text\": \"You are an NRI tax and FEMA first-response information assistant. Provide source-grounded answers based strictly on retrieved records. Never invent provisions. End with: 'Consult your CA for a case-specific position.'\"\n    }]\n  },\n  \"contents\": [{\n    \"parts\": [{\n      \"text\": \"Question: \" + $json.question + \"\\nVerified Records: \" + JSON.stringify($json.matches)\n    }]\n  }],\n  \"generationConfig\": {\n    \"temperature\": 0.1\n  }\n}",
+        "options": {}
+      },
+      "id": "node-call-gemini",
+      "name": "Call Gemini API",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [1460, 540]
+    },
+    {
+      "parameters": {
+        "jsCode": "const geminiText = $input.item.json.candidates?.[0]?.content?.parts?.[0]?.text || '';\nconst matches = $('Rank & Filter Matches').first().json.matches || [];\nconst primary = matches[0] || {};\n\nconst disclaimer = 'Consult your CA for a case-specific position.';\nlet finalAnswer = geminiText.trim();\nif (!finalAnswer.includes(disclaimer)) {\n  finalAnswer += '\\n\\n' + disclaimer;\n}\n\nconst sources = matches.map(m => ({\n  provision: m.act_or_regulation + ' - ' + m.section_rule_regulation,\n  authority: m.source_authority,\n  source: m.source_type,\n  url: m.source_url,\n  applicable_period: m.relevant_FY,\n  excerpt: m.source_excerpt_or_summary\n}));\n\nreturn {\n  json: {\n    answer: finalAnswer,\n    sources,\n    topic: primary.category || 'General NRI Advisory',\n    matched_faq_ids: matches.map(m => m.faq_id),\n    out_of_scope: false,\n    escalation_required: primary.professional_review_required === 'YES',\n    disclaimer\n  }\n};"
+      },
+      "id": "node-post-validate",
+      "name": "Validate & Format Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1700, 540]
+    },
+    {
+      "parameters": {
+        "operation": "appendRow",
+        "authentication": "serviceAccount",
+        "documentId": {
+          "__rl": true,
+          "value": "={{ $env.GOOGLE_SHEET_DATABASE_ID || 'AUTHORITATIVE_NRI_FAQ_SHEET' }}",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "CHAT_LOG",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "timestamp": "={{ new Date().toISOString() }}",
+            "session_id": "={{ $('Validate & Detect Injection').first().json.sessionId }}",
+            "channel": "={{ $('Validate & Detect Injection').first().json.channel }}",
+            "user_question": "={{ $('Validate & Detect Injection').first().json.question }}",
+            "detected_topic": "={{ $json.topic }}",
+            "matched_faq_ids": "={{ $json.matched_faq_ids.join(',') }}",
+            "confidence": 0.95,
+            "out_of_scope": false,
+            "escalation_required": "={{ $json.escalation_required }}",
+            "response_status": "SUCCESS"
+          }
+        },
+        "options": {}
+      },
+      "id": "node-log-chat",
+      "name": "Log to Google Sheets",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4,
+      "position": [1920, 540]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $('Validate & Format Response').first().json }}",
+        "options": {}
+      },
+      "id": "node-respond-success",
+      "name": "Return Grounded Answer",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [2140, 540]
+    }
+  ],
+  "connections": {
+    "Webhook Ingest": {
+      "main": [
+        [
+          {
+            "node": "Validate & Detect Injection",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate & Detect Injection": {
+      "main": [
+        [
+          {
+            "node": "Is Injection?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Injection?": {
+      "main": [
+        [
+          {
+            "node": "Reject Injection",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Search Google Sheet KB",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Search Google Sheet KB": {
+      "main": [
+        [
+          {
+            "node": "Rank & Filter Matches",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Rank & Filter Matches": {
+      "main": [
+        [
+          {
+            "node": "Is Out of Scope?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Out of Scope?": {
+      "main": [
+        [
+          {
+            "node": "Return Out of Scope",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Call Gemini API",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call Gemini API": {
+      "main": [
+        [
+          {
+            "node": "Validate & Format Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate & Format Response": {
+      "main": [
+        [
+          {
+            "node": "Log to Google Sheets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log to Google Sheets": {
+      "main": [
+        [
+          {
+            "node": "Return Grounded Answer",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}
