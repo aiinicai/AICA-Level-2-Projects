@@ -1,0 +1,1113 @@
+/**
+ * ============================================================================
+ * DEVELOPMENT & UAT BENCHMARK DATASET ONLY
+ * ============================================================================
+ * This dataset contains reference baseline records used strictly for isolated
+ * unit testing, control algorithm validation, and developer benchmarking.
+ *
+ * ZERO PRODUCTION EXECUTION PATH:
+ * There is NO production execution path from application startup, Google login,
+ * Firestore initialization, dashboard rendering, or the Agentic CFO Financial
+ * Review to this file. Production workspaces begin completely empty until
+ * real hospital extracts are uploaded and confirmed by an authenticated user.
+ * ============================================================================
+ */
+
+import {
+  Billing,
+  BudgetRecord,
+  Claim,
+  Collection,
+  Encounter,
+  HospitalDepartment,
+  Service,
+  TariffMasterItem,
+} from '../types';
+
+export const INITIAL_ENCOUNTERS: Encounter[] = [
+  // C01 Planted: Unbilled Service
+  {
+    Encounter_ID: 'ENC-2001',
+    Admission_Date: '2026-09-19',
+    Discharge_Date: '2026-09-22',
+    Department: 'Cardiology',
+    Ward: 'CCU-02',
+    Bed_Type: 'ICU',
+    Payer_Type: 'TPA / Insurance',
+    Discharge_Status: 'Discharged',
+  },
+  // C02 Planted: Quantity Mismatch
+  {
+    Encounter_ID: 'ENC-2002',
+    Admission_Date: '2026-09-18',
+    Discharge_Date: '2026-09-23',
+    Department: 'General Surgery',
+    Ward: 'Surg-West',
+    Bed_Type: 'Deluxe Single',
+    Payer_Type: 'Self Pay',
+    Discharge_Status: 'Discharged',
+  },
+  // C03 Planted: Amount Mismatch
+  {
+    Encounter_ID: 'ENC-2003',
+    Admission_Date: '2026-09-17',
+    Discharge_Date: '2026-09-21',
+    Department: 'Orthopaedics',
+    Ward: 'Ortho-03',
+    Bed_Type: 'Semi-Private',
+    Payer_Type: 'Corporate',
+    Discharge_Status: 'Discharged',
+  },
+  // C04 Planted: Post-Billing Service
+  {
+    Encounter_ID: 'ENC-2004',
+    Admission_Date: '2026-09-20',
+    Discharge_Date: '2026-09-23',
+    Department: 'Neurology',
+    Ward: 'Neuro-ICU',
+    Bed_Type: 'ICU',
+    Payer_Type: 'TPA / Insurance',
+    Discharge_Status: 'Discharged',
+  },
+  // C05 Planted: Missing / Pending Final Bill on Discharged encounter
+  {
+    Encounter_ID: 'ENC-2005',
+    Admission_Date: '2026-09-16',
+    Discharge_Date: '2026-09-22',
+    Department: 'Oncology',
+    Ward: 'Onco-Daycare',
+    Bed_Type: 'Standard',
+    Payer_Type: 'TPA / Insurance',
+    Discharge_Status: 'Discharged',
+  },
+  // C06 Planted: TPA Shortfall
+  {
+    Encounter_ID: 'ENC-2006',
+    Admission_Date: '2026-09-14',
+    Discharge_Date: '2026-09-20',
+    Department: 'Cardiology',
+    Ward: 'Cath-Recovery',
+    Bed_Type: 'Deluxe Single',
+    Payer_Type: 'TPA / Insurance',
+    Discharge_Status: 'Discharged',
+  },
+  // C07 Planted: Collection Outstanding (>30 days)
+  {
+    Encounter_ID: 'ENC-2007',
+    Admission_Date: '2026-08-05',
+    Discharge_Date: '2026-08-11',
+    Department: 'Emergency',
+    Ward: 'Stepdown-01',
+    Bed_Type: 'Standard',
+    Payer_Type: 'Self Pay',
+    Discharge_Status: 'Discharged',
+  },
+  // C08 Planted: Unusual Discount (>10%)
+  {
+    Encounter_ID: 'ENC-2008',
+    Admission_Date: '2026-09-20',
+    Discharge_Date: '2026-09-23',
+    Department: 'General Surgery',
+    Ward: 'Surg-East',
+    Bed_Type: 'Deluxe Single',
+    Payer_Type: 'Self Pay',
+    Discharge_Status: 'Discharged',
+  },
+  // Additional Discharged & Admitted encounters for realistic hospital volume
+  {
+    Encounter_ID: 'ENC-2009',
+    Admission_Date: '2026-09-21',
+    Discharge_Date: '2026-09-23',
+    Department: 'Cardiology',
+    Ward: 'CCU-01',
+    Bed_Type: 'ICU',
+    Payer_Type: 'TPA / Insurance',
+    Discharge_Status: 'Discharged',
+  },
+  {
+    Encounter_ID: 'ENC-2010',
+    Admission_Date: '2026-09-22',
+    Discharge_Date: null,
+    Department: 'Nephrology',
+    Ward: 'Renal-02',
+    Bed_Type: 'Standard',
+    Payer_Type: 'Government Scheme',
+    Discharge_Status: 'Admitted',
+  },
+  {
+    Encounter_ID: 'ENC-2011',
+    Admission_Date: '2026-09-20',
+    Discharge_Date: '2026-09-23',
+    Department: 'Orthopaedics',
+    Ward: 'Ortho-01',
+    Bed_Type: 'Deluxe Single',
+    Payer_Type: 'TPA / Insurance',
+    Discharge_Status: 'Discharged',
+  },
+  {
+    Encounter_ID: 'ENC-2012',
+    Admission_Date: '2026-09-18',
+    Discharge_Date: '2026-09-22',
+    Department: 'Emergency',
+    Ward: 'Observation-B',
+    Bed_Type: 'Standard',
+    Payer_Type: 'Self Pay',
+    Discharge_Status: 'Discharged',
+  },
+  {
+    Encounter_ID: 'ENC-2013',
+    Admission_Date: '2026-09-22',
+    Discharge_Date: null,
+    Department: 'Neurology',
+    Ward: 'Neuro-Gen',
+    Bed_Type: 'Semi-Private',
+    Payer_Type: 'Corporate',
+    Discharge_Status: 'Admitted',
+  },
+  {
+    Encounter_ID: 'ENC-2014',
+    Admission_Date: '2026-08-15',
+    Discharge_Date: '2026-08-20',
+    Department: 'General Surgery',
+    Ward: 'Surg-West',
+    Bed_Type: 'Standard',
+    Payer_Type: 'Self Pay',
+    Discharge_Status: 'Discharged',
+  },
+  {
+    Encounter_ID: 'ENC-2015',
+    Admission_Date: '2026-09-21',
+    Discharge_Date: '2026-09-23',
+    Department: 'Oncology',
+    Ward: 'Onco-Inpatient',
+    Bed_Type: 'Deluxe Single',
+    Payer_Type: 'TPA / Insurance',
+    Discharge_Status: 'Discharged',
+  },
+];
+
+export const INITIAL_SERVICES: Service[] = [
+  // ENC-2001: Cardiology (Planted C01: SVC-101 has NO billing record)
+  {
+    Service_ID: 'SVC-100',
+    Encounter_ID: 'ENC-2001',
+    Service_DateTime: '2026-09-19 10:15:00',
+    Revenue_Centre: 'OT / Surgery',
+    Service_Code: 'OT-ANGIO-01',
+    Description: 'Coronary Angiography Procedure',
+    Quantity: 1,
+    Expected_Amount: 5200.0,
+  },
+  {
+    Service_ID: 'SVC-101', // C01 UNBILLED
+    Encounter_ID: 'ENC-2001',
+    Service_DateTime: '2026-09-20 14:30:00',
+    Revenue_Centre: 'Radiology',
+    Service_Code: 'RAD-CT-CHEST',
+    Description: 'High-Resolution Chest CT Scan with Contrast',
+    Quantity: 1,
+    Expected_Amount: 1850.0,
+  },
+  {
+    Service_ID: 'SVC-102',
+    Encounter_ID: 'ENC-2001',
+    Service_DateTime: '2026-09-21 08:00:00',
+    Revenue_Centre: 'Laboratory',
+    Service_Code: 'LAB-TROP-I',
+    Description: 'High Sensitivity Troponin-I Serial Testing',
+    Quantity: 3,
+    Expected_Amount: 450.0,
+  },
+  {
+    Service_ID: 'SVC-103',
+    Encounter_ID: 'ENC-2001',
+    Service_DateTime: '2026-09-21 16:00:00',
+    Revenue_Centre: 'Pharmacy',
+    Service_Code: 'PHARM-HEPARIN',
+    Description: 'Enoxaparin Sodium 60mg Injection Pack',
+    Quantity: 4,
+    Expected_Amount: 640.0,
+  },
+
+  // ENC-2002: General Surgery (Planted C02: SVC-105 Qty 10 vs Billed 4)
+  {
+    Service_ID: 'SVC-104',
+    Encounter_ID: 'ENC-2002',
+    Service_DateTime: '2026-09-18 11:00:00',
+    Revenue_Centre: 'OT / Surgery',
+    Service_Code: 'OT-LAP-CHOLE',
+    Description: 'Laparoscopic Cholecystectomy Procedure',
+    Quantity: 1,
+    Expected_Amount: 6500.0,
+  },
+  {
+    Service_ID: 'SVC-105', // C02 QUANTITY MISMATCH (Expected 10 x $150 = $1500)
+    Encounter_ID: 'ENC-2002',
+    Service_DateTime: '2026-09-19 09:30:00',
+    Revenue_Centre: 'Pharmacy',
+    Service_Code: 'PHARM-MERO-1G',
+    Description: 'IV Meropenem 1g Sterile Vial',
+    Quantity: 10,
+    Expected_Amount: 1500.0,
+  },
+  {
+    Service_ID: 'SVC-106',
+    Encounter_ID: 'ENC-2002',
+    Service_DateTime: '2026-09-20 10:00:00',
+    Revenue_Centre: 'Bed & Nursing',
+    Service_Code: 'BED-DELUXE',
+    Description: 'Deluxe Inpatient Room Stay & Nursing Care',
+    Quantity: 5,
+    Expected_Amount: 3750.0,
+  },
+
+  // ENC-2003: Orthopaedics (Planted C03: SVC-108 Expected $4,200 vs Billed $3,200)
+  {
+    Service_ID: 'SVC-107',
+    Encounter_ID: 'ENC-2003',
+    Service_DateTime: '2026-09-17 14:00:00',
+    Revenue_Centre: 'OT / Surgery',
+    Service_Code: 'OT-ARTHRO-KNEE',
+    Description: 'Knee Arthroscopy & Meniscal Repair',
+    Quantity: 1,
+    Expected_Amount: 5800.0,
+  },
+  {
+    Service_ID: 'SVC-108', // C03 AMOUNT MISMATCH (Expected 4200 vs Billed 3200)
+    Encounter_ID: 'ENC-2003',
+    Service_DateTime: '2026-09-17 16:30:00',
+    Revenue_Centre: 'OT / Surgery',
+    Service_Code: 'IMP-BIOCLIP-SET',
+    Description: 'Titanium Bio-Absorbable Anchor Kit',
+    Quantity: 1,
+    Expected_Amount: 4200.0,
+  },
+  {
+    Service_ID: 'SVC-109',
+    Encounter_ID: 'ENC-2003',
+    Service_DateTime: '2026-09-18 11:15:00',
+    Revenue_Centre: 'Physiotherapy',
+    Service_Code: 'PT-REHAB-SESS',
+    Description: 'Post-Surgical Joint Mobilization Therapy',
+    Quantity: 4,
+    Expected_Amount: 800.0,
+  },
+
+  // ENC-2004: Neurology (Planted C04: Final bill was 2026-09-23 11:00, SVC-111 entered 16:30)
+  {
+    Service_ID: 'SVC-110',
+    Encounter_ID: 'ENC-2004',
+    Service_DateTime: '2026-09-20 18:00:00',
+    Revenue_Centre: 'Radiology',
+    Service_Code: 'RAD-MRI-BRAIN',
+    Description: 'Brain MRI with Diffusion & Angio Sequence',
+    Quantity: 1,
+    Expected_Amount: 2600.0,
+  },
+  {
+    Service_ID: 'SVC-111', // C04 POST-BILLING SERVICE
+    Encounter_ID: 'ENC-2004',
+    Service_DateTime: '2026-09-23 16:30:00',
+    Revenue_Centre: 'Pharmacy',
+    Service_Code: 'PHARM-NEURO-IV',
+    Description: 'Intravenous Levetiracetam Infusion Pack',
+    Quantity: 2,
+    Expected_Amount: 780.0,
+  },
+
+  // ENC-2005: Oncology (Planted C05: Discharged encounter, billing provisional)
+  {
+    Service_ID: 'SVC-112',
+    Encounter_ID: 'ENC-2005',
+    Service_DateTime: '2026-09-16 11:00:00',
+    Revenue_Centre: 'Pharmacy',
+    Service_Code: 'PHARM-CHEMO-R',
+    Description: 'Chemotherapy Regimen Monoclonal Antibody',
+    Quantity: 1,
+    Expected_Amount: 7200.0,
+  },
+  {
+    Service_ID: 'SVC-113',
+    Encounter_ID: 'ENC-2005',
+    Service_DateTime: '2026-09-17 14:00:00',
+    Revenue_Centre: 'Laboratory',
+    Service_Code: 'LAB-CBC-COMP',
+    Description: 'Comprehensive Flow Cytometry & Complete Blood Count',
+    Quantity: 2,
+    Expected_Amount: 900.0,
+  },
+
+  // ENC-2006: Cardiology (Planted C06: Claim $14,000, Approved $10,500)
+  {
+    Service_ID: 'SVC-114',
+    Encounter_ID: 'ENC-2006',
+    Service_DateTime: '2026-09-14 10:00:00',
+    Revenue_Centre: 'OT / Surgery',
+    Service_Code: 'OT-ANGIOPLASTY',
+    Description: 'Percutaneous Coronary Intervention with Drug-Eluting Stent',
+    Quantity: 1,
+    Expected_Amount: 11500.0,
+  },
+  {
+    Service_ID: 'SVC-115',
+    Encounter_ID: 'ENC-2006',
+    Service_DateTime: '2026-09-15 12:00:00',
+    Revenue_Centre: 'Bed & Nursing',
+    Service_Code: 'BED-ICU',
+    Description: 'Cardiac Care Unit Intensive Monitoring',
+    Quantity: 3,
+    Expected_Amount: 2500.0,
+  },
+
+  // ENC-2007: Emergency (Planted C07: Billed $4,200, only $500 collected > 30 days ago)
+  {
+    Service_ID: 'SVC-116',
+    Encounter_ID: 'ENC-2007',
+    Service_DateTime: '2026-08-05 21:00:00',
+    Revenue_Centre: 'OT / Surgery',
+    Service_Code: 'OT-EMERG-SUTURE',
+    Description: 'Emergency Complex Trauma Wound Debridement & Repair',
+    Quantity: 1,
+    Expected_Amount: 2900.0,
+  },
+  {
+    Service_ID: 'SVC-117',
+    Encounter_ID: 'ENC-2007',
+    Service_DateTime: '2026-08-06 09:00:00',
+    Revenue_Centre: 'Radiology',
+    Service_Code: 'RAD-XRAY-MULT',
+    Description: 'Emergency Whole Body Trauma Radiography Series',
+    Quantity: 1,
+    Expected_Amount: 1300.0,
+  },
+
+  // ENC-2008: General Surgery (Planted C08: Billed $3,500 with $1,200 discount = 25.5%)
+  {
+    Service_ID: 'SVC-118',
+    Encounter_ID: 'ENC-2008',
+    Service_DateTime: '2026-09-20 11:30:00',
+    Revenue_Centre: 'OT / Surgery',
+    Service_Code: 'OT-HERNIA-REPAIR',
+    Description: 'Open Inguinal Hernioplasty with Mesh Placement',
+    Quantity: 1,
+    Expected_Amount: 4700.0,
+  },
+
+  // Other clean Encounters
+  {
+    Service_ID: 'SVC-119',
+    Encounter_ID: 'ENC-2009',
+    Service_DateTime: '2026-09-21 14:00:00',
+    Revenue_Centre: 'Radiology',
+    Service_Code: 'RAD-ECHO-2D',
+    Description: 'Transthoracic 2D Echocardiography with Doppler',
+    Quantity: 1,
+    Expected_Amount: 1200.0,
+  },
+  {
+    Service_ID: 'SVC-120',
+    Encounter_ID: 'ENC-2009',
+    Service_DateTime: '2026-09-22 09:00:00',
+    Revenue_Centre: 'Consultation',
+    Service_Code: 'CON-CARDIO-ROUND',
+    Description: 'Cardiologist Inpatient Consultation & Evaluation',
+    Quantity: 2,
+    Expected_Amount: 500.0,
+  },
+  {
+    Service_ID: 'SVC-121',
+    Encounter_ID: 'ENC-2010',
+    Service_DateTime: '2026-09-22 15:00:00',
+    Revenue_Centre: 'Laboratory',
+    Service_Code: 'LAB-RENAL-PANEL',
+    Description: 'Serum Electrolytes, Urea, Creatinine Renal Function Profile',
+    Quantity: 2,
+    Expected_Amount: 380.0,
+  },
+  {
+    Service_ID: 'SVC-122',
+    Encounter_ID: 'ENC-2011',
+    Service_DateTime: '2026-09-20 10:00:00',
+    Revenue_Centre: 'OT / Surgery',
+    Service_Code: 'OT-CARPAL-TUNNEL',
+    Description: 'Carpal Tunnel Release Decompression',
+    Quantity: 1,
+    Expected_Amount: 3400.0,
+  },
+  {
+    Service_ID: 'SVC-123',
+    Encounter_ID: 'ENC-2012',
+    Service_DateTime: '2026-09-18 20:00:00',
+    Revenue_Centre: 'Laboratory',
+    Service_Code: 'LAB-TOX-SCREEN',
+    Description: 'Comprehensive Toxicology Screening Panel',
+    Quantity: 1,
+    Expected_Amount: 620.0,
+  },
+  {
+    Service_ID: 'SVC-124',
+    Encounter_ID: 'ENC-2014',
+    Service_DateTime: '2026-08-15 14:00:00',
+    Revenue_Centre: 'OT / Surgery',
+    Service_Code: 'OT-EXC-BIOPSY',
+    Description: 'Soft Tissue Excisional Biopsy',
+    Quantity: 1,
+    Expected_Amount: 2200.0,
+  },
+  {
+    Service_ID: 'SVC-125',
+    Encounter_ID: 'ENC-2015',
+    Service_DateTime: '2026-09-21 10:00:00',
+    Revenue_Centre: 'Pharmacy',
+    Service_Code: 'PHARM-IMMUNO',
+    Description: 'Immune Checkpoint Inhibitor Infusion Dose',
+    Quantity: 1,
+    Expected_Amount: 9800.0,
+  },
+];
+
+export const INITIAL_BILLING: Billing[] = [
+  // ENC-2001: Notice SVC-101 is NOT billed! (Planted C01)
+  {
+    Bill_ID: 'BIL-201',
+    Encounter_ID: 'ENC-2001',
+    Service_ID: 'SVC-100',
+    Bill_DateTime: '2026-09-22 11:00:00',
+    Billed_Quantity: 1,
+    Billed_Amount: 5200.0,
+    Discount: 0,
+    Bill_Status: 'Final',
+  },
+  {
+    Bill_ID: 'BIL-202',
+    Encounter_ID: 'ENC-2001',
+    Service_ID: 'SVC-102',
+    Bill_DateTime: '2026-09-22 11:00:00',
+    Billed_Quantity: 3,
+    Billed_Amount: 450.0,
+    Discount: 0,
+    Bill_Status: 'Final',
+  },
+  {
+    Bill_ID: 'BIL-203',
+    Encounter_ID: 'ENC-2001',
+    Service_ID: 'SVC-103',
+    Bill_DateTime: '2026-09-22 11:00:00',
+    Billed_Quantity: 4,
+    Billed_Amount: 640.0,
+    Discount: 0,
+    Bill_Status: 'Final',
+  },
+
+  // ENC-2002: Planted C02 Quantity Mismatch on SVC-105 (Billed 4 instead of 10)
+  {
+    Bill_ID: 'BIL-204',
+    Encounter_ID: 'ENC-2002',
+    Service_ID: 'SVC-104',
+    Bill_DateTime: '2026-09-23 10:00:00',
+    Billed_Quantity: 1,
+    Billed_Amount: 6500.0,
+    Discount: 0,
+    Bill_Status: 'Final',
+  },
+  {
+    Bill_ID: 'BIL-205', // Billed qty 4 vs service qty 10. Billed $600 vs expected $1500
+    Encounter_ID: 'ENC-2002',
+    Service_ID: 'SVC-105',
+    Bill_DateTime: '2026-09-23 10:00:00',
+    Billed_Quantity: 4,
+    Billed_Amount: 600.0,
+    Discount: 0,
+    Bill_Status: 'Final',
+  },
+  {
+    Bill_ID: 'BIL-206',
+    Encounter_ID: 'ENC-2002',
+    Service_ID: 'SVC-106',
+    Bill_DateTime: '2026-09-23 10:00:00',
+    Billed_Quantity: 5,
+    Billed_Amount: 3750.0,
+    Discount: 0,
+    Bill_Status: 'Final',
+  },
+
+  // ENC-2003: Planted C03 Amount Mismatch on SVC-108 (Expected 4200 vs Billed 3200)
+  {
+    Bill_ID: 'BIL-207',
+    Encounter_ID: 'ENC-2003',
+    Service_ID: 'SVC-107',
+    Bill_DateTime: '2026-09-21 14:00:00',
+    Billed_Quantity: 1,
+    Billed_Amount: 5800.0,
+    Discount: 0,
+    Bill_Status: 'Final',
+  },
+  {
+    Bill_ID: 'BIL-208', // Amount mismatch: $3,200 billed vs $4,200 expected (diff $1,000, 23.8%)
+    Encounter_ID: 'ENC-2003',
+    Service_ID: 'SVC-108',
+    Bill_DateTime: '2026-09-21 14:00:00',
+    Billed_Quantity: 1,
+    Billed_Amount: 3200.0,
+    Discount: 0,
+    Bill_Status: 'Final',
+  },
+  {
+    Bill_ID: 'BIL-209',
+    Encounter_ID: 'ENC-2003',
+    Service_ID: 'SVC-109',
+    Bill_DateTime: '2026-09-21 14:00:00',
+    Billed_Quantity: 4,
+    Billed_Amount: 800.0,
+    Discount: 0,
+    Bill_Status: 'Final',
+  },
+
+  // ENC-2004: Planted C04 Post-Billing Service
+  // Final bill generated at 2026-09-23 11:00:00. SVC-111 was done at 16:30:00!
+  {
+    Bill_ID: 'BIL-210',
+    Encounter_ID: 'ENC-2004',
+    Service_ID: 'SVC-110',
+    Bill_DateTime: '2026-09-23 11:00:00',
+    Billed_Quantity: 1,
+    Billed_Amount: 2600.0,
+    Discount: 0,
+    Bill_Status: 'Final',
+  },
+
+  // ENC-2005: Planted C05 Missing/Pending Final Bill on Discharged encounter
+  // Bill status is 'Provisional'
+  {
+    Bill_ID: 'BIL-211',
+    Encounter_ID: 'ENC-2005',
+    Service_ID: 'SVC-112',
+    Bill_DateTime: '2026-09-21 16:00:00',
+    Billed_Quantity: 1,
+    Billed_Amount: 7200.0,
+    Discount: 0,
+    Bill_Status: 'Provisional',
+  },
+  {
+    Bill_ID: 'BIL-212',
+    Encounter_ID: 'ENC-2005',
+    Service_ID: 'SVC-113',
+    Bill_DateTime: '2026-09-21 16:00:00',
+    Billed_Quantity: 2,
+    Billed_Amount: 900.0,
+    Discount: 0,
+    Bill_Status: 'Provisional',
+  },
+
+  // ENC-2006: Cardiology
+  {
+    Bill_ID: 'BIL-213',
+    Encounter_ID: 'ENC-2006',
+    Service_ID: 'SVC-114',
+    Bill_DateTime: '2026-09-19 15:00:00',
+    Billed_Quantity: 1,
+    Billed_Amount: 11500.0,
+    Discount: 0,
+    Bill_Status: 'Final',
+  },
+  {
+    Bill_ID: 'BIL-214',
+    Encounter_ID: 'ENC-2006',
+    Service_ID: 'SVC-115',
+    Bill_DateTime: '2026-09-19 15:00:00',
+    Billed_Quantity: 3,
+    Billed_Amount: 2500.0,
+    Discount: 0,
+    Bill_Status: 'Final',
+  },
+
+  // ENC-2007: Emergency (Discharged 2026-08-11)
+  {
+    Bill_ID: 'BIL-215',
+    Encounter_ID: 'ENC-2007',
+    Service_ID: 'SVC-116',
+    Bill_DateTime: '2026-08-11 12:00:00',
+    Billed_Quantity: 1,
+    Billed_Amount: 2900.0,
+    Discount: 0,
+    Bill_Status: 'Final',
+  },
+  {
+    Bill_ID: 'BIL-216',
+    Encounter_ID: 'ENC-2007',
+    Service_ID: 'SVC-117',
+    Bill_DateTime: '2026-08-11 12:00:00',
+    Billed_Quantity: 1,
+    Billed_Amount: 1300.0,
+    Discount: 0,
+    Bill_Status: 'Final',
+  },
+
+  // ENC-2008: Planted C08 Unusual Discount
+  {
+    Bill_ID: 'BIL-217',
+    Encounter_ID: 'ENC-2008',
+    Service_ID: 'SVC-118',
+    Bill_DateTime: '2026-09-23 09:30:00',
+    Billed_Quantity: 1,
+    Billed_Amount: 3500.0,
+    Discount: 1200.0, // Discount is 25.5% of total gross $4,700 (> 10%)
+    Bill_Status: 'Final',
+  },
+
+  // Other Encounters
+  {
+    Bill_ID: 'BIL-218',
+    Encounter_ID: 'ENC-2009',
+    Service_ID: 'SVC-119',
+    Bill_DateTime: '2026-09-23 10:30:00',
+    Billed_Quantity: 1,
+    Billed_Amount: 1200.0,
+    Discount: 0,
+    Bill_Status: 'Final',
+  },
+  {
+    Bill_ID: 'BIL-219',
+    Encounter_ID: 'ENC-2009',
+    Service_ID: 'SVC-120',
+    Bill_DateTime: '2026-09-23 10:30:00',
+    Billed_Quantity: 2,
+    Billed_Amount: 500.0,
+    Discount: 0,
+    Bill_Status: 'Final',
+  },
+  {
+    Bill_ID: 'BIL-220',
+    Encounter_ID: 'ENC-2011',
+    Service_ID: 'SVC-122',
+    Bill_DateTime: '2026-09-23 11:30:00',
+    Billed_Quantity: 1,
+    Billed_Amount: 3400.0,
+    Discount: 0,
+    Bill_Status: 'Final',
+  },
+  {
+    Bill_ID: 'BIL-221',
+    Encounter_ID: 'ENC-2012',
+    Service_ID: 'SVC-123',
+    Bill_DateTime: '2026-09-22 17:00:00',
+    Billed_Quantity: 1,
+    Billed_Amount: 620.0,
+    Discount: 0,
+    Bill_Status: 'Final',
+  },
+  {
+    Bill_ID: 'BIL-222',
+    Encounter_ID: 'ENC-2014',
+    Service_ID: 'SVC-124',
+    Bill_DateTime: '2026-08-20 16:00:00',
+    Billed_Quantity: 1,
+    Billed_Amount: 2200.0,
+    Discount: 0,
+    Bill_Status: 'Final',
+  },
+  {
+    Bill_ID: 'BIL-223',
+    Encounter_ID: 'ENC-2015',
+    Service_ID: 'SVC-125',
+    Bill_DateTime: '2026-09-23 12:00:00',
+    Billed_Quantity: 1,
+    Billed_Amount: 9800.0,
+    Discount: 200.0, // small acceptable discount < 5%
+    Bill_Status: 'Final',
+  },
+];
+
+export const INITIAL_CLAIMS: Claim[] = [
+  // ENC-2001
+  {
+    Claim_ID: 'CLM-301',
+    Encounter_ID: 'ENC-2001',
+    Claim_Amount: 6290.0,
+    Approved_Amount: 6150.0,
+    Rejected_Amount: 140.0,
+    Claim_Status: 'Partially Approved',
+    Submission_Date: '2026-09-22',
+    Approval_Date: '2026-09-23',
+  },
+  // ENC-2004
+  {
+    Claim_ID: 'CLM-302',
+    Encounter_ID: 'ENC-2004',
+    Claim_Amount: 2600.0,
+    Approved_Amount: 0.0,
+    Rejected_Amount: 0.0,
+    Claim_Status: 'Submitted',
+    Submission_Date: '2026-09-23',
+    Approval_Date: null,
+  },
+  // ENC-2005
+  {
+    Claim_ID: 'CLM-303',
+    Encounter_ID: 'ENC-2005',
+    Claim_Amount: 8100.0,
+    Approved_Amount: 0.0,
+    Rejected_Amount: 0.0,
+    Claim_Status: 'Pending Info',
+    Submission_Date: '2026-09-21',
+    Approval_Date: null,
+  },
+  // ENC-2006: Planted C06 TPA Shortfall ($14,000 claimed vs $10,500 approved = $3,500 shortfall, 25%)
+  {
+    Claim_ID: 'CLM-304',
+    Encounter_ID: 'ENC-2006',
+    Claim_Amount: 14000.0,
+    Approved_Amount: 10500.0,
+    Rejected_Amount: 3500.0,
+    Claim_Status: 'Partially Approved',
+    Submission_Date: '2026-09-19',
+    Approval_Date: '2026-09-21',
+  },
+  // ENC-2009
+  {
+    Claim_ID: 'CLM-305',
+    Encounter_ID: 'ENC-2009',
+    Claim_Amount: 1700.0,
+    Approved_Amount: 1650.0,
+    Rejected_Amount: 50.0,
+    Claim_Status: 'Approved',
+    Submission_Date: '2026-09-23',
+    Approval_Date: '2026-09-23',
+  },
+  // ENC-2011
+  {
+    Claim_ID: 'CLM-306',
+    Encounter_ID: 'ENC-2011',
+    Claim_Amount: 3400.0,
+    Approved_Amount: 0.0,
+    Rejected_Amount: 0.0,
+    Claim_Status: 'Submitted',
+    Submission_Date: '2026-09-23',
+    Approval_Date: null,
+  },
+  // ENC-2015
+  {
+    Claim_ID: 'CLM-307',
+    Encounter_ID: 'ENC-2015',
+    Claim_Amount: 9600.0,
+    Approved_Amount: 0.0,
+    Rejected_Amount: 0.0,
+    Claim_Status: 'Submitted',
+    Submission_Date: '2026-09-23',
+    Approval_Date: null,
+  },
+];
+
+export const INITIAL_COLLECTIONS: Collection[] = [
+  // ENC-2001
+  {
+    Receipt_ID: 'REC-401',
+    Encounter_ID: 'ENC-2001',
+    Receipt_Date: '2026-09-23',
+    Amount: 6150.0,
+    Payment_Mode: 'TPA Settlement',
+  },
+  // ENC-2002: Self Pay collected
+  {
+    Receipt_ID: 'REC-402',
+    Encounter_ID: 'ENC-2002',
+    Receipt_Date: '2026-09-23',
+    Amount: 10850.0,
+    Payment_Mode: 'Credit Card',
+  },
+  // ENC-2003: Corporate deposit
+  {
+    Receipt_ID: 'REC-403',
+    Encounter_ID: 'ENC-2003',
+    Receipt_Date: '2026-09-21',
+    Amount: 9800.0,
+    Payment_Mode: 'Bank Transfer',
+  },
+  // ENC-2006: Partial insurance settlement
+  {
+    Receipt_ID: 'REC-404',
+    Encounter_ID: 'ENC-2006',
+    Receipt_Date: '2026-09-22',
+    Amount: 10500.0,
+    Payment_Mode: 'TPA Settlement',
+  },
+  // ENC-2007: Planted C07: Billed $4,200. Only $500 collected 45 days ago! Outstanding = $3,700!
+  {
+    Receipt_ID: 'REC-405',
+    Encounter_ID: 'ENC-2007',
+    Receipt_Date: '2026-08-05',
+    Amount: 500.0,
+    Payment_Mode: 'Cash',
+  },
+  // ENC-2008: Self pay settled
+  {
+    Receipt_ID: 'REC-406',
+    Encounter_ID: 'ENC-2008',
+    Receipt_Date: '2026-09-23',
+    Amount: 3500.0,
+    Payment_Mode: 'Credit Card',
+  },
+  // ENC-2012: Self pay
+  {
+    Receipt_ID: 'REC-407',
+    Encounter_ID: 'ENC-2012',
+    Receipt_Date: '2026-09-22',
+    Amount: 620.0,
+    Payment_Mode: 'Cash',
+  },
+  // ENC-2014: Discharged Aug 20, collected
+  {
+    Receipt_ID: 'REC-408',
+    Encounter_ID: 'ENC-2014',
+    Receipt_Date: '2026-08-20',
+    Amount: 2200.0,
+    Payment_Mode: 'Credit Card',
+  },
+];
+
+// NOTE: mapRevenueCentreToDepartment has been removed from this file.
+// Use the canonical implementation from '../utils/departmentMapping' instead.
+
+export const INITIAL_TARIFF_MASTER: TariffMasterItem[] = [
+  // Laboratory
+  {
+    Service_Code: 'LAB-CBC-AUTO',
+    Service_Description: 'Complete Blood Count (CBC) with Automated Differential',
+    Revenue_Centre: 'Laboratory',
+    Standard_Tariff: 450,
+    Effective_From: '2026-01-01',
+    Effective_To: '2026-12-31',
+    Payer: 'Standard',
+    Payer_Tariff: 450,
+  },
+  {
+    Service_Code: 'LAB-CBC-AUTO',
+    Service_Description: 'Complete Blood Count (CBC) with Automated Differential',
+    Revenue_Centre: 'Laboratory',
+    Standard_Tariff: 450,
+    Effective_From: '2026-01-01',
+    Effective_To: '2026-12-31',
+    Payer: 'Star Health',
+    Payer_Tariff: 400,
+  },
+  {
+    Service_Code: 'LAB-CMP-ELEC',
+    Service_Description: 'Comprehensive Metabolic & Electrolyte Panel',
+    Revenue_Centre: 'Laboratory',
+    Standard_Tariff: 1200,
+    Effective_From: '2026-01-01',
+    Effective_To: '2026-12-31',
+    Payer: 'Standard',
+    Payer_Tariff: 1200,
+  },
+  {
+    Service_Code: 'LAB-CMP-ELEC',
+    Service_Description: 'Comprehensive Metabolic & Electrolyte Panel',
+    Revenue_Centre: 'Laboratory',
+    Standard_Tariff: 1200,
+    Effective_From: '2026-01-01',
+    Effective_To: '2026-12-31',
+    Payer: 'MediAssist',
+    Payer_Tariff: 1050,
+  },
+  {
+    Service_Code: 'LAB-TROP-I',
+    Service_Description: 'Cardiac Biomarker Troponin-I (High Sensitivity)',
+    Revenue_Centre: 'Laboratory',
+    Standard_Tariff: 2800,
+    Effective_From: '2026-01-01',
+    Effective_To: '2026-12-31',
+    Payer: 'Standard',
+    Payer_Tariff: 2800,
+  },
+  {
+    Service_Code: 'LAB-TROP-II',
+    Service_Description: 'Cardiac Biomarker Troponin-II / CK-MB Panel',
+    Revenue_Centre: 'Laboratory',
+    Standard_Tariff: 1800,
+    Effective_From: '2026-01-01',
+    Effective_To: '2026-12-31',
+    Payer: 'Standard',
+    Payer_Tariff: 1800,
+  },
+  // Radiology
+  {
+    Service_Code: 'RAD-CXR-PA',
+    Service_Description: 'Digital Chest X-Ray (PA & Lateral Views)',
+    Revenue_Centre: 'Radiology',
+    Standard_Tariff: 950,
+    Effective_From: '2026-01-01',
+    Effective_To: '2026-12-31',
+    Payer: 'Standard',
+    Payer_Tariff: 950,
+  },
+  {
+    Service_Code: 'RAD-CT-CHEST',
+    Service_Description: 'Multi-Slice Contrast CT Chest',
+    Revenue_Centre: 'Radiology',
+    Standard_Tariff: 8500,
+    Effective_From: '2026-01-01',
+    Effective_To: '2026-12-31',
+    Payer: 'Standard',
+    Payer_Tariff: 8500,
+  },
+  {
+    Service_Code: 'RAD-CT-CHEST',
+    Service_Description: 'Multi-Slice Contrast CT Chest',
+    Revenue_Centre: 'Radiology',
+    Standard_Tariff: 8500,
+    Effective_From: '2026-01-01',
+    Effective_To: '2026-12-31',
+    Payer: 'ICICI Lombard',
+    Payer_Tariff: 7600,
+  },
+  {
+    Service_Code: 'RAD-MRI-BRAIN',
+    Service_Description: '3T MRI Brain Neuro Study',
+    Revenue_Centre: 'Radiology',
+    Standard_Tariff: 14500,
+    Effective_From: '2026-01-01',
+    Effective_To: '2026-12-31',
+    Payer: 'Standard',
+    Payer_Tariff: 14500,
+  },
+  // Pharmacy
+  {
+    Service_Code: 'PHARM-MERO-1G',
+    Service_Description: 'IV Meropenem 1g Injection Vial (Anti-Infective)',
+    Revenue_Centre: 'Pharmacy',
+    Standard_Tariff: 1850,
+    Effective_From: '2026-01-01',
+    Effective_To: '2026-12-31',
+    Payer: 'Standard',
+    Payer_Tariff: 1850,
+  },
+  {
+    Service_Code: 'PHARM-PANTO-40',
+    Service_Description: 'IV Pantoprazole 40mg Infusion Vial',
+    Revenue_Centre: 'Pharmacy',
+    Standard_Tariff: 220,
+    Effective_From: '2026-01-01',
+    Effective_To: '2026-12-31',
+    Payer: 'Standard',
+    Payer_Tariff: 220,
+  },
+  {
+    Service_Code: 'PHARM-ENOX-40',
+    Service_Description: 'LMWH Enoxaparin 40mg Pre-filled Syringe (Anticoagulant)',
+    Revenue_Centre: 'Pharmacy',
+    Standard_Tariff: 680,
+    Effective_From: '2026-01-01',
+    Effective_To: '2026-12-31',
+    Payer: 'Standard',
+    Payer_Tariff: 680,
+  },
+  // OT / Surgery
+  {
+    Service_Code: 'SURG-OT-MAJ',
+    Service_Description: 'Major Operating Theatre Suite Charges (120 Mins)',
+    Revenue_Centre: 'OT / Surgery',
+    Standard_Tariff: 45000,
+    Effective_From: '2026-01-01',
+    Effective_To: '2026-12-31',
+    Payer: 'Standard',
+    Payer_Tariff: 45000,
+  },
+  {
+    Service_Code: 'SURG-OT-MAJ',
+    Service_Description: 'Major Operating Theatre Suite Charges (120 Mins)',
+    Revenue_Centre: 'OT / Surgery',
+    Standard_Tariff: 45000,
+    Effective_From: '2026-01-01',
+    Effective_To: '2026-12-31',
+    Payer: 'Star Health',
+    Payer_Tariff: 38000,
+  },
+  {
+    Service_Code: 'SURG-ANAES-GEN',
+    Service_Description: 'General Anaesthesia Administration & Intra-op Monitoring',
+    Revenue_Centre: 'OT / Surgery',
+    Standard_Tariff: 18000,
+    Effective_From: '2026-01-01',
+    Effective_To: '2026-12-31',
+    Payer: 'Standard',
+    Payer_Tariff: 18000,
+  },
+  {
+    Service_Code: 'OT-ANGIO-01',
+    Service_Description: 'Coronary Angioplasty (PTCA) with Drug Eluting Stent',
+    Revenue_Centre: 'OT / Surgery',
+    Standard_Tariff: 180000,
+    Effective_From: '2026-01-01',
+    Effective_To: '2026-12-31',
+    Payer: 'Standard',
+    Payer_Tariff: 180000,
+  },
+  // ICU
+  {
+    Service_Code: 'ICU-BED-24H',
+    Service_Description: 'Intensive Care Unit (ICU) Bed Charges with Monitoring (24h)',
+    Revenue_Centre: 'ICU / Critical Care',
+    Standard_Tariff: 12500,
+    Effective_From: '2026-01-01',
+    Effective_To: '2026-12-31',
+    Payer: 'Standard',
+    Payer_Tariff: 12500,
+  },
+  // Room Rent / Nursing
+  {
+    Service_Code: 'ROOM-DELUXE-1D',
+    Service_Description: 'Inpatient Deluxe Single Room Accommodation (24h)',
+    Revenue_Centre: 'Room Rent / Nursing',
+    Standard_Tariff: 5500,
+    Effective_From: '2026-01-01',
+    Effective_To: '2026-12-31',
+    Payer: 'Standard',
+    Payer_Tariff: 5500,
+  },
+  // Consumables / Implants
+  {
+    Service_Code: 'CONS-MESH-BIO',
+    Service_Description: 'Surgical Titanium Mesh & Bio-Absorbable Suture Kit',
+    Revenue_Centre: 'Consumables / Implants',
+    Standard_Tariff: 22000,
+    Effective_From: '2026-01-01',
+    Effective_To: '2026-12-31',
+    Payer: 'Standard',
+    Payer_Tariff: 22000,
+  },
+];
+
+export const INITIAL_BUDGET: BudgetRecord[] = [
+  // September 2026 (Current Active Month)
+  { Month: '2026-09', Department: 'Laboratory', Revenue_Budget: 1850000, Expense_Budget: 920000 },
+  { Month: '2026-09', Department: 'Pharmacy', Revenue_Budget: 3200000, Expense_Budget: 2100000 },
+  { Month: '2026-09', Department: 'Radiology', Revenue_Budget: 2400000, Expense_Budget: 1150000 },
+  { Month: '2026-09', Department: 'OT/Surgery', Revenue_Budget: 5500000, Expense_Budget: 2600000 },
+  { Month: '2026-09', Department: 'ICU', Revenue_Budget: 4200000, Expense_Budget: 2450000 },
+  { Month: '2026-09', Department: 'Operations', Revenue_Budget: 3800000, Expense_Budget: 1900000 },
+  { Month: '2026-09', Department: 'Stores', Revenue_Budget: 1900000, Expense_Budget: 1400000 },
+  { Month: '2026-09', Department: 'Finance/Admin', Revenue_Budget: 450000, Expense_Budget: 380000 },
+
+  // August 2026
+  { Month: '2026-08', Department: 'Laboratory', Revenue_Budget: 1800000, Expense_Budget: 900000 },
+  { Month: '2026-08', Department: 'Pharmacy', Revenue_Budget: 3100000, Expense_Budget: 2050000 },
+  { Month: '2026-08', Department: 'Radiology', Revenue_Budget: 2350000, Expense_Budget: 1120000 },
+  { Month: '2026-08', Department: 'OT/Surgery', Revenue_Budget: 5300000, Expense_Budget: 2500000 },
+  { Month: '2026-08', Department: 'ICU', Revenue_Budget: 4100000, Expense_Budget: 2400000 },
+  { Month: '2026-08', Department: 'Operations', Revenue_Budget: 3750000, Expense_Budget: 1880000 },
+  { Month: '2026-08', Department: 'Stores', Revenue_Budget: 1850000, Expense_Budget: 1350000 },
+  { Month: '2026-08', Department: 'Finance/Admin', Revenue_Budget: 450000, Expense_Budget: 380000 },
+
+  // July 2026
+  { Month: '2026-07', Department: 'Laboratory', Revenue_Budget: 1750000, Expense_Budget: 880000 },
+  { Month: '2026-07', Department: 'Pharmacy', Revenue_Budget: 3000000, Expense_Budget: 1980000 },
+  { Month: '2026-07', Department: 'Radiology', Revenue_Budget: 2300000, Expense_Budget: 1100000 },
+  { Month: '2026-07', Department: 'OT/Surgery', Revenue_Budget: 5200000, Expense_Budget: 2450000 },
+  { Month: '2026-07', Department: 'ICU', Revenue_Budget: 4000000, Expense_Budget: 2350000 },
+  { Month: '2026-07', Department: 'Operations', Revenue_Budget: 3700000, Expense_Budget: 1850000 },
+  { Month: '2026-07', Department: 'Stores', Revenue_Budget: 1800000, Expense_Budget: 1300000 },
+  { Month: '2026-07', Department: 'Finance/Admin', Revenue_Budget: 450000, Expense_Budget: 380000 },
+];
+
+export const INITIAL_BUDGET_RECORDS = INITIAL_BUDGET;

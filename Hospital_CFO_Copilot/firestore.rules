@@ -1,0 +1,198 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Global Deny All Default
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Helper functions
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isBootstrappedAdmin() {
+      return isSignedIn() && (
+        (request.auth.token.email == 'rukminigopakumar@gmail.com') ||
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'CFO')
+      );
+    }
+
+
+    function getUserRole() {
+      // SECURITY: Never default an unknown user to a privileged role.
+      // If no Firestore user profile exists, return 'UNAUTHORIZED' which
+      // will fail all role checks (isCFO, isFinanceManager, isAuditor, isDeptManager).
+      // Bootstrap CFO access is handled separately by isBootstrappedAdmin() above.
+      return exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        ? get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role
+        : 'UNAUTHORIZED';
+    }
+
+
+    function getUserDept() {
+      return exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        ? get(/databases/$(database)/documents/users/$(request.auth.uid)).data.department
+        : '';
+    }
+
+    function isCFO() {
+      return isSignedIn() && (isBootstrappedAdmin() || getUserRole() == 'CFO');
+    }
+
+    function isFinanceManager() {
+      return isSignedIn() && (isCFO() || getUserRole() == 'Finance/Billing Manager');
+    }
+
+    function isAuditor() {
+      return isSignedIn() && (getUserRole() == 'Auditor');
+    }
+
+    function isDeptManager() {
+      return isSignedIn() && (getUserRole() == 'Department Manager');
+    }
+
+    function isDeptMatch(dept) {
+      return isDeptManager() && (getUserDept() == '' || getUserDept() == dept);
+    }
+
+    // Permitted self-update: Authenticated user updating their own profile document.
+    // Must NOT alter privileged fields: role, department, authorized, status.
+    // Changes to role or department strictly require CFO or Bootstrapped Admin authority.
+    function isSelfProfileUpdate() {
+      return isSignedIn() && request.auth.uid == userId &&
+        request.resource.data.role == resource.data.role &&
+        (
+          (!('department' in request.resource.data) && !('department' in resource.data)) ||
+          request.resource.data.department == resource.data.department
+        ) &&
+        (
+          (!('authorized' in request.resource.data) && !('authorized' in resource.data)) ||
+          request.resource.data.authorized == resource.data.authorized
+        ) &&
+        (
+          (!('status' in request.resource.data) && !('status' in resource.data)) ||
+          request.resource.data.status == resource.data.status
+        );
+    }
+
+    // USERS COLLECTION
+    match /users/{userId} {
+      allow get: if isSignedIn();
+      allow list: if isSignedIn();
+      // Provisioning new users requires CFO or Bootstrapped Admin authority
+      allow create: if isSignedIn() && (isCFO() || isBootstrappedAdmin());
+      // Self-update can only modify non-privileged fields; changing role or department requires CFO
+      allow update: if isSignedIn() && (isCFO() || isBootstrappedAdmin() || isSelfProfileUpdate());
+      allow delete: if isCFO();
+    }
+
+    // DEPARTMENTS
+    match /departments/{departmentId} {
+      allow read: if isSignedIn();
+      allow write: if isFinanceManager() || isCFO();
+    }
+
+    // ENCOUNTERS
+    match /encounters/{encounterId} {
+      allow get, list: if isSignedIn();
+      allow write: if isFinanceManager() || isCFO();
+    }
+
+    // SERVICES
+    match /services/{serviceId} {
+      allow get, list: if isSignedIn();
+      allow write: if isFinanceManager() || isCFO();
+    }
+
+    // BILLING
+    match /billing/{billingId} {
+      allow get, list: if isSignedIn();
+      allow write: if isFinanceManager() || isCFO();
+    }
+
+    // CLAIMS
+    match /claims/{claimId} {
+      allow get, list: if isSignedIn();
+      allow write: if isFinanceManager() || isCFO();
+    }
+
+    // COLLECTIONS
+    match /collections/{collectionId} {
+      allow get, list: if isSignedIn();
+      allow write: if isFinanceManager() || isCFO();
+    }
+
+    // TARIFF MASTER
+    match /tariff_master/{tariffId} {
+      allow read: if isSignedIn();
+      allow write: if isFinanceManager() || isCFO();
+    }
+
+    // TARIFF INVESTIGATIONS & RESPONSES
+    match /tariff_investigations/{investigationId} {
+      allow get, list: if isSignedIn();
+      allow write: if isSignedIn() && (isFinanceManager() || isCFO() || isAuditor() || isBootstrappedAdmin());
+    }
+
+    // BUDGETS
+    match /budgets/{budgetId} {
+      allow read: if isSignedIn();
+      allow write: if isFinanceManager() || isCFO();
+    }
+
+    // CONTROL RUNS
+    match /control_runs/{runId} {
+      allow read: if isSignedIn();
+      allow write: if isFinanceManager() || isCFO();
+    }
+
+    // EXCEPTIONS
+    match /exceptions/{exceptionId} {
+      allow get, list: if isSignedIn();
+      allow create, delete: if isFinanceManager() || isCFO();
+      allow update: if isFinanceManager() || isCFO() || isDeptManager();
+    }
+
+    // DEPARTMENT CLEARANCES
+    match /department_clearances/{clearanceId} {
+      allow get, list: if isSignedIn();
+      allow create, delete: if isFinanceManager() || isCFO();
+      allow update: if isFinanceManager() || isCFO() || isDeptManager();
+    }
+
+    // EXCEPTION RESOLUTIONS
+    match /exception_resolutions/{resolutionId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && (isFinanceManager() || isCFO() || isDeptManager());
+      allow update, delete: if isFinanceManager() || isCFO();
+    }
+
+    // AUDIT LOGS - Immutable ledger
+    match /audit_logs/{logId} {
+      allow get, list: if isSignedIn() && (isFinanceManager() || isAuditor() || isCFO());
+      allow create: if isSignedIn();
+      allow update, delete: if false;
+    }
+
+    // CFO REPORTS
+    match /cfo_reports/{reportId} {
+      allow read: if isSignedIn();
+      allow write: if isFinanceManager() || isCFO() || isBootstrappedAdmin();
+    }
+
+    // IMPORT HISTORY
+    match /import_history/{importId} {
+      allow read: if isSignedIn();
+      allow write: if isFinanceManager() || isCFO() || isBootstrappedAdmin();
+    }
+
+    // Test connection doc (authenticated probe only; public unauthenticated read removed)
+    match /test/{docId} {
+      allow read, write: if isSignedIn();
+    }
+  }
+}
