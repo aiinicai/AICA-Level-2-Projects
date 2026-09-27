@@ -1,5 +1,19 @@
 # CFO Pulse Release Report
 
+## 2026-09-27 upload and extraction correction
+
+The home page's multipart workbook form now submits the session's hidden `csrf_token`. The browser's broad `Accept` header no longer makes `/upload` return raw JSON; JSON responses require an explicit JSON media type, while browser uploads redirect to the ingestion report.
+
+Some subtotal cells in the unstructured workbook have formulas with no saved calculated values and stale references after the workbook was reshaped. The analyzer now reconstructs supported P&L totals from recognized source line items and stores their exact contributing cells and raw values as lineage. Unsupported uncached formulas produce an ingestion warning. AR/AP calculated lineage now lists the contributing source values and avoids ranges that include subtotal rows.
+
+Incomplete Drafts created by the prior importer can be repaired by uploading the same workbook again. The app reuses the report ID, refreshes its facts and lineage transactionally, appends an ingest-run record, and audits the repair. Reviewed or approved reports are not automatically rewritten. A regression simulates the old zero-P&L Draft and proves that re-upload restores the dashboard series.
+
+Latest command: `py -3.13 scripts/verify.py` (2026-09-27; 87.12 seconds; exit 0). All 13 checks passed: compile, lint, unit tests, placeholder scan, dependencies, vendor integrity, template safety, ingest scan, server boot, golden ingest, robustness ingest, smoke e2e, and audit chain.
+
+Latest Windows executable: `dist/CFOPulse-Verified.exe`; 25,689,507 bytes; SHA-256 `F42E1EFAA3633A50F4D3E24B64190C48C7BCC20AA5044ED09D3186B3274E662E`. Rebuilt with `py -3.13 build_exe.py --name CFOPulse-Verified`. Packaged smoke passed, including browser-style form upload and redirect, golden values, three-period and unstructured schedules, dashboard routes, PDF/PPTX export, watcher, scenarios, and occupied-port fallback. Authenticode remains `NotSigned`.
+
+Both `CFO-Pulse-Windows-App.zip` and `CFO-Pulse-GitHub-Ready.zip` were refreshed from this build and passed ZIP integrity checks. Use the updated Windows ZIP/executable; a previously running app instance can continue serving the old code on port 8765.
+
 ## Result
 
 The final source verification harness passes all 13 checks, the refreshed Windows executable passes packaged smoke including the structured and unstructured three-period uploads, and the clean-checkout bootstrap passes. This run adds period focus across dashboard sections; filtered schedule drill-through with source lineage; paginated PDF and PPTX rendering of ordered saved reports; same-month YoY seasonal signals; price, volume, materials-cost, margin, and DSO sensitivities; configurable admin thresholds, units, branding, and session lifetimes; and compact sample workbooks with all dashboard schedules. This is still a partial product release: remaining product gates and external release actions are listed below.
