@@ -1,0 +1,104 @@
+ABC PRIVATE LIMITED - TRAVEL & EXPENSE APP - TEST REPORT
+Date: 27 Sep 2026   Environment: Node.js v22.22.2, Chromium (Playwright), Linux
+
+A. AUTOMATED API WORKFLOW TEST  (tests/api_workflow_test.js - run with: npm test)
+-----------------------------------------------------------------------------
+ 
+ 1. Sign up rules
+   ✔ Fresh database has no users
+   ✔ First sign-up becomes Admin
+   ✔ Email not added by admin is refused sign-up
+   ✔ Wrong password refused
+   ✔ Admin logs in
+ 
+ 2. Admin adds employees with roles
+   ✔ Sales Executive added with assigned Business Head
+   ✔ Duplicate employee email refused
+   ✔ All admin-added employees signed up and logged in
+   ✔ Second sign-up with same email refused
+   ✔ Non-admin cannot open employee dashboard
+ 
+ 3. Pre-travel approval request
+   ✔ Late request (5 days ahead) without justification is blocked
+   ✔ Request submitted -> Pending Business Head
+   ✔ Employee can edit while still pending (before first approval)
+   ✔ MD cannot approve at Business Head stage
+   ✔ Request visible in Business Head approval queue
+   ✔ Business Head approves with revised budget
+   ✔ Employee can no longer edit after approval started
+   ✔ Managing Director approves
+   ✔ Now pending booking with approved budget ₹21000
+   ✔ Late booking exception flagged
+ 
+ 4. Advance & booking
+   ✔ Accountant disburses travel advance ₹5000
+   ✔ Booking 5 Star for Sales Executive without justification blocked (Matrix of Authority)
+   ✔ Travel Assistant books flight + 3 Star hotel
+ 
+ 5. Expense statement with bills
+   ✔ 4 expense lines added
+   ✔ Claim without bills above ₹500 blocked unless remarks given
+   ✔ Bills attached (PDF)
+   ✔ Disallowed file type rejected
+   ✔ Expense statement submitted
+   ✔ Claim ₹4750 pending Business Head
+ 
+ 6. Claim approvals
+   ✔ Business Head approves with one line reduced
+   ✔ HR Head sends claim back
+   ✔ Employee re-submits claim
+   ✔ HR Head gives final approval
+   ✔ Approved ₹4350, pending Accountant
+ 
+ 7. Accounting & payment
+   ✔ Payment processed; net = 4350 - 5000 advance = -650 (recoverable)
+   ✔ Request closed as PAID with full audit trail
+ 
+ 8. Special routing & admin views
+   ✔ Business Head's own request skips BH stage -> Pending MD
+   ✔ Nobody can approve their own request
+   ✔ Analytics: employee-wise & airline-wise data
+   ✔ Analytics: exceptions listed
+   ✔ Analytics restricted to Admin
+   ✔ Sign-in / sign-up events saved in database
+   ✔ Employee received workflow notifications
+ 
+ Result: 43 passed, 0 failed
+ 
+
+B. BROWSER (UI) END-TO-END TEST - fresh database, every role logged in through the login page
+-----------------------------------------------------------------------------
+ • Admin signup: Welcome! You are the first user and have been made the Administrator. Please log in.
+ • Unauthorised signup: This email id is not authorised. Please ask your Admin to add you as an employee first.
+ • Admin dashboard: Welcome, Anita
+ • Employees listed: 7
+ • Employees signed up
+ • Request created: TR-2026-0001 · Mumbai → Delhi stage=Pending Business Head
+ • After BH: Pending Managing Director
+ • After MD: Pending Travel Booking
+ • Advance paid
+ • After booking: Booked - Travel / Submit Expenses
+ • After claim submit: Claim Pending Business Head
+ • After BH claim: Claim Pending HR Head
+ • After HR: Pending Accounting & Payment
+ • After payment: Paid & Closed
+ • Installability errors: [] | manifest errors: [] | SW registered: true
+ • Install button present: true
+ Console errors: [
+   'Failed to load resource: the server responded with a status of 403 (Forbidden)'
+ ]
+
+ Note: the single 403 console entry is the deliberate test of a sign-up by an email id not added by Admin (correctly refused).
+
+C. PWA CHECKS
+-----------------------------------------------------------------------------
+ Chrome installability errors (DevTools Page.getInstallabilityErrors): none
+ Web manifest errors: none   Service worker: registered and active
+ Icons 192/512/maskable, shortcuts, wide + narrow screenshots present; Install App button in menu bar
+
+D. OTHER CHECKS
+-----------------------------------------------------------------------------
+ CSV employee import (Sample_Employee_Import.csv): 8 added, 0 skipped, Business Heads linked
+ CSV export of travel register: OK (Example_Travel_Register_Export.csv)
+ Demo data generator: 15 employees, 46 trips across all stages; analytics & exceptions render with no console errors
+ Responsive layout checked at 390 px (phone), 540 px, 1280 px and 1366 px widths
