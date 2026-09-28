@@ -1,0 +1,1449 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<!--
+  HS Mind Mapper - proof of concept
+  Created by Harshal Sopariwala.
+  Free to use, study and adapt with attribution. Provided as is, without warranty.
+  The sample map is illustrative learning content, not tax advice.
+-->
+
+<meta charset="UTF-8">
+<title>HS Mind Mapper</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<style>
+  :root{
+    --bg:#00434b;
+    --panel:#00535C;
+    --panel-2:#026670;
+    --line:#0d6871;
+    --ink:#ffffff;
+    --ink-dim:#a9d4d2;
+    --accent:#F09721;
+    --accent-dim:#c97a1a;
+    --canvas:#fffdf9;
+    --canvas-dot:#dcebe9;
+    --node:#ffffff;
+    --node-border:#e2ded2;
+    --node-root:#00535C;
+    --danger:#c9502f;
+    --charcoal:#292424;
+    --grey:#878585;
+    --serif:Georgia,'Iowan Old Style','Times New Roman',serif;
+    --mono:'IBM Plex Mono','SF Mono',Menlo,Consolas,monospace;
+  }
+  *{box-sizing:border-box;}
+  html,body{height:100%;margin:0;}
+  body{
+    display:flex;
+    background:var(--bg);
+    color:var(--ink);
+    font-family:var(--mono);
+    font-size:13px;
+    overflow:hidden;
+  }
+
+  /* Sidebar */
+  #sidebar{
+    width:250px;min-width:250px;
+    background:var(--panel);
+    border-right:1px solid var(--line);
+    display:flex;flex-direction:column;
+    transition:width 0.18s ease;
+  }
+  #brand{padding:18px 16px 14px;border-bottom:1px solid var(--line);}
+  #brand .mark{font-family:var(--serif);font-size:20px;color:#ffffff;font-weight:bold;}
+  #brand .mark .v{color:var(--accent);}
+  #brand .sub{font-size:10.5px;color:var(--ink-dim);margin-top:3px;text-transform:uppercase;letter-spacing:0.6px;}
+  #newMapBtn{
+    margin:12px;padding:8px 10px;background:transparent;
+    border:1px dashed var(--accent-dim);color:var(--accent);
+    font-family:var(--mono);font-size:12px;cursor:pointer;border-radius:3px;text-align:left;
+  }
+  #newMapBtn:hover{background:rgba(79,214,137,0.08);border-color:var(--accent);}
+  #mapList{flex:1;overflow-y:auto;padding-bottom:12px;}
+  .mapEntry{padding:10px 16px;border-bottom:1px solid var(--line);cursor:pointer;}
+  .mapEntry:hover{background:var(--panel-2);}
+  .mapEntry.active{background:var(--panel-2);box-shadow:inset 3px 0 0 var(--accent);}
+  .mapEntry .title{font-family:var(--serif);font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .mapEntry .meta{font-size:10px;color:var(--ink-dim);margin-top:4px;}
+  #emptyMaps{padding:20px 16px;color:var(--ink-dim);font-size:11.5px;line-height:1.6;}
+  #footerNote{padding:9px 16px;border-top:1px solid var(--line);font-size:10px;color:var(--ink-dim);line-height:1.5;}
+  #footerNote b{color:var(--accent-dim);}
+
+  /* Main */
+  #main{flex:1;display:flex;flex-direction:column;background:var(--canvas);position:relative;min-width:0;}
+  #toolbar{
+    display:flex;flex-wrap:wrap;align-items:center;gap:8px 10px;
+    padding:10px 16px;border-bottom:1px solid var(--canvas-dot);
+    background:var(--canvas);z-index:5;
+  }
+  #mapTitleInput{
+    border:none;background:transparent;font-family:var(--serif);font-size:18px;
+    color:var(--node-root);outline:none;flex:0 1 240px;min-width:100px;
+    overflow:hidden;text-overflow:ellipsis;
+  }
+  #toolbar .hint{font-size:10.5px;color:var(--grey);flex:1 1 160px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  #toolbar .right{display:flex;flex-wrap:wrap;gap:6px;margin-left:auto;position:relative;}
+  #toolbar .right button{
+    font-family:var(--mono);font-size:11px;padding:6px 11px;border-radius:6px;white-space:nowrap;
+    border:1px solid var(--canvas-dot);background:transparent;color:#00535C;cursor:pointer;
+  }
+  #toolbar .right button:hover{background:#e3f3f2;}
+  #clearBtn{color:var(--danger);border-color:#e6bba5;}
+  #clearBtn:hover{background:#f9e6dc;}
+  #closeMapBtn{color:var(--charcoal);border-color:var(--canvas-dot);}
+
+  #zoomGroup{display:flex;align-items:center;gap:2px;border:1px solid var(--canvas-dot);border-radius:6px;overflow:hidden;}
+  #zoomGroup button{
+    font-family:var(--mono);font-size:13px;padding:6px 10px;border:none;background:transparent;
+    color:#00535C;cursor:pointer;line-height:1;
+  }
+  #zoomGroup button:hover{background:#e3f3f2;}
+  #zoomLabel{
+    font-family:var(--mono);font-size:11px;color:var(--charcoal);padding:0 8px;
+    min-width:42px;text-align:center;cursor:pointer;user-select:none;border-left:1px solid var(--canvas-dot);border-right:1px solid var(--canvas-dot);
+  }
+  #zoomLabel:hover{background:#e3f3f2;}
+
+  #exportMenu{
+    position:absolute;top:calc(100% + 6px);right:0;z-index:50;
+    background:#ffffff;border:1px solid var(--node-border);border-radius:8px;
+    box-shadow:0 6px 20px rgba(0,67,75,0.18);padding:6px;display:none;min-width:150px;
+  }
+  #exportMenu.open{display:block;}
+  #exportMenu .item{
+    padding:8px 10px;font-size:11.5px;color:var(--charcoal);cursor:pointer;border-radius:5px;
+    font-family:var(--mono);
+  }
+  #exportMenu .item:hover{background:#e3f3f2;color:#00535C;}
+
+  /* Sidebar collapse */
+  #sidebarToggle{
+    position:fixed;top:16px;left:262px;z-index:60;
+    width:26px;height:26px;border-radius:50%;
+    background:#00535C;color:#fff;border:2px solid var(--bg);
+    display:flex;align-items:center;justify-content:center;
+    font-size:12px;cursor:pointer;transition:left 0.18s ease;
+    box-shadow:0 2px 6px rgba(0,0,0,0.25);
+  }
+  body.sidebar-collapsed #sidebarToggle{left:10px;}
+  body.sidebar-collapsed #sidebar{width:0;min-width:0;overflow:hidden;border-right:none;}
+
+  #canvasWrap{
+    flex:1;overflow:auto;position:relative;
+    background-color:var(--canvas);
+    background-image:
+      radial-gradient(var(--canvas-dot) 1.5px, transparent 1.5px),
+      radial-gradient(circle at 15% 10%, rgba(240,151,33,0.05), transparent 40%),
+      radial-gradient(circle at 85% 90%, rgba(0,83,92,0.06), transparent 40%);
+    background-size:22px 22px, 100% 100%, 100% 100%;
+  }
+  #canvas{
+    position:relative;width:3000px;height:2000px;
+    transform-origin:0 0;
+  }
+  svg#lines{position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;}
+  svg#lines path{fill:none;stroke-width:2.25;stroke-linecap:round;opacity:0.75;}
+  svg#lines path.rootline{stroke-width:3;opacity:0.9;}
+
+  @keyframes popIn{
+    0%{transform:scale(0.55);opacity:0;}
+    70%{transform:scale(1.06);opacity:1;}
+    100%{transform:scale(1);}
+  }
+
+  .node{
+    position:absolute;
+    min-width:130px;max-width:260px;
+    padding:10px 14px;
+    background:var(--node);
+    border:1.5px solid var(--node-border);
+    border-radius:16px;
+    font-family:var(--serif);
+    font-size:14px;
+    color:var(--charcoal);
+    cursor:grab;
+    box-shadow:0 2px 6px rgba(0,67,75,0.10);
+    user-select:none;
+    transition:transform 0.15s ease, box-shadow 0.15s ease;
+    animation:popIn 0.22s ease;
+  }
+  .node:hover{transform:translateY(-2px);box-shadow:0 6px 16px rgba(0,67,75,0.18);}
+  .node.root{
+    background:linear-gradient(135deg, #00535C, #027a86);
+    color:#ffffff;
+    border-color:#00434b;
+    font-size:16px;
+    font-weight:bold;
+    border-radius:22px;
+    box-shadow:0 4px 14px rgba(0,67,75,0.35);
+  }
+  .node.root:hover{transform:translateY(-2px) scale(1.02);}
+  .node.dragging{cursor:grabbing;box-shadow:0 8px 22px rgba(0,67,75,0.28);z-index:20;transform:scale(1.03);}
+  .node .txt{outline:none;white-space:pre-wrap;word-break:break-word;}
+  .node .controls{
+    position:absolute;top:-11px;right:-11px;display:none;gap:3px;
+  }
+  .node:hover .controls{display:flex;}
+  .node .btn{
+    width:21px;height:21px;border-radius:50%;
+    display:flex;align-items:center;justify-content:center;
+    font-size:12px;line-height:1;cursor:pointer;
+    border:1px solid var(--node-border);background:var(--canvas);color:var(--grey);
+    transition:transform 0.1s ease;
+  }
+  .node .btn:hover{transform:scale(1.15);}
+  .node .btn.add{color:#ffffff;border-color:var(--accent);background:var(--accent);}
+  .node .btn.add:hover{background:var(--accent-dim);border-color:var(--accent-dim);}
+  .node .btn.del{color:var(--danger);border-color:#e6bba5;}
+  .node .btn.del:hover{background:#f9e6dc;}
+  .node .btn.style{color:#00535C;border-color:#a9d4d2;}
+  .node .btn.style:hover{background:#e3f3f2;}
+
+  .collapseHandle{
+    position:absolute;top:50%;right:-11px;transform:translateY(-50%);
+    width:21px;height:21px;border-radius:50%;
+    display:flex;align-items:center;justify-content:center;
+    font-size:11px;line-height:1;cursor:pointer;
+    border:1.5px solid var(--node-border);background:#fffdf9;color:var(--grey);
+    font-family:var(--mono);z-index:6;
+    transition:transform 0.1s ease;
+  }
+  .collapseHandle:hover{transform:translateY(-50%) scale(1.15);}
+  .collapseHandle.hasHidden{background:var(--accent);color:#ffffff;border-color:var(--accent-dim);font-size:9.5px;font-weight:bold;}
+
+  /* Style popover */
+  #stylePop{
+    position:fixed;z-index:100;background:#ffffff;
+    border:1px solid var(--node-border);border-radius:8px;
+    box-shadow:0 6px 20px rgba(40,35,20,0.18);
+    padding:12px;width:250px;font-family:var(--mono);display:none;
+    max-height:80vh;overflow-y:auto;
+  }
+  #stylePop .secLabel{font-size:9.5px;text-transform:uppercase;letter-spacing:0.5px;color:var(--grey);margin:8px 0 6px;}
+  #stylePop .secLabel:first-child{margin-top:0;}
+  #stylePop .swatchRow{display:flex;flex-wrap:wrap;gap:6px;}
+  #stylePop .swatch{width:20px;height:20px;border-radius:50%;cursor:pointer;border:1.5px solid rgba(0,0,0,0.1);}
+  #stylePop .swatch.selected{outline:2px solid #00535C;outline-offset:1.5px;}
+  #stylePop input[type=color]{width:28px;height:20px;border:1px solid var(--node-border);padding:0;cursor:pointer;border-radius:4px;background:none;}
+  #stylePop .fontRow, #stylePop .sizeRow, #stylePop .styleRow{display:flex;gap:5px;}
+  #stylePop .optBtn{
+    flex:1;font-size:10.5px;padding:5px 4px;border:1px solid var(--node-border);
+    border-radius:6px;background:#fffdf9;cursor:pointer;color:var(--charcoal);text-align:center;
+  }
+  #stylePop .optBtn.active{background:#00535C;color:#ffffff;border-color:#00535C;}
+  #stylePop .resetLink{font-size:10px;color:var(--grey);cursor:pointer;margin-top:10px;text-decoration:underline;text-align:right;}
+
+  /* Branch panel — collapse/expand each top-level branch from the central idea */
+  #branchPanel{
+    position:fixed;z-index:100;background:#ffffff;
+    border:1px solid var(--node-border);border-radius:8px;
+    box-shadow:0 6px 20px rgba(0,67,75,0.2);
+    padding:10px;width:230px;font-family:var(--mono);display:none;
+    max-height:70vh;overflow-y:auto;
+  }
+  #branchPanel .panelTitle{font-size:9.5px;text-transform:uppercase;letter-spacing:0.5px;color:var(--grey);margin-bottom:8px;}
+  #branchPanel .branchRow{
+    display:flex;align-items:center;gap:8px;padding:7px 6px;border-radius:6px;cursor:pointer;
+  }
+  #branchPanel .branchRow:hover{background:#f4f6f5;}
+  #branchPanel .dot{width:11px;height:11px;border-radius:50%;flex-shrink:0;}
+  #branchPanel .label{
+    flex:1;font-family:var(--serif);font-size:13px;color:var(--charcoal);
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  }
+  #branchPanel .state{
+    font-size:9.5px;padding:3px 7px;border-radius:10px;font-family:var(--mono);
+    border:1px solid var(--node-border);color:var(--grey);
+  }
+  #branchPanel .state.open{color:#00535C;border-color:#a9d4d2;background:#e3f3f2;}
+  #branchPanel .empty{font-size:11px;color:var(--grey);padding:6px;}
+  #branchPanel .soloBtn{
+    font-size:9.5px;color:var(--accent-dim);border:1px solid var(--accent);border-radius:10px;
+    padding:3px 7px;background:#fff7ec;cursor:pointer;white-space:nowrap;
+  }
+  #branchPanel .soloBtn:hover{background:var(--accent);color:#ffffff;}
+  #branchPanel .showAllLink{font-size:10px;color:var(--grey);cursor:pointer;margin-top:8px;text-decoration:underline;text-align:right;}
+  .node .btn.branches{color:var(--accent-dim);border-color:var(--accent);background:#fff7ec;}
+  .node .btn.branches:hover{background:var(--accent);color:#ffffff;}
+
+  /* Reorder controls — move a node (and its whole subtree) up/down among its siblings */
+  .node .reorderControls{
+    position:absolute;top:-11px;left:-11px;display:none;gap:3px;
+  }
+  .node:hover .reorderControls{display:flex;}
+  .node .btn.reorder{color:#00535C;border-color:#a9d4d2;background:#ffffff;}
+  .node .btn.reorder:hover{background:#e3f3f2;}
+  .node .btn.reorder.disabled{opacity:0.3;cursor:default;pointer-events:none;}
+  .node.root .btn.reorder{background:var(--panel);color:#ffffff;border-color:var(--panel);}
+  .node.dropTarget{outline:3px solid var(--accent);outline-offset:3px;box-shadow:0 0 0 8px rgba(240,151,33,0.22)!important;}
+
+  /* Per-node note strip — always visible, single-line preview by default */
+  .node .noteFooter{
+    margin-top:7px;padding-top:6px;border-top:1px dashed var(--node-border);
+    font-family:var(--mono);font-size:10.5px;color:var(--grey);cursor:pointer;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  }
+  .node .noteFooter.hasNote{color:#00535C;}
+  .node .noteFooter:hover{color:var(--accent-dim);}
+  .node.root .noteFooter{border-top-color:rgba(255,255,255,0.3);color:rgba(255,255,255,0.7);}
+  .node.root .noteFooter.hasNote{color:#ffffff;}
+  .node.root .noteFooter:hover{color:var(--accent);}
+  #canvas.notes-visible .node{max-width:320px;}
+  #canvas.notes-visible .node .noteFooter{
+    white-space:pre-wrap;overflow:visible;text-overflow:clip;
+    font-size:11.5px;line-height:1.55;font-family:var(--serif);
+  }
+
+  /* Note editor modal */
+  #noteModalOverlay{
+    position:fixed;inset:0;background:rgba(0,52,58,0.45);z-index:200;
+    display:none;align-items:center;justify-content:center;padding:24px;
+  }
+  #noteModalOverlay.open{display:flex;}
+  #noteModal{
+    background:#ffffff;border-radius:12px;width:560px;max-width:100%;
+    box-shadow:0 12px 40px rgba(0,0,0,0.3);padding:18px;font-family:var(--mono);
+  }
+  #noteModalHeader{font-size:11px;text-transform:uppercase;letter-spacing:0.5px;color:var(--grey);margin-bottom:4px;}
+  #noteModalTitle{font-family:var(--serif);font-size:18px;color:#00535C;margin-bottom:12px;}
+  #noteTextarea{
+    width:100%;min-height:260px;resize:vertical;
+    font-family:var(--serif);font-size:14.5px;line-height:1.65;color:var(--charcoal);
+    border:1px solid var(--node-border);border-radius:8px;padding:12px 14px;outline:none;box-sizing:border-box;
+  }
+  #noteTextarea:focus{border-color:#00535C;}
+  #noteModalActions{display:flex;justify-content:flex-end;gap:8px;margin-top:12px;}
+  #noteModalActions button{
+    font-family:var(--mono);font-size:12px;padding:8px 16px;border-radius:6px;cursor:pointer;border:1px solid var(--node-border);
+  }
+  #noteCancelBtn{background:transparent;color:var(--charcoal);}
+  #noteCancelBtn:hover{background:#f4f6f5;}
+  #noteSaveBtn{background:#00535C;color:#ffffff;border-color:#00535C;font-weight:bold;}
+  #noteSaveBtn:hover{background:#026670;}
+  #noteModalHint{font-size:10.5px;color:var(--grey);margin-top:8px;}
+
+  #welcome{
+    flex:1;display:flex;align-items:center;justify-content:center;
+    flex-direction:column;color:var(--grey);text-align:center;padding:40px;
+  }
+  #welcome .mark{font-family:var(--serif);font-size:24px;color:#00535C;margin-bottom:8px;}
+  #welcome p{max-width:340px;font-size:12.5px;line-height:1.7;}
+  #welcome button{
+    margin-top:16px;font-family:var(--mono);font-size:12px;padding:9px 16px;
+    background:var(--accent);color:#ffffff;border:none;border-radius:8px;cursor:pointer;font-weight:bold;
+  }
+  #welcome button:hover{background:var(--accent-dim);}
+
+  ::-webkit-scrollbar{width:9px;height:9px;}
+  #sidebar ::-webkit-scrollbar-thumb{background:#0d6871;border-radius:4px;}
+  #canvasWrap::-webkit-scrollbar-thumb{background:#dcebe9;border-radius:4px;}
+</style>
+</head>
+<body>
+
+<button id="sidebarToggle" title="Hide/show panel">‹</button>
+
+<div id="sidebar">
+  <div id="brand">
+    <div class="mark">HS Mind Mapper<span class="v">.</span></div>
+    <div class="sub">Local mind maps · no sync</div>
+  </div>
+  <button id="newMapBtn">+ New map</button>
+  <div id="mapList"></div>
+  <div id="footerNote"><b>Stored locally</b> in this browser only. Nothing is uploaded. Export a map before clearing browser data.</div>
+</div>
+
+<div id="stylePop">
+  <div class="secLabel">Brand colours</div>
+  <div class="swatchRow" id="swatchRow"></div>
+  <div class="secLabel">Full spectrum</div>
+  <div class="swatchRow" id="spectrumRow"></div>
+  <div class="secLabel">Custom — pick any colour</div>
+  <input type="color" id="customColorInput" style="width:100%;height:30px;">
+  <div class="secLabel">Font</div>
+  <div class="fontRow" id="fontRow"></div>
+  <div class="secLabel">Size</div>
+  <div class="sizeRow" id="sizeRow"></div>
+  <div class="secLabel">Style</div>
+  <div class="styleRow" id="styleRow"></div>
+  <div class="resetLink" id="resetStyleLink">Reset to branch default</div>
+</div>
+
+<div id="branchPanel">
+  <div class="panelTitle" id="branchPanelTitle">Branches</div>
+  <div id="branchList"></div>
+</div>
+
+<div id="noteModalOverlay">
+  <div id="noteModal">
+    <div id="noteModalHeader">Note</div>
+    <div id="noteModalTitle">Untitled</div>
+    <textarea id="noteTextarea" placeholder="Write a brief or long note here — explanations, formulas, examples. This can be as short or as detailed as you like."></textarea>
+    <div id="noteModalHint">Formulas and worked examples are fine as plain text — line breaks are kept as written.</div>
+    <div id="noteModalActions">
+      <button id="noteCancelBtn">Cancel</button>
+      <button id="noteSaveBtn">Save note</button>
+    </div>
+  </div>
+</div>
+
+<div id="main">
+  <div id="welcome">
+    <div class="mark">No map selected</div>
+    <p>Pick a map from the left, or start a new one. Double-click the canvas to drop an idea, or use + on any node to branch off it.</p>
+    <button onclick="createMap()">+ New map</button>
+  </div>
+</div>
+
+<script>
+const STORAGE_KEY = 'atlas_maps_v1';
+let maps = [];
+let activeMapId = null;
+let dragState = null;
+let styleTargetId = null;
+
+// ---- colour system ----
+// Base hues assigned to top-level branches (children of the root), cycling in order.
+// Derived from a teal and orange brand pair (teal #00535C, orange #F09721) plus in-family tints/shades for variety.
+const BRANCH_PALETTE = ['#F09721','#00535C','#0B7A82','#C97A1A','#127D6E','#E8890E','#035E6B','#B56A17'];
+const FONTS = [
+  { key:'serif', label:'Serif', css:"Georgia,'Iowan Old Style','Times New Roman',serif" },
+  { key:'sans', label:'Sans', css:"'Helvetica Neue',Arial,sans-serif" },
+  { key:'mono', label:'Mono', css:"'IBM Plex Mono','SF Mono',Menlo,monospace" },
+  { key:'slab', label:'Slab', css:"'Rockwell','Roboto Slab',serif" }
+];
+const SIZES = [ { key:'s', label:'S', px:12.5 }, { key:'m', label:'M', px:14 }, { key:'l', label:'L', px:17 } ];
+
+function hexToRgb(hex){
+  hex = hex.replace('#','');
+  if(hex.length===3) hex = hex.split('').map(c=>c+c).join('');
+  const n = parseInt(hex,16);
+  return { r:(n>>16)&255, g:(n>>8)&255, b:n&255 };
+}
+function rgbToHex(r,g,b){
+  return '#' + [r,g,b].map(v=>Math.round(Math.max(0,Math.min(255,v))).toString(16).padStart(2,'0')).join('');
+}
+// Mix a colour toward white by `amount` (0-1) to produce a lighter tint for deeper branch levels.
+function lighten(hex, amount){
+  const {r,g,b} = hexToRgb(hex);
+  return rgbToHex(r+(255-r)*amount, g+(255-g)*amount, b+(255-b)*amount);
+}
+// Border/text tint: mix toward black slightly for a readable outline on light backgrounds.
+function darken(hex, amount){
+  const {r,g,b} = hexToRgb(hex);
+  return rgbToHex(r*(1-amount), g*(1-amount), b*(1-amount));
+}
+// Convert HSL (h in degrees, s/l in %) to hex, used to generate the full-spectrum swatches.
+function hslToHex(h, s, l){
+  s /= 100; l /= 100;
+  const k = n => (n + h/30) % 12;
+  const a = s * Math.min(l, 1-l);
+  const f = n => l - a * Math.max(-1, Math.min(k(n)-3, Math.min(9-k(n), 1)));
+  return rgbToHex(255*f(0), 255*f(8), 255*f(4));
+}
+
+function uid(){ return Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
+function loadMaps(){
+  try{ const raw = localStorage.getItem(STORAGE_KEY); maps = raw ? JSON.parse(raw) : []; }
+  catch(e){ maps = []; }
+}
+function saveMaps(){ localStorage.setItem(STORAGE_KEY, JSON.stringify(maps)); }
+function fmtDate(ts){
+  const d = new Date(ts);
+  return d.toLocaleDateString(undefined,{day:'2-digit',month:'short'}) + ' · ' + d.toLocaleTimeString(undefined,{hour:'2-digit',minute:'2-digit'});
+}
+function escapeHtml(s){
+  return (s||'').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+function createMap(){
+  const rootId = uid();
+  const m = {
+    id: uid(),
+    title: 'Untitled map',
+    updated: Date.now(),
+    nodes: [{ id: rootId, text:'Central idea', x:1300, y:900, parent:null, root:true, font:'serif', size:'m', bold:false, italic:false, note:'' }],
+    branchCount: 0,
+    zoom: 1
+  };
+  maps.unshift(m);
+  saveMaps();
+  activeMapId = m.id;
+  renderMapList();
+  renderMain();
+}
+
+function deleteMap(id, ev){
+  ev && ev.stopPropagation();
+  if(!confirm('Delete this entire map? This cannot be undone.')) return;
+  maps = maps.filter(m => m.id !== id);
+  saveMaps();
+  if(activeMapId === id) activeMapId = null;
+  renderMapList();
+  renderMain();
+}
+
+function selectMap(id){
+  activeMapId = id;
+  renderMapList();
+  renderMain();
+}
+
+function getActiveMap(){ return maps.find(m => m.id === activeMapId); }
+
+function renderMapList(){
+  const list = document.getElementById('mapList');
+  if(maps.length === 0){
+    list.innerHTML = `<div id="emptyMaps">No maps yet. Start your first one.</div>`;
+    return;
+  }
+  const sorted = [...maps].sort((a,b)=> b.updated - a.updated);
+  list.innerHTML = sorted.map(m => {
+    const active = m.id === activeMapId ? 'active' : '';
+    return `<div class="mapEntry ${active}" onclick="selectMap('${m.id}')">
+      <div class="title">${escapeHtml(m.title || 'Untitled map')}</div>
+      <div class="meta">${m.nodes.length} node${m.nodes.length===1?'':'s'} · ${fmtDate(m.updated)}</div>
+    </div>`;
+  }).join('');
+}
+
+function renderMain(){
+  const main = document.getElementById('main');
+  const m = getActiveMap();
+  closeStylePopover();
+  closeBranchPanel();
+  if(!m){
+    main.innerHTML = `<div id="welcome">
+      <div class="mark">No map selected</div>
+      <p>Pick a map from the left, or start a new one. Double-click the canvas to drop an idea, or use + on any node to branch off it.</p>
+      <button onclick="createMap()">+ New map</button>
+    </div>`;
+    return;
+  }
+  main.innerHTML = `
+    <div id="toolbar">
+      <input id="mapTitleInput" value="${escapeHtml(m.title)}">
+      <div class="hint">Dbl-click: new idea · Drag onto another node: reparent · + branch · 🎨 style · − collapse</div>
+      <div class="right">
+        <div id="zoomGroup">
+          <button id="zoomOutBtn" title="Zoom out">−</button>
+          <div id="zoomLabel" title="Reset to 100%">100%</div>
+          <button id="zoomInBtn" title="Zoom in">+</button>
+        </div>
+        <button id="toggleNotesBtn">${m.notesVisible ? 'Hide notes' : 'Show all notes'}</button>
+        <button id="expandAllBtn">Expand all</button>
+        <button id="collapseAllBtn">Collapse all</button>
+        <button id="exportToggleBtn">Export ▾</button>
+        <div id="exportMenu">
+          <div class="item" id="exportPngItem">Export as Image (.png)</div>
+          <div class="item" id="exportPdfItem">Export as PDF</div>
+          <div class="item" id="exportNotesDocItem">Export notes as document (print/PDF)</div>
+          <div class="item" id="exportJsonItem">Export as data (.json)</div>
+        </div>
+        <button id="closeMapBtn">Close map</button>
+        <button id="clearBtn">Delete map</button>
+      </div>
+    </div>
+    <div id="canvasWrap">
+      <div id="canvas">
+        <svg id="lines"></svg>
+      </div>
+    </div>
+  `;
+  document.getElementById('mapTitleInput').oninput = e => {
+    m.title = e.target.value; m.updated = Date.now(); saveMaps(); renderMapList();
+  };
+  document.getElementById('closeMapBtn').onclick = () => {
+    activeMapId = null;
+    renderMapList();
+    renderMain();
+  };
+  document.getElementById('clearBtn').onclick = (e) => deleteMap(m.id, e);
+  document.getElementById('toggleNotesBtn').onclick = (e) => {
+    m.notesVisible = !m.notesVisible;
+    m.updated = Date.now();
+    saveMaps();
+    document.getElementById('canvas').classList.toggle('notes-visible', m.notesVisible);
+    e.target.textContent = m.notesVisible ? 'Hide notes' : 'Show all notes';
+  };
+  document.getElementById('exportToggleBtn').onclick = (e) => {
+    e.stopPropagation();
+    document.getElementById('exportMenu').classList.toggle('open');
+  };
+  document.getElementById('exportPngItem').onclick = () => { document.getElementById('exportMenu').classList.remove('open'); exportImage(m); };
+  document.getElementById('exportPdfItem').onclick = () => { document.getElementById('exportMenu').classList.remove('open'); exportPdf(m); };
+  document.getElementById('exportNotesDocItem').onclick = () => { document.getElementById('exportMenu').classList.remove('open'); exportNotesDocument(m); };
+  document.getElementById('exportJsonItem').onclick = () => { document.getElementById('exportMenu').classList.remove('open'); exportMap(m.id); };
+  document.getElementById('collapseAllBtn').onclick = () => {
+    m.nodes.forEach(n => { if(hasChildren(m, n.id)) n.collapsed = true; });
+    m.updated = Date.now(); saveMaps(); renderNodes(m);
+  };
+  document.getElementById('expandAllBtn').onclick = () => {
+    m.nodes.forEach(n => { n.collapsed = false; });
+    m.updated = Date.now(); saveMaps(); renderNodes(m);
+  };
+  document.getElementById('canvasWrap').ondblclick = (e) => {
+    if(e.target.id === 'canvasWrap' || e.target.id === 'canvas' || e.target.id === 'lines'){
+      const rect = document.getElementById('canvas').getBoundingClientRect();
+      const zoom = m.zoom || 1;
+      const x = (e.clientX - rect.left) / zoom;
+      const y = (e.clientY - rect.top) / zoom;
+      addNode(m, null, x, y);
+    }
+  };
+  document.getElementById('canvasWrap').addEventListener('wheel', (e) => {
+    if(!e.ctrlKey && !e.metaKey) return;
+    e.preventDefault();
+    setZoom(m, (m.zoom || 1) + (e.deltaY < 0 ? 0.1 : -0.1));
+  }, { passive:false });
+  document.getElementById('zoomInBtn').onclick = () => setZoom(m, (m.zoom || 1) + 0.1);
+  document.getElementById('zoomOutBtn').onclick = () => setZoom(m, (m.zoom || 1) - 0.1);
+  document.getElementById('zoomLabel').onclick = () => setZoom(m, 1);
+  renderNodes(m);
+  applyZoom(m);
+  centerOnRoot(m);
+  if(m.notesVisible) document.getElementById('canvas').classList.add('notes-visible');
+}
+
+// Scrolls the canvas so the central idea starts centred in view, instead of at the
+// canvas's raw top-left corner where it'd otherwise be off-screen.
+function centerOnRoot(m){
+  const root = m.nodes.find(n => n.root);
+  const wrap = document.getElementById('canvasWrap');
+  if(!root || !wrap) return;
+  const zoom = m.zoom || 1;
+  const targetX = (root.x + 65) * zoom;
+  const targetY = (root.y + 20) * zoom;
+  wrap.scrollLeft = Math.max(0, targetX - wrap.clientWidth / 2);
+  wrap.scrollTop = Math.max(0, targetY - wrap.clientHeight / 2);
+}
+
+// Zoom is display-only (a CSS transform on #canvas); node x/y stay in the map's own
+// coordinate space, so drag and double-click handlers divide client coordinates by
+// the current zoom to convert back to that space.
+function setZoom(m, value){
+  m.zoom = Math.max(0.4, Math.min(2, Math.round(value * 20) / 20));
+  saveMaps();
+  applyZoom(m);
+}
+function applyZoom(m){
+  const canvas = document.getElementById('canvas');
+  const label = document.getElementById('zoomLabel');
+  if(!canvas) return;
+  const zoom = m.zoom || 1;
+  canvas.style.transform = 'scale(' + zoom + ')';
+  if(label) label.textContent = Math.round(zoom * 100) + '%';
+}
+
+// Spreads siblings outward from the parent's vertical centre: 0, 1, -1, 2, -2, ...
+// so a new branch never lands stacked on top of an existing one.
+function spreadIndex(i){
+  if(i === 0) return 0;
+  return i % 2 === 1 ? Math.ceil(i/2) : -Math.ceil(i/2);
+}
+
+function addNode(m, parentId, x, y){
+  const parent = parentId ? m.nodes.find(n => n.id === parentId) : null;
+  let color, font, size, bold, italic, nx, ny;
+
+  if(parent){
+    const siblings = m.nodes.filter(n => n.parent === parentId);
+    const spread = spreadIndex(siblings.length);
+    nx = parent.x + 260;
+    ny = parent.y + spread * 120;
+  } else {
+    nx = x - 60; ny = y - 20;
+  }
+
+  if(!parent || parent.root){
+    // New top-level branch off the central idea: pick a random hue from the full spectrum,
+    // keeping it a good distance from the last one so consecutive branches look distinct.
+    let hue = Math.floor(Math.random() * 360);
+    if(m.lastHue !== undefined){
+      let attempts = 0;
+      while(Math.min(Math.abs(hue - m.lastHue), 360 - Math.abs(hue - m.lastHue)) < 40 && attempts < 12){
+        hue = Math.floor(Math.random() * 360);
+        attempts++;
+      }
+    }
+    m.lastHue = hue;
+    color = hslToHex(hue, 68, 46);
+    font = 'serif'; size = 'm'; bold = false; italic = false;
+  } else {
+    // Sub-branch: inherit the parent's palette, one step lighter.
+    const baseColor = parent.color || BRANCH_PALETTE[0];
+    color = lighten(baseColor, 0.32);
+    font = parent.font; size = parent.size; bold = parent.bold; italic = parent.italic;
+  }
+
+  const n = { id: uid(), text:'New idea', x: nx, y: ny, parent: parentId, root:false, color, font, size, bold, italic, note:'' };
+  m.nodes.push(n);
+  m.updated = Date.now();
+  saveMaps();
+  renderNodes(m);
+  renderMapList();
+  setTimeout(()=>{
+    const el = document.querySelector(`.node[data-id="${n.id}"] .txt`);
+    if(el){ el.focus(); document.execCommand('selectAll', false, null); }
+  }, 30);
+}
+
+// Recompute this node's descendants as progressively lighter tints of its own colour —
+// called after a manual colour change so the branch stays a consistent, lightening palette.
+function cascadeColor(m, nodeId){
+  const byParent = {};
+  m.nodes.forEach(n => { if(n.parent){ (byParent[n.parent] = byParent[n.parent]||[]).push(n); } });
+  const start = m.nodes.find(n=>n.id===nodeId);
+  if(!start) return;
+  const walk = (node, baseColor, depth) => {
+    const children = byParent[node.id] || [];
+    children.forEach(c => {
+      c.color = lighten(baseColor, Math.min(0.32*depth, 0.88));
+      walk(c, baseColor, depth+1);
+    });
+  };
+  walk(start, start.color, 1);
+}
+
+function deleteNode(m, id, ev){
+  ev && ev.stopPropagation();
+  const node = m.nodes.find(n=>n.id===id);
+  if(node && node.root){ alert("Can't delete the central idea. Delete the whole map instead."); return; }
+  if(!confirm('Delete this node and its branches?')) return;
+  const toDelete = new Set([id]);
+  let changed = true;
+  while(changed){
+    changed = false;
+    m.nodes.forEach(n => {
+      if(n.parent && toDelete.has(n.parent) && !toDelete.has(n.id)){
+        toDelete.add(n.id); changed = true;
+      }
+    });
+  }
+  m.nodes = m.nodes.filter(n => !toDelete.has(n.id));
+  m.updated = Date.now();
+  saveMaps();
+  renderNodes(m);
+  renderMapList();
+}
+
+function hasChildren(m, id){
+  return m.nodes.some(n => n.parent === id);
+}
+
+// IDs of nodes hidden because an ancestor is collapsed.
+function getHiddenIds(m){
+  const hidden = new Set();
+  const byParent = {};
+  m.nodes.forEach(n => { if(n.parent){ (byParent[n.parent] = byParent[n.parent]||[]).push(n); } });
+  const hideSubtree = (id) => {
+    (byParent[id]||[]).forEach(c => { hidden.add(c.id); hideSubtree(c.id); });
+  };
+  m.nodes.forEach(n => { if(n.collapsed) hideSubtree(n.id); });
+  return hidden;
+}
+// Count of nodes hidden directly beneath a collapsed node (for the badge).
+function countDescendants(m, id){
+  const byParent = {};
+  m.nodes.forEach(n => { if(n.parent){ (byParent[n.parent] = byParent[n.parent]||[]).push(n); } });
+  let count = 0;
+  const walk = (pid) => { (byParent[pid]||[]).forEach(c => { count++; walk(c.id); }); };
+  walk(id);
+  return count;
+}
+
+// All descendant IDs of a node (not including the node itself).
+function getDescendantIds(m, id){
+  const byParent = {};
+  m.nodes.forEach(n => { if(n.parent){ (byParent[n.parent] = byParent[n.parent]||[]).push(n); } });
+  const ids = [];
+  const walk = (pid) => { (byParent[pid]||[]).forEach(c => { ids.push(c.id); walk(c.id); }); };
+  walk(id);
+  return ids;
+}
+
+// Recomputes a node's colour to match its (possibly new) parent — a fresh random hue if the
+// parent is the central idea, or a lighter tint of the parent's colour otherwise — then
+// cascades that down through its own descendants so the whole branch stays consistent.
+function reassignBranchColor(m, node){
+  const parent = node.parent ? m.nodes.find(p => p.id === node.parent) : null;
+  if(!parent || parent.root){
+    node.color = hslToHex(Math.floor(Math.random() * 360), 68, 46);
+  } else {
+    node.color = lighten(parent.color || '#00535C', 0.32);
+  }
+  cascadeColor(m, node.id);
+}
+
+// Promote (↑): the node becomes a sibling of its current parent — reconnected directly to
+// its grandparent — instead of staying nested underneath it. Its whole subtree moves with it,
+// repositioned near the grandparent, and its colour is reassigned to match its new branch.
+function promoteNode(m, nodeId){
+  const node = m.nodes.find(n => n.id === nodeId);
+  if(!node || !node.parent) return;
+  const parent = m.nodes.find(n => n.id === node.parent);
+  if(!parent || parent.root || !parent.parent) return; // already top-level — nothing to promote to
+  const grandparent = m.nodes.find(n => n.id === parent.parent);
+  if(!grandparent) return;
+
+  const siblingsAtNewLevel = m.nodes.filter(n => n.parent === grandparent.id && n.id !== node.id);
+  const spread = spreadIndex(siblingsAtNewLevel.length);
+  const nx = grandparent.x + 260;
+  const ny = grandparent.y + spread * 120;
+  const dx = nx - node.x, dy = ny - node.y;
+  const subtreeIds = [node.id, ...getDescendantIds(m, node.id)];
+  subtreeIds.forEach(id => { const x = m.nodes.find(n => n.id === id); if(x){ x.x += dx; x.y += dy; } });
+
+  node.parent = grandparent.id;
+  reassignBranchColor(m, node);
+
+  m.updated = Date.now();
+  saveMaps();
+  renderNodes(m);
+}
+
+// Demote (↓): the node becomes a child of the sibling just above it — nesting one level
+// deeper, connected to that sibling instead of the shared parent. Subtree and colour follow.
+function demoteNode(m, nodeId){
+  const node = m.nodes.find(n => n.id === nodeId);
+  if(!node || !node.parent) return;
+  const siblings = m.nodes.filter(n => n.parent === node.parent).sort((a,b) => a.y - b.y);
+  const idx = siblings.findIndex(n => n.id === nodeId);
+  if(idx <= 0) return; // no earlier sibling to nest under
+  const newParent = siblings[idx - 1];
+
+  const childrenOfNewParent = m.nodes.filter(n => n.parent === newParent.id);
+  const spread = spreadIndex(childrenOfNewParent.length);
+  const nx = newParent.x + 260;
+  const ny = newParent.y + spread * 120;
+  const dx = nx - node.x, dy = ny - node.y;
+  const subtreeIds = [node.id, ...getDescendantIds(m, node.id)];
+  subtreeIds.forEach(id => { const x = m.nodes.find(n => n.id === id); if(x){ x.x += dx; x.y += dy; } });
+
+  node.parent = newParent.id;
+  reassignBranchColor(m, node);
+
+  m.updated = Date.now();
+  saveMaps();
+  renderNodes(m);
+}
+
+// True if `nodeId` is somewhere in the subtree below `ancestorId` — used to block a drag-drop
+// reparent that would nest a node inside its own descendant (which would create a cycle).
+function isDescendantOf(m, ancestorId, nodeId){
+  let current = m.nodes.find(n => n.id === nodeId);
+  while(current && current.parent){
+    if(current.parent === ancestorId) return true;
+    current = m.nodes.find(n => n.id === current.parent);
+  }
+  return false;
+}
+
+// Reparents a node onto wherever it was dropped — drag it onto the grandparent (or any other
+// node) to reconnect it there directly; drag it back later to undo. Position stays exactly
+// where it was dropped; colour is reassigned to match the new branch.
+function reparentNodeByDrop(m, nodeId, newParentId){
+  const node = m.nodes.find(n => n.id === nodeId);
+  if(!node || node.root) return;
+  if(node.parent === newParentId) return;
+  if(newParentId === node.id || isDescendantOf(m, node.id, newParentId)) return;
+  node.parent = newParentId;
+  reassignBranchColor(m, node);
+  m.updated = Date.now();
+  saveMaps();
+  renderNodes(m);
+}
+
+function renderNodes(m){
+  const canvas = document.getElementById('canvas');
+  canvas.querySelectorAll('.node').forEach(el => el.remove());
+  const hiddenIds = getHiddenIds(m);
+
+  m.nodes.forEach(n => {
+    if(hiddenIds.has(n.id)) return;
+    const div = document.createElement('div');
+    div.className = 'node' + (n.root ? ' root' : '');
+    div.dataset.id = n.id;
+    div.style.left = n.x + 'px';
+    div.style.top = n.y + 'px';
+    const nodeHasChildren = hasChildren(m, n.id);
+    const noteText = (n.note || '').trim();
+
+    let canPromote = false, canDemote = false;
+    if(n.parent){
+      const parent = m.nodes.find(x => x.id === n.parent);
+      canPromote = !!(parent && !parent.root && parent.parent);
+      const siblings = m.nodes.filter(x => x.parent === n.parent).sort((a,b) => a.y - b.y);
+      const idx = siblings.findIndex(x => x.id === n.id);
+      canDemote = idx > 0;
+    }
+
+    div.innerHTML = `
+      <div class="txt" contenteditable="true" spellcheck="false">${escapeHtml(n.text)}</div>
+      <div class="noteFooter${noteText ? ' hasNote' : ''}" title="Click to write or read the note">${noteText ? escapeHtml(noteText) : '+ Add note'}</div>
+      <div class="controls">
+        <div class="btn add" title="Add branch">+</div>
+        <div class="btn style" title="Colour, font, style">🎨</div>
+        ${nodeHasChildren ? '<div class="btn branches" title="Show one branch at a time">🌿</div>' : ''}
+        ${n.root ? '' : '<div class="btn del" title="Delete">×</div>'}
+      </div>
+      ${n.parent ? `<div class="reorderControls">
+        <div class="btn reorder${canPromote ? '' : ' disabled'}" title="Promote — make this a sibling of its parent, connected to the grandparent">↑</div>
+        <div class="btn reorder${canDemote ? '' : ' disabled'}" title="Demote — nest this under the sibling just above it">↓</div>
+      </div>` : ''}
+    `;
+    applyNodeStyle(div, n);
+
+    if(nodeHasChildren){
+      const handle = document.createElement('div');
+      const hiddenCount = n.collapsed ? countDescendants(m, n.id) : 0;
+      handle.className = 'collapseHandle' + (n.collapsed ? ' hasHidden' : '');
+      handle.title = n.collapsed ? 'Expand branch' : 'Collapse branch';
+      handle.textContent = n.collapsed ? hiddenCount : '−';
+      handle.addEventListener('click', (e) => {
+        e.stopPropagation();
+        n.collapsed = !n.collapsed;
+        m.updated = Date.now();
+        saveMaps();
+        renderNodes(m);
+      });
+      div.appendChild(handle);
+    }
+
+    canvas.appendChild(div);
+
+    if(n.parent){
+      const reorderBtns = div.querySelectorAll('.btn.reorder');
+      if(reorderBtns[0]) reorderBtns[0].addEventListener('click', (e) => { e.stopPropagation(); promoteNode(m, n.id); });
+      if(reorderBtns[1]) reorderBtns[1].addEventListener('click', (e) => { e.stopPropagation(); demoteNode(m, n.id); });
+    }
+
+    div.querySelector('.noteFooter').addEventListener('click', (e) => {
+      e.stopPropagation();
+      openNoteModal(m, n);
+    });
+    div.querySelector('.noteFooter').addEventListener('mousedown', e => e.stopPropagation());
+
+    const txt = div.querySelector('.txt');
+    txt.addEventListener('blur', () => {
+      n.text = txt.innerText.trim() || 'Untitled';
+      m.updated = Date.now();
+      saveMaps();
+      renderMapList();
+    });
+    txt.addEventListener('keydown', e => {
+      if(e.key === 'Enter'){ e.preventDefault(); txt.blur(); }
+    });
+    txt.addEventListener('mousedown', e => e.stopPropagation());
+
+    div.querySelector('.btn.add').addEventListener('click', (e) => {
+      e.stopPropagation();
+      if(n.collapsed) n.collapsed = false;
+      addNode(m, n.id);
+    });
+    div.querySelector('.btn.style').addEventListener('click', (e) => {
+      e.stopPropagation();
+      openStylePopover(m, n, e.currentTarget);
+    });
+    const delBtn = div.querySelector('.btn.del');
+    if(delBtn) delBtn.addEventListener('click', (e) => deleteNode(m, n.id, e));
+    const branchesBtn = div.querySelector('.btn.branches');
+    if(branchesBtn) branchesBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      openBranchPanel(m, n, e.currentTarget);
+    });
+
+    div.addEventListener('mousedown', (e) => {
+      if(e.target.closest('.btn') || e.target.classList.contains('txt') || e.target.classList.contains('noteFooter')) return;
+      const canvasRect = canvas.getBoundingClientRect();
+      const zoom = m.zoom || 1;
+      const localX = (e.clientX - canvasRect.left) / zoom;
+      const localY = (e.clientY - canvasRect.top) / zoom;
+      dragState = { mapId: m.id, nodeId: n.id, isRoot: n.root, offsetX: localX - n.x, offsetY: localY - n.y, dropTargetId: null };
+      div.classList.add('dragging');
+    });
+  });
+
+  drawLines(m);
+}
+
+// Apply a node's colour/font/size/style fields as inline CSS.
+function applyNodeStyle(div, n){
+  const fontDef = FONTS.find(f => f.key === n.font) || FONTS[0];
+  const sizeDef = SIZES.find(s => s.key === n.size) || SIZES[1];
+  const txt = div.querySelector('.txt');
+  if(txt){
+    txt.style.fontFamily = fontDef.css;
+    txt.style.fontSize = sizeDef.px + 'px';
+    txt.style.fontWeight = n.bold ? 'bold' : (n.root ? 'bold' : 'normal');
+    txt.style.fontStyle = n.italic ? 'italic' : 'normal';
+  }
+  if(!n.root && n.color){
+    div.style.background = lighten(n.color, 0.80);
+    div.style.borderColor = lighten(n.color, 0.25);
+    div.style.borderLeft = '4px solid ' + n.color;
+  }
+}
+
+function hashSign(id){
+  let sum = 0;
+  for(let i=0;i<id.length;i++) sum += id.charCodeAt(i);
+  return sum % 2 === 0 ? 1 : -1;
+}
+
+function drawLines(m){
+  const svg = document.getElementById('lines');
+  if(!svg) return;
+  const byId = {};
+  m.nodes.forEach(n => byId[n.id] = n);
+  const hiddenIds = getHiddenIds(m);
+  let html = '';
+  m.nodes.forEach(n => {
+    if(hiddenIds.has(n.id)) return;
+    if(n.parent && byId[n.parent] && !hiddenIds.has(n.parent)){
+      const p = byId[n.parent];
+      const cls = p.root ? 'rootline' : '';
+      const x1 = p.x + 60, y1 = p.y + 18, x2 = n.x + 60, y2 = n.y + 18;
+      const dx = x2 - x1, dy = y2 - y1;
+      const dist = Math.sqrt(dx*dx + dy*dy) || 1;
+      const bow = Math.min(dist * 0.28, 70) * hashSign(n.id);
+      // perpendicular offset from the midpoint gives the line a gentle, organic bow
+      const mx = (x1 + x2) / 2 - (dy / dist) * bow;
+      const my = (y1 + y2) / 2 + (dx / dist) * bow;
+      const stroke = n.color ? lighten(n.color, 0.15) : '#F09721';
+      html += `<path class="${cls}" d="M ${x1} ${y1} Q ${mx} ${my} ${x2} ${y2}" stroke="${stroke}"/>`;
+    }
+  });
+  svg.innerHTML = html;
+}
+
+document.addEventListener('mousemove', (e) => {
+  if(!dragState) return;
+  const m = maps.find(m => m.id === dragState.mapId);
+  if(!m) return;
+  const n = m.nodes.find(n => n.id === dragState.nodeId);
+  if(!n) return;
+  const canvasEl = document.getElementById('canvas');
+  const zoom = m.zoom || 1;
+  const canvasRect = canvasEl.getBoundingClientRect();
+  const localX = (e.clientX - canvasRect.left) / zoom;
+  const localY = (e.clientY - canvasRect.top) / zoom;
+  n.x = localX - dragState.offsetX;
+  n.y = localY - dragState.offsetY;
+  const div = document.querySelector(`.node[data-id="${n.id}"]`);
+  if(div){ div.style.left = n.x + 'px'; div.style.top = n.y + 'px'; }
+  drawLines(m);
+
+  // Highlight whichever other node the cursor is currently over, as a valid drop target for
+  // reparenting — unless this node is the root, or the hovered node is itself or its descendant.
+  const prevHighlight = document.querySelector('.node.dropTarget');
+  if(prevHighlight) prevHighlight.classList.remove('dropTarget');
+  dragState.dropTargetId = null;
+  if(!dragState.isRoot){
+    const hits = document.elementsFromPoint(e.clientX, e.clientY);
+    const targetEl = hits.find(el => el.classList && el.classList.contains('node') && el.dataset.id !== n.id);
+    if(targetEl && !isDescendantOf(m, n.id, targetEl.dataset.id)){
+      targetEl.classList.add('dropTarget');
+      dragState.dropTargetId = targetEl.dataset.id;
+    }
+  }
+});
+document.addEventListener('mouseup', () => {
+  if(!dragState) return;
+  const m = maps.find(m => m.id === dragState.mapId);
+  document.querySelectorAll('.node.dragging').forEach(el => el.classList.remove('dragging'));
+  const dropId = dragState.dropTargetId;
+  const nodeId = dragState.nodeId;
+  document.querySelectorAll('.node.dropTarget').forEach(el => el.classList.remove('dropTarget'));
+  if(m){
+    m.updated = Date.now();
+    saveMaps();
+    if(dropId) reparentNodeByDrop(m, nodeId, dropId);
+  }
+  dragState = null;
+});
+
+function openStylePopover(m, n, anchorEl){
+  styleTargetId = n.id;
+  const pop = document.getElementById('stylePop');
+  const rect = anchorEl.getBoundingClientRect();
+  pop.style.display = 'block';
+  pop.style.top = Math.min(rect.bottom + 6, window.innerHeight - 420) + 'px';
+  pop.style.left = Math.min(rect.left, window.innerWidth - 266) + 'px';
+
+  const currentColor = (n.color || BRANCH_PALETTE[0]).toLowerCase();
+
+  // Brand palette (teal/orange family)
+  const swatchRow = document.getElementById('swatchRow');
+  swatchRow.innerHTML = BRANCH_PALETTE.map(c =>
+    `<div class="swatch ${c.toLowerCase()===currentColor?'selected':''}" style="background:${c}" data-color="${c}"></div>`
+  ).join('');
+  swatchRow.querySelectorAll('.swatch').forEach(sw => {
+    sw.addEventListener('click', () => { setNodeColor(m, n, sw.dataset.color); openStylePopover(m, n, anchorEl); });
+  });
+
+  // Full spectrum — 24 hues around the colour wheel
+  const spectrumRow = document.getElementById('spectrumRow');
+  const spectrumColors = Array.from({length:24}, (_,i) => hslToHex(i * 15, 70, 52));
+  spectrumRow.innerHTML = spectrumColors.map(c =>
+    `<div class="swatch ${c.toLowerCase()===currentColor?'selected':''}" style="background:${c}" data-color="${c}"></div>`
+  ).join('');
+  spectrumRow.querySelectorAll('.swatch').forEach(sw => {
+    sw.addEventListener('click', () => { setNodeColor(m, n, sw.dataset.color); openStylePopover(m, n, anchorEl); });
+  });
+
+  // Custom — full-range colour picker
+  const customInput = document.getElementById('customColorInput');
+  customInput.value = n.color || BRANCH_PALETTE[0];
+  customInput.oninput = (e) => setNodeColor(m, n, e.target.value);
+
+  // Font
+  const fontRow = document.getElementById('fontRow');
+  fontRow.innerHTML = FONTS.map(f =>
+    `<div class="optBtn ${n.font===f.key?'active':''}" data-font="${f.key}" style="font-family:${f.css}">${f.label}</div>`
+  ).join('');
+  fontRow.querySelectorAll('.optBtn').forEach(b => {
+    b.addEventListener('click', () => { n.font = b.dataset.font; commitNodeStyle(m); openStylePopover(m, n, anchorEl); });
+  });
+
+  // Size
+  const sizeRow = document.getElementById('sizeRow');
+  sizeRow.innerHTML = SIZES.map(s =>
+    `<div class="optBtn ${n.size===s.key?'active':''}" data-size="${s.key}">${s.label}</div>`
+  ).join('');
+  sizeRow.querySelectorAll('.optBtn').forEach(b => {
+    b.addEventListener('click', () => { n.size = b.dataset.size; commitNodeStyle(m); openStylePopover(m, n, anchorEl); });
+  });
+
+  // Bold / italic
+  const styleRow = document.getElementById('styleRow');
+  styleRow.innerHTML = `
+    <div class="optBtn ${n.bold?'active':''}" id="boldBtn" style="font-weight:bold">B</div>
+    <div class="optBtn ${n.italic?'active':''}" id="italicBtn" style="font-style:italic">I</div>
+  `;
+  document.getElementById('boldBtn').addEventListener('click', () => { n.bold = !n.bold; commitNodeStyle(m); openStylePopover(m, n, anchorEl); });
+  document.getElementById('italicBtn').addEventListener('click', () => { n.italic = !n.italic; commitNodeStyle(m); openStylePopover(m, n, anchorEl); });
+
+  document.getElementById('resetStyleLink').onclick = () => {
+    const parent = n.parent ? m.nodes.find(p => p.id === n.parent) : null;
+    if(!parent || parent.root){
+      n.color = hslToHex(Math.floor(Math.random() * 360), 68, 46);
+    } else {
+      n.color = lighten(parent.color || '#00535C', 0.32);
+    }
+    n.font = parent ? parent.font : 'serif';
+    n.size = parent ? parent.size : 'm';
+    n.bold = false; n.italic = false;
+    cascadeColor(m, n.id);
+    commitNodeStyle(m);
+    closeStylePopover();
+  };
+}
+
+function setNodeColor(m, n, color){
+  n.color = color;
+  cascadeColor(m, n.id);
+  commitNodeStyle(m);
+}
+
+function commitNodeStyle(m){
+  m.updated = Date.now();
+  saveMaps();
+  renderNodes(m);
+}
+
+function closeStylePopover(){
+  styleTargetId = null;
+  document.getElementById('stylePop').style.display = 'none';
+}
+
+document.addEventListener('mousedown', (e) => {
+  const pop = document.getElementById('stylePop');
+  if(pop.style.display === 'block' && !pop.contains(e.target) && !e.target.closest('.btn.style')){
+    closeStylePopover();
+  }
+});
+
+// Lets you open/close each child branch individually from its parent node, or show just
+// one at a time ("Solo") — handy for revealing steps and linkages one by one when teaching.
+function openBranchPanel(m, parentNode, anchorEl){
+  const panel = document.getElementById('branchPanel');
+  const rect = anchorEl.getBoundingClientRect();
+  panel.style.display = 'block';
+  panel.style.top = Math.min(rect.bottom + 8, window.innerHeight - 340) + 'px';
+  panel.style.left = Math.min(rect.left, window.innerWidth - 246) + 'px';
+  const title = (parentNode.text || 'Untitled').trim().slice(0, 30) || 'Untitled';
+  document.getElementById('branchPanelTitle').textContent = 'Branches of "' + title + '"';
+  renderBranchPanelList(m, parentNode);
+}
+
+function renderBranchPanelList(m, parentNode){
+  const list = document.getElementById('branchList');
+  const branches = m.nodes.filter(n => n.parent === parentNode.id);
+  if(branches.length === 0){
+    list.innerHTML = '<div class="empty">No branches yet. Use + on this node to start one.</div>';
+    return;
+  }
+  list.innerHTML = branches.map(b => {
+    const label = (b.text || 'Untitled').trim() || 'Untitled';
+    const isOpen = !b.collapsed;
+    return `<div class="branchRow" data-id="${b.id}">
+      <div class="dot" style="background:${b.color || '#00535C'}"></div>
+      <div class="label" data-toggle="${b.id}">${escapeHtml(label)}</div>
+      ${branches.length > 1 ? `<div class="soloBtn" data-solo="${b.id}" title="Hide the other branches, show only this one">Solo</div>` : ''}
+      <div class="state ${isOpen ? 'open' : ''}" data-toggle="${b.id}">${isOpen ? 'Open' : 'Closed'}</div>
+    </div>`;
+  }).join('') + (branches.length > 1 ? '<div class="showAllLink" id="showAllBranchesLink">Show all branches</div>' : '');
+
+  list.querySelectorAll('[data-toggle]').forEach(el => {
+    el.addEventListener('click', () => {
+      const b = m.nodes.find(n => n.id === el.dataset.toggle);
+      if(!b) return;
+      b.collapsed = !b.collapsed;
+      m.updated = Date.now();
+      saveMaps();
+      renderNodes(m);
+      renderBranchPanelList(m, parentNode);
+    });
+  });
+  list.querySelectorAll('[data-solo]').forEach(el => {
+    el.addEventListener('click', (e) => {
+      e.stopPropagation();
+      branches.forEach(b => { b.collapsed = (b.id !== el.dataset.solo); });
+      m.updated = Date.now();
+      saveMaps();
+      renderNodes(m);
+      renderBranchPanelList(m, parentNode);
+    });
+  });
+  const showAll = document.getElementById('showAllBranchesLink');
+  if(showAll) showAll.addEventListener('click', () => {
+    branches.forEach(b => { b.collapsed = false; });
+    m.updated = Date.now();
+    saveMaps();
+    renderNodes(m);
+    renderBranchPanelList(m, parentNode);
+  });
+}
+
+function closeBranchPanel(){
+  document.getElementById('branchPanel').style.display = 'none';
+}
+
+document.addEventListener('mousedown', (e) => {
+  const panel = document.getElementById('branchPanel');
+  if(panel.style.display === 'block' && !panel.contains(e.target) && !e.target.closest('.btn.branches')){
+    closeBranchPanel();
+  }
+});
+
+// ---- Note editor modal ----
+let noteTarget = null; // { mapId, nodeId }
+
+function openNoteModal(m, n){
+  noteTarget = { mapId: m.id, nodeId: n.id };
+  document.getElementById('noteModalTitle').textContent = (n.text || 'Untitled').trim() || 'Untitled';
+  document.getElementById('noteTextarea').value = n.note || '';
+  document.getElementById('noteModalOverlay').classList.add('open');
+  setTimeout(() => document.getElementById('noteTextarea').focus(), 30);
+}
+
+function closeNoteModal(){
+  noteTarget = null;
+  document.getElementById('noteModalOverlay').classList.remove('open');
+}
+
+function saveNoteModal(){
+  if(!noteTarget) return;
+  const m = maps.find(m => m.id === noteTarget.mapId);
+  if(!m) return closeNoteModal();
+  const n = m.nodes.find(n => n.id === noteTarget.nodeId);
+  if(n){
+    n.note = document.getElementById('noteTextarea').value;
+    m.updated = Date.now();
+    saveMaps();
+    renderNodes(m);
+  }
+  closeNoteModal();
+}
+
+document.getElementById('noteSaveBtn').addEventListener('click', saveNoteModal);
+document.getElementById('noteCancelBtn').addEventListener('click', closeNoteModal);
+document.getElementById('noteModalOverlay').addEventListener('mousedown', (e) => {
+  if(e.target.id === 'noteModalOverlay') closeNoteModal();
+});
+document.addEventListener('keydown', (e) => {
+  if(e.key === 'Escape' && document.getElementById('noteModalOverlay').classList.contains('open')){
+    closeNoteModal();
+  }
+});
+
+// ---- Printable notes document ----
+function buildNotesOutlineHtml(m){
+  const byParent = {};
+  m.nodes.forEach(n => { if(n.parent) (byParent[n.parent] = byParent[n.parent]||[]).push(n); });
+  const root = m.nodes.find(n => n.root);
+  if(!root) return '<p>No content.</p>';
+  const renderEntry = (n, depth) => {
+    const title = escapeHtml((n.text || 'Untitled').trim() || 'Untitled');
+    const note = (n.note || '').trim();
+    const noteHtml = note ? `<div class="note">${escapeHtml(note)}</div>` : '';
+    const tag = depth === 0 ? 'h1' : depth === 1 ? 'h2' : depth === 2 ? 'h3' : 'h4';
+    const children = byParent[n.id] || [];
+    let html = `<div class="entry"><${tag} style="border-left:4px solid ${n.color || '#00535C'};padding-left:10px;">${title}</${tag}>${noteHtml}</div>`;
+    if(children.length) html += `<div class="children">${children.map(c => renderEntry(c, depth+1)).join('')}</div>`;
+    return html;
+  };
+  return renderEntry(root, 0);
+}
+
+function exportNotesDocument(m){
+  const bodyHtml = buildNotesOutlineHtml(m);
+  const win = window.open('', '_blank');
+  if(!win){ alert('Please allow pop-ups for this site to export the notes document.'); return; }
+  win.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>${escapeHtml(m.title || 'Mind Map')} — Notes</title>
+<style>
+  body{font-family:Georgia,'Times New Roman',serif;color:#292424;max-width:760px;margin:40px auto;padding:0 24px 60px;line-height:1.65;}
+  .kicker{font-size:11px;text-transform:uppercase;letter-spacing:1px;color:#878585;font-family:'IBM Plex Mono',Menlo,monospace;margin-bottom:6px;}
+  h1{color:#00535C;font-size:27px;margin:0 0 6px;}
+  h2{color:#00535C;font-size:20px;margin:26px 0 6px;}
+  h3{color:#0B7A82;font-size:16px;margin:18px 0 4px;}
+  h4{color:#0B7A82;font-size:14px;margin:14px 0 4px;}
+  .note{font-size:13.5px;color:#292424;background:#faf9f5;border:1px solid #e6e2d4;
+    padding:10px 14px;border-radius:6px;margin:6px 0 10px 2px;white-space:pre-wrap;}
+  .children{margin-left:24px;}
+  .entry{margin-bottom:2px;}
+  @media print{ body{margin:0;padding:24px;} }
+</style>
+</head><body>
+<div class="kicker">HS Mind Mapper — Notes document</div>
+${bodyHtml}
+</body></html>`);
+  win.document.close();
+  win.focus();
+  setTimeout(() => win.print(), 400);
+}
+
+function exportMap(id){
+  const m = maps.find(m => m.id === id);
+  if(!m) return;
+  const blob = new Blob([JSON.stringify(m, null, 2)], {type:'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = (m.title.trim() || 'untitled-map') + '.json';
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+document.getElementById('newMapBtn').addEventListener('click', createMap);
+document.getElementById('sidebarToggle').addEventListener('click', () => {
+  document.body.classList.toggle('sidebar-collapsed');
+  const collapsed = document.body.classList.contains('sidebar-collapsed');
+  document.getElementById('sidebarToggle').textContent = collapsed ? '›' : '‹';
+  localStorage.setItem('atlas_sidebar_collapsed', collapsed ? '1' : '0');
+});
+if(localStorage.getItem('atlas_sidebar_collapsed') === '1'){
+  document.body.classList.add('sidebar-collapsed');
+  document.getElementById('sidebarToggle').textContent = '›';
+}
+document.addEventListener('mousedown', (e) => {
+  const menu = document.getElementById('exportMenu');
+  if(menu && menu.classList.contains('open') && !menu.contains(e.target) && e.target.id !== 'exportToggleBtn'){
+    menu.classList.remove('open');
+  }
+});
+
+// Bounding box of currently visible nodes, with padding, used to crop exports to just the map content.
+function computeBounds(m){
+  const hiddenIds = getHiddenIds(m);
+  const visible = m.nodes.filter(n => !hiddenIds.has(n.id));
+  const pad = 60;
+  const minX = Math.min(...visible.map(n => n.x)) - pad;
+  const minY = Math.min(...visible.map(n => n.y)) - pad;
+  const maxX = Math.max(...visible.map(n => n.x + 260)) + pad;
+  const maxY = Math.max(...visible.map(n => n.y + 90)) + pad;
+  return { x: minX, y: minY, width: maxX - minX, height: maxY - minY };
+}
+
+function captureCanvas(m){
+  const b = computeBounds(m);
+  const canvasEl = document.getElementById('canvas');
+  // Export at true 1x scale regardless of the current on-screen zoom level.
+  const prevTransform = canvasEl.style.transform;
+  canvasEl.style.transform = 'scale(1)';
+  return html2canvas(canvasEl, {
+    x: b.x, y: b.y, width: b.width, height: b.height,
+    backgroundColor: '#fffdf9', scale: 2
+  }).finally(() => { canvasEl.style.transform = prevTransform; });
+}
+
+function exportImage(m){
+  captureCanvas(m).then(canvas => {
+    const url = canvas.toDataURL('image/png');
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = (m.title.trim() || 'untitled-map') + '.png';
+    a.click();
+  }).catch(() => alert('Could not export image. Check your internet connection (needed once to load the export library).'));
+}
+
+function exportPdf(m){
+  captureCanvas(m).then(canvas => {
+    const { jsPDF } = window.jspdf;
+    const orientation = canvas.width >= canvas.height ? 'l' : 'p';
+    const pdf = new jsPDF({ orientation, unit: 'pt', format: [canvas.width, canvas.height] });
+    pdf.addImage(canvas.toDataURL('image/png'), 'PNG', 0, 0, canvas.width, canvas.height);
+    pdf.save((m.title.trim() || 'untitled-map') + '.pdf');
+  }).catch(() => alert('Could not export PDF. Check your internet connection (needed once to load the export library).'));
+}
+
+
+// ---- Sample map (seeded once on first open) ----
+const SAMPLE_SPEC = {"t": "Rule 11UA & Section 50C", "n": "Illustrative learning map using Income-tax Act, 1961 numbering. Under the Income-tax Act, 2025 (from 1 Apr 2026): s.50C is now s.78, s.50CA is s.79, s.43CA is s.53 and s.56 is s.92. Verify current law and rule numbers before relying on this.", "c": [{"t": "Why these rules exist", "n": "Parties can show a low price to save tax or stamp duty. The law replaces the price with a benchmark value.", "c": [{"t": "Anti-avoidance", "n": "Tax is charged on the benchmark value, not just the price written in the agreement.", "c": []}, {"t": "Stamp duty value (SDV)", "n": "Value adopted by the stamp valuation authority for registration. It is the benchmark for land and building.", "c": []}, {"t": "Fair market value (FMV)", "n": "Value prescribed by Rule 11UA for other assets such as shares and jewellery.", "c": []}]}, {"t": "Section 50C: Seller", "n": "Applies to the seller in a transfer of land or building.", "c": [{"t": "Applies to", "n": "Transfer of land or building or both, held as a capital asset.", "c": []}, {"t": "Deemed sale price", "n": "If SDV is higher than the actual consideration, SDV is taken as the full value of consideration for capital gains.", "c": []}, {"t": "10% safe harbour", "n": "If SDV is within 110% of the actual consideration, the actual consideration is accepted.", "c": []}, {"t": "Which date's SDV?", "n": "SDV on the registration date. If the agreement date is earlier and payment (part or full) was received by a non-cash mode on or before the agreement date, SDV on the agreement date is used.", "c": []}, {"t": "If seller disputes", "n": "s.50C(2): the Assessing Officer can refer the value to a Valuation Officer. s.50C(3): if the Valuation Officer's value is higher than SDV, SDV is taken; otherwise the Valuation Officer's value applies.", "c": []}, {"t": "Related: s.43CA", "n": "Same idea for land or building held as stock-in-trade. The gap is taxed as business income.", "c": []}]}, {"t": "Section 56(2)(x): Buyer", "n": "Taxes the buyer when property is received free or for less than its benchmark value.", "c": [{"t": "No consideration", "n": "Immovable property received free: SDV above Rs 50,000 is taxable as income from other sources.", "c": []}, {"t": "Inadequate consideration", "n": "If SDV minus price is more than the higher of Rs 50,000 and 10% of the price, the whole difference is taxable.", "c": []}, {"t": "Other property", "n": "Shares, jewellery, artwork etc.: FMV above Rs 50,000 if free, or a difference above Rs 50,000 if inadequately paid.", "c": []}, {"t": "Exemptions", "n": "Gifts from relatives, on marriage, under a will or inheritance, and from certain trusts and institutions.", "c": []}]}, {"t": "Rule 11UA: FMV method", "n": "Sets how FMV is worked out for assets other than land and building.", "c": [{"t": "Where it is used", "n": "s.56(2)(x) for the buyer and s.50CA for the seller of unquoted shares. It also applied to s.56(2)(viib) (angel tax), which was abolished from AY 2025-26.", "c": []}, {"t": "Immovable property", "n": "SDV as per the stamp valuation authority.", "c": []}, {"t": "Quoted shares", "n": "Based on the price on a recognised stock exchange on the valuation date. Specific rules apply to off-market deals.", "c": []}, {"t": "Unquoted equity shares", "n": "Net asset value method.", "c": [{"t": "Formula: (A+B+C+D-L) x PE/PV", "n": "FMV per share = (A + B + C + D - L) x PE / PV", "c": []}, {"t": "Inputs", "n": "A: book value of other assets. B: FMV of jewellery and artwork. C: FMV of shares and securities. D: SDV of immovable property. L: book value of liabilities. PE: paid-up equity capital. PV: paid-up value of equity shares.", "c": []}]}, {"t": "Unquoted other shares", "n": "Valuation report from a merchant banker or an accountant.", "c": []}, {"t": "Other assets", "n": "Jewellery, artwork etc.: registered valuer's report.", "c": []}]}, {"t": "Worked example", "n": "Plot agreed at Rs 80 lakh. Buyer and seller are unrelated.", "c": [{"t": "Case 1: SDV Rs 95 lakh", "n": "Safe harbour limit is 110% x 80 = Rs 88 lakh. SDV is above it, so the benchmark applies.", "c": [{"t": "Seller (s.50C)", "n": "Full value of consideration = Rs 95 lakh, not Rs 80 lakh. Capital gain is computed on Rs 95 lakh.", "c": []}, {"t": "Buyer (s.56(2)(x))", "n": "Difference = Rs 15 lakh, which is above the higher of Rs 50,000 and Rs 8 lakh (10% of 80). Rs 15 lakh is taxed as income from other sources. Buyer's cost of acquisition becomes Rs 95 lakh.", "c": []}]}, {"t": "Case 2: SDV Rs 86 lakh", "n": "SDV is 107.5% of the price, within the 110% limit.", "c": [{"t": "Seller", "n": "Rs 80 lakh accepted. No s.50C addition.", "c": []}, {"t": "Buyer", "n": "Difference Rs 6 lakh is below Rs 8 lakh. No addition.", "c": []}]}]}, {"t": "Compliance tips", "n": "Simple habits that avoid disputes.", "c": [{"t": "Check SDV first", "n": "Compare the agreed price with SDV before signing the agreement.", "c": []}, {"t": "Fix the agreement date", "n": "Record the agreement date and pay by account payee cheque, bank transfer or another prescribed mode.", "c": []}, {"t": "Use a valuation officer", "n": "If SDV looks too high, request a reference to the Valuation Officer.", "c": []}, {"t": "Keep valuation reports", "n": "Retain the registered valuer or merchant banker report for share transfers.", "c": []}]}]};
+function seedSampleMap(){
+  try{ if(localStorage.getItem('atlas_sample_seeded') === '1') return; }catch(e){}
+  if(maps.length) return;
+  const HUES = [28,185,265,340,140,215];
+  const SP = 60, DX = 270, RX = 1300, RY = 900;
+  const nodes = [];
+  let leaf = 0;
+  const total = (function count(s){ return s.c.length ? s.c.reduce((a,c)=>a+count(c),0) : 1; })(SAMPLE_SPEC);
+  function place(s, depth, parentId, color, isRoot, branchIdx){
+    const id = uid();
+    const kids = s.c;
+    const idxs = [];
+    let myColor = color;
+    if(depth === 1) myColor = hslToHex(HUES[branchIdx % HUES.length], 68, 46);
+    else if(depth > 1) myColor = lighten(color, 0.32);
+    const node = { id, text:s.t, x: RX + DX*depth, y:0, parent:parentId, root:isRoot, color: isRoot ? undefined : myColor,
+                   font:'serif', size: isRoot ? 'l' : 'm', bold: isRoot || depth === 1, italic:false, note:s.n||'' };
+    nodes.push(node);
+    if(kids.length){
+      const ys = kids.map((k,i)=> place(k, depth+1, id, depth === 0 ? undefined : myColor, false, depth === 0 ? i : branchIdx));
+      node.y = (ys[0] + ys[ys.length-1]) / 2;
+    } else {
+      node.y = RY + (leaf - (total-1)/2) * SP;
+      leaf++;
+    }
+    return node.y;
+  }
+  const rootY = place(SAMPLE_SPEC, 0, null, undefined, true, 0);
+  const root = nodes[0]; root.x = RX; root.y = rootY;
+  const m = { id: uid(), title:'Rule 11UA & Section 50C (sample)', updated: Date.now(), nodes, branchCount: 6, zoom: 0.55, lastHue: HUES[5], notesVisible:false };
+  maps.unshift(m);
+  activeMapId = m.id;
+  saveMaps();
+  try{ localStorage.setItem('atlas_sample_seeded','1'); }catch(e){}
+}
+
+loadMaps();
+seedSampleMap();
+renderMapList();
+renderMain();
+</script>
+</body>
+</html>
