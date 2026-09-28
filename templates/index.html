@@ -1,0 +1,551 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>AutoContract2Tally</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  :root {
+    --bg:#090e1a; --panel:#0f1626; --panel2:#111a2e; --border:#1e293f;
+    --text:#e7edf6; --muted:#8391ab; --muted2:#5c6a85;
+    --teal:#2dd4bf; --teal-dim:rgba(45,212,191,0.12);
+    --purple:#a78bfa; --purple-dim:rgba(167,139,250,0.12);
+    --blue:#60a5fa; --blue-dim:rgba(96,165,250,0.12);
+    --green:#4ade80; --amber:#fbbf24; --red:#f87171;
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--text); font-family:-apple-system,Segoe UI,Roboto,sans-serif; }
+  a { color:var(--teal); }
+  header { display:flex; align-items:center; justify-content:space-between; gap:16px;
+    padding:14px 24px; border-bottom:1px solid var(--border); background:var(--panel); flex-wrap:wrap; }
+  .brand { display:flex; align-items:center; gap:12px; }
+  .brand .logo { width:38px; height:38px; border-radius:9px; background:linear-gradient(135deg,var(--teal),var(--blue));
+    display:flex; align-items:center; justify-content:center; font-weight:700; color:#06261f; font-size:16px; flex-shrink:0; }
+  .brand h1 { font-size:16px; margin:0; }
+  .brand p { margin:1px 0 0; font-size:11.5px; color:var(--muted); }
+  .badges { display:flex; gap:8px; flex-wrap:wrap; }
+  .pill { font-size:11px; padding:4px 10px; border-radius:999px; border:1px solid var(--border); color:var(--muted); white-space:nowrap; }
+  .pill.on { color:var(--green); border-color:rgba(74,222,128,0.3); background:rgba(74,222,128,0.08); }
+  .pill.warn { color:var(--amber); border-color:rgba(251,191,36,0.3); background:rgba(251,191,36,0.08); }
+  main { max-width:1180px; margin:0 auto; padding:20px 20px 60px; }
+  .steps { display:grid; grid-template-columns:repeat(5,1fr); gap:10px; margin-bottom:18px; }
+  .step { background:var(--panel); border:1px solid var(--border); border-radius:10px; padding:12px 12px 10px; cursor:pointer; transition:border-color .15s; }
+  .step:hover { border-color:var(--muted2); }
+  .step.active { border-color:var(--teal); box-shadow:0 0 0 1px var(--teal) inset; }
+  .step .top { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:8px; }
+  .step .num { font-size:11px; color:var(--muted2); }
+  .step h3 { font-size:12.5px; margin:0 0 3px; }
+  .step p { font-size:10.5px; color:var(--muted); margin:0; line-height:1.35; }
+  .badge { font-size:9.5px; padding:2px 7px; border-radius:999px; white-space:nowrap; }
+  .badge.ready { background:var(--teal-dim); color:var(--teal); }
+  .badge.planned { background:rgba(251,191,36,0.1); color:var(--amber); }
+  .panel { background:var(--panel); border:1px solid var(--border); border-radius:12px; padding:20px 22px; margin-bottom:16px; }
+  .panel h2 { font-size:16px; margin:0 0 4px; }
+  .panel .sub { color:var(--muted); font-size:12.5px; margin:0 0 16px; }
+  .tag { display:inline-block; font-size:10.5px; padding:3px 9px; border-radius:6px; background:var(--teal-dim); color:var(--teal); margin-bottom:10px; }
+  .grid2 { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+  label { display:block; font-size:11.5px; color:var(--muted); margin:10px 0 4px; }
+  input[type=text] { width:100%; padding:8px 10px; border-radius:6px; border:1px solid var(--border); background:var(--bg); color:var(--text); font-size:13px; }
+  button { background:var(--teal); color:#06261f; border:none; padding:9px 16px; border-radius:7px; font-size:12.5px; font-weight:600; cursor:pointer; }
+  button.secondary { background:var(--panel2); color:var(--text); border:1px solid var(--border); }
+  button.ghost { background:transparent; color:var(--muted); border:1px solid var(--border); }
+  button:disabled { opacity:0.5; cursor:default; }
+  .row { display:flex; gap:8px; flex-wrap:wrap; margin-top:10px; }
+  table { width:100%; border-collapse:collapse; font-size:12px; margin-top:10px; }
+  th { text-align:left; color:var(--muted); font-weight:500; font-size:10.5px; text-transform:uppercase; letter-spacing:.03em; padding:6px 8px; border-bottom:1px solid var(--border); }
+  td { padding:7px 8px; border-bottom:1px solid var(--border); }
+  tr:last-child td { border-bottom:none; }
+  .dr { color:var(--blue); } .cr { color:var(--green); }
+  .buy { color:var(--green); } .sell { color:var(--red); }
+  ul.filelist { list-style:none; padding:0; margin:8px 0 0; max-height:150px; overflow:auto; font-size:12px; }
+  ul.filelist li { padding:4px 0; border-bottom:1px solid var(--border); color:var(--muted); }
+  #log { white-space:pre-wrap; font-family:ui-monospace,Consolas,monospace; font-size:11.5px; background:var(--bg);
+    border-radius:8px; padding:12px; max-height:200px; overflow:auto; border:1px solid var(--border); color:var(--muted); }
+  .note-card { border:1px solid var(--border); border-radius:10px; padding:14px 16px; margin-bottom:14px; background:var(--panel2); }
+  .note-card .meta { display:grid; grid-template-columns:repeat(4,1fr); gap:10px; margin:10px 0; }
+  .note-card .meta div span { display:block; font-size:10px; color:var(--muted2); text-transform:uppercase; }
+  .note-card .meta div b { font-size:12.5px; }
+  .balance-ok { color:var(--green); font-weight:600; }
+  .balance-bad { color:var(--red); font-weight:600; }
+  .empty-state { text-align:center; padding:40px 20px; color:var(--muted); }
+  .empty-state .badge.planned { font-size:11px; padding:4px 12px; margin-bottom:10px; }
+  .toggle-row { display:flex; gap:8px; align-items:center; margin-bottom:14px; }
+  .toggle-btn { padding:7px 14px; border-radius:7px; font-size:12px; border:1px solid var(--border); background:var(--bg); color:var(--muted); cursor:default; }
+  .toggle-btn.active { background:var(--teal-dim); color:var(--teal); border-color:var(--teal); }
+  .strategy-btn.active { background:var(--purple-dim); color:var(--purple); border-color:var(--purple); }
+  .label-chip { font-size:11px; padding:4px 10px; border-radius:999px; border:1px solid var(--border); background:var(--bg); color:var(--muted); cursor:pointer; }
+  .label-chip:hover { border-color:var(--teal); color:var(--teal); }
+  footer { text-align:center; color:var(--muted2); font-size:11px; padding:20px; }
+</style>
+</head>
+<body>
+<header>
+  <div class="brand">
+    <div class="logo">A2T</div>
+    <div>
+      <h1>AutoContract2Tally</h1>
+      <p>Zerodha · Angel One · Upstox → Tally Prime — running locally on this machine</p>
+    </div>
+  </div>
+  <div class="badges">
+    <span class="pill on">● Offline pipeline</span>
+    <span class="pill" id="pillWatch">Watch folder: —</span>
+    <span class="pill" id="pillGmail">Gmail: —</span>
+  </div>
+</header>
+
+<main>
+  <div class="steps" id="steps">
+    <div class="step active" data-step="1">
+      <div class="top"><span class="num">1</span><span class="badge ready" id="badge1">0 pending</span></div>
+      <h3>Ingestion &amp; Watcher</h3>
+      <p>Gmail fetch &amp; local hot-folder</p>
+    </div>
+    <div class="step" data-step="2">
+      <div class="top"><span class="num">2</span><span class="badge ready" id="badge2">Normalized</span></div>
+      <h3>Broker Parser</h3>
+      <p>Zerodha / Angel One / Upstox → trades</p>
+    </div>
+    <div class="step" data-step="3">
+      <div class="top"><span class="num">3</span><span class="badge ready" id="badge3">0 vouchers</span></div>
+      <h3>Tally Accounting</h3>
+      <p>Double-entry journal voucher, Dr = Cr</p>
+    </div>
+    <div class="step" data-step="4">
+      <div class="top"><span class="num">4</span><span class="badge planned">Planned</span></div>
+      <h3>EOD Position Report</h3>
+      <p>Bhavcopy MTM &amp; unrealised P&amp;L</p>
+    </div>
+    <div class="step" data-step="5">
+      <div class="top"><span class="num">5</span><span class="badge planned">Planned</span></div>
+      <h3>3-Way Reconciliation</h3>
+      <p>Broker vs Tally vs bank</p>
+    </div>
+  </div>
+
+  <!-- STEP 1 -->
+  <div class="stepPanel" id="panel1">
+    <div class="panel">
+      <span class="tag">PHASE 1 · INGESTION &amp; INFLOW</span>
+      <h2>Automated Contract Note Ingestion</h2>
+      <p class="sub">Stage A (needs internet) fetches broker PDFs from Gmail into the watch folder below. Stage B (fully offline) then parses and posts them.</p>
+      <div class="grid2">
+        <div>
+          <label>Watch folder (parent — a subfolder is created automatically per client, below)</label>
+          <input type="text" id="watch_folder" value="{{ settings.watch_folder }}">
+          <label>Tally XML/HTTP gateway URL</label>
+          <input type="text" id="tally_gateway_url" value="{{ settings.tally_gateway_url }}">
+          <label>Tally company name (this client's subfolder is named after it)</label>
+          <input type="text" id="tally_company" value="{{ settings.tally_company }}">
+          <p id="resolvedFolderHint" style="font-size:11px; color:var(--muted2); margin:4px 0 0;">This client's contract notes, processed/errors history and logs are kept separate from every other client, in their own subfolder.</p>
+          <label>PDF password(s) / Client PAN(s) — comma-separated</label>
+          <input type="text" id="pdf_passwords" value="{{ settings.pdf_passwords }}" placeholder="e.g. AAACI9921K, AAAAA0000A">
+          <p style="font-size:11px; color:var(--muted2); margin:4px 0 0;">Most brokers password-protect the contract note PDF with the client's own PAN. Each file is tried against every password here until one opens it — add one per client you file for.</p>
+          <div class="row">
+            <button class="secondary" onclick="saveSettings()">Save settings</button>
+          </div>
+        </div>
+        <div>
+          <label>Gmail connection (Stage A)</label>
+          <div id="gmailStatusBox" style="font-size:12.5px; color:var(--muted); border:1px solid var(--border); border-radius:8px; padding:10px 12px;">Checking…</div>
+          <div class="row">
+            <button onclick="fetchGmail()" id="btnFetch">Fetch new contract notes</button>
+            <button class="ghost" onclick="signOutGmail()" id="btnSignOut" style="display:none;">Sign out / switch account</button>
+          </div>
+          <label style="margin-top:16px;">Pipeline (Stage B — offline)</label>
+          <div class="row">
+            <button class="secondary" onclick="runPipeline(true)">Dry run</button>
+            <button onclick="runPipeline(false)" id="btnPost">Post to Tally</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="panel">
+      <span class="tag">GMAIL FILTER &amp; WATCHER SETTINGS</span>
+      <h2 style="font-size:15px;">Which emails Stage A should look at</h2>
+      <p class="sub">Contract notes reach a practice's inbox two ways: directly from the broker, or forwarded by a client from their own mailbox. Pick a strategy so Stage A finds the right messages before Stage B identifies the actual broker from the note itself.</p>
+      <div class="row" id="filterStrategyRow">
+        <button class="secondary strategy-btn" data-strategy="client_forwards">Client Forwards (Any)</button>
+        <button class="secondary strategy-btn" data-strategy="all">All (Brokers + Forwards)</button>
+        <button class="secondary strategy-btn" data-strategy="broker_only">Brokers only (default)</button>
+        <button class="secondary strategy-btn" data-strategy="by_label">By Gmail Label</button>
+      </div>
+
+      <div class="grid2" style="margin-top:14px;">
+        <div>
+          <label>Client / forwarder email ID(s) — comma-separated</label>
+          <input type="text" id="gmail_client_emails" value="{{ settings.gmail_client_emails }}" placeholder="e.g. rajesh.client@gmail.com, another@x.com">
+          <p style="font-size:11px; color:var(--muted2); margin:4px 0 0;">Used when the strategy is "Client Forwards" or "All".</p>
+        </div>
+        <div>
+          <label>Gmail label filter</label>
+          <input type="text" id="gmail_label" value="{{ settings.gmail_label }}" placeholder="e.g. ContractNotes">
+          <div class="row" style="margin-top:6px;">
+            <button class="ghost" onclick="fetchLabels()" id="btnFetchLabels">Fetch my Gmail labels</button>
+          </div>
+          <div id="labelList" style="margin-top:6px; display:flex; flex-wrap:wrap; gap:6px;"></div>
+        </div>
+      </div>
+
+      <label style="margin-top:16px;">Search window</label>
+      <select id="gmail_search_days" style="width:100%; padding:8px 10px; border-radius:6px; border:1px solid var(--border); background:var(--bg); color:var(--text); font-size:13px;">
+        <option value="0" {{ 'selected' if settings.gmail_search_days|int == 0 }}>Full inbox (no date limit)</option>
+        <option value="1" {{ 'selected' if settings.gmail_search_days|int == 1 }}>Last 1 day</option>
+        <option value="7" {{ 'selected' if settings.gmail_search_days|int == 7 }}>Last 7 days</option>
+        <option value="30" {{ 'selected' if settings.gmail_search_days|int == 30 }}>Last 30 days</option>
+        <option value="90" {{ 'selected' if settings.gmail_search_days|int == 90 }}>Last 90 days</option>
+        <option value="365" {{ 'selected' if settings.gmail_search_days|int == 365 }}>Last 365 days</option>
+      </select>
+      <p style="font-size:11px; color:var(--muted2); margin:4px 0 0;">A shorter window is faster and less likely to re-surface old correspondence on a large mailbox. Full inbox has no limit but can be slow the first time.</p>
+
+      <div class="row" style="margin-top:14px;">
+        <button onclick="saveGmailFilter()">Save filter settings</button>
+      </div>
+
+      <label style="margin-top:16px;">Active search query (Gmail syntax)</label>
+      <div id="activeQuery" style="font-family:ui-monospace,Consolas,monospace; font-size:11.5px; color:var(--teal); background:var(--bg); border:1px solid var(--border); border-radius:8px; padding:10px 12px;">—</div>
+    </div>
+    <div class="panel">
+      <h2 style="font-size:14px;">Pending / processed / errors</h2>
+      <div class="row" style="margin-top:4px;">
+        <span class="pill" id="pillPending">Pending: —</span>
+        <span class="pill" id="pillProcessed">Processed: —</span>
+        <span class="pill" id="pillErrors">Errors: —</span>
+        <button class="ghost" onclick="refreshStatus()">Refresh</button>
+        <button class="secondary" onclick="retryErrors()" id="btnRetryErrors">Retry failed files</button>
+      </div>
+      <label style="margin-top:12px;">Pending (in watch folder root)</label>
+      <ul class="filelist" id="pendingList"></ul>
+      <label style="margin-top:12px;">Errors (fix the cause — e.g. add a password below — then click "Retry failed files")</label>
+      <ul class="filelist" id="errorList"></ul>
+    </div>
+    <div class="panel">
+      <h2 style="font-size:14px;">Activity log</h2>
+      <div id="log">Ready.</div>
+    </div>
+  </div>
+
+  <!-- STEP 2 -->
+  <div class="stepPanel" id="panel2" style="display:none;">
+    <div class="panel">
+      <span class="tag">PHASE 2 · BROKER PARSER</span>
+      <h2>Normalized Trade Transactions</h2>
+      <p class="sub">Most recently parsed contract notes (from the last dry run / post). Run Stage B on the Ingestion tab to populate this.</p>
+      <div id="parserNotes"></div>
+    </div>
+  </div>
+
+  <!-- STEP 3 -->
+  <div class="stepPanel" id="panel3" style="display:none;">
+    <div class="panel">
+      <span class="tag">PHASE 3 · TALLY ACCOUNTING ENGINE</span>
+      <h2>Journal Vouchers (Double-Entry)</h2>
+      <p class="sub">Split 4 ways per the client's pure-trading profile: Speculation (intraday, netted), Equity delivery (stock-in-trade), Futures, Options.</p>
+      <div class="toggle-row">
+        <span class="toggle-btn active">Trading Mode (P&amp;L Turnover)</span>
+        <span class="toggle-btn" title="This client is a pure trading business with no capital-gains positions, so Investment Mode doesn't apply and is locked off.">Investment Mode (Capital Assets) — locked, not applicable to this client</span>
+      </div>
+      <div id="voucherNotes"></div>
+    </div>
+  </div>
+
+  <!-- STEP 4 -->
+  <div class="stepPanel" id="panel4" style="display:none;">
+    <div class="panel">
+      <span class="tag" style="background:rgba(251,191,36,0.1); color:var(--amber);">PHASE 4 · NOT YET BUILT</span>
+      <h2>End-of-Day Position &amp; Bhavcopy MTM Report</h2>
+      <div class="empty-state">
+        <span class="badge planned">Planned, not implemented</span>
+        <p>This needs a verified live NSE/BSE Bhavcopy fetch and a "yesterday's mark" state store for F&amp;O — both still open items on the project log. Ask me to build this once you can confirm NSE Bhavcopy is reachable from this machine.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- STEP 5 -->
+  <div class="stepPanel" id="panel5" style="display:none;">
+    <div class="panel">
+      <span class="tag" style="background:rgba(251,191,36,0.1); color:var(--amber);">PHASE 5 · NOT YET BUILT</span>
+      <h2>3-Way Reconciliation: Broker vs Tally vs Bank</h2>
+      <div class="empty-state">
+        <span class="badge planned">Planned, not implemented</span>
+        <p>This needs real broker ledger CSV exports and a bank statement to reconcile against — both still open items on the project log. Ask me to build this once you can share sample files.</p>
+      </div>
+    </div>
+  </div>
+
+  <footer>AutoContract2Tally · AICA Capstone Project · running fully on this machine</footer>
+</main>
+
+<script>
+function showStep(n) {
+  document.querySelectorAll('.step').forEach(el => el.classList.toggle('active', el.dataset.step == n));
+  document.querySelectorAll('.stepPanel').forEach(el => el.style.display = 'none');
+  document.getElementById('panel'+n).style.display = 'block';
+  if (n == 2 || n == 3) loadLastRun();
+}
+document.querySelectorAll('.step').forEach(el => el.addEventListener('click', () => showStep(el.dataset.step)));
+
+function log(msg) {
+  const el = document.getElementById('log');
+  const ts = new Date().toLocaleTimeString();
+  el.textContent = `[${ts}] ${msg}\n` + el.textContent;
+}
+
+async function saveSettings() {
+  const body = {
+    watch_folder: document.getElementById('watch_folder').value,
+    tally_gateway_url: document.getElementById('tally_gateway_url').value,
+    tally_company: document.getElementById('tally_company').value,
+    pdf_passwords: document.getElementById('pdf_passwords').value,
+  };
+  await fetch('/api/settings', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)});
+  log('Settings saved.');
+  refreshStatus();
+}
+
+async function fetchGmail() {
+  const btn = document.getElementById('btnFetch'); btn.disabled = true;
+  log('Fetching from Gmail...');
+  let downloadedCount = 0;
+  try {
+    const r = await fetch('/api/fetch-gmail', {method:'POST'});
+    const j = await r.json();
+    if (j.ok) {
+      const res = j.result;
+      downloadedCount = res.downloaded.length;
+      log(`Gmail fetch done (query: ${res.query_used}). Matched ${res.messages_found} message(s), already-seen ${res.skipped_messages}, downloaded ${downloadedCount}: ${res.downloaded.join(', ') || '(none new)'}`);
+      if (res.no_pdf_found && res.no_pdf_found.length) {
+        res.no_pdf_found.forEach(m => log(`  No PDF found in "${m.subject}" from ${m.from} — attachments seen: ${m.attachments_seen.join(', ') || '(none)'}`));
+      }
+      if (res.messages_found === 0) {
+        log('  No messages matched the search query at all — check the sender address / label spelling in Gmail Filter & Watcher Settings, or open Gmail and run this exact query yourself to confirm.');
+      }
+    } else {
+      log('Gmail fetch failed: ' + j.error);
+    }
+  } catch (e) { log('Gmail fetch error: ' + e); }
+  btn.disabled = false;
+  refreshStatus(); refreshGmailStatus();
+
+  // Ingestion and parsing go hand in hand: as soon as new notes land in the
+  // watch folder, automatically run them through Stage B as a dry run so
+  // Broker Parser (step 2) and Tally Accounting (step 3) populate right
+  // away, without a separate manual "Dry run" click. Nothing gets posted
+  // to Tally or moved on disk here -- that still only happens on "Post to
+  // Tally", deliberately, since it's the one step with real side effects.
+  if (downloadedCount > 0) {
+    log(`Auto-processing ${downloadedCount} newly ingested note(s) through the parser and accounting engine (dry run)...`);
+    await runPipeline(true, /*silent*/ true);
+  }
+}
+
+let currentStrategy = "{{ settings.gmail_filter_strategy }}" || "broker_only";
+
+function setStrategyButtons() {
+  document.querySelectorAll('.strategy-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.strategy === currentStrategy);
+  });
+}
+document.querySelectorAll('.strategy-btn').forEach(btn => {
+  btn.addEventListener('click', () => { currentStrategy = btn.dataset.strategy; setStrategyButtons(); });
+});
+setStrategyButtons();
+
+async function saveGmailFilter() {
+  const days = parseInt(document.getElementById('gmail_search_days').value, 10) || 0;
+  const body = {
+    gmail_filter_strategy: currentStrategy,
+    gmail_client_emails: document.getElementById('gmail_client_emails').value,
+    gmail_label: document.getElementById('gmail_label').value,
+    gmail_search_days: days,
+  };
+  await fetch('/api/settings', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)});
+  log(`Gmail filter saved: strategy=${currentStrategy}, window=${days === 0 ? 'full inbox' : days + ' day(s)'}`);
+  refreshQueryPreview();
+}
+
+async function signOutGmail() {
+  if (!confirm('Sign out of the current Gmail account? Your Google OAuth app setup (credentials.json) stays in place — only the signed-in account is cleared. Next fetch will show Google\'s account picker so you can sign in as someone else.')) return;
+  const btn = document.getElementById('btnSignOut'); btn.disabled = true;
+  try {
+    const r = await fetch('/api/gmail-signout', {method:'POST'});
+    const j = await r.json();
+    log(j.removed ? 'Signed out of Gmail. Click "Fetch new contract notes" to sign in as a different account.' : 'Already signed out.');
+  } catch (e) { log('Sign-out error: ' + e); }
+  btn.disabled = false;
+  refreshGmailStatus();
+}
+
+async function refreshQueryPreview() {
+  const r = await fetch('/api/gmail-query-preview');
+  const j = await r.json();
+  document.getElementById('activeQuery').textContent = j.query;
+}
+
+async function fetchLabels() {
+  const btn = document.getElementById('btnFetchLabels'); btn.disabled = true;
+  log('Fetching your Gmail labels...');
+  try {
+    const r = await fetch('/api/gmail-labels');
+    const j = await r.json();
+    const box = document.getElementById('labelList');
+    if (j.ok) {
+      box.innerHTML = j.labels.map(l => `<span class="label-chip" onclick="pickLabel('${l.name.replace(/'/g,"\\'")}')">${l.name}</span>`).join('') || '<span style="color:var(--muted2); font-size:11px;">No user labels found.</span>';
+      log(`Found ${j.labels.length} label(s).`);
+    } else {
+      log('Could not fetch labels: ' + j.error);
+      box.innerHTML = '';
+    }
+  } catch (e) { log('Label fetch error: ' + e); }
+  btn.disabled = false;
+}
+
+function pickLabel(name) {
+  document.getElementById('gmail_label').value = name;
+  currentStrategy = 'by_label';
+  setStrategyButtons();
+}
+
+async function runPipeline(dryRun, silent) {
+  const btn = document.getElementById('btnPost'); btn.disabled = true;
+  if (!silent) log(dryRun ? 'Running dry run...' : 'Posting to Tally...');
+  let ok = false, processedCount = 0;
+  try {
+    const r = await fetch('/api/run-pipeline', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({dry_run: dryRun})});
+    const j = await r.json();
+    if (j.ok) {
+      const res = j.result;
+      ok = true; processedCount = res.posted.length;
+      log(`${dryRun ? 'Parsed' : 'Posted'}: ${res.posted.length}, Skipped: ${res.skipped.length}, Errors: ${res.errors.length}`);
+      if (res.errors.length) res.errors.forEach(e => log(`  ERROR ${e.file}: ${e.error}`));
+    } else {
+      log('Pipeline failed: ' + j.error);
+    }
+  } catch (e) { log('Pipeline error: ' + e); }
+  btn.disabled = false;
+  refreshStatus(); await loadLastRun();
+
+  // Steps 2 (Broker Parser) and 3 (Tally Accounting) go hand in hand with
+  // Stage B: jump straight to the relevant view as soon as there's
+  // something to show, instead of leaving the user to click over manually.
+  if (ok && processedCount > 0) {
+    showStep(dryRun ? '2' : '3');
+  }
+}
+
+async function refreshStatus() {
+  const r = await fetch('/api/status');
+  const j = await r.json();
+  document.getElementById('pillPending').textContent = `Pending: ${j.pending.length}`;
+  document.getElementById('pillProcessed').textContent = `Processed: ${j.processed.length}`;
+  document.getElementById('pillErrors').textContent = `Errors: ${j.errors.length}`;
+  document.getElementById('pillWatch').textContent = `Watch folder: ${j.pending.length} pending`;
+  const hint = document.getElementById('resolvedFolderHint');
+  if (hint) hint.textContent = `This client's notes are stored in: ${j.watch_folder}`;
+  document.getElementById('badge1').textContent = `${j.pending.length} pending`;
+  document.getElementById('badge3').textContent = `${j.processed.length} vouchers`;
+  const ul = document.getElementById('pendingList');
+  ul.innerHTML = j.pending.map(f => `<li>${f}</li>`).join('') || '<li>No pending files</li>';
+  const el = document.getElementById('errorList');
+  el.innerHTML = j.errors.map(f => `<li style="color:var(--red);">${f}</li>`).join('') || '<li>No errored files</li>';
+}
+
+async function retryErrors() {
+  const btn = document.getElementById('btnRetryErrors'); btn.disabled = true;
+  log('Moving failed files back for retry...');
+  try {
+    const r = await fetch('/api/retry-errors', {method:'POST'});
+    const j = await r.json();
+    if (j.moved.length) {
+      log(`Moved ${j.moved.length} file(s) back to the watch folder: ${j.moved.join(', ')}. Click "Dry run" or "Post to Tally" to try them again.`);
+    } else {
+      log('No failed files to retry.');
+    }
+  } catch (e) { log('Retry error: ' + e); }
+  btn.disabled = false;
+  refreshStatus();
+}
+
+async function refreshGmailStatus() {
+  const r = await fetch('/api/gmail-status');
+  const j = await r.json();
+  const box = document.getElementById('gmailStatusBox');
+  const pill = document.getElementById('pillGmail');
+  const signOutBtn = document.getElementById('btnSignOut');
+  signOutBtn.style.display = j.signed_in ? 'inline-block' : 'none';
+  if (j.signed_in) {
+    box.innerHTML = 'Signed in — ready to fetch. <span id="whoamiText" style="color:var(--muted2);">(checking account…)</span>';
+    pill.textContent = 'Gmail: connected'; pill.className = 'pill on';
+    fetch('/api/gmail-whoami').then(r => r.json()).then(w => {
+      const el = document.getElementById('whoamiText');
+      if (el) el.textContent = (w.ok && w.email) ? `(as ${w.email})` : '';
+    }).catch(() => {});
+  } else if (j.credentials_configured) {
+    box.innerHTML = 'credentials.json found. Click "Fetch new contract notes" to sign in.';
+    pill.textContent = 'Gmail: setup needed'; pill.className = 'pill warn';
+  } else {
+    box.innerHTML = `Not set up yet. Place your Google OAuth <code>credentials.json</code> at:<br><code style="font-size:11px;">${j.credentials_path}</code><br>See README for the one-time setup steps.`;
+    pill.textContent = 'Gmail: not configured'; pill.className = 'pill warn';
+  }
+}
+
+function segClass(seg) {
+  return {equity_intraday:'Speculation (Intraday)', equity_delivery:'Equity Delivery', futures:'Futures', options:'Options'}[seg] || seg;
+}
+
+async function loadLastRun() {
+  const r = await fetch('/api/last-run');
+  const j = await r.json();
+  const parserEl = document.getElementById('parserNotes');
+  const voucherEl = document.getElementById('voucherNotes');
+  if (!j.details || j.details.length === 0) {
+    parserEl.innerHTML = '<div class="empty-state">No notes parsed yet — run a dry run or post from the Ingestion tab.</div>';
+    voucherEl.innerHTML = '<div class="empty-state">No vouchers generated yet — run a dry run or post from the Ingestion tab.</div>';
+    return;
+  }
+  parserEl.innerHTML = j.details.map(d => {
+    const n = d.normalized;
+    const rows = n.trades.map(t => `<tr>
+        <td>${t.symbol}</td><td>${segClass(t.segment)}</td>
+        <td class="${t.buy_sell === 'B' ? 'buy' : 'sell'}">${t.buy_sell === 'B' ? 'BUY' : 'SELL'}</td>
+        <td>${t.quantity}</td><td>₹${t.price.toFixed(2)}</td><td>₹${t.value.toFixed(2)}</td>
+      </tr>`).join('');
+    return `<div class="note-card">
+      <b>${d.broker.charAt(0).toUpperCase()+d.broker.slice(1)}</b> — ${d.file}
+      <div class="meta">
+        <div><span>Contract Note No.</span><b>${n.contract_note_no}</b></div>
+        <div><span>Client A/c</span><b>${n.account_code}</b></div>
+        <div><span>Trade Date</span><b>${n.trade_date}</b></div>
+        <div><span>Trades</span><b>${n.trades.length}</b></div>
+      </div>
+      <table><thead><tr><th>Symbol</th><th>Segment</th><th>Type</th><th>Qty</th><th>Rate</th><th>Value</th></tr></thead>
+      <tbody>${rows || '<tr><td colspan=6>No trade rows extracted</td></tr>'}</tbody></table>
+    </div>`;
+  }).join('');
+
+  voucherEl.innerHTML = j.details.map(d => {
+    const v = d.voucher;
+    const rows = v.lines.map(l => `<tr>
+        <td>${l.ledger}</td>
+        <td class="${l.dr_cr === 'Dr' ? 'dr' : 'cr'}">${l.dr_cr}</td>
+        <td>₹${l.amount.toFixed(2)}</td>
+      </tr>`).join('');
+    const totalDr = v.lines.filter(l=>l.dr_cr==='Dr').reduce((s,l)=>s+l.amount,0);
+    const totalCr = v.lines.filter(l=>l.dr_cr==='Cr').reduce((s,l)=>s+l.amount,0);
+    const balanced = Math.abs(totalDr - totalCr) < 0.01;
+    return `<div class="note-card">
+      <b>${d.broker.charAt(0).toUpperCase()+d.broker.slice(1)}</b> — ${v.narration}
+      <table><thead><tr><th>Ledger</th><th>Dr/Cr</th><th>Amount</th></tr></thead>
+      <tbody>${rows}</tbody></table>
+      <p style="margin-top:8px; font-size:12px;">Total Dr ₹${totalDr.toFixed(2)} · Total Cr ₹${totalCr.toFixed(2)} —
+      <span class="${balanced ? 'balance-ok' : 'balance-bad'}">${balanced ? 'Balanced ✓' : 'NOT balanced'}</span></p>
+    </div>`;
+  }).join('');
+}
+
+refreshStatus();
+refreshGmailStatus();
+refreshQueryPreview();
+</script>
+</body>
+</html>
