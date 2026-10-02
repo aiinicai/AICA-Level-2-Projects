@@ -1,0 +1,112 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+model User {
+  id        String   @id @default(uuid())
+  username  String   @unique
+  name      String
+  email     String
+  password  String
+  role      String   @default("Admin") // "Admin" or "User"
+  createdAt DateTime @default(now())
+}
+
+model Client {
+  id            String        @id @default(uuid())
+  clientCode    String        @unique
+  name          String
+  contactPerson String
+  email         String
+  address       String
+  gstin         String
+  ratePerFile   Float         @default(5.0)
+  active        Boolean       @default(true)
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  deliveryLogs  DeliveryLog[]
+  billings      Billing[]
+  emailLogs     EmailLog[]
+}
+
+model DeliveryLog {
+  id            String   @id @default(uuid())
+  clientId      String
+  client        Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  month         String
+  quarter       String   // e.g. "Q1", "Q2", "Q3", "Q4"
+  financialYear String   // e.g. "2026-27"
+  fileCount     Int
+  amount        Float
+  createdAt     DateTime @default(now())
+}
+
+model Billing {
+  id             String     @id @default(uuid())
+  clientId       String
+  client         Client     @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  quarter        String     // e.g. "Q1"
+  financialYear  String     // e.g. "2026-27"
+  totalFileCount Int
+  ratePerFile    Float
+  subtotal       Float
+  tax            Float
+  totalAmount    Float
+  status         String     @default("PENDING_CONFIRMATION") // PENDING_CONFIRMATION, CONFIRMED, INVOICE_GENERATED, INVOICE_SENT, REJECTED
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+  invoice        Invoice?
+  emailLogs      EmailLog[]
+
+  @@unique([clientId, quarter, financialYear])
+}
+
+model EmailLog {
+  id         String   @id @default(uuid())
+  clientId   String?
+  client     Client?  @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  billingId  String?
+  billing    Billing? @relation(fields: [billingId], references: [id], onDelete: SetNull)
+  type       String   // "CONFIRMATION" | "INVOICE"
+  recipient  String
+  subject    String
+  body       String
+  status     String   // "SENT" | "SIMULATED" | "FAILED"
+  sentAt     DateTime @default(now())
+  createdAt  DateTime @default(now())
+}
+
+model Invoice {
+  id            String   @id @default(uuid())
+  billingId     String   @unique
+  billing       Billing  @relation(fields: [billingId], references: [id], onDelete: Cascade)
+  invoiceNumber String   @unique
+  invoiceDate   DateTime @default(now())
+  subtotal      Float
+  tax           Float
+  totalAmount   Float
+  pdfPath       String?
+  status        String   @default("GENERATED") // "GENERATED", "SENT", "PAID"
+  createdAt     DateTime @default(now())
+}
+
+model AuditLog {
+  id          String   @id @default(uuid())
+  action      String
+  entity      String
+  entityId    String?
+  description String
+  createdAt   DateTime @default(now())
+}
+
+model SystemSetting {
+  id        String   @id @default("global")
+  key       String   @unique
+  value     String
+  updatedAt DateTime @updatedAt
+}
