@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>GST Inward HSN/SAC Fetcher</title>
+<style>
+  * { box-sizing: border-box; }
+  body { font-family: 'Segoe UI', Arial, sans-serif; margin: 0; background: #eef3f8; color: #1f2937; font-size: 13px; }
+  .header { background: #1a5fa8; padding: 14px 20px; display: flex; align-items: center; justify-content: space-between; }
+  .header .title { color: #ffffff; font-size: 16px; font-weight: 500; display: flex; align-items: center; gap: 10px; }
+  .header select { height: 32px; font-size: 13px; background: #ffffff; color: #1a5fa8; border: none; border-radius: 4px; padding: 0 8px; }
+  .tabbar { background: #ffffff; border-bottom: 1px solid #d7dfe8; display: flex; align-items: center; justify-content: space-between; padding: 0 8px; }
+  .tabbar .left { display: flex; }
+  .tabbtn { padding: 10px 16px; font-size: 13px; font-weight: 500; background: none; border: none; border-bottom: 2px solid transparent; color: #6b7280; cursor: pointer; }
+  .tabbtn.active { border-bottom: 2px solid #1a5fa8; color: #1a5fa8; }
+  .panel { padding: 20px; display: none; }
+  .panel.active { display: block; }
+  .muted { font-size: 12px; color: #6b7280; margin: 0 0 16px; }
+  .row { display: flex; gap: 10px; margin-bottom: 16px; align-items: center; }
+  select, input { height: 34px; font-size: 13px; flex: 1; border: 1px solid #d7dfe8; border-radius: 4px; padding: 0 8px; color: #1f2937; background: #fff; }
+  .tilegrid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-bottom: 20px; }
+  .tile { background: #ffffff; border: 1px solid #1a5fa8; border-radius: 6px; padding: 20px 12px; display: flex; flex-direction: column; align-items: center; gap: 6px; cursor: pointer; }
+  .tile:disabled { opacity: 0.45; cursor: not-allowed; }
+  .tile .ttl { font-size: 14px; font-weight: 500; color: #1a5fa8; }
+  .tile .sub { font-size: 11px; color: #6b7280; }
+  .logbox { background: #ffffff; border: 1px solid #d7dfe8; border-radius: 6px; padding: 12px 14px; font-family: 'Consolas', monospace; font-size: 12px; color: #374151; line-height: 1.8; max-height: 160px; overflow-y: auto; }
+  .btn-primary { height: 36px; font-size: 12px; padding: 0 14px; color: #ffffff; background: #1a5fa8; border: none; border-radius: 4px; cursor: pointer; flex: none; }
+  .btn-outline { height: 32px; font-size: 12px; padding: 0 12px; color: #1a5fa8; background: #fff; border: 1px solid #1a5fa8; border-radius: 4px; cursor: pointer; }
+  .card { background: #ffffff; border: 1px solid #d7dfe8; border-radius: 6px; padding: 12px 14px; margin-bottom: 12px; }
+  .label { font-size: 13px; font-weight: 500; color: #1f2937; margin: 0 0 8px; }
+  .exportrow { display: flex; padding: 10px 14px; font-size: 12px; color: #374151; border-bottom: 1px solid #eef1f5; align-items: center; }
+  .exportrow:last-child { border-bottom: none; }
+  .exportrow span:first-child { flex: 2; }
+  .exportrow span:nth-child(2) { flex: 1; }
+  .gstinrow { display: flex; justify-content: space-between; align-items: center; padding: 6px 0; font-size: 12px; }
+  .footer { background: #ffffff; border-top: 1px solid #d7dfe8; padding: 8px 20px; display: flex; justify-content: space-between; font-size: 11px; color: #9ca3af; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="title">GST Inward HSN/SAC Fetcher</div>
+  <select id="gstinSelect"><option value="">Select GSTIN</option></select>
+</div>
+
+<div class="tabbar">
+  <div class="left">
+    <button class="tabbtn active" data-tab="home">Home</button>
+    <button class="tabbtn" data-tab="reports">Reports</button>
+  </div>
+  <button class="tabbtn" data-tab="settings">Settings</button>
+</div>
+
+<!-- HOME -->
+<div class="panel active" id="panel-home">
+  <p class="muted">Upload a downloaded e-invoice JSON to extract HSN-wise inward supply data.</p>
+  <div class="tilegrid">
+    <button class="tile" disabled title="Coming in V2">
+      <span class="ttl">Fetch from portal</span>
+      <span class="sub">Coming soon (V2)</span>
+    </button>
+    <button class="tile" id="btnUpload">
+      <span class="ttl">Manual upload</span>
+      <span class="sub">Use an already-downloaded JSON</span>
+    </button>
+  </div>
+  <div class="logbox" id="homeLog">Ready. Select Manual upload to begin.</div>
+</div>
+
+<!-- REPORTS -->
+<div class="panel" id="panel-reports">
+  <p class="muted">Select a period range to generate a consolidated HSN report.</p>
+  <div class="row">
+    <select id="periodFrom"><option value="">From month</option></select>
+    <span style="flex:none; font-size:12px; color:#9ca3af;">to</span>
+    <select id="periodTo"><option value="">To month</option></select>
+    <button class="btn-primary" id="btnGenerate">Generate</button>
+  </div>
+  <p class="label">Past exports</p>
+  <div class="card" id="exportsList" style="padding:0;"></div>
+</div>
+
+<!-- SETTINGS -->
+<div class="panel" id="panel-settings">
+  <p class="label">Registered GSTINs</p>
+  <p class="muted" style="margin-top:-6px;">Used to tag uploads and filter reports. Stored locally only.</p>
+  <div class="card">
+    <div id="gstinList"></div>
+    <div class="row" style="margin-top:8px; margin-bottom:0;">
+      <input id="newGstin" placeholder="GSTIN" />
+      <input id="newLabel" placeholder="Label (optional)" />
+      <button class="btn-outline" id="btnAddGstin">Add</button>
+    </div>
+  </div>
+  <p class="label">Save location</p>
+  <div class="card" style="display:flex; align-items:center; justify-content:space-between;">
+    <span id="saveFolderPath" style="color:#374151;">—</span>
+    <button class="btn-outline" id="btnBrowse">Browse</button>
+  </div>
+</div>
+
+<div class="footer">
+  <span>Developed by Sunayana</span>
+  <span>v1.0</span>
+</div>
+
+<script>
+function api(name, ...args) { return window.pywebview.api[name](...args); }
+
+document.querySelectorAll('.tabbtn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.tabbtn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('panel-' + btn.dataset.tab).classList.add('active');
+    if (btn.dataset.tab === 'reports') refreshReports();
+    if (btn.dataset.tab === 'settings') refreshSettings();
+  });
+});
+
+function log(msg) {
+  const box = document.getElementById('homeLog');
+  const line = document.createElement('div');
+  line.textContent = msg;
+  box.appendChild(line);
+  box.scrollTop = box.scrollHeight;
+}
+
+document.getElementById('btnUpload').addEventListener('click', async () => {
+  const gstin = document.getElementById('gstinSelect').value;
+  log('Opening file picker...');
+  const result = await api('upload_json', gstin);
+  if (result.error) { log('Error: ' + result.error); return; }
+  if (result.cancelled) { log('Cancelled.'); return; }
+  log(`Processed ${result.ingested} invoice(s), ${result.failed} failed.`);
+  log(`Periods found: ${result.periods.join(', ')}`);
+  refreshPeriods();
+  refreshGstinOptions();
+});
+
+async function refreshPeriods() {
+  const gstin = document.getElementById('gstinSelect').value;
+  const periods = await api('get_periods', gstin);
+  const fromSel = document.getElementById('periodFrom');
+  const toSel = document.getElementById('periodTo');
+  fromSel.innerHTML = '<option value="">From month</option>';
+  toSel.innerHTML = '<option value="">To month</option>';
+  periods.forEach(p => {
+    fromSel.innerHTML += `<option value="${p}">${p}</option>`;
+    toSel.innerHTML += `<option value="${p}">${p}</option>`;
+  });
+  if (periods.length) {
+    fromSel.value = periods[0];
+    toSel.value = periods[periods.length - 1];
+  }
+}
+
+document.getElementById('btnGenerate').addEventListener('click', async () => {
+  const from = document.getElementById('periodFrom').value;
+  const to = document.getElementById('periodTo').value;
+  const gstin = document.getElementById('gstinSelect').value;
+  if (!from || !to) { alert('Select both From and To months.'); return; }
+  const result = await api('generate_report', from, to, gstin);
+  if (result.error) { alert(result.error); return; }
+  refreshReports();
+});
+
+async function refreshReports() {
+  const exports = await api('list_exports');
+  const list = document.getElementById('exportsList');
+  if (!exports.length) {
+    list.innerHTML = '<div class="exportrow"><span>No reports generated yet.</span></div>';
+    return;
+  }
+  list.innerHTML = exports.map(e =>
+    `<div class="exportrow"><span>${e.period_from} to ${e.period_to}${e.gstin ? ' · ' + e.gstin : ''}</span><span>${e.invoice_count} invoices</span></div>`
+  ).join('');
+}
+
+async function refreshSettings() {
+  const folder = await api('get_save_folder');
+  document.getElementById('saveFolderPath').textContent = folder;
+  refreshGstinList();
+}
+
+async function refreshGstinList() {
+  const gstins = await api('list_gstins');
+  const box = document.getElementById('gstinList');
+  box.innerHTML = gstins.length
+    ? gstins.map(g => `<div class="gstinrow"><span>${g.gstin}${g.label ? ' — ' + g.label : ''}</span><span style="color:#c0392b; cursor:pointer;" onclick="removeGstin('${g.gstin}')">Remove</span></div>`).join('')
+    : '<div class="gstinrow"><span style="color:#9ca3af;">No GSTINs added yet.</span></div>';
+}
+
+async function removeGstin(gstin) {
+  await api('remove_gstin', gstin);
+  refreshGstinList();
+  refreshGstinOptions();
+}
+
+document.getElementById('btnAddGstin').addEventListener('click', async () => {
+  const gstin = document.getElementById('newGstin').value.trim();
+  const label = document.getElementById('newLabel').value.trim();
+  const result = await api('add_gstin', gstin, label);
+  if (result.error) { alert(result.error); return; }
+  document.getElementById('newGstin').value = '';
+  document.getElementById('newLabel').value = '';
+  refreshGstinList();
+  refreshGstinOptions();
+});
+
+document.getElementById('btnBrowse').addEventListener('click', async () => {
+  const folder = await api('browse_folder');
+  if (folder) document.getElementById('saveFolderPath').textContent = folder;
+});
+
+async function refreshGstinOptions() {
+  const gstins = await api('list_gstins');
+  const sel = document.getElementById('gstinSelect');
+  const current = sel.value;
+  sel.innerHTML = '<option value="">Select GSTIN</option>' +
+    gstins.map(g => `<option value="${g.gstin}">${g.gstin}${g.label ? ' — ' + g.label : ''}</option>`).join('');
+  sel.value = current;
+}
+
+document.getElementById('gstinSelect').addEventListener('change', refreshPeriods);
+
+window.addEventListener('pywebviewready', async () => {
+  refreshGstinOptions();
+  refreshPeriods();
+});
+</script>
+</body>
+</html>
