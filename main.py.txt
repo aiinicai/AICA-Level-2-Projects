@@ -1,0 +1,90 @@
+"""
+GST Inward HSN/SAC Fetcher — desktop app entry point
+Developed by Sunayana
+
+Run: python main.py
+Build to .exe (on Windows): pyinstaller build.spec
+"""
+import os
+import sys
+import webview
+
+import backend
+
+
+def resource_path(relative_path):
+    """Resolve paths correctly both when run as a script and when frozen by PyInstaller."""
+    if hasattr(sys, "_MEIPASS"):
+        return os.path.join(sys._MEIPASS, relative_path)
+    return os.path.join(os.path.abspath("."), relative_path)
+
+
+class Api:
+    def upload_json(self, gstin):
+        result = window.create_file_dialog(webview.OPEN_DIALOG, file_types=("JSON files (*.json)", "All files (*.*)"))
+        if not result:
+            return {"cancelled": True}
+        try:
+            summary = backend.ingest_json_file(result[0], gstin_tag=gstin or None)
+            return summary
+        except Exception as e:
+            return {"error": str(e)}
+
+    def get_periods(self, gstin):
+        try:
+            return backend.get_available_periods(gstin or None)
+        except Exception:
+            return []
+
+    def generate_report(self, period_from, period_to, gstin):
+        try:
+            return backend.generate_report(period_from, period_to, gstin or None)
+        except Exception as e:
+            return {"error": str(e)}
+
+    def list_exports(self):
+        try:
+            return backend.list_exports()
+        except Exception:
+            return []
+
+    def list_gstins(self):
+        try:
+            return backend.list_gstins()
+        except Exception:
+            return []
+
+    def add_gstin(self, gstin, label):
+        try:
+            return backend.add_gstin(gstin, label)
+        except Exception as e:
+            return {"error": str(e)}
+
+    def remove_gstin(self, gstin):
+        backend.remove_gstin(gstin)
+        return {"ok": True}
+
+    def get_save_folder(self):
+        return backend.get_save_folder()
+
+    def browse_folder(self):
+        result = window.create_file_dialog(webview.FOLDER_DIALOG)
+        if result:
+            folder = result[0]
+            backend.set_setting("save_folder", folder)
+            return folder
+        return None
+
+
+if __name__ == "__main__":
+    backend.init_db()
+    api = Api()
+    window = webview.create_window(
+        "GST Inward HSN/SAC Fetcher",
+        resource_path("ui.html"),
+        js_api=api,
+        width=760,
+        height=680,
+        resizable=True,
+    )
+    webview.start()
