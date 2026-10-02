@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+{% from "_macros.html" import band, tags, status, who with context %}
+{% block title %}{{ o.form }} — {{ o.period_key }}{% endblock %}
+{% block content %}
+<div class="page-head"><div>
+  <div class="eyebrow">{{ o.rule_code }} · {{ o.period_key }}</div>
+  <h1>{{ o.form }}</h1>
+  <div class="mt-1">{{ o.title }} — {{ who(o) }}</div>
+  <div class="mt-2">{{ band(h) }} {{ status(o.status) }} {{ tags(o, rule.verified if rule else None) }}</div>
+</div>
+<div class="kpi kpi-{{ h if h in ('overdue','due7','due30','closed') else 'gold' }} text-end"><div class="kpi-label">Due date</div><div class="kpi-value">{{ o.due_date|dmy }}</div>
+  <div class="small-muted">{% if h == 'overdue' %}{{ (today - o.due_date).days }} days late{% elif h != 'closed' %}in {{ (o.due_date - today).days }} days{% endif %}</div></div>
+</div>
+<div class="row g-4">
+<div class="col-lg-7">
+  <div class="card mb-4"><div class="card-body">
+    <dl class="row mb-0 small">
+      <dt class="col-sm-4">Due date</dt><dd class="col-sm-8 fw-semibold">{{ o.due_date|dmy }} {% if o.due_date.weekday() == 6 %}<span class="small-muted">(falls on a Sunday — online filing, no shift)</span>{% endif %}</dd>
+      <dt class="col-sm-4">Anchor</dt><dd class="col-sm-8">{{ o.anchor_type.replace('_', ' ')|lower }} {{ o.anchor_date|dmy }}</dd>
+      <dt class="col-sm-4">Law</dt><dd class="col-sm-8">{{ o.law }}</dd>
+      {% if rule and rule.penalty_summary %}<dt class="col-sm-4">Penalty (text only)</dt><dd class="col-sm-8">{{ rule.penalty_summary }} — adjudicated by the ROC, never computed here</dd>{% endif %}
+      <dt class="col-sm-4">Rule</dt><dd class="col-sm-8"><a href="{{ url_for('rules.show', code=o.rule_code) }}">{{ o.rule_code }}</a> · pack {{ o.rule_version }} · hash <span class="mono">{{ o.rule_hash }}</span>
+        {% if rule and rule.verified %}<span class="badge text-bg-success">Verified by {{ rule.verified_by }} on {{ rule.verified_on|dmy }}</span>{% else %}<span class="tag tag-unverified">Unverified rule</span>{% endif %}</dd>
+      <dt class="col-sm-4">Assigned to</dt><dd class="col-sm-8"><span id="assignee">{{ o.assignee.full_name if o.assignee else 'nobody' }}</span>
+        {% if can('assign') %}<form class="d-inline-flex gap-1 ms-2" hx-post="{{ url_for('obligations.assign', obl_id=o.id) }}" hx-target="#assignee"><label class="visually-hidden" for="assignee_id">Assign to</label><select class="form-select form-select-sm" id="assignee_id" name="assignee_id"><option value="">—</option>{% for u in staff %}<option value="{{ u.id }}" {% if o.assignee_id == u.id %}selected{% endif %}>{{ u.full_name }}</option>{% endfor %}</select><button class="btn btn-sm btn-outline-secondary">Assign</button></form>{% endif %}</dd>
+      {% if o.reviewer %}<dt class="col-sm-4">Approved by</dt><dd class="col-sm-8">{{ o.reviewer.full_name }}</dd>{% endif %}
+      {% if o.status_reason %}<dt class="col-sm-4">Reason</dt><dd class="col-sm-8">{{ o.status_reason }}</dd>{% endif %}
+      {% for n in o.notes or [] %}<dt class="col-sm-4">{% if loop.first %}Notes{% endif %}</dt><dd class="col-sm-8">{{ n }}</dd>{% endfor %}
+      {% if o.superseded_at %}<dt class="col-sm-4">Superseded</dt><dd class="col-sm-8">{{ o.superseded_reason }}</dd>{% endif %}
+    </dl></div></div>
+
+  {% if fb %}
+  <div class="card mb-4"><div class="card-header bg-white d-flex justify-content-between align-items-center">
+    <span class="fw-semibold">Fee if filed on {{ what_if|dmy }}</span>
+    <form method="get" class="d-flex gap-1"><label class="visually-hidden" for="what_if">What if filed on</label><input class="form-control form-control-sm" type="date" id="what_if" name="what_if" value="{{ what_if }}"><button class="btn btn-sm btn-outline-secondary">What if</button></form></div>
+    <div class="card-body"><table class="table table-sm mb-2"><tbody>
+      <tr><td>Normal fee</td><td class="text-end">{{ fb.normal|inr }}</td></tr>
+      <tr><td>Additional fee {% if fb.slab %}<span class="small-muted">({{ fb.slab }})</span>{% endif %}</td><td class="text-end">{{ fb.additional|inr }}</td></tr>
+      {% if fb.scheme_relief %}<tr><td>Scheme relief — {{ fb.scheme }}</td><td class="text-end">−{{ fb.scheme_relief|inr }}</td></tr>{% endif %}
+      <tr class="fw-semibold"><td>Total</td><td class="text-end">{{ fb.total|inr }}</td></tr></tbody></table>
+      {% if not fb.verified %}<div class="tag tag-unverified mb-2">Estimate — unverified</div>{% endif %}
+      {% if fb.blocked %}<div class="alert alert-warning small">{{ fb.blocked }}</div>{% endif %}
+      <div class="fee-lines small-muted">{{ fb.explanation }}</div></div></div>
+  {% endif %}
+
+  {% if filings %}
+  <div class="card mb-4"><div class="card-header">Filings</div>
+    <ul class="list-group list-group-flush">{% for f in filings %}
+      <li class="list-group-item small">SRN <span class="mono">{{ f.srn }}</span> on {{ f.filing_date|dmy }} · {{ f.delay_days }} days late · paid {{ (f.normal_fee_paid + f.additional_fee_paid)|inr }} vs computed {{ f.computed_fee_json.total|inr }}
+        {% if f.fee_mismatch %}<span class="badge text-bg-danger">Fee mismatch</span>{% endif %}
+        {% if f.attachment_path %} · <a href="{{ url_for('obligations.download', filing_id=f.id) }}">{{ f.attachment_name }}</a>{% endif %}</li>
+    {% endfor %}</ul></div>
+  {% endif %}
+</div>
+
+<div class="col-lg-5">
+  <div class="card mb-4"><div class="card-header">Workflow</div><div class="card-body">
+    {% for s in next_statuses if s != 'FILED' %}
+      <form method="post" action="{{ url_for('obligations.set_status', obl_id=o.id) }}" class="d-inline"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="status" value="{{ s }}"><button class="btn btn-sm btn-outline-primary mb-1">{{ 'Send back' if s == 'IN_PROGRESS' and o.status in ('READY_FOR_REVIEW', 'APPROVED_FOR_FILING') else STATUS_LABELS[s] }}</button></form>
+    {% endfor %}
+    {% if o.status in ('APPROVED_FOR_FILING', 'RESUBMISSION_REQUIRED') %}
+      {% if can('mark_filed') %}
+      <form id="file" method="post" action="{{ url_for('obligations.file', obl_id=o.id) }}" enctype="multipart/form-data" class="border rounded p-2 mt-2">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div class="fw-semibold small mb-1">Mark filed</div>
+        <div class="row g-1">
+          <div class="col-6"><label class="form-label small" for="srn">SRN</label><input class="form-control form-control-sm mono" id="srn" name="srn" required></div>
+          <div class="col-6"><label class="form-label small" for="filing_date">Filing date</label><input class="form-control form-control-sm" type="date" id="filing_date" name="filing_date" value="{{ today }}" required></div>
+          <div class="col-6"><label class="form-label small" for="nfp">Normal fee paid ₹</label><input class="form-control form-control-sm" id="nfp" name="normal_fee_paid" value="{{ '%.0f'|format(fb_today.normal) if fb_today else 0 }}"></div>
+          <div class="col-6"><label class="form-label small" for="afp">Additional fee paid ₹</label><input class="form-control form-control-sm" id="afp" name="additional_fee_paid" value="{{ '%.0f'|format(fb_today.additional - fb_today.scheme_relief) if fb_today else 0 }}"></div>
+          <div class="col-12"><label class="form-label small" for="att">Challan / acknowledgement (PDF or PNG, ≤ 5 MB)</label><input class="form-control form-control-sm" type="file" id="att" name="attachment" accept="application/pdf,image/png"></div>
+        </div>
+        <button class="btn btn-sm btn-success mt-2">Mark filed</button></form>
+      {% else %}<p class="small-muted mt-2">A partner or owner marks this filed.</p>{% endif %}
+    {% endif %}
+    {% if can('waive') and o.status not in ('FILED','ROC_APPROVED','NOT_APPLICABLE','WAIVED') %}
+      <form method="post" action="{{ url_for('obligations.set_status', obl_id=o.id) }}" class="border rounded p-2 mt-3">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div class="fw-semibold small mb-1">Not applicable / waived</div>
+        <label class="visually-hidden" for="wstatus">Outcome</label>
+        <select class="form-select form-select-sm mb-1" id="wstatus" name="status"><option value="NOT_APPLICABLE">Not applicable</option><option value="WAIVED">Waived</option></select>
+        <label class="visually-hidden" for="wreason">Reason</label>
+        <textarea class="form-control form-control-sm mb-1" id="wreason" name="reason" rows="2" placeholder="Reason (at least 20 characters)"></textarea>
+        <button class="btn btn-sm btn-outline-secondary">Record</button></form>
+    {% endif %}
+  </div></div>
+
+  <div class="card"><div class="card-header">History</div>
+    <ul class="list-group list-group-flush small">{% for h in history %}
+      <li class="list-group-item"><span class="small-muted">{{ h.ts[:16].replace('T', ' ') }} UTC</span> — {{ h.actor_name }}: {{ h.action }}
+        {% if h.after_json %}<div class="mono audit-json small-muted">{{ h.after_json[:300] }}</div>{% endif %}</li>
+    {% else %}<li class="list-group-item text-muted">No changes yet.</li>{% endfor %}</ul></div>
+</div>
+</div>
+{% endblock %}

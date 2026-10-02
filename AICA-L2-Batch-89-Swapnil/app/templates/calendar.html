@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% from "_macros.html" import head, band, tags, status, who with context %}
+{% block title %}Calendar{% endblock %}
+{% block content %}
+<div class="page-head">{{ head("Compliance calendar", first.strftime('%B %Y') if view == 'month' else ('Agenda ' ~ (start|dmy) ~ ' – ' ~ (end|dmy)), obls|length ~ " item(s) in view") }}
+  <div class="d-flex flex-wrap gap-2">
+    <a class="btn btn-sm btn-gold" href="{{ url_for('reports.calendar_ics', scope='mine') }}">My calendar (.ics)</a>
+    {% if a.get('entity_id') %}<a class="btn btn-sm btn-outline-secondary" href="{{ url_for('reports.calendar_ics', scope='entity', entity_id=a.get('entity_id')) }}">This entity (.ics)</a>{% endif %}
+    {% if can('view_all') %}<a class="btn btn-sm btn-outline-secondary" href="{{ url_for('reports.calendar_ics', scope='firm') }}">Whole firm (.ics)</a>{% endif %}
+  </div></div>
+<form class="row g-2 align-items-end mb-3" method="get">
+  <input type="hidden" name="view" value="{{ view }}">{% if view == 'month' %}<input type="hidden" name="month" value="{{ first.strftime('%Y-%m') }}">{% endif %}
+  <div class="col-md-3"><label class="form-label small mb-0" for="c-ent">Entity</label><select class="form-select form-select-sm" id="c-ent" name="entity_id"><option value="">All</option>{% for e in ents %}<option value="{{ e.id }}" {% if a.get('entity_id') == e.id|string %}selected{% endif %}>{{ e.name }}</option>{% endfor %}</select></div>
+  <div class="col-md-2"><label class="form-label small mb-0" for="c-staff">Staff</label><select class="form-select form-select-sm" id="c-staff" name="staff"><option value="">All</option>{% for u in staff %}<option value="{{ u.id }}" {% if a.get('staff') == u.id|string %}selected{% endif %}>{{ u.full_name }}</option>{% endfor %}</select></div>
+  <div class="col-md-3"><label class="form-label small mb-0" for="c-form">Form</label><select class="form-select form-select-sm" id="c-form" name="form"><option value="">All</option>{% for code, form in codes %}<option value="{{ code }}" {% if a.get('form') == code %}selected{% endif %}>{{ form }} ({{ code }})</option>{% endfor %}</select></div>
+  {% if view == 'agenda' %}
+  <div class="col-md-2"><label class="form-label small mb-0" for="c-from">From</label><input class="form-control form-control-sm" type="date" id="c-from" name="from" value="{{ start }}"></div>
+  <div class="col-md-2"><label class="form-label small mb-0" for="c-to">To</label><input class="form-control form-control-sm" type="date" id="c-to" name="to" value="{{ end }}"></div>
+  {% endif %}
+  <div class="col-auto"><button class="btn btn-sm btn-brand">Apply</button></div>
+  <div class="col-auto ms-auto btn-group" role="group" aria-label="View">
+    <a class="btn btn-sm {{ 'btn-brand' if view == 'month' else 'btn-outline-secondary' }}" href="{{ url_for('reports.calendar', view='month', entity_id=a.get('entity_id', ''), staff=a.get('staff', ''), form=a.get('form', '')) }}">Month</a>
+    <a class="btn btn-sm {{ 'btn-brand' if view == 'agenda' else 'btn-outline-secondary' }}" href="{{ url_for('reports.calendar', view='agenda', entity_id=a.get('entity_id', ''), staff=a.get('staff', ''), form=a.get('form', '')) }}">Agenda</a>
+  </div>
+</form>
+
+{% if view == 'month' %}
+<div class="d-flex justify-content-between align-items-center mb-2">
+  <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('reports.calendar', month=prev_m.strftime('%Y-%m'), entity_id=a.get('entity_id', ''), staff=a.get('staff', ''), form=a.get('form', '')) }}">‹ {{ prev_m.strftime('%B') }}</a>
+  <a class="small" href="{{ url_for('reports.calendar') }}">Today</a>
+  <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('reports.calendar', month=next_m.strftime('%Y-%m'), entity_id=a.get('entity_id', ''), staff=a.get('staff', ''), form=a.get('form', '')) }}">{{ next_m.strftime('%B') }} ›</a>
+</div>
+<div class="card"><div class="table-responsive"><table class="table table-bordered mb-0 cal">
+  <thead><tr>{% for d in ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'] %}<th class="text-center">{{ d }}</th>{% endfor %}</tr></thead>
+  <tbody>{% for week in weeks %}<tr>{% for d in week %}
+    <td class="cal-day {{ 'cal-out' if d.month != first.month }} {{ 'cal-today' if d == today }}">
+      <div class="cal-date">{{ d.day }}{% if d.weekday() == 6 and by_day.get(d) %} <span class="small-muted" title="Due date falls on a Sunday — online filing, no shift">Sun</span>{% endif %}</div>
+      {% for o in by_day.get(d, [])[:4] %}<a class="cal-item band-{{ health(o) }}" href="{{ url_for('obligations.show', obl_id=o.id) }}" title="{{ o.form }} — {{ o.entity.name if o.entity else o.person.name }}">{{ o.form[:18] }} · {{ (o.entity.name if o.entity else o.person.name)[:14] }}</a>{% endfor %}
+      {% if by_day.get(d, [])|length > 4 %}<a class="small" href="{{ url_for('reports.calendar', view='agenda', **{'from': d, 'to': d}) }}">+{{ by_day[d]|length - 4 }} more</a>{% endif %}
+    </td>{% endfor %}</tr>{% endfor %}</tbody>
+</table></div></div>
+{% else %}
+<div class="card"><div class="table-responsive"><table class="table table-sm mb-0 align-middle">
+  <thead><tr><th>Date</th><th>Health</th><th>Form</th><th>Entity / person</th><th>Status</th><th>Assignee</th></tr></thead>
+  <tbody>{% for o in obls %}
+    {% if loop.first or o.due_date != loop.previtem.due_date %}<tr class="table-light"><th colspan="6">{{ o.due_date.strftime('%A') }}, {{ o.due_date|dmy }}</th></tr>{% endif %}
+    <tr><td></td><td>{{ band(health(o)) }}</td><td><a href="{{ url_for('obligations.show', obl_id=o.id) }}">{{ o.form }}</a> <span class="small-muted">{{ o.period_key }}</span>{{ tags(o) }}</td><td>{{ who(o) }}</td><td>{{ status(o.status) }}</td><td class="small">{{ o.assignee.full_name if o.assignee else '—' }}</td></tr>
+  {% else %}<tr><td colspan="6" class="text-muted">Nothing due in this window.</td></tr>{% endfor %}</tbody>
+</table></div></div>
+{% endif %}
+<p class="small-muted mt-2">Dates are never shifted for Sundays or holidays (MCA filing is online). Imported .ics events carry a 7-day reminder.</p>
+{% endblock %}

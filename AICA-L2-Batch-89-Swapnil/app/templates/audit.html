@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% from "_macros.html" import head with context %}
+{% block title %}Audit trail{% endblock %}
+{% block content %}
+<div class="page-head">{{ head("Append-only · hash-chained", "Audit trail", "Every change, sign-in and refused attempt — written in the same transaction as the change.") }}
+  <div class="d-flex gap-2">
+    <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('admin.audit_csv', **args) }}">Export CSV</a>
+    {% if can('settings') %}<form method="post" action="{{ url_for('admin.audit_verify') }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn btn-sm btn-brand">Verify audit chain</button></form>{% endif %}
+  </div>
+</div>
+<form class="row g-2 mb-3" method="get">
+  <div class="col-md-2"><label class="visually-hidden" for="a-ent">Entity id</label><input class="form-control form-control-sm" id="a-ent" name="entity_id" value="{{ args.get('entity_id', '') }}" placeholder="Entity id"></div>
+  <div class="col-md-2"><label class="visually-hidden" for="a-user">User</label><input class="form-control form-control-sm" id="a-user" name="user" value="{{ args.get('user', '') }}" placeholder="User name"></div>
+  <div class="col-md-3"><label class="visually-hidden" for="a-act">Action</label><select class="form-select form-select-sm" id="a-act" name="action"><option value="">All actions</option>{% for a in actions %}<option {% if args.get('action') == a %}selected{% endif %}>{{ a }}</option>{% endfor %}</select></div>
+  <div class="col-md-2"><label class="visually-hidden" for="a-from">From</label><input class="form-control form-control-sm" type="date" id="a-from" name="from" value="{{ args.get('from', '') }}"></div>
+  <div class="col-md-2"><label class="visually-hidden" for="a-to">To</label><input class="form-control form-control-sm" type="date" id="a-to" name="to" value="{{ args.get('to', '') }}"></div>
+  <div class="col-auto"><button class="btn btn-sm btn-outline-secondary">Filter</button></div>
+</form>
+<div class="card"><div class="table-responsive"><table class="table table-sm mb-0 small">
+  <thead><tr><th>#</th><th>When (UTC)</th><th>Who</th><th>Action</th><th>Object</th><th>Entity</th><th>Before</th><th>After</th><th>Hash</th></tr></thead>
+  <tbody>{% for r in rows %}
+    <tr class="{{ 'table-danger' if r.action == 'DENIED' else '' }}"><td>{{ r.id }}</td><td class="text-nowrap">{{ r.ts[:19].replace('T', ' ') }}</td><td>{{ r.actor_name }} <span class="small-muted">{{ r.actor_role }}</span></td><td>{{ r.action }}</td>
+      <td class="mono">{{ r.object_type }} {{ r.object_id or '' }}</td><td>{{ r.entity_id or '' }}</td>
+      <td class="mono audit-json">{{ (r.before_json or '')[:200] }}</td><td class="mono audit-json">{{ (r.after_json or '')[:200] }}</td><td class="mono small-muted">{{ r.row_hash[:10] }}</td></tr>
+  {% else %}<tr><td colspan="9" class="text-muted">No rows.</td></tr>{% endfor %}</tbody>
+</table></div></div>
+<p class="small-muted mt-2">Showing the latest 300 matching rows. The table is append-only (database triggers) and hash-chained.</p>
+{% endblock %}

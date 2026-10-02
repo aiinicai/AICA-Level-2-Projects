@@ -1,0 +1,109 @@
+{% extends "base.html" %}
+{% from "_macros.html" import head with context %}
+{% block title %}{{ r.code if r else 'Rule pack' }}{% endblock %}
+{% block content %}
+{% if mode == 'versions' %}
+<div class="page-head">{{ head("Rule pack", "Versions & diff", "Law changes are made by closing a row (effective_to) and opening a new one — never by editing history.") }}
+  <div class="d-flex gap-2">{% if can('edit_rulepack') %}
+    <div class="dropdown"><button class="btn btn-sm btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">Edit a rule file</button>
+      <ul class="dropdown-menu">{% for f in ['VERSION', 'companies_onetime.yaml', 'companies_annual.yaml', 'companies_event.yaml', 'llp.yaml', 'directors.yaml', 'fees.yaml', 'schemes.yaml'] %}<li><a class="dropdown-item mono small" href="{{ url_for('rules.edit', name=f) }}">{{ f }}</a></li>{% endfor %}</ul></div>
+    <form method="post" action="{{ url_for('rules.publish') }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn btn-sm btn-gold" {{ 'disabled' if not unpublished }}>Publish {{ rp.version }}</button></form>{% endif %}</div></div>
+{% if unpublished %}<div class="alert alert-warning small">The rule pack in force (<strong>{{ rp.version }}</strong>, hash <span class="mono">{{ rp.content_hash[:12] }}</span>) has not been published yet{% if rows %} — it differs from the last published version {{ rows[0].version }}{% endif %}.</div>{% endif %}
+<div class="row g-4">
+  <div class="col-lg-4"><div class="card"><div class="card-header"><span class="serif">Published versions</span></div>
+    <ul class="list-group list-group-flush small">{% for v in rows %}<li class="list-group-item"><strong>{{ v.version }}</strong> <span class="mono small-muted">{{ v.content_hash[:12] }}</span><div class="small-muted">{{ v.published_at.strftime('%d-%m-%Y %H:%M') }} UTC · {{ v.snapshot.rules|length }} rules</div></li>
+    {% else %}<li class="list-group-item text-muted">Nothing published yet.</li>{% endfor %}</ul></div></div>
+  <div class="col-lg-8"><div class="card"><div class="card-header d-flex justify-content-between align-items-center"><span class="serif">Diff</span>
+    <form class="d-flex gap-1" method="get"><label class="visually-hidden" for="da">From</label><select class="form-select form-select-sm" id="da" name="a">{% for v in rows %}<option {% if a == v.version %}selected{% endif %}>{{ v.version }}</option>{% endfor %}<option value="current" {% if a == 'current' %}selected{% endif %}>current (in force)</option></select>
+      <span class="small align-self-center">→</span><label class="visually-hidden" for="db">To</label><select class="form-select form-select-sm" id="db" name="b"><option value="current" {% if b == 'current' %}selected{% endif %}>current (in force)</option>{% for v in rows %}<option {% if b == v.version %}selected{% endif %}>{{ v.version }}</option>{% endfor %}</select><button class="btn btn-sm btn-outline-secondary">Compare</button></form></div>
+    <div class="card-body small">{% if not diff %}<p class="text-muted mb-0">Publish a version to compare against.</p>
+    {% elif not (diff.added or diff.removed or diff.changed or diff.other) %}<p class="mb-0">No differences between {{ a }} and {{ b }}.</p>
+    {% else %}
+      {% if diff.added %}<p><strong>Added rows:</strong> {% for c in diff.added %}<span class="badge text-bg-success mono">{{ c }}</span> {% endfor %}</p>{% endif %}
+      {% if diff.removed %}<p><strong>Removed rows:</strong> {% for c in diff.removed %}<span class="badge text-bg-danger mono">{{ c }}</span> {% endfor %}</p>{% endif %}
+      {% for code, fields in diff.changed %}<div class="mb-3"><strong class="mono">{{ code }}</strong>
+        <table class="table table-sm mb-0"><thead><tr><th>Field</th><th>{{ a }}</th><th>{{ b }}</th></tr></thead><tbody>{% for k, old, new in fields %}<tr><td class="mono">{{ k }}</td><td class="diff-old mono">{{ old }}</td><td class="diff-new mono">{{ new }}</td></tr>{% endfor %}</tbody></table></div>{% endfor %}
+      {% if diff.other %}<p><strong>Also changed:</strong> {{ diff.other|join(', ') }}</p>{% endif %}
+    {% endif %}</div></div></div>
+</div>
+{% elif mode == 'edit' %}
+<div class="page-head">{{ head("Rule pack · Owner only", "Edit " ~ name, "The whole pack is re-validated before anything is saved; a bad row is refused with its file and code.") }}
+  <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('rules.versions') }}">Versions &amp; diff</a></div>
+{% if error %}<div class="alert alert-danger small"><strong>Not saved — the rule pack would be invalid:</strong><pre class="mb-0 mt-2">{{ error }}</pre></div>{% endif %}
+<form method="post" class="card"><div class="card-body">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <label class="visually-hidden" for="content">{{ name }}</label>
+  <textarea class="form-control code-editor" id="content" name="content" spellcheck="false">{{ content }}</textarea>
+  <p class="small-muted mt-2">To change the law: set <span class="mono">effective_to</span> on the old row and add a new row with a new code and <span class="mono">effective_from</span>. Then bump <span class="mono">VERSION</span> and publish. Saving recomputes every entity; existing statuses are kept and changed due dates are logged.</p>
+  <button class="btn btn-brand">Validate &amp; save</button>
+</div></form>
+{% elif mode == 'updates' %}
+<div class="page-head">{{ head("Rule pack", "Regulatory update log", "Notifications and circulars, linked to the rule rows they created or closed.") }}</div>
+<div class="row g-4">
+  <div class="col-lg-{{ '7' if can('edit_rulepack') else '12' }}"><div class="card"><ul class="list-group list-group-flush">{% for u in rows %}
+    <li class="list-group-item"><div class="d-flex justify-content-between"><strong>{{ u.number }}</strong><span class="small-muted">{{ u.issued_on|dmy }}</span></div>
+      <div class="small">{{ u.summary }}</div>{% if u.url %}<div class="small text-break"><a href="{{ u.url }}" rel="noopener noreferrer" target="_blank">{{ u.url }}</a></div>{% endif %}
+      <div class="mt-1">{% for l in u.linked_rules %}<a class="badge {{ 'text-bg-danger' if l.relation == 'closed' else 'text-bg-success' }} me-1" href="{{ url_for('rules.show', code=l.code) }}">{{ l.relation }} {{ l.code }}</a>{% endfor %}</div></li>
+  {% else %}<li class="list-group-item text-muted">No updates logged yet.</li>{% endfor %}</ul></div></div>
+  {% if can('edit_rulepack') %}<div class="col-lg-5"><form method="post" class="card"><div class="card-header"><span class="serif">Log a notification / circular</span></div><div class="card-body">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <div class="row g-2">
+      <div class="col-7"><label class="form-label small" for="u-no">Number</label><input class="form-control form-control-sm" id="u-no" name="number" placeholder="G.S.R. 943(E)" required></div>
+      <div class="col-5"><label class="form-label small" for="u-date">Date</label><input class="form-control form-control-sm" type="date" id="u-date" name="issued_on" required></div>
+      <div class="col-12"><label class="form-label small" for="u-url">URL</label><input class="form-control form-control-sm" id="u-url" name="url" placeholder="https://…"></div>
+      <div class="col-12"><label class="form-label small" for="u-sum">Summary</label><textarea class="form-control form-control-sm" id="u-sum" name="summary" rows="3" required></textarea></div>
+    </div>
+    <div class="small fw-semibold mt-3 mb-1">Rule rows it created / closed</div>
+    <div class="border rounded p-2 small overflow-auto scroll-14">{% for x in rp.rules %}
+      <div class="d-flex align-items-center gap-2"><input class="form-check-input mt-0" type="checkbox" name="codes" value="{{ x.code }}" id="c-{{ x.code }}"><label class="form-check-label mono flex-grow-1" for="c-{{ x.code }}">{{ x.code }}</label>
+        <label class="visually-hidden" for="rel-{{ x.code }}">Relation</label><select class="form-select form-select-sm w-auto" id="rel-{{ x.code }}" name="rel_{{ x.code }}"><option>created</option><option>closed</option><option>amended</option></select></div>{% endfor %}</div>
+    <button class="btn btn-sm btn-brand mt-3">Log update</button></div></form></div>{% endif %}
+</div>
+{% elif not r %}
+<div class="page-head">{{ head("The law as versioned data", "Rule pack " ~ rp.version, rules|length ~ " rows · content hash " ~ rp.content_hash[:12] ~ " · " ~ (rp.rules|selectattr('verified')|list|length) ~ " verified by a partner") }}
+  <form class="d-flex gap-1" method="get"><label class="visually-hidden" for="rq">Search</label><input class="form-control form-control-sm" id="rq" name="q" value="{{ q }}" placeholder="Code or form"><button class="btn btn-sm btn-outline-secondary">Search</button></form></div>
+<div class="card"><div class="table-responsive"><table class="table table-sm table-hover mb-0 small align-middle">
+  <thead><tr><th>Code</th><th>Form</th><th>Due</th><th>Law</th><th>In force</th><th>Fee regime</th><th class="text-end">Open items</th><th>Verified</th></tr></thead>
+  <tbody>{% for x in rules %}
+    <tr><td><a class="mono" href="{{ url_for('rules.show', code=x.code) }}">{{ x.code }}</a>{% if x.interpretation %}<span class="tag tag-interp">Interpretation</span>{% endif %}</td><td>{{ x.form }}</td>
+      <td>{{ x.anchor.replace('_', ' ')|lower }}{% if x.offset.months %} + {{ x.offset.months }} m{% endif %}{% if x.offset.days %} {{ '+' if x.offset.days > 0 else '−' }} {{ x.offset.days|abs }} d{% endif %}{% if x.fixed %} → {{ x.fixed.day }}/{{ x.fixed.month }}{% endif %}</td>
+      <td>{{ x.law }}</td><td class="nowrap">{{ x.effective_from|dmy }} – {{ x.effective_to|dmy if x.effective_to else 'open' }}</td><td>{{ x.fee_regime }}</td>
+      <td class="text-end">{{ counts.get(x.code, 0) }}</td>
+      <td>{% if x.verified %}<span class="badge text-bg-success">{{ x.verified_by }}</span>{% else %}<span class="tag tag-unverified">Unverified</span>{% endif %}</td></tr>
+  {% endfor %}</tbody></table></div></div>
+{% else %}
+<div class="page-head">{{ head(r.code, r.form, r.title) }}
+  <div>{% if r.verified %}<span class="badge text-bg-success">Verified by {{ r.verified_by }}</span>{% else %}<span class="tag tag-unverified">Unverified</span>{% endif %}
+  <a class="btn btn-sm btn-outline-secondary ms-2" href="{{ url_for('rules.index') }}">All rules</a></div></div>
+<div class="row g-4">
+<div class="col-lg-7"><div class="card"><div class="card-body"><dl class="row small mb-0">
+  <dt class="col-sm-4">Law</dt><dd class="col-sm-8">{{ r.law }}</dd>
+  <dt class="col-sm-4">Entity types</dt><dd class="col-sm-8">{{ r.entity_types|join(', ') }}</dd>
+  <dt class="col-sm-4">Applicability</dt><dd class="col-sm-8 mono">{{ r.applicability }}</dd>
+  <dt class="col-sm-4">Anchor / offset</dt><dd class="col-sm-8">{{ r.anchor }} {{ r.offset.months }} months {{ r.offset.days }} days{% if r.fixed %}; fixed {{ r.fixed.day }}/{{ r.fixed.month }}{% endif %} ({{ r.recurrence }})</dd>
+  {% if r.event_types %}<dt class="col-sm-4">Triggered by</dt><dd class="col-sm-8">{{ r.event_types|join(', ') }}</dd>{% endif %}
+  <dt class="col-sm-4">Fee regime</dt><dd class="col-sm-8">{{ r.fee_regime }}{% if r.fee_slab %} ({{ r.fee_slab }}){% endif %}</dd>
+  <dt class="col-sm-4">Penalty (text only)</dt><dd class="col-sm-8">{{ r.penalty_summary or '—' }}</dd>
+  <dt class="col-sm-4">In force</dt><dd class="col-sm-8">{{ r.effective_from|dmy }} to {{ r.effective_to|dmy if r.effective_to else 'open' }}</dd>
+  <dt class="col-sm-4">Sources</dt><dd class="col-sm-8">{% for s in r.sources %}<div class="text-break"><a href="{{ s }}" rel="noopener noreferrer" target="_blank">{{ s }}</a></div>{% else %}—{% endfor %}</dd>
+  <dt class="col-sm-4">Notes</dt><dd class="col-sm-8">{{ r.notes or '—' }}</dd>
+  <dt class="col-sm-4">Content hash</dt><dd class="col-sm-8 mono">{{ r.content_hash }} (pack {{ rp.version }})</dd>
+</dl></div></div></div>
+<div class="col-lg-5">
+  {% if can('verify_rule') %}
+  <div class="card mb-3"><div class="card-header"><span class="serif">Partner sign-off</span></div><div class="card-body">
+    <form method="post" action="{{ url_for('rules.verify', code=r.code) }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <label class="form-label small" for="note">What did you check? (source, section, date)</label>
+      <textarea class="form-control form-control-sm mb-2" id="note" name="note" rows="3" required></textarea>
+      <button class="btn btn-sm btn-gold">Verify this row</button></form>
+    <p class="small-muted mt-2 mb-0">The sign-off applies to this exact content hash. If the row changes, it is unverified again.</p>
+  </div></div>
+  {% endif %}
+  <div class="card"><div class="card-header"><span class="serif">Verification history</span></div>
+    <ul class="list-group list-group-flush small">{% for h in history %}
+      <li class="list-group-item">{{ h.verified_by.full_name }} · {{ h.verified_at.strftime('%d-%m-%Y') }} · hash <span class="mono">{{ h.rule_hash }}</span>{% if h.rule_hash != r.content_hash %} <span class="badge text-bg-secondary">older content</span>{% endif %}<div class="small-muted">{{ h.note }}</div></li>
+    {% else %}<li class="list-group-item text-muted">Not yet verified.</li>{% endfor %}</ul></div>
+  {% if updates %}<div class="card mt-3"><div class="card-header"><span class="serif">Regulatory updates</span></div><ul class="list-group list-group-flush small">{% for u in updates %}<li class="list-group-item"><strong>{{ u.number }}</strong> · {{ u.issued_on|dmy }}<div class="small-muted">{{ u.summary }}</div></li>{% endfor %}</ul></div>{% endif %}
+</div></div>
+{% endif %}
+{% endblock %}

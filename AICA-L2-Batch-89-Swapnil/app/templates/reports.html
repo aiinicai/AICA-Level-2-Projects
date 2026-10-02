@@ -1,0 +1,96 @@
+{% extends "base.html" %}
+{% from "_macros.html" import head, band, tags, who with context %}
+{% block title %}{{ {'reports': 'Reports', 'letter_form': 'Client reminder letter', 'letter': 'Letter — ' ~ (e.name if e else ''), 'notifications': 'Notifications'}[mode] }}{% endblock %}
+{% block content %}
+{% if mode == 'reports' %}
+<div class="page-head">{{ head("Reports", "Registers, exposure & performance", "Excel exports open in Excel / LibreOffice; every export is logged in the audit trail.") }}
+  <div class="d-flex flex-wrap gap-2">
+    <a class="btn btn-sm btn-brand" href="{{ url_for('reports.register_xlsx') }}">Compliance register (.xlsx)</a>
+    <a class="btn btn-sm btn-gold" href="{{ url_for('reports.overdue_xlsx') }}">Overdue &amp; fee exposure (.xlsx)</a>
+    <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('reports.letter') }}">Client reminder letter</a>
+  </div></div>
+<div class="row g-3 mb-4">
+  <div class="col-md-4"><div class="kpi kpi-overdue"><div class="kpi-label">Overdue items</div><div class="kpi-value">{{ exposure|length }}</div></div></div>
+  <div class="col-md-4"><div class="kpi kpi-gold"><div class="kpi-label">Fee exposure if all filed today</div><div class="kpi-value">{{ total_exposure|inr }}</div><div class="small-muted">Fees only — penalties are adjudicated by the ROC</div></div></div>
+  <div class="col-md-4"><div class="kpi kpi-upcoming"><div class="kpi-label">KPI window</div><div class="kpi-value">24 months</div><div class="small-muted">from {{ window_start|dmy }}; pre-engagement items excluded</div></div></div>
+</div>
+<div class="row g-4">
+  <div class="col-xl-6"><div class="card"><div class="card-header"><span class="serif">Entity compliance score</span> <span class="small-muted">on-time filings ÷ filings due</span></div>
+    <div class="table-responsive"><table class="table table-sm mb-0 align-middle"><thead><tr><th>Entity</th><th class="text-end">On time</th><th class="text-end">Due</th><th class="w-50">Score</th></tr></thead><tbody>
+    {% for e, ok, n in scores %}{% set pct = (100 * ok / n)|round|int if n else 100 %}
+      <tr><td><a href="{{ url_for('entities.show', entity_id=e.id) }}">{{ e.name }}</a></td><td class="text-end">{{ ok }}</td><td class="text-end">{{ n }}</td>
+        <td><div class="d-flex align-items-center gap-2"><div class="timeline-bar flex-grow-1" role="img" aria-label="{{ pct }} percent"><span class="w-{{ pct }}" data-pct="{{ pct }}"></span></div><strong class="{{ 'text-danger' if pct < 60 else '' }}">{{ pct }}%</strong></div></td></tr>
+    {% else %}<tr><td colspan="4" class="text-muted">No filings fell due in the window.</td></tr>{% endfor %}</tbody></table></div></div></div>
+  <div class="col-xl-6"><div class="card"><div class="card-header"><span class="serif">Staff productivity</span> <span class="small-muted">filed on time, by assignee</span></div>
+    <div class="table-responsive"><table class="table table-sm mb-0"><thead><tr><th>Staff</th><th>Role</th><th class="text-end">Filed</th><th class="text-end">On time</th><th class="text-end">%</th></tr></thead><tbody>
+    {% for u, ok, n in staff_kpi %}<tr><td>{{ u.full_name }}</td><td class="small">{{ u.role|title }}</td><td class="text-end">{{ n }}</td><td class="text-end">{{ ok }}</td><td class="text-end fw-semibold">{{ (100 * ok / n)|round|int if n else '—' }}</td></tr>
+    {% else %}<tr><td colspan="5" class="text-muted">No filings by assigned staff in the window.</td></tr>{% endfor %}</tbody></table></div></div></div>
+  <div class="col-12"><div class="card"><div class="card-header"><span class="serif">Overdue &amp; fee exposure</span></div>
+    <div class="table-responsive"><table class="table table-sm mb-0 align-middle"><thead><tr><th>Due</th><th class="text-end">Days late</th><th>Form</th><th>Entity / person</th><th class="text-end">Normal</th><th class="text-end">Additional</th><th class="text-end">Relief</th><th class="text-end">If filed today</th></tr></thead><tbody>
+    {% for o, fb in exposure %}<tr><td class="nowrap">{{ o.due_date|dmy }}</td><td class="text-end">{{ (today - o.due_date).days }}</td><td><a href="{{ url_for('obligations.show', obl_id=o.id) }}">{{ o.form }}</a> <span class="small-muted">{{ o.period_key }}</span>{{ tags(o) }}</td><td>{{ who(o) }}</td>
+      {% if fb %}<td class="text-end">{{ fb.normal|inr }}</td><td class="text-end">{{ fb.additional|inr }}</td><td class="text-end">{{ fb.scheme_relief|inr }}</td><td class="text-end fw-semibold">{{ fb.total|inr }}{% if not fb.verified %}<div><span class="tag tag-unverified">Estimate</span></div>{% endif %}</td>
+      {% else %}<td colspan="4" class="text-end small-muted">no fee</td>{% endif %}</tr>
+    {% else %}<tr><td colspan="8" class="text-muted">Nothing overdue.</td></tr>{% endfor %}</tbody></table></div></div></div>
+</div>
+<style nonce="{{ csp_nonce }}">{% for i in range(0, 101) %}.w-{{ i }} { width: {{ i }}%; left: 0; }{% endfor %}</style>
+
+{% elif mode == 'letter_form' %}
+<div class="page-head">{{ head("Client communication", "Client reminder letter", "Obligations due in the window plus anything overdue, with the documents we need from the client.") }}</div>
+{% if blocked %}<div class="alert alert-danger"><strong>Export blocked:</strong> the letter for {{ e.name }} would include fees or due dates from rules not yet verified by a partner: <span class="mono">{{ blocked|join(', ') }}</span>. Verify them under <a href="{{ url_for('rules.index') }}">Rule pack</a> first (brief §6.3).</div>{% endif %}
+<form method="get" class="card"><div class="card-body row g-3 align-items-end">
+  <div class="col-md-5"><label class="form-label" for="l-ent">Entity</label><select class="form-select" id="l-ent" name="entity_id" required>{% for x in ents %}<option value="{{ x.id }}" {% if e and x.id == e.id %}selected{% endif %}>{{ x.name }}</option>{% endfor %}</select></div>
+  <div class="col-md-3"><label class="form-label" for="l-from">From</label><input class="form-control" type="date" id="l-from" name="from" value="{{ start }}"></div>
+  <div class="col-md-3"><label class="form-label" for="l-to">To</label><input class="form-control" type="date" id="l-to" name="to" value="{{ end }}"></div>
+  <div class="col-md-1"><button class="btn btn-brand w-100">Draft</button></div>
+</div></form>
+
+{% elif mode == 'letter' %}
+<div class="d-flex justify-content-between align-items-center mb-3 no-print">
+  <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('reports.letter', entity_id=e.id, **{'from': start, 'to': end}) }}">Refresh</a>
+  <div class="d-flex gap-2"><button class="btn btn-sm btn-outline-secondary" id="copy-btn" type="button">Copy e-mail text</button><button class="btn btn-sm btn-brand" id="print-btn" type="button">Print / save as PDF</button></div>
+</div>
+<article class="letter" id="letter">
+  <div class="letterhead d-flex justify-content-between align-items-end"><div class="d-flex align-items-center gap-3">{% if logo_url %}<img class="letter-logo" src="{{ logo_url }}" alt="{{ firm_name }} logo">{% endif %}<div><div class="brand-name text-dark fs-3">{{ firm_name }}</div><div class="eyebrow mb-0">{{ firm_tagline }}</div></div></div><div class="small text-end">{{ address }}<br>{{ firm_phone }} · {{ firm_email }}<br>{{ today|dmy }}</div></div>
+  <p>To<br>The Board of Directors / Designated Partners<br><strong>{{ e.name }}</strong>{% if e.cin %}<br>{{ e.cin }}{% endif %}</p>
+  <p><strong>Subject: MCA / ROC compliances due between {{ start|dmy }} and {{ end|dmy }}</strong></p>
+  <p>Dear Sir / Madam,</p>
+  <p>As part of our compliance support, we set out below the filings with the Registrar of Companies that fall due in the period, together with any that are overdue, and the information we need from you. Please share the documents at least seven days before each due date.</p>
+  <table class="table table-sm table-bordered"><thead><tr><th>Due date</th><th>Filing</th><th>Period</th><th>What we need from you</th></tr></thead><tbody>
+  {% for it in items %}{% set o = it.o %}<tr><td class="nowrap">{{ o.due_date|dmy }}{% if o.due_date < today %}<br><strong class="text-danger">Overdue</strong>{% endif %}</td>
+    <td>{{ o.form }}{% if o.person %}<br><span class="small-muted">{{ o.person.name }} (DIN {{ o.person.din }})</span>{% endif %}{% if o.id in fees %}<br><span class="small">Fee if filed today: {{ fees[o.id].total|inr }}</span>{% endif %}</td>
+    <td>{{ o.period_key }}</td><td><ul class="mb-0 ps-3">{% for d in it.docs %}<li>{{ d }}</li>{% endfor %}</ul></td></tr>
+  {% else %}<tr><td colspan="4">No filings fall due in this period.</td></tr>{% endfor %}</tbody></table>
+  <p class="small">Fees shown are the government filing fees under the Companies (Registration Offices and Fees) Rules, 2014 / LLP Rules, 2009 as on today. Late filing can also attract penalties that are decided by the Registrar; we will advise separately where relevant.</p>
+  <p>Yours faithfully,<br><br><strong>For {{ firm_name }}</strong><br>{{ firm_tagline }}<br><br>{{ signatory }}</p>
+</article>
+<textarea class="visually-hidden" id="letter-text" aria-label="E-mail text" readonly>Subject: MCA / ROC compliances due between {{ start|dmy }} and {{ end|dmy }} — {{ e.name }}
+
+Dear Sir / Madam,
+
+The following filings with the Registrar fall due (or are overdue), and we need the listed information from you:
+{% for it in items %}{% set o = it.o %}
+- {{ o.due_date|dmy }}{% if o.due_date < today %} (OVERDUE){% endif %}: {{ o.form }} — {{ o.period_key }}{% if o.person %} — {{ o.person.name }}{% endif %}{% if o.id in fees %} — fee if filed today {{ fees[o.id].total|inr }}{% endif %}
+  Needed: {{ it.docs|join('; ') }}{% endfor %}
+
+Please share the documents at least seven days before each due date.
+
+Regards,
+{{ signatory }}
+For {{ firm_name }}, {{ firm_tagline }}</textarea>
+<script nonce="{{ csp_nonce }}">
+document.getElementById('print-btn').addEventListener('click', function () { window.print(); });
+document.getElementById('copy-btn').addEventListener('click', function () {
+  var t = document.getElementById('letter-text').value, b = this;
+  navigator.clipboard.writeText(t).then(function () { b.textContent = 'Copied'; setTimeout(function () { b.textContent = 'Copy e-mail text'; }, 1500); });
+});
+</script>
+
+{% else %}
+<div class="page-head">{{ head("Reminders", "Notifications", "Created by the nightly job at 30, 7 and 1 day(s) before a due date and on the first overdue day.") }}
+  <form method="post" action="{{ url_for('reports.notifications_read') }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn btn-sm btn-outline-secondary">Mark all read</button></form></div>
+<div class="card"><ul class="list-group list-group-flush">{% for n in rows %}
+  <li class="list-group-item d-flex justify-content-between gap-3 {{ 'fw-semibold' if not n.read_at }}"><span><span class="band band-{{ 'overdue' if n.kind == 'OVERDUE' else ('due7' if n.kind in ('T-7', 'T-1') else 'due30') }}">{{ n.kind }}</span>
+    {% if n.obligation_id %}<a href="{{ url_for('obligations.show', obl_id=n.obligation_id) }}">{{ n.message }}</a>{% else %}{{ n.message }}{% endif %}</span><span class="small-muted nowrap">{{ n.created_at.strftime('%d-%m-%Y') }}</span></li>
+{% else %}<li class="list-group-item text-muted">No notifications.</li>{% endfor %}</ul></div>
+{% endif %}
+{% endblock %}

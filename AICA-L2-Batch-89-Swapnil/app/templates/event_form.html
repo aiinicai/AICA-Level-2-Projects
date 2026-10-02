@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% from "_macros.html" import head, fields_block with context %}
+{% block title %}Record event — {{ e.name }}{% endblock %}
+{% block content %}
+<div class="page-head">{{ head("Record a corporate event", e.name) }}
+  <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('entities.show', entity_id=e.id) }}">Back to entity</a></div>
+<div class="row g-4">
+  <div class="col-lg-4"><div class="card"><div class="card-header">Event type</div>
+    <div class="list-group list-group-flush">
+    {% set ns = namespace(group='') %}
+    {% for k, s in specs.items() %}
+      {% if s.group != ns.group %}<div class="list-group-item small-muted text-uppercase fw-semibold bg-light">{{ s.group }}</div>{% set ns.group = s.group %}{% endif %}
+      <a class="list-group-item list-group-item-action {{ 'active' if k == etype }}" href="{{ url_for('entities.new_event', entity_id=e.id, type=k) }}"
+         hx-get="{{ url_for('entities.new_event', entity_id=e.id, type=k) }}" hx-target="#event-fields" hx-swap="outerHTML" hx-push-url="true">{{ s.label }}</a>
+    {% endfor %}</div></div></div>
+  <div class="col-lg-8"><form method="post" action="{{ url_for('entities.add_event', entity_id=e.id) }}" class="card"><div class="card-body p-4">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="from_form" value="1">
+    {{ fields_block(etype, spec, creates, links) }}
+    <button class="btn btn-brand mt-4">Record event</button>
+  </div></form></div>
+</div>
+{% endblock %}

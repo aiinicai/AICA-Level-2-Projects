@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% from "_macros.html" import head, fee_result with context %}
+{% block title %}{{ 'Fee calculator' if mode == 'fees' else 'Board-meeting planner' }}{% endblock %}
+{% block content %}
+{% if mode == 'fees' %}
+<div class="page-head">{{ head("Tools", "Fee calculator", "Normal + additional fee under every regime, with scheme overlays applied on the filing date.") }}</div>
+<div class="row g-4">
+  <div class="col-lg-5"><form class="card" method="get" hx-get="{{ url_for('tools.fees') }}" hx-target="#fee-result" hx-swap="outerHTML" hx-trigger="change, submit"><div class="card-body">
+    <div class="mb-2"><label class="form-label" for="rule">Form / rule</label><select class="form-select" id="rule" name="rule">{% for r in fee_rules %}<option value="{{ r.code }}" {% if r.code == code %}selected{% endif %}>{{ r.form }} — {{ r.code }} ({{ r.fee_regime }})</option>{% endfor %}</select></div>
+    <div class="mb-2"><label class="form-label" for="entity_id">Entity</label><select class="form-select" id="entity_id" name="entity_id"><option value="">— ad-hoc (enter below) —</option>{% for e in ents %}<option value="{{ e.id }}" {% if a.get('entity_id') == e.id|string %}selected{% endif %}>{{ e.name }}</option>{% endfor %}</select></div>
+    <fieldset class="border rounded p-2 mb-2"><legend class="small-muted fs-6 px-1 w-auto float-none mb-0">Ad-hoc entity</legend><div class="row g-2">
+      <div class="col-6"><label class="form-label small" for="etype">Type</label><select class="form-select form-select-sm" id="etype" name="etype">{% for t in ['PRIVATE','OPC','PUBLIC_UNLISTED','SECTION8','LLP'] %}<option {% if a.get('etype') == t %}selected{% endif %}>{{ t }}</option>{% endfor %}</select></div>
+      <div class="col-6"><label class="form-label small" for="nominal">Authorised capital ₹</label><input class="form-control form-control-sm" id="nominal" name="nominal" value="{{ a.get('nominal', '') }}"></div>
+      <div class="col-6"><label class="form-label small" for="contribution">LLP contribution ₹</label><input class="form-control form-control-sm" id="contribution" name="contribution" value="{{ a.get('contribution', '') }}"></div>
+      <div class="col-6"><label class="form-label small" for="small">Small company / small LLP?</label><select class="form-select form-select-sm" id="small" name="small"><option value="">auto</option><option value="yes" {% if a.get('small') == 'yes' %}selected{% endif %}>Yes</option><option value="no" {% if a.get('small') == 'no' %}selected{% endif %}>No</option></select></div>
+    </div></fieldset>
+    <div class="row g-2">
+      <div class="col-6"><label class="form-label" for="due">Due date</label><input class="form-control" type="date" id="due" name="due" value="{{ a.get('due', '') }}" required></div>
+      <div class="col-6"><label class="form-label" for="filed">Filed / filing on</label><input class="form-control" type="date" id="filed" name="filed" value="{{ a.get('filed', today) }}" required></div>
+      <div class="col-6"><label class="form-label small" for="period">Period (for extension circulars)</label><input class="form-control form-control-sm" id="period" name="period" value="{{ a.get('period', '') }}" placeholder="FY2025-26"></div>
+      <div class="col-6"><label class="form-label small" for="prior">Belated filings of this form in last 365 days</label><input class="form-control form-control-sm" id="prior" name="prior" value="{{ a.get('prior', '0') }}"></div>
+      <div class="col-12"><label class="form-label small" for="charge_amount">Amount secured (CHG-1 ad valorem) ₹</label><input class="form-control form-control-sm" id="charge_amount" name="charge_amount" value="{{ a.get('charge_amount', '') }}"></div>
+    </div>
+    <button class="btn btn-brand mt-3">Calculate</button>
+  </div></form></div>
+  <div class="col-lg-7">{{ fee_result(result, err) }}</div>
+</div>
+{% else %}
+<div class="page-head">{{ head("Tools", "Board-meeting planner", "Section 173 gap rules for the entity's regime, from recorded Board meetings.") }}
+  <form class="d-flex gap-1" method="get"><label class="visually-hidden" for="be">Entity</label><select class="form-select form-select-sm" id="be" name="entity_id">{% for x in ents %}<option value="{{ x.id }}" {% if e and x.id == e.id %}selected{% endif %}>{{ x.name }}</option>{% endfor %}</select><button class="btn btn-sm btn-outline-secondary">Show</button></form></div>
+{% if not e %}<p class="text-muted">No companies assigned to you.</p>
+{% else %}
+<div class="row g-4">
+  <div class="col-lg-5">
+    <div class="card mb-4"><div class="card-header">{{ e.name }}</div><div class="card-body">
+      <div class="kpi kpi-gold mb-3"><div class="kpi-label">Regime</div><div class="kpi-value">{{ regime.result|title }}</div><div class="small-muted">{{ regime.reasons|join('; ') }}</div></div>
+      <div class="small-muted fst-italic">{{ regime.citation }}</div>
+      {% if plan %}
+        {% if plan.summary %}<p class="mt-3 mb-2">{{ plan.summary }}</p>{% endif %}
+        {% if plan.next_by %}<p class="mb-1">Next meeting must be held by <strong>{{ plan.next_by|dmy }}</strong>.</p>{% endif %}
+        {% if plan.next_not_before %}<p class="mb-1 small">…and not before <strong>{{ plan.next_not_before|dmy }}</strong> (at least 90 days after the last one).</p>{% endif %}
+      {% endif %}
+      {% if can('record_event') %}<a class="btn btn-sm btn-brand mt-3" href="{{ url_for('entities.new_event', entity_id=e.id, type='BOARD_MEETING') }}">Record a Board meeting</a>{% endif %}
+    </div></div>
+  </div>
+  <div class="col-lg-7">
+    {% if plan %}
+      {% for w in plan.warnings %}<div class="alert alert-warning small">{{ w }}</div>{% endfor %}
+      <div class="card"><div class="card-header">Meetings recorded</div><div class="table-responsive"><table class="table table-sm mb-0">
+        <thead><tr><th>Date</th><th>Days since previous</th><th>Gap rule</th></tr></thead><tbody>
+        {% for m, gap, ok in plan.rows|reverse %}<tr><td>{{ m|dmy }}</td><td>{{ gap if gap is not none else '—' }}</td><td>{% if ok %}<span class="badge text-bg-success">OK</span>{% else %}<span class="badge text-bg-danger">Breach</span>{% endif %}</td></tr>
+        {% else %}<tr><td colspan="3" class="text-muted">No Board meetings recorded yet.</td></tr>{% endfor %}</tbody></table></div></div>
+    {% else %}<div class="alert alert-info">Board-meeting requirements do not apply ({{ regime.reasons|join('; ') }}).</div>{% endif %}
+  </div>
+</div>
+{% endif %}
+{% endif %}
+{% endblock %}

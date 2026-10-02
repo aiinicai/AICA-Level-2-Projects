@@ -1,0 +1,157 @@
+{% extends "base.html" %}
+{% from "_macros.html" import band, tags, status with context %}
+{% block title %}{{ e.name }}{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <div class="eyebrow">{{ e.entity_type.replace('_', ' ')|title }}{% if e.archived %} · archived{% endif %}</div>
+    <h1>{{ e.name }}</h1>
+    <div class="small-muted mt-1"><span class="mono">{{ e.cin or 'no CIN/LLPIN' }}</span> · incorporated {{ e.incorporation_date|dmy }} · {{ e.status|title }}{% if e.roc %} · {{ e.roc }}{% endif %}
+      · PAN <span id="pan">{{ masked_pan }}</span>{% if can('reveal_pan') and e.pan_enc %} <button class="btn btn-link btn-sm p-0 align-baseline" hx-post="{{ url_for('entities.reveal_pan', entity_id=e.id) }}" hx-target="#pan" hx-swap="innerHTML">show (logged)</button>{% endif %}</div>
+    <div class="small-muted">{% if e.entity_type == 'LLP' %}Contribution {{ e.llp_contribution|inr }}{% else %}Authorised {{ e.nominal_capital|inr }} · paid-up {{ e.paid_up_capital|inr }}{% endif %}
+      · RM {{ e.rm.full_name if e.rm else '—' }} · preparer {{ e.preparer.full_name if e.preparer else '—' }} · engaged from {{ e.engagement_start|dmy }}</div>
+  </div>
+  <div class="d-flex flex-wrap gap-2 no-print">
+    {% if can('record_event') %}<a class="btn btn-sm btn-gold" href="{{ url_for('entities.new_event', entity_id=e.id) }}">Record event</a>{% endif %}
+    <a class="btn btn-sm btn-brand" href="{{ url_for('entities.facts_screen', entity_id=e.id) }}">Annual facts</a>
+    {% if e.entity_type != 'LLP' %}<a class="btn btn-sm btn-outline-secondary" href="{{ url_for('tools.board', entity_id=e.id) }}">Board planner</a>{% endif %}
+    {% if can('edit_entity') %}<a class="btn btn-sm btn-outline-secondary" href="{{ url_for('entities.edit', entity_id=e.id) }}">Edit</a>{% endif %}
+    {% if can('archive_entity') and not e.archived %}<form method="post" action="{{ url_for('entities.archive', entity_id=e.id) }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn btn-sm btn-outline-warning">Archive</button></form>{% endif %}
+    {% if can('delete_entity') %}<form method="post" action="{{ url_for('entities.remove', entity_id=e.id) }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn btn-sm btn-outline-danger">Delete</button></form>{% endif %}
+  </div>
+</div>
+
+<div class="row g-3 mb-4">
+  <div class="col-6 col-md-3"><div class="kpi kpi-overdue"><div class="kpi-label">Overdue</div><div class="kpi-value">{{ counts.overdue }}</div></div></div>
+  <div class="col-6 col-md-3"><div class="kpi kpi-upcoming"><div class="kpi-label">Open items</div><div class="kpi-value">{{ counts.open }}</div></div></div>
+  <div class="col-6 col-md-3"><div class="kpi kpi-gold"><div class="kpi-label">Current FY</div><div class="kpi-value">{{ fy.key }}</div></div></div>
+  <div class="col-6 col-md-3"><div class="kpi kpi-upcoming"><div class="kpi-label">Directors / DPs</div><div class="kpi-value">{{ links|rejectattr('ceased_on')|list|length }}</div></div></div>
+</div>
+
+<div class="row g-4">
+<div class="col-xl-8">
+  <div class="card mb-4">
+    <div class="card-header d-flex justify-content-between align-items-center">
+      <span class="serif">Compliance timeline</span>
+      <a class="small" href="{{ url_for('entities.show', entity_id=e.id, all='0' if show_all else '1') }}">{{ 'Hide' if show_all else 'Show' }} pre-engagement &amp; superseded</a>
+    </div>
+    <div class="table-responsive"><table class="table table-sm mb-0 align-middle">
+      <thead><tr><th>Due</th><th>Health</th><th>Obligation</th><th>Anchor</th><th>Status</th><th>Assignee</th></tr></thead>
+      {% for group, items in grouped %}
+        <tr class="table-light"><th colspan="6">{{ group }}</th></tr>
+        {% for o in items %}
+        <tr><td class="nowrap">{{ o.due_date|dmy }}</td><td>{{ band(health(o)) }}</td>
+          <td><a href="{{ url_for('obligations.show', obl_id=o.id) }}">{{ o.form }}</a>{% if o.period_key.startswith('EVT') %} <span class="small-muted">{{ o.title }}</span>{% endif %}{{ tags(o) }}</td>
+          <td class="small-muted small">{{ o.anchor_type.replace('_', ' ')|lower }} {{ o.anchor_date|dmy }}</td>
+          <td>{{ status(o.status) }}</td><td class="small-muted">{{ o.assignee.full_name if o.assignee else '' }}</td></tr>
+        {% endfor %}
+      {% else %}<tr><td class="text-muted">No obligations.</td></tr>{% endfor %}
+      {% if din_obls %}<tr class="table-light"><th colspan="6">Directors' DIN obligations</th></tr>
+        {% for o in din_obls %}<tr><td class="nowrap">{{ o.due_date|dmy }}</td><td>{{ band(health(o)) }}</td><td><a href="{{ url_for('obligations.show', obl_id=o.id) }}">{{ o.form }}</a> — <a href="{{ url_for('people.show', person_id=o.person.id) }}">{{ o.person.name }}</a>{{ tags(o) }}</td><td class="small-muted small">{{ o.period_key }}</td><td>{{ status(o.status) }}</td><td></td></tr>{% endfor %}
+      {% endif %}
+    </table></div>
+  </div>
+
+  <div class="card mb-4"><div class="card-header d-flex justify-content-between"><span class="serif">Events</span>{% if can('record_event') %}<a class="small" href="{{ url_for('entities.new_event', entity_id=e.id) }}">Record an event</a>{% endif %}</div>
+    <ul class="list-group list-group-flush">{% for ev in events %}
+      <li class="list-group-item small">{{ ev.event_date|dmy }} — <strong>{{ event_types.get(ev.type, ev.type) }}</strong> {% if ev.reference %}<span class="small-muted">({{ ev.reference }})</span>{% endif %} {% for k, v in (ev.attrs or {}).items() %}<span class="tag tag-pre">{{ k.replace('_', ' ') }}: {{ v|inr if k in ('amount', 'new_authorised') else v }}</span>{% endfor %}</li>
+    {% else %}<li class="list-group-item text-muted small">No events recorded.</li>{% endfor %}</ul>
+  </div>
+
+  <div class="row g-4 mb-4">
+    <div class="col-md-6"><div class="card h-100"><div class="card-header"><span class="serif">Notes</span></div><div class="card-body">
+      {% if can('edit_entity') %}<form method="post" action="{{ url_for('entities.save_notes', entity_id=e.id) }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <label class="visually-hidden" for="notes">Notes</label><textarea class="form-control form-control-sm mb-2" id="notes" name="notes" rows="4">{{ e.notes or '' }}</textarea>
+        <button class="btn btn-sm btn-outline-secondary">Save notes</button></form>
+      {% else %}<p class="small mb-0">{{ e.notes or '—' }}</p>{% endif %}
+    </div></div></div>
+    <div class="col-md-6"><div class="card h-100"><div class="card-header"><span class="serif">Documents</span></div>
+      <ul class="list-group list-group-flush">{% for d in docs %}<li class="list-group-item small"><a href="{{ url_for('entities.download_document', doc_id=d.id) }}">{{ d.title }}</a> <span class="small-muted">{{ (d.size / 1024)|round(1) }} KB · {{ d.uploaded_by.full_name }} · {{ d.uploaded_at.strftime('%d-%m-%Y') }}</span></li>
+      {% else %}<li class="list-group-item small text-muted">No documents.</li>{% endfor %}</ul>
+      {% if can('edit_entity') %}<div class="card-body border-top"><form method="post" action="{{ url_for('entities.upload_document', entity_id=e.id) }}" enctype="multipart/form-data" class="row g-2">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div class="col-12"><label class="visually-hidden" for="doc_title">Title</label><input class="form-control form-control-sm" id="doc_title" name="title" placeholder="Title (e.g. Certificate of incorporation)"></div>
+        <div class="col-8"><label class="visually-hidden" for="doc_file">File</label><input class="form-control form-control-sm" type="file" id="doc_file" name="file" accept="application/pdf,image/png" required></div>
+        <div class="col-4"><button class="btn btn-sm btn-outline-secondary w-100">Upload</button></div>
+        <div class="col-12 small-muted">PDF or PNG, up to 5 MB. Stored outside the web folder, served only to authorised staff.</div>
+      </form></div>{% endif %}
+    </div></div>
+  </div>
+
+  {% if trail %}
+  <div class="card mb-4"><div class="card-header"><span class="serif">Audit trail</span> <span class="small-muted">latest 40</span></div>
+    <div class="table-responsive"><table class="table table-sm mb-0 small"><thead><tr><th>When (UTC)</th><th>Who</th><th>Action</th><th>Object</th></tr></thead>
+    <tbody>{% for r in trail %}<tr class="{{ 'table-danger' if r.action == 'DENIED' }}"><td class="nowrap">{{ r.ts[:19].replace('T', ' ') }}</td><td>{{ r.actor_name }}</td><td>{{ r.action }}</td><td class="mono">{{ r.object_id }}</td></tr>{% endfor %}</tbody></table></div></div>
+  {% endif %}
+</div>
+
+<div class="col-xl-4">
+  <div class="card mb-4"><div class="card-header d-flex justify-content-between align-items-center">
+    <span class="serif">Classification</span>
+    <form method="get" class="d-flex"><label class="visually-hidden" for="fysel">Financial year</label><select class="form-select form-select-sm" id="fysel" name="fy">{% for f in fys %}<option {% if f.key == fy.key %}selected{% endif %}>{{ f.key }}</option>{% endfor %}</select><button class="btn btn-sm btn-outline-secondary ms-1">Go</button></form>
+  </div>
+  <ul class="list-group list-group-flush">{% for c in panel %}
+    <li class="list-group-item small"><div class="d-flex justify-content-between gap-2"><strong>{{ c.name.replace('_', ' ')|capitalize }}</strong>
+      <span>{% if c.result is sameas true %}<span class="badge text-bg-success">Yes</span>{% elif c.result is sameas false %}<span class="badge text-bg-light border">No</span>{% elif c.result == 'AMBIGUOUS' %}<span class="badge text-bg-danger">Ambiguous</span>{% else %}<span class="badge text-bg-primary">{{ c.result }}</span>{% endif %}</span></div>
+      {% for r in c.reasons %}<div class="small-muted">{{ r }}</div>{% endfor %}
+      <div class="small-muted fst-italic">{{ c.citation }}{% if c.threshold_version %} · {{ c.threshold_version }}{% endif %}</div></li>
+  {% endfor %}</ul>
+  <div class="card-footer small-muted bg-white">{{ fy.key }}: {{ fy.start|dmy }} to {{ fy.end|dmy }}{% if fy.is_long %} (long first FY){% endif %}</div></div>
+
+  {% if pending_decisions or decisions %}
+  <div class="card mb-4 border-danger"><div class="card-header"><span class="serif">Partner decisions</span></div><div class="card-body small">
+    {% for d in decisions %}<div class="mb-2"><span class="tag tag-decision">{{ d.key }}</span> → <strong>{{ d.value }}</strong><div class="small-muted">{{ d.reason }}</div></div>{% endfor %}
+    {% for k in pending_decisions %}
+      {% if can('decide') %}
+      <form method="post" action="{{ url_for('entities.decide', entity_id=e.id) }}" class="border rounded p-2 mb-2">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="key" value="{{ k }}">
+        <div class="mb-1"><span class="tag tag-decision">{{ k }}</span> needs a decision</div>
+        <label class="visually-hidden" for="val-{{ loop.index }}">Decision</label>
+        <select class="form-select form-select-sm mb-1" id="val-{{ loop.index }}" name="value">{% if k.startswith('SMALL') %}<option value="SMALL">Small company</option><option value="NOT_SMALL">Not a small company</option>{% else %}<option value="CONTINUE">Rule 9B continues</option><option value="STOP">Rule 9B no longer applies</option>{% endif %}</select>
+        <label class="visually-hidden" for="reason-{{ loop.index }}">Reason</label>
+        <textarea class="form-control form-control-sm mb-1" id="reason-{{ loop.index }}" name="reason" rows="2" minlength="20" placeholder="Reason (at least 20 characters)" required></textarea>
+        <button class="btn btn-sm btn-brand">Record decision</button></form>
+      {% else %}<div><span class="tag tag-decision">{{ k }}</span> awaiting a partner.</div>{% endif %}
+    {% endfor %}
+  </div></div>
+  {% endif %}
+
+  <div class="card mb-4"><div class="card-header d-flex justify-content-between"><span class="serif">Annual facts — {{ fy.key }}</span><a class="small" href="{{ url_for('entities.facts_screen', entity_id=e.id, fy=fy.key) }}">{{ 'Edit' if can('edit_entity') else 'View' }}</a></div>
+    {% set f = facts.get(fy.key) %}
+    <div class="card-body small">{% if f %}
+      {% if e.entity_type == 'LLP' %}Contribution {{ f.llp_contribution|inr }} · turnover {{ f.turnover|inr }}{% else %}Paid-up {{ f.paid_up_capital|inr }} · turnover {{ f.turnover|inr }}<br>Net worth {{ f.net_worth|inr }} · net profit {{ f.net_profit|inr }}<br>AGM {{ f.agm_date|dmy }}{% if f.isin_obtained_date %} · ISIN {{ f.isin_obtained_date|dmy }}{% endif %}{% endif %}
+    {% else %}<span class="tag tag-stale">Not entered</span> — the engine uses the nearest year's figures and marks dependent items “Facts stale”.{% endif %}</div></div>
+
+  {% if can('edit_entity') %}
+  <div class="card mb-4"><div class="card-header"><span class="serif">Period flags</span></div><div class="card-body small">
+    {% for fl in flags %}<div>{{ fl.period_key }} — {{ 'MSME dues > 45 days' if fl.name == 'msme_over_45' else 'Deposits / exempted receipts at 31 March' }}: <strong>{{ 'Yes' if fl.value else 'No' }}</strong></div>{% endfor %}
+    <form method="post" action="{{ url_for('entities.save_flag', entity_id=e.id) }}" class="row g-1 mt-2">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div class="col-5"><label class="visually-hidden" for="pk">Period</label><input class="form-control form-control-sm" id="pk" name="period_key" placeholder="H1-FY2026-27 / FY2025-26" required></div>
+      <div class="col-4"><label class="visually-hidden" for="fn">Flag</label><select class="form-select form-select-sm" id="fn" name="name"><option value="msme_over_45">MSME dues &gt; 45 days</option><option value="deposits_outstanding">Deposits at 31 March</option></select></div>
+      <div class="col-3"><label class="visually-hidden" for="fv">Value</label><select class="form-select form-select-sm" id="fv" name="value"><option value="yes">Yes</option><option value="no">No</option></select></div>
+      <div class="col-12"><button class="btn btn-sm btn-outline-secondary">Save flag</button></div>
+    </form></div></div>
+  {% endif %}
+
+  <div class="card mb-4"><div class="card-header d-flex justify-content-between"><span class="serif">Directors / designated partners</span>{% if can('record_event') %}<a class="small" href="{{ url_for('entities.new_event', entity_id=e.id, type='PARTNER_CHANGE' if e.entity_type == 'LLP' else 'DIRECTOR_APPOINTED') }}">Appoint</a>{% endif %}</div>
+    <ul class="list-group list-group-flush">{% for l in links %}
+      <li class="list-group-item small {{ 'text-muted' if l.ceased_on }}"><a href="{{ url_for('people.show', person_id=l.person.id) }}">{{ l.person.name }}</a> <span class="mono small-muted">DIN {{ l.person.din }}</span> — {{ l.designation }}{% if l.ceased_on %} (ceased {{ l.ceased_on|dmy }}){% endif %}
+        {% if l.person.dsc_expiry %}<div class="small-muted">DSC expires {{ l.person.dsc_expiry|dmy }}</div>{% endif %}</li>
+    {% else %}<li class="list-group-item text-muted small">None linked.</li>{% endfor %}</ul>
+    {% if can('edit_entity') %}
+    <div class="card-body border-top"><div class="small-muted mb-1">Link an existing director (no event — e.g. when onboarding history):</div>
+    <form method="post" action="{{ url_for('entities.add_director', entity_id=e.id) }}" class="row g-1">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div class="col-4"><label class="visually-hidden" for="d-din">DIN</label><input class="form-control form-control-sm mono" id="d-din" name="din" maxlength="8" placeholder="DIN" required></div>
+      <div class="col-4"><label class="visually-hidden" for="d-des">Designation</label><input class="form-control form-control-sm" id="d-des" name="designation" value="Director"></div>
+      <div class="col-4"><label class="visually-hidden" for="d-appt">Appointed on</label><input class="form-control form-control-sm" type="date" id="d-appt" name="appointed_on"></div>
+      <div class="col-6"><label class="visually-hidden" for="d-name">Name (new DIN)</label><input class="form-control form-control-sm" id="d-name" name="name" placeholder="Name (if new DIN)"></div>
+      <div class="col-6"><label class="visually-hidden" for="d-allot">DIN allotted on</label><input class="form-control form-control-sm" type="date" id="d-allot" name="din_allotment_date" title="DIN allotted on (if new)"></div>
+      <div class="col-12"><button class="btn btn-sm btn-outline-secondary mt-1">Link director</button></div>
+    </form></div>
+    {% endif %}
+  </div>
+</div>
+</div>
+{% endblock %}
