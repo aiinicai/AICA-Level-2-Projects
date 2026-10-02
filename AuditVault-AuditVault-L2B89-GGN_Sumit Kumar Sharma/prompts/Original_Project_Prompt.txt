@@ -1,0 +1,241 @@
+PROJECT DEVELOPMENT PROMPT: "AuditVault" -- AI-POWERED INTERNAL AUDIT ENGAGEMENT AND WORKING PAPER MANAGEMENT SYSTEM
+
+=====================================================================
+1. PROJECT OVERVIEW
+
+Build a comprehensive, Python-based, Streamlit-powered web application called "AuditVault" designed for Internal Audit Departments of companies and Indian Chartered Accountant (CA) firms. This is a capstone-level project intended to demonstrate full-stack application design using Python, Streamlit, SQLite, and local file system management.
+
+APP NAME: AuditVault
+TAGLINE (suggested): "Every Engagement. Every Version. Securely Vaulted."
+
+MISSION: To simplify, standardize, and digitize the internal audit engagement lifecycle so that audit teams spend less time managing folders, files, and version confusion, and more time on actual audit judgment and quality.
+
+VISION: To become a lightweight, easy-to-deploy digital workspace that any internal audit team or CA firm can use to manage engagements end-to-end, from engagement letter issuance to final consolidated audit file, with a complete, tamper-proof audit trail -- functioning as a secure "vault" for every engagement's data and evidence.
+
+PROBLEM STATEMENT: Internal audit departments and CA firms currently manage audit engagements using manual folder structures, email threads, and shared drives. As data volume grows across multiple engagements, teams face:
+
+Difficulty organizing working papers and evidence per risk/process area
+Loss or misplacement of files before manager/HOD review
+No clear version history or audit trail of who changed what and when
+No centralized visibility for managers into engagement progress
+No structured workflow connecting engagement letters, IDRs, RCMs, and working papers
+
+SOLUTION: AuditVault is a role-based Python desktop/web application (via Streamlit) that digitizes the entire internal audit workflow: engagement creation, team assignment, initial data request (IDR) management, risk control matrix (RCM) handling, evidence and working paper storage with automatic date-wise versioning, manager review and lock/unlock controls, and final consolidated archival with a permanent, immutable audit trail.
+
+=====================================================================
+2. USER ROLES AND PERMISSIONS
+
+ROLE 1: ADMIN
+
+Create and manage user accounts (Managers, Engagement Team Members)
+Reset passwords for any user (cannot create engagements or RCMs)
+Switch into any user account without re-entering credentials ("Impersonate User" / "Switch User" feature), for support purposes
+Every impersonation action must be logged in the audit trail showing "Admin X accessed AuditVault as User Y at [timestamp]"
+Cannot edit engagement data directly while impersonating without it being logged under the admin's true identity
+
+ROLE 2: MANAGER
+
+Create unlimited engagements, clients, and engagement team members
+Create and manage multiple teams (group team members into Team 1, Team 2, Team 3, etc. in any combination)
+Create and upload Engagement Letters
+Define engagement metadata: client/auditee name, process under audit, audit period, scope, and areas to be covered
+Assign engagement teams to specific engagements
+Upload and edit Initial Data Request (IDR) templates (Excel, CSV, Word, PDF supported); IDR appears in an editable on-screen grid after upload
+Export finalized IDR back to Excel or send via email (email integration with Outlook attachment is a future phase, not in prototype)
+Upload and edit Risk Control Matrix (RCM); has override rights over engagement team edits to RCM (team cannot overwrite manager's edits)
+Review submitted working papers and observations
+Lock/finalize an engagement after review; only the manager can reopen a finalized engagement to allow further edits
+View a dashboard showing ALL engagements they have created, with status, progress percentage, and overdue alerts
+
+ROLE 3: ENGAGEMENT TEAM MEMBER (AUDITOR)
+
+View only engagements/audits they have been assigned to on their personal dashboard
+View and edit assigned IDR and RCM within permission boundaries (cannot override manager-edited fields)
+For each finalized RCM line item, a dedicated tab/section opens where the member can:
+Upload working papers and evidence documents (any file type)
+Type or paste audit observations directly into a text field
+Open supported files (Excel/Word) directly within the app, edit, and save back without manual re-upload (stretch goal, native OS file association integration)
+Cannot access engagements they are not assigned to
+Once manager finalizes/locks an engagement, team members lose edit rights until manager reopens it
+=====================================================================
+3. CORE WORKFLOW (STEP BY STEP)
+
+STEP 1: Engagement Creation (Manager)
+Manager logs in to AuditVault -> clicks "New Engagement" -> uploads Engagement Letter -> fills form: Client Name, Process/Area under Audit, Audit Period (with Indian date format calendar picker: DD-MM-YYYY), Scope, Areas Covered -> Saves engagement (status: "Draft")
+
+STEP 2: Team Assignment (Manager)
+Manager selects or creates a team -> assigns team members to the engagement -> engagement now appears on each assigned member's dashboard (status: "Assigned")
+
+STEP 3: Initial Data Request - IDR (Manager or Team)
+Predefined IDR template uploaded (Excel/CSV/Word/PDF) -> system parses and displays it as an editable on-screen table -> manager/team edits rows (add/remove/modify data requirements) -> finalize IDR -> option to export as Excel or send via email (email button placeholder for future Outlook integration)
+
+STEP 4: Risk Control Matrix - RCM Upload (Manager)
+Manager uploads RCM file (Excel/CSV/Word/PDF) -> system parses and displays editable grid with columns such as: Risk ID, Risk Description, Control Description, Audit Procedure, Person Responsible, Status -> each row gets a Unique Line Item ID (e.g., AREA-01, AREA-02) automatically -> manager finalizes RCM (status: "In Progress")
+PERMISSION RULE: If manager edits/locks a specific RCM field, that field becomes read-only for team members (visually indicated, e.g. grey background with a lock icon)
+
+STEP 5: Fieldwork and Evidence Upload (Team)
+Each RCM line item has its own dedicated tab. Within each tab, team members can:
+
+Upload evidence/working papers (any format)
+Write or paste observations in a rich text box
+View file version history for that line item
+
+FOLDER STRUCTURE AUTO-GENERATED:
+/AuditVault_Data/Engagements/{EngagementID}/{ClientName}/{LineItemID}/{DD-MM-YYYY}/
+A new dated sub-folder is auto-created each calendar day a file in that line item is modified, preserving prior versions untouched. This creates a natural, automatic version history and backup.
+
+STEP 6: Review (Manager, then HOD if applicable)
+Manager reviews each line item's evidence and observations -> can leave review comments/queries (via built-in Comment/Query feature per line item, avoiding external email threads) -> team responds to queries within the app -> manager marks line item as "Reviewed"
+
+STEP 7: Finalization and Consolidation
+Once all line items are reviewed, manager clicks "Complete Audit" -> system consolidates all FINAL files (latest version per line item) into a clean folder structure:
+/AuditVault_Data/Consolidated/{EngagementID}_{ClientName}/{LineItemID}/[final files]
+System prompts: "Save consolidated ZIP file to location?" -> user selects destination -> ZIP created via copy (not cut, originals remain safe in AuditVault storage) -> system asks: "Delete original working files from AuditVault storage, or retain as backup?" -> user chooses
+Engagement status becomes "Completed" -> locked for all team members
+Manager can still "Reopen" if further changes are needed, which reverts status to "In Progress" and re-enables team edit rights (this reopening action is itself logged in the audit trail)
+
+STEP 8: Audit Trail
+A separate, non-editable audit trail log (visible to Manager and Admin only) records every action: file uploads, edits, deletions, status changes, logins, impersonations, reopenings -- each entry timestamped in DD-MM-YYYY HH:MM format with the acting user's name. This log cannot be edited or deleted by ANY user, including Admin.
+
+=====================================================================
+4. KEY FEATURES SUMMARY
+Role-based multi-user system: Admin, Manager, Engagement Team Member
+Multi-engagement and multi-client support
+Engagement Letter, IDR, and RCM upload with on-screen editable grids (support for Excel, CSV, Word, PDF parsing)
+Field-level lock/override hierarchy (Manager beats Team edits)
+Auto-generated unique Line Item IDs per RCM row, each with its own dedicated workspace tab
+Automatic date-wise versioned folder structure for all uploads (acts as natural backup and audit trail of file versions)
+One-click native file editing (open Excel/Word file from within AuditVault, edit in native application, auto-save back into AuditVault storage)
+End-of-audit consolidation into a clean, line-item-wise folder structure, exportable as a ZIP to any user-chosen location
+Immutable, admin-and-manager-visible audit trail log of all actions including logins, edits, uploads, status changes, and admin impersonation events
+Lock/unlock engagement finalization workflow controlled solely by Manager
+Admin panel: create users, reset passwords, impersonate/switch user (logged), cannot create engagements or edit audit data
+Manager panel: unlimited engagement, client, and team member creation; flexible team grouping and reassignment
+Personalized dashboards:
+Manager Dashboard: all engagements created by them, with status, percentage completion, and overdue indicators
+Team Member Dashboard: only engagements assigned to them
+Both include visual analytics (bar/pie charts) showing counts of Draft, In Progress, Overdue, and Completed engagements
+Notification / reminder system: alerts to Manager if auditee data or team submissions are overdue against defined timelines
+In-app Comment/Query threads per RCM line item between Manager and Team (reduces reliance on external email)
+Global search and filter: find engagements by client name, date range, status, or team member across the system
+User Profile section: edit name, age, designation, email, phone number, profile picture (optional)
+Theme toggle: Light mode, Dark mode, and System default
+Sign Out option always accessible from the bottom of the navigation panel
+First-time login guided product tour highlighting each role's permissions and key navigation areas within AuditVault
+INDIAN LOCALE FORMATTING THROUGHOUT:
+All dates displayed and stored in DD-MM-YYYY format
+Interactive calendar date-picker widget wherever a date field exists, PLUS support for flexible manual numeric entry (e.g., typing "04062026" auto-formats to "04-06-2026") without requiring the user to type separators
+All currency and numeric amounts displayed using the Indian numbering system (e.g., 10,00,000 instead of 1,000,000), with Indian Rupee symbol where relevant
+=====================================================================
+5. UI/UX DESIGN GUIDELINES
+
+DESIGN PRINCIPLE: Clean, professional, modern, and eye-catching, yet uncluttered enough for daily heavy use by audit professionals. The branding should visually reinforce the "Vault" concept, security, trust, and safe-keeping of engagement data.
+
+COLOR PALETTE:
+
+Primary: Deep Blue (used for headers, primary buttons, active nav items, sidebar, and the AuditVault logo) -- conveys trust, professionalism, and security
+Secondary/Background: Clean White / Very Light Grey (main content background, cards, tables) for readability during long working sessions
+Accent: A single accent color such as Teal or Amber/Gold (gold ties nicely into the "Vault" theme), used sparingly for status badges, alerts, and call-to-action highlights (e.g., "Overdue" in amber/red, "Completed" in green, "In Progress" in blue)
+Dark Mode variant: Charcoal/near-black background with the same blue and accent colors adjusted for contrast, ensuring readability
+
+LOGO / BRANDING CONCEPT:
+A simple vault/lock icon combined with a folder or document icon, in deep blue with a gold/teal accent, next to the wordmark "AuditVault" in a clean sans-serif font
+
+LAYOUT STRUCTURE:
+
+Left-hand fixed sidebar navigation containing: Dashboard, Engagements, Clients, Team Management (Manager/Admin only), Audit Trail (Manager/Admin only), My Profile, Theme Toggle, Sign Out (Admin sees additional "Switch User" option here). AuditVault logo and wordmark pinned at the top of the sidebar.
+Top bar showing: current logged-in user name and role, notification bell icon with badge count, search bar for global search/filter
+Main content area uses card-based design: each engagement is a card showing client name, status badge (color-coded), progress bar, and assigned team avatars
+Dashboard includes summary tiles at the top (Total Engagements, In Progress, Overdue, Completed) followed by a chart section (bar chart of engagements by status, pie chart of workload by team member) followed by the detailed engagement list/cards below
+RCM line item view uses a tabbed interface, one tab per line item, with sub-sections within each tab for: Risk/Control Details (read-only reference pulled from RCM), Evidence Upload area (drag and drop), Observations text box, Comment/Query thread, and Version History expander
+Consistent iconography throughout (folder icons for storage sections, lock icons for locked fields/engagements, clock icons for audit trail/history, chat bubble icons for comments)
+Rounded corners on cards and buttons, subtle drop shadows, generous white space, consistent padding, and a legible sans-serif font (e.g., Inter, Roboto, or similar) throughout
+Fully responsive layout using Streamlit's column and container system so it works well on both laptop and wider monitor screens
+
+FIRST-TIME USER EXPERIENCE:
+On first login, trigger a step-by-step guided tour (using tooltips or a modal walkthrough) that welcomes the user to AuditVault and highlights: sidebar navigation, role-specific permissions, dashboard elements, and how to create/access an engagement, tailored to the logged-in user's role. Tour can be skipped and relaunched later from the Profile or Help menu.
+
+=====================================================================
+6. TECHNICAL ARCHITECTURE
+
+FRONTEND AND BACKEND: Streamlit (Python), using Streamlit's native components, session state management for role-based views, and custom CSS injection for the color palette, card layouts, and light/dark theming described above
+
+DATABASE: SQLite for the prototype phase (file: auditvault.db), storing:
+
+Users table (user_id, name, age, designation, email, phone, role, username, hashed_password, theme_preference)
+Clients table
+Engagements table (engagement_id, client_id, process, audit_period, scope, status, manager_id, created_date, deadline)
+Teams table and Team_Members mapping table
+Engagement_Team_Assignment mapping table
+IDR table (linked to engagement_id, editable rows)
+RCM table (linked to engagement_id, unique line_item_id per row, field-level lock metadata to enforce manager-override rule)
+Observations/Comments table (linked to line_item_id, user_id, timestamp, thread/reply structure)
+Audit_Trail table (append-only, no update/delete permitted at the application logic level, storing action_type, user_id, acting_as_user_id for impersonation cases, timestamp, description)
+
+Design with future migration to PostgreSQL in mind (use SQLAlchemy ORM so the underlying database engine can be swapped with minimal code change if the project needs to scale beyond prototype)
+
+FILE STORAGE: Local file system with an organized, programmatically managed directory structure:
+
+/AuditVault_Data/
+  /engagements/{engagement_id}/{client_name}/{line_item_id}/{DD-MM-YYYY}/
+  /consolidated/{engagement_id}_{client_name}/{line_item_id}/
+  /engagement_letters/{engagement_id}/
+  /idr/{engagement_id}/
+  /rcm/{engagement_id}/
+
+All file operations (upload, version folder creation, consolidation copy, ZIP export) handled via Python's os, shutil, and zipfile standard libraries. File parsing for on-screen editable display handled via pandas (for Excel/CSV), python-docx (for Word), and PyPDF2 or pdfplumber (for PDF, read-only preview since PDFs are not natively editable inline)
+
+AUTHENTICATION: Password hashing via bcrypt or passlib; session management via Streamlit's session_state; role-based access control enforced at both the UI rendering level and the data query level
+
+CHARTS/ANALYTICS: Plotly or Altair for interactive bar and pie charts on dashboards
+
+DATE AND NUMBER FORMATTING: Custom Python utility functions to enforce DD-MM-YYYY parsing/display and Indian numbering system formatting (using the babel library with locale "en_IN", or a custom comma-placement function) applied consistently across all input and display fields
+
+DEPLOYMENT (PROTOTYPE): Run locally via streamlit run app.py; can optionally be deployed to Streamlit Community Cloud or a simple VPS for demonstration purposes during capstone presentation
+
+=====================================================================
+7. PROJECT PHASES / MILESTONES (SUGGESTED)
+
+PHASE 1: Core Setup
+
+Database schema design and creation (SQLAlchemy models)
+User authentication system with 3 roles (Admin, Manager, Team Member)
+Basic sidebar navigation, AuditVault branding/logo, and theme toggle (light/dark)
+
+PHASE 2: Engagement and Team Management
+
+Engagement creation form with Engagement Letter upload
+Client and Team Member creation (Admin/Manager)
+Team assignment logic and Manager/Team dashboards with status tiles
+
+PHASE 3: IDR and RCM Modules
+
+File upload and parsing into editable on-screen grids (Excel/CSV/Word/PDF)
+Field-level lock and override permission logic (Manager over Team)
+Unique Line Item ID auto-generation from RCM rows
+
+PHASE 4: Fieldwork Workspace
+
+Dedicated tab per RCM line item
+Evidence upload with automatic date-wise versioned folder creation
+Observations text entry and Comment/Query thread per line item
+
+PHASE 5: Review, Lock, and Consolidation
+
+Manager review and lock/unlock (reopen) workflow
+End-of-audit consolidation logic and ZIP export with user-chosen save location and optional cleanup of original backup files
+Immutable Audit Trail logging integrated across all above modules
+
+PHASE 6: Polish and Extras
+
+Dashboard analytics charts (Plotly/Altair)
+Global search and filter functionality
+Notification/reminder system for overdue items
+First-time user guided tour
+Admin "Switch User" (impersonation) feature with audit logging
+Indian date and number formatting utilities applied app-wide
+UI refinement: color palette, card design, iconography, responsiveness
+=====================================================================
+8. DELIVERABLE EXPECTATION FOR THIS PROMPT
+
+Using all details above, generate a fully working Streamlit application named "AuditVault" in Python, structured into clean, modular files (e.g., app.py, database.py/models.py, auth.py, utils.py, and separate page modules for Dashboard, Engagements, IDR, RCM, Fieldwork, Audit Trail, Admin Panel, and Profile). Begin with Phase 1 and Phase 2 functionality as the Minimum Viable Prototype, then progressively add Phase 3 through 6 functionality. Ensure the SQLite database (auditvault.db) auto-initializes on first run with the necessary tables and a default Admin account. Apply the specified color palette, card-based UI, AuditVault branding, and Indian date/number formatting from the very first version, since these are foundational to the user experience described above.
