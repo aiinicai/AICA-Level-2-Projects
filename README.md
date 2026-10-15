@@ -1,81 +1,45 @@
-# GST Inward HSN/SAC Fetcher — V1
+﻿# BharatBill Enterprise GST v2.0
 
-Desktop app that reads a downloaded NIC e-invoice "Received" JSON export and
-produces an HSN-wise Excel report. Runs fully offline — no data leaves the
-machine.
+## What's New in v2.0
 
-## What's built in this version (V1)
+### 1. Multi-Company ERP Support
+You can now manage **multiple business entities** from a single installation.
 
-- **Home** — Manual upload of a downloaded e-invoice JSON. Decodes every
-  record's embedded signed invoice, extracts HSN-level line items, stores
-  them locally (SQLite), and is ready to export.
-  "Fetch from portal" tile is present but disabled — that's the V2
-  auto-download feature, not built yet.
-- **Reports** — Pick a From/To month range (and optionally a GSTIN) and
-  generate a consolidated 3-sheet Excel (Invoice Summary / HSN Item Detail /
-  HSN Summary). Keeps a running list of past exports.
-- **Settings** — Register the GSTINs you work with, and choose the folder
-  where generated Excel reports are saved.
+**How to use:**
+- Click **Company Manager** in the sidebar (🏢) or press `Ctrl+Shift+C`
+- Click **➕ New Company** to create a second/third company profile
+- Each company gets its own isolated data: invoices, purchases, parties, stock, accounts
+- Use the **🏢 company switcher dropdown** in the top header bar to instantly switch between companies
+- Or click **🔄 Switch Active** next to any company in Company Manager
+- The currently active company is shown in the header bar — all screens refresh automatically
 
-Data accumulates month-on-month in a local database
-(`%APPDATA%\GSTInwardHSNFetcher\data.db`), so re-running the app next month
-adds to what's already there rather than starting over. Re-uploading the same
-JSON is safe — invoices are keyed by IRN, so nothing gets duplicated.
+### 2. GSTR-2B Reconciliation
+Automatically match your GST portal's GSTR-2B (auto-drafted ITC statement) against purchase bills recorded in the ERP.
 
-## Before you build — one-time setup on your Windows machine
+**How to use:**
+1. Download your GSTR-2B JSON file from the GST Portal (gst.gov.in → Returns → GSTR-2B → Download JSON)
+2. In the app, go to **🧾 GSTR-2B Reconciliation** in the sidebar (or press `Ctrl+2`)
+3. Select the Financial Year
+4. Click **📂 Browse GSTR-2B JSON** and select the downloaded file
+5. Click **▶ Run Reconciliation**
+6. Review the results in four tabs:
+   - ✅ **Matched** — supplier invoice found in books with matching GST
+   - ⚠️ **Amt Differs** — found in books but GST amount doesn't match (needs correction)
+   - ❌ **In 2B Only** — supplier filed GST but you haven't recorded the bill (record purchase)
+   - 📖 **In Books Only** — you recorded the bill but supplier hasn't filed (follow up)
+7. Click **📥 Export CSV** to save the reconciliation report
 
-You need Python 3.10+ installed. If DGFT AutoComply's build environment is
-still on this machine, you likely already have everything needed.
-
-```
-cd GSTInwardFetcher
-python -m venv venv
-venv\Scripts\activate
-pip install -r requirements.txt
-```
-
-## Test it first (without building the exe)
-
+## Running the Application
+Double-click `run_app.bat` or:
 ```
 python main.py
 ```
 
-A window should open with the app. Try uploading a real e-invoice JSON and
-confirm a report generates into your chosen folder before you build the exe —
-much faster to catch issues here than after packaging.
+## Default Login
+- Username: `admin`
+- Password: `admin123`
 
-## Build the .exe
-
+## Requirements
 ```
-pyinstaller build.spec
+pip install -r requirements.txt
 ```
-
-The finished file appears at:
-
-```
-dist\GST Inward HSN-SAC Fetcher.exe
-```
-
-This is a single portable file — the whole app, nothing else to carry
-alongside it.
-
-## Getting the .exe onto your office laptop via GitHub
-
-1. Create a repository on GitHub (private, since this is your own tool) —
-   e.g. `gst-inward-hsn-fetcher`.
-2. Push the source code (main.py, backend.py, ui.html, etc.) — do **not**
-   commit the built .exe into the repo itself (GitHub's normal file-size
-   limits are much stricter than Release assets).
-3. On GitHub, go to the repo → **Releases** → **Draft a new release** →
-   attach `GST Inward HSN-SAC Fetcher.exe` as a release asset → publish.
-4. On your office laptop, open the Release page in the browser and click
-   the .exe link to download — this is a plain HTTPS download from
-   github.com, which should go through even if other file-transfer routes
-   are blocked.
-
-## Known limitation to mention in the demo
-
-The uploaded JSON file needs to be the **"Received" download** from
-`einvoice.gst.gov.in` (Services → e-Invoice → Download e-Invoice →
-Received tab). It reads the array of records with the `SignedInvoice`
-field per record — the format we tested this against.
