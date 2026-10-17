@@ -109,3 +109,50 @@ def test_cli_end_to_end_and_audit_trail(fraud, tmp_path):
     j = json.loads(next(tmp_path.glob("*.json")).read_text(encoding="utf-8"))
     hashed = " ".join(j["inputs_sha256"])
     assert "bank_statement.xlsx" in hashed and "stock_register.xlsx" in hashed and "fs_data.xlsx" in hashed
+
+
+def _flat_signatures(fraud, tmp_path, rename_register=None, upper_ext=False, as_pdf=()):
+    """Signatures supplied the way the app saves uploads: everything flat in one folder."""
+    import shutil
+    from PIL import Image
+    sig = tmp_path / "sig"
+    sig.mkdir()
+    for f in (fraud / "signatures").glob("*"):
+        name = f.name
+        if rename_register and "regist" in name.lower():
+            name = rename_register
+        if upper_ext and f.suffix.lower() == ".png":
+            name = f.stem + ".PNG"
+        shutil.copy(f, sig / name)
+    for n in as_pdf:                      # scan saved as PDF, referenced by the same stem
+        Image.open(fraud / "signatures" / n).convert("RGB").save(sig / (Path(n).stem + ".pdf"), "PDF", resolution=150)
+    return sig
+
+
+def test_uploaded_signature_set_matches_folder_result(fraud, tmp_path):
+    base = _text(_run(fraud)["FA-11"])
+    assert _text(_run(fraud, signatures=_flat_signatures(fraud, tmp_path))["FA-11"]) == base
+
+
+def test_single_spreadsheet_is_taken_as_register_and_extension_case_ignored(fraud, tmp_path):
+    sig = _flat_signatures(fraud, tmp_path, rename_register="my_cheques.xlsx", upper_ext=True)
+    t = _text(_run(fraud, signatures=sig)["FA-11"])
+    assert "CHQ-10455" in t and "Identical signature image" in t
+
+
+def test_pdf_scan_of_signature_is_readable():
+    import tempfile
+    from PIL import Image, ImageDraw
+    from auditsignoff.rules_fa2 import _ink
+    d = Path(tempfile.mkdtemp())
+    im = Image.new("RGB", (300, 120), "white")
+    ImageDraw.Draw(im).line([(10, 90), (80, 20), (150, 100), (290, 40)], fill="black", width=4)
+    im.save(d / "s.pdf", "PDF", resolution=100)
+    im.save(d / "s.png")
+    from auditsignoff.rules_fa2 import _corr
+    assert _corr(_ink(d / "s.pdf"), _ink(d / "s.png")) > 0.9
+
+
+def test_no_register_in_folder_is_not_run_not_pass(fraud, tmp_path):
+    (tmp_path / "x.png").write_bytes((fraud / "signatures" / next(p.name for p in (fraud / "signatures").glob("*.png"))).read_bytes())
+    assert _run(fraud, signatures=tmp_path)["FA-11"].status == "NOTRUN"
