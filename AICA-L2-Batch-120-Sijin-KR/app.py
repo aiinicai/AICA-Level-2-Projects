@@ -121,6 +121,30 @@ else:
 TPL = Path(__file__).parent / "templates"
 
 
+def _pick_folder():
+    """Native 'select folder' dialog. The app runs locally, so the dialog opens on this PC. Returns '' if cancelled or unavailable."""
+    import subprocess, sys
+    code = ("import tkinter as t\nfrom tkinter import filedialog as f\nr=t.Tk();r.withdraw();r.attributes('-topmost',True)\n"
+            "print(f.askdirectory(title='Select folder'),end='')")
+    try:
+        out = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, timeout=300).stdout.strip()
+        return out.replace("/", "\\") if sys.platform == "win32" else out
+    except Exception:
+        return ""
+
+
+def _folder_input(label, key, **kw):
+    """Text box for a folder path plus a Browse button that fills it."""
+    c_in, c_btn = st.columns([6, 1], vertical_alignment="bottom")
+    if c_btn.button("Browse…", key=key + "_browse", help="Select the folder in a window"):
+        picked = _pick_folder()
+        if picked:
+            st.session_state[key] = picked
+        else:
+            st.toast("No folder selected (cancelled, or the folder window is not available - type the path instead).")
+    return c_in.text_input(label, key=key, **kw)
+
+
 def _save(upload, folder):
     p = Path(folder) / upload.name
     p.write_bytes(upload.getbuffer())
@@ -226,7 +250,7 @@ if PAGE == "fs":
                 f = _save(fs, tmp); t = _save(tb, tmp) if tb else None
                 _run_fs(e, f, t)
     else:
-        folder = st.text_input("Folder path (e.g. C:\\Clients\\GoldenCrest\\FY2025)", key="fs_folder")
+        folder = _folder_input("Folder path (e.g. C:\\Clients\\GoldenCrest\\FY2025)", "fs_folder")
         st.caption("The app runs on this PC, so it reads the folder directly. Files are sorted by name; correct any role below.")
         if folder and st.button("Scan folder"):
             try:
@@ -277,7 +301,7 @@ if PAGE == "pre":
         ups = st.file_uploader("Licence / MOA / AOA / certificates (any format, several allowed)", type=ANY_DOC, accept_multiple_files=True, key="pre_ups")
         paths = [str(_save(u, tmpd)) for u in ups or []]
     else:
-        pf = st.text_input("Folder path", key="pre_folder")
+        pf = _folder_input("Folder path", "pre_folder")
         if pf:
             try:
                 paths = [r["_path"] for r in scan_folder(pf) if r["Role"] in ("Trade licence", "MOA / AOA", "Other source document (pre-fill)")]
@@ -373,23 +397,38 @@ if PAGE == "fa":
     emp = c4.file_uploader("Employee master (optional)", type=["xlsx", "xls", "csv"], key="fa_emp")
     rel = st.text_input("Related parties / persons of interest (comma-separated)", key="fa_rel")
     reg = st.file_uploader("Evidence / confirmation register (optional)", type=["xlsx", "xls", "csv"], key="fa_reg")
-    evd = st.text_input("Evidence folder on this PC (for authenticity metadata and hash check)", key="fa_evd")
+    evd_up = st.file_uploader("Evidence files: PDFs, Word, Excel, photos, scanned copies (any number)", type=ANY_DOC + ["xlsm", "csv", "bmp", "webp", "docm", "msg", "eml", "txt"],
+                              accept_multiple_files=True, key="fa_evdup")
+    evd = _folder_input("…or an evidence folder on this PC (preferred: keeps the original file dates for the metadata check)", "fa_evd")
+    st.caption("Uploaded copies lose the original file dates, so the date-based authenticity tests rely on metadata inside the file only. Ledger, bank, stock and statement inputs must be tables (Excel or CSV); a scanned or PDF statement has to be converted to Excel first.")
     with st.expander("Fraud-scenario inputs (optional): bank diversion, signatures, FS manipulation, inventory, holidays"):
         c5, c6 = st.columns(2)
         bank_up = c5.file_uploader("Bank statement (Date, Narration, Beneficiary, Beneficiary IBAN, Debit, Credit, Balance)", type=["xlsx", "xls", "csv"], key="fa_bank")
         stock_up = c6.file_uploader("Stock register (Item, Opening, GRN, Issued, Adjustments, Closing book, Physical count, Unit cost, Invoiced sales, Invoiced purchases)", type=["xlsx", "xls", "csv"], key="fa_stock")
         fsd_up = c5.file_uploader("Financial statement data, current and prior year (Item, CY, PY)", type=["xlsx", "xls", "csv"], key="fa_fsd")
         man_up = c6.file_uploader("Authorised-signatory mandate (Name, Designation, Single limit, Specimen, Valid from, Valid to)", type=["xlsx", "xls", "csv"], key="fa_man")
-        sigf = st.text_input("Signatures folder on this PC (holds the signature register and the image files)", key="fa_sigf")
+        sig_up = st.file_uploader("Signature register and signature images, scanned copies included (select the register Excel/CSV and all images together, specimens too)",
+                                  type=["xlsx", "xls", "csv", "png", "jpg", "jpeg", "tif", "tiff", "bmp", "webp", "pdf"], accept_multiple_files=True, key="fa_sig")
+        sigf = _folder_input("…or a signatures folder on this PC (used instead of the uploads above if filled)", "fa_sigf")
         hol = st.text_input("Public holidays in the period (YYYY-MM-DD, comma-separated; check the official UAE calendar)", key="fa_hol")
-    if st.button("Run forensic review", type="primary", disabled=not (case and (gl_up or evd or reg or bank_up or stock_up or fsd_up))):
+    if st.button("Run forensic review", type="primary", disabled=not (case and (gl_up or evd or evd_up or reg or bank_up or stock_up or fsd_up))):
         with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
             sy = [int(x) for x in re.findall(r"\d{4}", yrs)]
+            sig_dir = sigf.strip().strip('"') or None
+            if not sig_dir and sig_up:
+                sig_dir = str(Path(tmp) / "sig"); Path(sig_dir).mkdir()
+                for f in sig_up:
+                    _save(f, sig_dir)
+            evd_dir = evd.strip().strip('"') or None
+            if not evd_dir and evd_up:
+                evd_dir = str(Path(tmp) / "evd"); Path(evd_dir).mkdir()
+                for f in evd_up:
+                    _save(f, evd_dir)
             _run(review_fa, case, gl=_save(gl_up, tmp) if gl_up else None, period_end=pe.isoformat() if pe else None, scope_years=sy or None,
                  vendors=_save(ven, tmp) if ven else None, employees=_save(emp, tmp) if emp else None,
-                 related=[x.strip() for x in rel.split(",") if x.strip()], register=_save(reg, tmp) if reg else None, evidence_dir=evd.strip().strip('"') or None,
+                 related=[x.strip() for x in rel.split(",") if x.strip()], register=_save(reg, tmp) if reg else None, evidence_dir=evd_dir,
                  bank=_save(bank_up, tmp) if bank_up else None, stock=_save(stock_up, tmp) if stock_up else None, fs_data=_save(fsd_up, tmp) if fsd_up else None,
-                 mandate=_save(man_up, tmp) if man_up else None, signatures=sigf.strip().strip('"') or None, holidays=re.findall(r"\d{4}-\d{2}-\d{2}", hol) or None)
+                 mandate=_save(man_up, tmp) if man_up else None, signatures=sig_dir, holidays=re.findall(r"\d{4}-\d{2}-\d{2}", hol) or None)
 
 if PAGE == "liq":
     st.write("Upload the tracker **and** the liquidation documents. The tool computes the clocks and checks each document against the tracker and against each other. "
@@ -404,7 +443,7 @@ if PAGE == "liq":
                              type=ANY, accept_multiple_files=True, key="liq_sr")
     ct_up = st.file_uploader("CT / VAT registration certificates, EmaraTax or FTA letters (any number)", type=ANY, accept_multiple_files=True, key="liq_ct")
     lic_up = st.file_uploader("Trade licence / MOA (optional, for name consistency)", type=ANY, accept_multiple_files=True, key="liq_lic")
-    lf = st.text_input("…or a folder on this PC holding all of these (files are matched by name; adjust the roles below)", key="liq_folder")
+    lf = _folder_input("…or a folder on this PC holding all of these (files are matched by name; adjust the roles below)", "liq_folder")
     if st.button("Scan liquidation folder", disabled=not lf.strip()):
         try:
             st.session_state["liq_scan"] = scan_liq_folder(lf)
