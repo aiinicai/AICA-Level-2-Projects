@@ -1,0 +1,161 @@
+LEDGER SENTINEL — VALIDATION RUN PROMPT (SELF-CONTAINED)
+FOR: REPRODUCING THE LIVE, INDEPENDENT VALIDATION RUN PERFORMED ON 16 OCTOBER 2026
+Produces: a fresh end-to-end re-run + a dated run log you can defend to a reviewer
+
+==============================================================================
+HOW TO USE THIS FOLDER
+==============================================================================
+This folder is self-contained. To get a genuine, independently re-run result
+(not just a restated number), upload/attach EVERY file in the "Supporting_Files"
+subfolder to an AI session that has CODE EXECUTION (a Python sandbox) enabled —
+e.g. ChatGPT with Code Interpreter / Advanced Data Analysis, Gemini with code
+execution, Claude with code tools, or any similar agent tool. Then paste the
+prompt text below.
+
+If you paste only this text into a plain chat-only AI with no code execution and
+no files attached, it CANNOT actually run or verify anything — it will only be
+able to restate the numbers written into this prompt, which is not a real check.
+
+This prompt documents the SAME validation run already performed once, live, on
+16 October 2026, on the student's own laptop, after a full Python environment
+rebuild. It exists so that run can be reproduced again — by a reviewer, an
+examiner, or the student herself on a different machine — and so every step of
+that original run (including the environment problem that was fixed first) is
+captured in one place next to the exact files it was run against.
+
+FILES INCLUDED IN "Supporting_Files" (all required — attach all of them):
+  - generate_data.py            Synthetic data generator (reference only — do
+                                 NOT re-run this; it would regenerate a dataset
+                                 with a different random draw unless the random
+                                 seed and logic are used exactly as shipped)
+  - ledger_sentinel_rules.py    All 11 rules + scoring logic (the engine under test)
+  - rules_engine.py             Runs the rules on the data and validates vs. the
+                                 answer key — THIS is the script to execute
+  - ai_explainer.py             AI explanation layer (reference — described
+                                 below, not required to run for the catch-rate
+                                 numbers themselves)
+  - app_streamlit.py            Interactive dashboard (reference — described
+                                 below, not required to run for the catch-rate
+                                 numbers themselves)
+  - tally_daybook_export.xlsx   THE INPUT: 7,778 vouchers, no fraud labels
+  - fraud_answer_key.xlsx       THE HIDDEN ANSWER KEY: 278 planted fraud entries
+                                 across 9 fraud types — used ONLY to score results
+                                 after rules_engine.py has already ranked everything
+  - requirements.txt            Python packages needed (pandas, openpyxl, etc.)
+
+==============================================================================
+PROMPT TEXT (paste everything below this line)
+==============================================================================
+
+ROLE AND CONTEXT
+
+You are reproducing a specific, already-performed independent validation run for
+"Ledger Sentinel," an AI-assisted fraud detection capstone project (AICA Level 2,
+ICAI) built around TallyPrime journal-entry testing under SA 240. The original run
+happened on 16 October 2026 on the student's own laptop, in a session that began
+by discovering and fixing a broken Python environment, then executed the engine
+fresh and cross-checked every headline number against what was already documented
+elsewhere in the project. All the code and data you need are attached alongside
+this prompt in Supporting_Files: generate_data.py, ledger_sentinel_rules.py,
+rules_engine.py, ai_explainer.py, app_streamlit.py, tally_daybook_export.xlsx
+(7,778 vouchers), fraud_answer_key.xlsx (278 planted fraud entries across 9 fraud
+types, hidden). Install requirements.txt first if needed.
+
+DO NOT regenerate data, retune weights, or change any rule logic. Your job is to
+reproduce the original run's steps and its result, and produce a short, dated run
+log exactly like the one already on file for 16 October 2026.
+
+STEP 1 — Confirm the environment, the honest way
+
+Before running anything, check the Python environment actually works end to end:
+"python --version" and "python -m pip --version" (or "pip --version") should both
+succeed cleanly. If either fails with a launcher error, a "not found" error, or a
+missing-pip error, that is itself worth recording — the original run hit exactly
+this (two conflicting Python installs on the laptop) and documented the fix
+(clean removal of both, then a fresh install from python.org with "Add python.exe
+to PATH" checked) rather than hiding it. Record whatever you find, good or bad.
+
+STEP 2 — Install dependencies and run the engine untouched
+
+- Install requirements.txt.
+- Run rules_engine.py against the attached tally_daybook_export.xlsx exactly as
+  it stands, from inside the folder that holds it (a "file not found" error on
+  the input file usually means the terminal is in the wrong folder, not that the
+  file is missing).
+- Confirm it produces a ranked output (risk_scored_vouchers.xlsx or equivalent).
+- Prove reproducibility, don't assume it: run the full pipeline twice and diff the
+  two output files. They rely on random.seed(42) and deterministic tie-breaking
+  (risk_score, then voucher_id), so the two runs must be byte-identical.
+
+STEP 3 — Validate against the hidden answer key and report both tiers
+
+Validate the ranked output against the attached fraud_answer_key.xlsx (build/test
+only — never read by production code) and report what you actually get. The
+run performed on 16 October 2026 produced, and this reproduction should land at
+or very close to, these figures — report BOTH tiers honestly rather than
+collapsing to one cutoff-dependent number, and flag clearly if your freshly-run
+numbers differ from these at all:
+  - Score sitting at the top-278 cutoff line: 9.7
+  - Vouchers tied on that exact score (the borderline band): 163
+  - Tier 1 — unambiguous (score > 9.7): 165 flagged | 161/278 caught (57.9%) |
+    4 false positives (2.4% of flagged)
+  - Tier 2 — including the borderline band (score >= 9.7): 328 flagged |
+    201/278 caught (72.3%) | 127 false positives (38.7% of flagged)
+  - Rule 11 (separate vendor-structuring screen, not blended into risk_score):
+    1 vendor ledger flagged | 10 vouchers flagged | 10/278 caught (3.6%) |
+    0 false positives
+  - Combined, Tier 1 + Rule 11: 171/278 fraud caught (61.5%)
+  - Combined, Tier 2 + Rule 11: 211/278 fraud caught (75.9%)
+
+STEP 4 — Run the explanation layer and note the dashboard the same way
+
+- Run ai_explainer.py. It should explain 60 entries total (50 by risk_score, plus
+  10 additional Rule 11-only vouchers, zero overlap), writing an
+  Auditor_Working_Paper.xlsx with blank sign-off columns for a human reviewer.
+  If no AI backend is configured, it should fall back to a template mode rather
+  than fail — note which mode it ran in.
+- If you launch app_streamlit.py, expect its generic "High risk (score >= 50)"
+  tile to read 0. This is expected, not a bug: risk_score is a weighted average
+  across all 10 single-entry rules' combined weight, not a sum, so even a
+  strongly-flagged voucher sits well below 50 once divided by the full weight
+  base. The project's actual cutoff is relative rank (top 278, i.e. score 9.7
+  in this run), never a fixed absolute score — don't mistake the dashboard tile
+  for the real threshold.
+
+STEP 5 — Write the dated run log
+
+Produce a short run log (a few paragraphs plus a results table) recording: the
+date of this reproduction, the environment check from Step 1 (pass, or the
+problem found and the fix applied), the exact commands run, the two-tier results
+from Step 3, the Rule 11 result, the explanation-layer outcome from Step 4, and
+one line stating whether every figure matched the 16 October 2026 run exactly.
+If anything differs, say so plainly rather than rounding it away.
+
+THE 11 RULES (for reference — state all of them if the run log needs to list them;
+never summarise them as just "10 rules plus Rule 11"):
+
+ 1. Weekend/after-hours posting          (weight 1.1)
+ 2. Near period end                       (weight 1.2)
+ 3. Round amount                          (weight 1.1)
+ 4. Near approval limit                   (weight 1.1)
+ 5. Rare account pair                     (weight 0.5)
+ 6. Vague narration                       (weight 0.7)
+ 7. Duplicate pattern                     (weight 1.2)
+ 8. Same user create/alter                (weight 1.3)
+ 9. Old voucher late edit                 (weight 1.4)
+10. Vendor bank-detail change              (weight 1.3)
+11. Vendor structured-disbursement screen  (SEPARATE flag — not weighted into
+    risk_score; flags a vendor whose trailing 270-day rolling payment total runs
+    more than 2x above that same vendor's own first-60-day baseline rate)
+
+GLOBAL CONSTRAINTS
+
+- Never let any detection code read fraud_answer_key.xlsx — it is scoring-only,
+  exactly like a real auditor never has advance knowledge of which entries are fraud.
+- Report false positives and missed fraud honestly; do not tune or round numbers
+  to make the headline look better.
+- Keep the rules deterministic and separate from the AI explanation layer in every
+  description — the AI explains an already-flagged entry, it never decides what
+  gets flagged.
+- Every number in the run log must trace back to an actual re-run of the attached
+  code in this session, not to memory or to this prompt's own text.

@@ -1,0 +1,169 @@
+LEDGER SENTINEL — PROMPT 1 (SELF-CONTAINED)
+FOR: FULL SYNTHETIC VALIDATION (ALL 7,778 VOUCHERS, HIDDEN ANSWER KEY)
+Produces: freshly re-verified catch-rate numbers + SOP + flowchart + PPT
+
+==============================================================================
+HOW TO USE THIS FOLDER
+==============================================================================
+This folder is self-contained. To get a genuine, independently re-run result
+(not just a restated number), upload/attach EVERY file in this folder to an AI
+session that has CODE EXECUTION (a Python sandbox) enabled — e.g. ChatGPT with
+Code Interpreter / Advanced Data Analysis, Gemini with code execution, Claude
+with code tools, or any similar agent tool. Then paste the prompt text below.
+
+If you paste only this text into a plain chat-only AI with no code execution and
+no files attached, it CANNOT actually run or verify anything — it will only be
+able to restate the numbers written into this prompt, which is not a real check.
+
+FILES INCLUDED IN THIS FOLDER (all required — attach all of them):
+  - generate_data.py            Synthetic data generator (reference only — do
+                                 NOT re-run this; it would regenerate a dataset
+                                 with a different random draw unless the random
+                                 seed and logic are used exactly as shipped)
+  - ledger_sentinel_rules.py    All 11 rules + scoring logic (the engine under test)
+  - rules_engine.py             Runs the rules on the data and validates vs. the
+                                 answer key — THIS is the script to execute
+  - ai_explainer.py             AI explanation layer (reference — described in
+                                 the SOP/flowchart, not required to run for the
+                                 catch-rate numbers themselves)
+  - app_streamlit.py            Interactive dashboard (reference — described in
+                                 the SOP/flowchart, not required to run for the
+                                 catch-rate numbers themselves)
+  - tally_daybook_export.xlsx   THE INPUT: 7,778 vouchers, no fraud labels
+  - fraud_answer_key.xlsx       THE HIDDEN ANSWER KEY: 278 planted fraud entries
+                                 across 9 fraud types — used ONLY to score results
+                                 after rules_engine.py has already ranked everything
+  - requirements.txt            Python packages needed (pandas, openpyxl, etc.)
+
+==============================================================================
+PROMPT TEXT (paste everything below this line)
+==============================================================================
+
+ROLE AND CONTEXT
+
+You are finishing the validation and documentation pass for "Ledger Sentinel," an
+AI-assisted fraud detection capstone project (AICA Level 2, ICAI) built around
+TallyPrime journal-entry testing under SA 240. All the code and data you need are
+attached alongside this prompt: generate_data.py, ledger_sentinel_rules.py,
+rules_engine.py, ai_explainer.py, app_streamlit.py, tally_daybook_export.xlsx
+(7,778 vouchers), fraud_answer_key.xlsx (278 planted fraud entries across 9 fraud
+types, hidden). Install requirements.txt first if needed.
+
+DO NOT regenerate data, retune weights, or change any rule logic. Your job is to
+(1) independently re-verify the existing synthetic validation end to end by
+actually running the attached code against the attached data, and (2) turn the
+verified numbers into three polished deliverables: a detailed SOP, a process
+flowchart, and a PowerPoint deck.
+
+STEP 1 — Re-run and independently verify (do this before writing anything)
+
+- Run rules_engine.py against the attached tally_daybook_export.xlsx exactly as
+  it stands.
+- Confirm it produces a ranked output (risk_scored_vouchers.xlsx or equivalent)
+  with a fully reproducible ranking (random.seed(42); ties broken deterministically
+  by risk_score then voucher_id — re-running the full pipeline must produce
+  byte-identical results every time; prove this by running it twice and diffing
+  the output).
+- Validate the ranked output against the attached fraud_answer_key.xlsx
+  (build/test only — never read by production code) and report what you actually
+  get. You should land at, or very close to, these previously-verified figures —
+  report BOTH tiers honestly rather than collapsing to one cutoff-dependent number,
+  and flag clearly if your freshly-run numbers differ from these at all:
+    - 57.9% of planted fraud caught UNAMBIGUOUSLY by the 10 single-entry rules
+      (161 of 278, from 165 vouchers clearly above the noise floor, 4 false positives)
+    - up to 72.3% if the large tied/borderline score band is also reviewed
+      (201 of 278, from 328 flagged vouchers, 163 of them tied on one exact score)
+    - Rule 11 (the separate vendor-structuring screen) adds 10 more catches with
+      ZERO false positives — pure upside, no overlap with the 10 single-entry rules
+    - Combined: 61.5% (unambiguous + Rule 11) to 75.9% (borderline + Rule 11)
+    - 6 of 9 fraud types caught at a perfect 100% once the borderline band is
+      included — 5 unambiguously (backdated, round-to-suspense, same-user,
+      old-voucher-edit, vendor-bank-detail); the 6th (amount just under approval
+      limit) lands entirely inside the borderline band itself
+- Print the weakest-performing entries (lowest-scored true fraud) so the gaps are
+  visible, not hidden.
+- State explicitly which fraud types remain genuinely hard (weekend/after-hours,
+  duplicate-invoice, and the 3 structuring payments Rule 11 missed) and WHY —
+  because legitimate activity genuinely overlaps with the same pattern, not because
+  of a tuning failure.
+
+STEP 2 — Build the SOP document (Word, .docx)
+
+Produce a Standard Operating Procedure covering:
+- Purpose/scope and the frozen scope statement
+- Roles: Student (preparer), CA mentor/reviewer, AICA Level 2 examiner
+- A numbered, ordered procedure table for a full run (generate → score → validate
+  → AI-explain → human review/sign-off → optional live dashboard → archive)
+- Data governance: the three AI-backend privacy tiers (template fallback, local
+  LM Studio, live Claude API) in increasing order of data exposure
+- Audit-trail discipline for the project itself: version control every script,
+  log every run (seed, date, headline numbers), freeze/date each milestone,
+  document every threshold and assumption, and a sign-off log
+- A full, honest Known Limitations table — all 9 fraud types, both catch-rate
+  tiers, and why each weak type is hard
+- The complete 11-rule inventory (table below) with the engine's exact weights
+
+STEP 3 — Build a process flowchart
+
+Draw one flowchart (as a diagram — Mermaid, draw.io XML, or a clean inline SVG/PNG,
+whichever this session can render) showing the FULL synthetic path end to end:
+
+  generate_data.py
+      -> tally_daybook_export.xlsx (input, no labels)
+      -> fraud_answer_key.xlsx (hidden, read-only, used only to SCORE afterwards)
+  tally_daybook_export.xlsx
+      -> ledger_sentinel_rules.py
+          - 10 weighted single-entry rules -> risk_score (0-100, ranked)
+          - Rule 11 (vendor aggregate screen) -> vendor_flag_score (SEPARATE, not blended)
+      -> rules_engine.py -> risk_scored_vouchers.xlsx
+      -> validated against fraud_answer_key.xlsx (build/test only, dashed line —
+        never in the production/live path)
+  risk_scored_vouchers.xlsx
+      -> ai_explainer.py (top-N by risk_score union every Rule 11 flag)
+      -> Auditor_Working_Paper.xlsx (sign-off columns blank for human reviewer)
+  tally_daybook_export.xlsx (or any uploaded Day Book)
+      -> app_streamlit.py -> interactive dashboard (self-contained re-implementation,
+        no access to the answer key)
+
+Make the "Rule 11 is a separate flag, never blended into risk_score" fact visually
+obvious — e.g. a distinct color/branch, with a one-line callout explaining that an
+earlier prototype proved blending it in buries the signal (it ranked 414th of 7,778
+despite firing correctly).
+
+STEP 4 — Build the PowerPoint deck
+
+Produce a slide deck covering: the problem (SA 240, sampling leaves most entries
+unexamined, and some fraud is deliberately designed to beat any single-entry
+threshold); the approach (11 rules, AI explains but never detects); the flowchart
+from Step 3; the headline results above, stated honestly with both tiers; the
+11-rule table below; limitations and ethics (rules prioritise for review, they
+don't prove fraud); and next steps.
+
+THE 11 RULES (state all of them, by number, in both the SOP and the deck — never
+summarise them as just "10 rules plus Rule 11"):
+
+ 1. Weekend/after-hours posting          (weight 1.1)
+ 2. Near period end                       (weight 1.2)
+ 3. Round amount                          (weight 1.1)
+ 4. Near approval limit                   (weight 1.1)
+ 5. Rare account pair                     (weight 0.5)
+ 6. Vague narration                       (weight 0.7)
+ 7. Duplicate pattern                     (weight 1.2)
+ 8. Same user create/alter                (weight 1.3)
+ 9. Old voucher late edit                 (weight 1.4)
+10. Vendor bank-detail change              (weight 1.3)
+11. Vendor structured-disbursement screen  (SEPARATE flag — not weighted into
+    risk_score; flags a vendor whose trailing 270-day rolling payment total runs
+    more than 2x above that same vendor's own first-60-day baseline rate)
+
+GLOBAL CONSTRAINTS
+
+- Never let any detection code read fraud_answer_key.xlsx — it is scoring-only,
+  exactly like a real auditor never has advance knowledge of which entries are fraud.
+- Report false positives and missed fraud honestly in every document; do not tune
+  or round numbers to make the headline look better.
+- Keep the rules deterministic and separate from the AI explanation layer in every
+  description — the AI explains an already-flagged entry, it never decides what
+  gets flagged.
+- Every number quoted in the SOP, flowchart callouts, and deck must trace back to
+  an actual re-run of the attached code in Step 1, not to memory or an earlier draft.
