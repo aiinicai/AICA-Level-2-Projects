@@ -46,7 +46,12 @@ def _ink(path, size=(160, 64)):
     """Signature image -> blurred ink map of fixed size, or None when no ink is found."""
     import numpy as np
     from PIL import Image, ImageFilter
-    im = Image.open(str(path))
+    if Path(str(path)).suffix.lower() == ".pdf":  # scanned signature saved as PDF: use page 1
+        import pdfplumber
+        with pdfplumber.open(str(path)) as pdf:
+            im = pdf.pages[0].to_image(resolution=150).original.copy()
+    else:
+        im = Image.open(str(path))
     if im.mode in ("RGBA", "LA", "P"):
         im = im.convert("RGBA")
         bg = Image.new("RGBA", im.size, (255, 255, 255, 255))
@@ -60,6 +65,15 @@ def _ink(path, size=(160, 64)):
     crop = Image.fromarray((ink[ys.min():ys.max() + 1, xs.min():xs.max() + 1] * 255).astype("uint8"))
     crop = crop.resize(size, Image.BILINEAR).filter(ImageFilter.GaussianBlur(2.5))
     return np.asarray(crop, dtype=float)
+
+
+def _find(folder, name):
+    """File in folder by name, ignoring case (uploads may change the case of extensions)."""
+    p = folder / str(name)
+    if p.exists():
+        return p
+    low = str(name).strip().lower()
+    return next((q for q in folder.glob("*") if q.name.lower() == low), None)
 
 
 def _corr(a, b):
@@ -80,14 +94,15 @@ def fa11_signatures(c):
     reg = []
     folder = Path(folder) if folder else None
     if folder:
-        regfile = next((p for p in sorted(folder.glob("*")) if p.suffix.lower() in (".xlsx", ".csv") and "regist" in p.name.lower()), None)
+        tabs = [p for p in sorted(folder.glob("*")) if p.suffix.lower() in (".xlsx", ".xls", ".csv")]
+        regfile = next((p for p in tabs if "regist" in p.name.lower()), None) or (tabs[0] if len(tabs) == 1 else None)
         if not regfile:
-            raise NotRun("No signature register (a file named *register*.xlsx or .csv) found in the signatures folder")
+            raise NotRun("No signature register found: put one Excel/CSV register (ideally named *register*) with the signature images")
         reg, _, _ = _table(regfile, SIGREG)
     spec = {}
     for m in mand:
-        if m.get("specimen") and folder and (folder / str(m["specimen"])).exists():
-            spec[_norm(m["name"])] = folder / str(m["specimen"])
+        if m.get("specimen") and folder and _find(folder, m["specimen"]):
+            spec[_norm(m["name"])] = _find(folder, m["specimen"])
     # a. authority
     for r in reg:
         who = r.get("who")
@@ -110,8 +125,11 @@ def fa11_signatures(c):
     ink = {}
     for r in reg:
         f = r.get("image")
-        if f and (folder / str(f)).exists():
-            ink[r["row"]] = _ink(folder / str(f))
+        if f and folder and _find(folder, f):
+            try:
+                ink[r["row"]] = _ink(_find(folder, f))
+            except Exception:  # unreadable or corrupt image: leave unscreened rather than abort
+                ink[r["row"]] = None
     byp = defaultdict(list)
     for r in reg:
         if ink.get(r["row"]) is not None:
