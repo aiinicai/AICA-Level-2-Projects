@@ -1,0 +1,951 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>Saathi — Daily Companion for Body, Glow & Stars</title>
+  <meta name="description" content="Your daily companion: interactive fortune cookie, astrological day card (sidereal & tropical), panchang, steps, BMI, guided routines, and glow check-ins.">
+  <meta name="theme-color" content="#0D0A1E">
+  <link rel="icon" href="data:image/svg+xml,&lt;svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'&gt;&lt;text y='.9em' font-size='90'&gt;🥠&lt;/text&gt;&lt;/svg&gt;">
+  <style>
+    :root {
+      --bg: #0D0A1E;
+      --card: #16122E;
+      --card-elevated: #201A42;
+      --card-highlight: #2A2254;
+      --border: #312A5C;
+      --border-light: rgba(245, 197, 66, 0.3);
+      --gold: #F5C542;
+      --gold-light: #FFE082;
+      --amber: #FFB300;
+      --rose: #F472B6;
+      --lavender: #C084FC;
+      --cyan: #38BDF8;
+      --mint: #34D399;
+      --danger: #FB7185;
+      --text: #F8FAFC;
+      --text-soft: #CBD5E1;
+      --text-muted: #94A3B8;
+      --nav-height: 64px;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+
+    body {
+      background-color: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      min-height: 100vh;
+      overflow-x: hidden;
+      padding-bottom: calc(var(--nav-height) + 30px);
+      user-select: none;
+    }
+
+    /* Top Bar */
+    header {
+      background: rgba(22, 18, 46, 0.92);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      border-bottom: 1px solid var(--border);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      padding: 12px 18px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .brand-wrap {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .logo-orb {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      background: radial-gradient(circle at 30% 30%, #FFE082, #F5C542 50%, #B45309 100%);
+      box-shadow: 0 0 16px rgba(245, 197, 66, 0.4);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+    }
+
+    .brand-text h1 {
+      font-size: 18px;
+      font-weight: 800;
+      letter-spacing: -0.3px;
+      background: linear-gradient(90deg, #FFFFFF, #FFE082);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .brand-text p {
+      font-size: 10px;
+      font-weight: 600;
+      color: var(--gold);
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+    }
+
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .pill-points {
+      background: rgba(245, 197, 66, 0.15);
+      border: 1px solid rgba(245, 197, 66, 0.4);
+      color: var(--gold-light);
+      padding: 5px 12px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .btn-download-top {
+      background: linear-gradient(135deg, var(--gold), var(--amber));
+      color: #0D0A1E;
+      border: none;
+      padding: 6px 14px;
+      border-radius: 12px;
+      font-size: 12px;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      cursor: pointer;
+      text-decoration: none;
+      box-shadow: 0 3px 12px rgba(245, 197, 66, 0.3);
+      transition: transform 0.15s ease;
+    }
+
+    .btn-download-top:active { transform: scale(0.96); }
+
+    /* Main Container */
+    .container {
+      max-width: 780px;
+      margin: 0 auto;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    /* Tab Panes */
+    .tab-content {
+      display: none;
+      flex-direction: column;
+      gap: 16px;
+      animation: fadeIn 0.25s ease-out;
+    }
+    .tab-content.active { display: flex; }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(6px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* Common Card */
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 22px;
+      padding: 18px;
+      position: relative;
+      overflow: hidden;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+    }
+
+    .card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+    }
+
+    .card-title {
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--text);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .card-subtitle {
+      font-size: 11px;
+      color: var(--text-muted);
+      margin-top: 2px;
+    }
+
+    /* Fortune Cookie Box */
+    .cookie-stage {
+      background: radial-gradient(circle at center, rgba(88, 64, 160, 0.3) 0%, rgba(22, 18, 46, 0.9) 70%);
+      border: 1px solid var(--border-light);
+      border-radius: 20px;
+      padding: 26px 16px;
+      text-align: center;
+      cursor: pointer;
+      position: relative;
+      transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+    .cookie-stage:active { transform: scale(0.96); }
+
+    .cookie-graphic {
+      font-size: 72px;
+      display: inline-block;
+      filter: drop-shadow(0 8px 20px rgba(245, 197, 66, 0.35));
+      animation: floatCookie 3s ease-in-out infinite;
+    }
+
+    @keyframes floatCookie {
+      0%, 100% { transform: translateY(0) rotate(0deg); }
+      50% { transform: translateY(-8px) rotate(-3deg); }
+    }
+
+    .golden-sparkle {
+      display: inline-block;
+      background: rgba(245, 197, 66, 0.2);
+      border: 1px solid var(--gold);
+      color: var(--gold-light);
+      padding: 3px 10px;
+      border-radius: 12px;
+      font-size: 11px;
+      font-weight: 700;
+      margin-top: 8px;
+    }
+
+    .scroll-revealed {
+      background: #FFFBEB;
+      color: #451A03;
+      border: 2px solid #FDE68A;
+      border-radius: 16px;
+      padding: 18px 20px;
+      text-align: center;
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.4);
+      display: none;
+      animation: unrollScroll 0.4s ease-out forwards;
+    }
+
+    @keyframes unrollScroll {
+      from { transform: scaleY(0.4) scaleX(0.8); opacity: 0; }
+      to { transform: scaleY(1) scaleX(1); opacity: 1; }
+    }
+
+    .scroll-revealed .quote-mark { font-size: 26px; color: #D97706; font-family: Georgia, serif; line-height: 1; }
+    .scroll-revealed .quote-body { font-size: 15px; font-family: Georgia, serif; line-height: 1.5; margin: 4px 0 10px; font-weight: 500; }
+    .scroll-revealed .quote-footer { font-size: 11px; font-weight: 700; color: #B45309; text-transform: uppercase; letter-spacing: 0.5px; }
+
+    /* Astro Day Card Grid */
+    .astro-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-top: 10px;
+    }
+
+    .astro-stat-box {
+      background: var(--card-elevated);
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      border-radius: 14px;
+      padding: 12px;
+    }
+    .astro-stat-box .label { font-size: 11px; color: var(--text-muted); font-weight: 600; }
+    .astro-stat-box .value { font-size: 14px; color: var(--text); font-weight: 700; margin-top: 2px; }
+    .astro-stat-box .hint { font-size: 10px; color: var(--text-soft); margin-top: 2px; }
+
+    /* Lo Shu Grid */
+    .loshu-container {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+      max-width: 320px;
+      margin: 12px auto;
+    }
+
+    .loshu-cell {
+      aspect-ratio: 1;
+      background: var(--card-elevated);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s;
+    }
+    .loshu-cell.present {
+      background: rgba(245, 197, 66, 0.15);
+      border-color: var(--gold);
+      box-shadow: inset 0 0 12px rgba(245, 197, 66, 0.15);
+    }
+    .loshu-cell .cell-num { font-size: 20px; font-weight: 800; color: var(--text); }
+    .loshu-cell.present .cell-num { color: var(--gold); }
+    .loshu-cell .cell-count { font-size: 10px; font-weight: 700; color: var(--text-muted); }
+    .loshu-cell.present .cell-count { color: var(--gold-light); }
+
+    /* Habit Checklist */
+    .habit-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: var(--card-elevated);
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      border-radius: 14px;
+      padding: 12px 14px;
+      margin-bottom: 8px;
+    }
+    .habit-left { display: flex; align-items: center; gap: 12px; }
+    .habit-icon {
+      width: 36px;
+      height: 36px;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+    }
+    .habit-info h4 { font-size: 13px; font-weight: 700; color: var(--text); }
+    .habit-info p { font-size: 11px; color: var(--text-muted); }
+    .btn-habit-act {
+      background: var(--card-highlight);
+      color: var(--text);
+      border: 1px solid var(--border);
+      padding: 7px 14px;
+      border-radius: 10px;
+      font-size: 12px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .btn-habit-act:active { transform: scale(0.95); background: var(--gold); color: #000; }
+
+    /* Signature Canvas */
+    .signature-wrap {
+      background: #090615;
+      border: 2px dashed var(--border);
+      border-radius: 16px;
+      overflow: hidden;
+      margin-top: 10px;
+      position: relative;
+    }
+    canvas#sigCanvas {
+      width: 100%;
+      height: 160px;
+      display: block;
+      touch-action: none;
+      cursor: crosshair;
+    }
+    .sig-guide {
+      position: absolute;
+      top: 50%;
+      left: 10%;
+      right: 10%;
+      height: 1px;
+      background: rgba(255, 255, 255, 0.1);
+      pointer-events: none;
+    }
+
+    /* Routine Timer Box */
+    .routine-timer-card {
+      background: var(--card-highlight);
+      border: 1px solid var(--cyan);
+      border-radius: 18px;
+      padding: 20px;
+      text-align: center;
+      display: none;
+      animation: fadeIn 0.3s ease;
+    }
+    .timer-ring {
+      width: 110px;
+      height: 110px;
+      border-radius: 50%;
+      border: 4px solid var(--cyan);
+      margin: 10px auto;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background: var(--card);
+    }
+    .timer-seconds { font-size: 32px; font-weight: 800; color: var(--cyan); }
+
+    /* Bottom Navigation Bar */
+    nav.bottom-bar {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: var(--nav-height);
+      background: rgba(22, 18, 46, 0.96);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border-top: 1px solid var(--border);
+      display: flex;
+      justify-content: space-around;
+      align-items: center;
+      z-index: 200;
+      padding-bottom: env(safe-area-inset-bottom);
+    }
+
+    .nav-btn {
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 3px;
+      font-size: 10px;
+      font-weight: 600;
+      cursor: pointer;
+      width: 20%;
+      transition: color 0.15s;
+    }
+    .nav-btn .nav-icon { font-size: 20px; transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1); }
+    .nav-btn.active { color: var(--gold); }
+    .nav-btn.active .nav-icon { transform: translateY(-3px) scale(1.15); }
+
+    /* Modals & Dialogs */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.75);
+      backdrop-filter: blur(8px);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+      padding: 16px;
+    }
+    .modal-overlay.open { display: flex; }
+    .modal-box {
+      background: var(--card);
+      border: 1px solid var(--border-light);
+      border-radius: 24px;
+      padding: 24px;
+      width: 100%;
+      max-width: 480px;
+      max-height: 90vh;
+      overflow-y: auto;
+      box-shadow: 0 16px 40px rgba(0, 0, 0, 0.6);
+      animation: modalPop 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+    @keyframes modalPop {
+      from { transform: scale(0.92); opacity: 0; }
+      to { transform: scale(1); opacity: 1; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Top App Bar -->
+  <header>
+    <div class="brand-wrap">
+      <div class="logo-orb">🥠</div>
+      <div class="brand-text">
+        <h1>Saathi</h1>
+        <p>Body • Glow • Stars</p>
+      </div>
+    </div>
+    <div class="header-actions">
+      <div class="pill-points">
+        <span>✨</span> <span id="hdrPoints">0</span> pts
+      </div>
+      <a href="downloads/saathi.apk" class="btn-download-top" download="saathi.apk">
+        <span>⬇️</span> APK
+      </a>
+    </div>
+  </header>
+
+  <!-- Main Multi-tab Body -->
+  <main class="container">
+
+    <!-- ==================== TAB 1: TODAY ==================== -->
+    <section id="tab-today" class="tab-content active">
+      <!-- Greeting & Streak Bar -->
+      <div class="card" style="background: linear-gradient(135deg, #211947, #16122E); border-color: rgba(245, 197, 66, 0.35);">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <div>
+            <h2 id="greetingName" style="font-size: 20px; font-weight: 800;">Namaste, Friend ✨</h2>
+            <p id="todayDateStr" style="font-size: 12px; color: var(--gold-light); margin-top: 2px;">Loading celestial sky...</p>
+          </div>
+          <div style="background: rgba(225, 29, 72, 0.2); border: 1px solid #FB7185; padding: 6px 12px; border-radius: 20px; font-size: 12px; font-weight: 700; color: #FECDD3; display: flex; align-items: center; gap: 4px;">
+            <span>🔥</span> <span id="streakCount">0</span> Day Streak
+          </div>
+        </div>
+      </div>
+
+      <!-- Interactive Daily Fortune Cookie Cracker -->
+      <div class="card" style="border-color: var(--gold);">
+        <div class="card-header">
+          <div class="card-title"><span>🥠</span> Daily Fortune Cookie</div>
+          <span class="golden-sparkle" id="cookieRarity">Seeded Daily Oracle</span>
+        </div>
+
+        <div id="cookieClickArea" class="cookie-stage" onclick="crackFortuneCookie()">
+          <div class="cookie-graphic">🥠</div>
+          <div style="font-size: 15px; font-weight: 700; color: var(--gold); margin-top: 10px;">Tap to Crack Open</div>
+          <p style="font-size: 12px; color: var(--text-muted); margin-top: 4px;">Wisdom scroll seeded for your unique day • +5 to +25 pts</p>
+        </div>
+
+        <div id="fortuneScroll" class="scroll-revealed">
+          <div class="quote-mark">“</div>
+          <div class="quote-body" id="fortuneText">A warm heart will unlock a doorway that intellect has been knocking on for weeks.</div>
+          <div class="quote-footer" id="fortuneBadge">★ Saathi Daily Oracle (+5 Pts) ★</div>
+          <button onclick="shareFortune()" style="margin-top: 12px; background: #D97706; color: white; border: none; padding: 6px 14px; border-radius: 8px; font-size: 12px; font-weight: 700; cursor: pointer;">
+            📤 Share Fortune Card
+          </button>
+        </div>
+      </div>
+
+      <!-- Quick Cosmic Sky Snapshot -->
+      <div class="card" onclick="switchTab('stars')" style="cursor: pointer;">
+        <div class="card-header">
+          <div class="card-title"><span>🌙</span> Today's Cosmic Sky Snapshot</div>
+          <span style="font-size: 12px; font-weight: 700; color: var(--lavender);">Full Chart →</span>
+        </div>
+        <div class="astro-grid">
+          <div class="astro-stat-box">
+            <div class="label" id="quickMoonLabel">Vedic Moon</div>
+            <div class="value" id="quickMoonVedic">—</div>
+            <div class="hint" id="quickNakshatra">—</div>
+          </div>
+          <div class="astro-stat-box">
+            <div class="label">Abhijit Muhurta</div>
+            <div class="value" style="color: var(--mint);" id="quickAbhijit">—</div>
+            <div class="hint" id="quickSun">Auspicious Golden Window</div>
+          </div>
+          <div class="astro-stat-box">
+            <div class="label">Rahu Kaal</div>
+            <div class="value" id="quickRahuKaal" style="color: var(--danger);">12:00 – 13:30</div>
+            <div class="hint">Avoid impulse starts</div>
+          </div>
+          <div class="astro-stat-box">
+            <div class="label">Lucky Color & Number</div>
+            <div class="value" id="quickLuckyColor" style="color: var(--gold);">Emerald Green • 5</div>
+            <div class="hint" id="quickDayLord">Day Lord</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Daily Glow Plan Checklist -->
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title"><span>💧</span> Daily Glow Plan</div>
+          <span style="font-size: 11px; color: var(--text-muted);">Streak fuel</span>
+        </div>
+
+        <!-- Water -->
+        <div class="habit-item">
+          <div class="habit-left">
+            <div class="habit-icon" style="background: rgba(56, 189, 248, 0.2); color: var(--cyan);">💧</div>
+            <div class="habit-info">
+              <h4>Water Hydration</h4>
+              <p id="waterLabel">0 of 8 glasses (250ml)</p>
+            </div>
+          </div>
+          <button class="btn-habit-act" onclick="addWaterGlass()">+1 Glass (+5)</button>
+        </div>
+
+        <!-- Steps -->
+        <div class="habit-item">
+          <div class="habit-left">
+            <div class="habit-icon" style="background: rgba(52, 211, 153, 0.2); color: var(--mint);">🚶‍♂️</div>
+            <div class="habit-info">
+              <h4>Daily Movement</h4>
+              <p id="stepsLabel">0 / 8,000 steps</p>
+            </div>
+          </div>
+          <button class="btn-habit-act" onclick="addManualSteps()">+500 Steps</button>
+        </div>
+
+        <!-- Eye Break -->
+        <div class="habit-item">
+          <div class="habit-left">
+            <div class="habit-icon" style="background: rgba(192, 132, 252, 0.2); color: var(--lavender);">👁️</div>
+            <div class="habit-info">
+              <h4>20-20-20 Eye Refresh</h4>
+              <p>Relieve digital screen strain</p>
+            </div>
+          </div>
+          <button class="btn-habit-act" onclick="triggerRoutine('eye')">Start 20s</button>
+        </div>
+      </div>
+
+      <!-- Active Guided Routine Runner Box -->
+      <div id="routineRunner" class="routine-timer-card">
+        <h3 id="routineTitle" style="color: var(--cyan); font-size: 16px; font-weight: 800;">Eye Refresh (20-20-20)</h3>
+        <p id="routineInstruction" style="font-size: 13px; color: var(--text-soft); margin: 6px 0;">Look at an object 20 feet away to relax your focusing muscles.</p>
+        <div class="timer-ring">
+          <div class="timer-seconds" id="timerCount">20</div>
+          <div style="font-size: 10px; color: var(--text-muted); text-transform: uppercase;">Seconds</div>
+        </div>
+        <button onclick="closeRoutineRunner()" style="background: var(--card); border: 1px solid var(--border); color: var(--text); padding: 8px 16px; border-radius: 10px; cursor: pointer; font-size: 12px; font-weight: 700;">
+          Close Routine
+        </button>
+      </div>
+    </section>
+
+
+    <!-- ==================== TAB 2: STARS & NUMEROLOGY ==================== -->
+    <section id="tab-stars" class="tab-content">
+      <!-- Birth Details Header & Edit -->
+      <div class="card" style="border-color: var(--lavender);">
+        <div class="card-header">
+          <div class="card-title"><span>🪐</span> Deep Astro Day Card</div>
+          <button onclick="openBirthModal()" style="background: var(--card-elevated); color: var(--lavender); border: 1px solid var(--border); padding: 4px 10px; border-radius: 8px; font-size: 11px; font-weight: 700; cursor: pointer;">
+            ✏️ Edit Details
+          </button>
+        </div>
+
+        <!-- Toggle Vedic vs Western -->
+        <div style="display: flex; gap: 8px; margin-bottom: 12px;">
+          <button id="btnVedic" onclick="setAstroSystem('Vedic')" style="flex: 1; padding: 8px; border-radius: 10px; border: 1px solid var(--gold); background: var(--gold); color: #0D0A1E; font-weight: 700; font-size: 12px; cursor: pointer;">
+            Vedic (Sidereal Lahiri)
+          </button>
+          <button id="btnWestern" onclick="setAstroSystem('Western')" style="flex: 1; padding: 8px; border-radius: 10px; border: 1px solid var(--border); background: var(--card-elevated); color: var(--text-soft); font-weight: 600; font-size: 12px; cursor: pointer;">
+            Western (Tropical)
+          </button>
+        </div>
+
+        <!-- Deep Card Details -->
+        <div style="background: var(--card-elevated); padding: 14px; border-radius: 14px;">
+          <div style="font-size: 18px; font-weight: 800; color: var(--gold-light);" id="astroMoonTitle">—</div>
+          <div style="font-size: 12px; color: var(--text-soft); margin-top: 2px;" id="astroPanchangTitle">—</div>
+          <div style="font-size: 12px; color: var(--mint); margin-top: 8px; font-weight: 600;" id="astroScore">
+            Day Harmony Score: —
+          </div>
+          <p style="font-size: 13px; color: var(--text); line-height: 1.5; margin-top: 8px;" id="astroProTip">—</p>
+          <div style="margin-top: 10px; padding-top: 10px; border-top: 1px solid rgba(255, 255, 255, 0.08); font-size: 12px; color: var(--rose); font-style: italic;" id="astroLoved">—</div>
+          <div style="margin-top: 8px; font-size: 11px; color: var(--text-muted);" id="astroFacts"></div>
+        </div>
+      </div>
+
+      <!-- Sacred Numerology & 3x3 Lo Shu Grid -->
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title"><span>🔢</span> Sacred Numerology & Lo Shu Grid</div>
+          <span style="font-size: 11px; color: var(--gold-light);">Cheiro & Vedic</span>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; text-align: center;">
+          <div class="astro-stat-box">
+            <div class="label">Life Path</div>
+            <div class="value" style="color: var(--gold);" id="numLifePath">—</div>
+            <div class="hint" id="numLifePathHint">Add birth date</div>
+          </div>
+          <div class="astro-stat-box">
+            <div class="label">Moolank</div>
+            <div class="value" style="color: var(--cyan);" id="numMoolank">—</div>
+            <div class="hint">Birth Day</div>
+          </div>
+          <div class="astro-stat-box">
+            <div class="label">Bhagyank</div>
+            <div class="value" style="color: var(--lavender);" id="numBhagyank">—</div>
+            <div class="hint">Destiny</div>
+          </div>
+        </div>
+
+        <div style="margin-top: 14px; text-align: center;">
+          <div style="font-size: 13px; font-weight: 700; color: var(--text);">3×3 Lo Shu Magic Square</div>
+          <div style="font-size: 11px; color: var(--text-muted);">Highlighted digits present in your birth date</div>
+        </div>
+
+        <div class="loshu-container" id="loshuGrid">
+        </div>
+
+        <div style="background: var(--card-elevated); padding: 12px; border-radius: 12px; font-size: 12px; color: var(--text-soft); margin-top: 10px;" id="loshuNote">
+          Add your birth date (Edit Details) to see your grid.
+        </div>
+      </div>
+
+      <!-- Signature Studio (Graphology) -->
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title"><span>✍️</span> Signature Studio & Graphology</div>
+          <button onclick="clearSignature()" style="background: none; border: 1px solid var(--border); color: var(--text-muted); padding: 3px 8px; border-radius: 6px; font-size: 11px; cursor: pointer;">Clear</button>
+        </div>
+        <p style="font-size: 12px; color: var(--text-soft);">Draw your signature below on your screen for instant on-device stroke analysis:</p>
+        <div class="signature-wrap">
+          <div class="sig-guide"></div>
+          <canvas id="sigCanvas"></canvas>
+        </div>
+        <div id="sigAnalysisBox" style="background: var(--card-elevated); padding: 12px; border-radius: 12px; font-size: 12px; color: var(--text-soft); margin-top: 10px;"><strong>Graphology Reading:</strong> Draw your signature above. Saathi measures your strokes on this device (slant, baseline, size) and explains what the tradition says.</div>
+      </div>
+    </section>
+
+
+    <!-- ==================== TAB 3: BODY & BMI ==================== -->
+    <section id="tab-body" class="tab-content">
+      <!-- Steps & Walk Session Card -->
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title"><span>🚶‍♂️</span> Steps & Walk Session</div>
+          <button id="btnWalkTimer" onclick="toggleWalkSession()" style="background: var(--mint); color: #0D0A1E; border: none; padding: 6px 14px; border-radius: 10px; font-size: 12px; font-weight: 700; cursor: pointer;">
+            ▶ Start Walk
+          </button>
+        </div>
+        <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-top: 6px;">
+          <div>
+            <div style="font-size: 32px; font-weight: 800; color: var(--mint);" id="bodyStepCount">0</div>
+            <div style="font-size: 11px; color: var(--text-muted);">Steps Today (walk timer estimates ~100 steps/min)</div>
+          </div>
+          <div style="text-align: right;">
+            <div style="font-size: 16px; font-weight: 700; color: var(--text);" id="bodyDistance">0.0 km • 0 kcal</div>
+            <div style="font-size: 11px; color: var(--text-muted);">Goal: 8,000 steps</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- BMI Health & Cutoffs -->
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title"><span>⚖️</span> BMI & Weight Range</div>
+          <label style="font-size: 11px; color: var(--text-soft); display: flex; align-items: center; gap: 4px; cursor: pointer;">
+            <input type="checkbox" id="chkAsianCutoff" checked onchange="updateBmiCalculations()"> Asian Cutoffs
+          </label>
+        </div>
+
+        <div style="display: flex; gap: 10px; margin: 8px 0;">
+          <div style="flex: 1;">
+            <label style="font-size: 11px; color: var(--text-muted);">Weight (kg)</label>
+            <input type="number" id="inpWeightVal" value="65" oninput="updateBmiCalculations()" style="width: 100%; padding: 10px; border-radius: 10px; border: 1px solid var(--border); background: var(--card-elevated); color: white; font-weight: 700;">
+          </div>
+          <div style="flex: 1;">
+            <label style="font-size: 11px; color: var(--text-muted);">Height (cm)</label>
+            <input type="number" id="inpHeightVal" value="170" oninput="updateBmiCalculations()" style="width: 100%; padding: 10px; border-radius: 10px; border: 1px solid var(--border); background: var(--card-elevated); color: white; font-weight: 700;">
+          </div>
+        </div>
+
+        <div id="bmiScoreCard" style="background: var(--card-elevated); padding: 14px; border-radius: 14px; margin-top: 6px;">
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <div>
+              <div style="font-size: 26px; font-weight: 800; color: var(--gold-light);" id="bmiNumberDisplay">22.5</div>
+              <div style="font-size: 11px; color: var(--text-muted);">Body Mass Index</div>
+            </div>
+            <div style="background: rgba(52, 211, 153, 0.2); border: 1px solid var(--mint); color: var(--mint); padding: 4px 12px; border-radius: 14px; font-size: 12px; font-weight: 700;" id="bmiCategoryLabel">
+              Optimal Harmony (Healthy)
+            </div>
+          </div>
+          <div style="font-size: 12px; color: var(--text-soft); margin-top: 10px;" id="bmiRangeText">
+            Healthy Target Range for 170cm: 53.5 kg – 66.2 kg (Asian cutoffs)
+          </div>
+          <p style="font-size: 12px; color: var(--lavender); margin-top: 6px; font-style: italic;">
+            “Your body is your lifelong temple. Celebrate its strength and nourish it with daily hydration and peaceful rest.”
+          </p>
+        </div>
+      </div>
+
+      <!-- Guided Routines Selector -->
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title"><span>🧘‍♀️</span> Guided Mobility Routines</div>
+        </div>
+        <div class="habit-item" onclick="triggerRoutine('neck')" style="cursor: pointer;">
+          <div class="habit-left">
+            <div class="habit-icon" style="background: rgba(244, 114, 182, 0.2); color: var(--rose);">💆</div>
+            <div class="habit-info">
+              <h4>Neck & Upper Back Relief</h4>
+              <p>Release cervical desk tension in 30s</p>
+            </div>
+          </div>
+          <button class="btn-habit-act">Start 30s</button>
+        </div>
+        <div class="habit-item" onclick="triggerRoutine('desk')" style="cursor: pointer;">
+          <div class="habit-left">
+            <div class="habit-icon" style="background: rgba(52, 211, 153, 0.2); color: var(--mint);">🧘</div>
+            <div class="habit-info">
+              <h4>Desk Mobility & Spinal Twist</h4>
+              <p>Reset spine alignment and breathing</p>
+            </div>
+          </div>
+          <button class="btn-habit-act">Start 30s</button>
+        </div>
+      </div>
+    </section>
+
+
+    <!-- ==================== TAB 4: GLOW ==================== -->
+    <section id="tab-glow" class="tab-content">
+      <div class="card" style="border-color: var(--rose);">
+        <div class="card-header">
+          <div class="card-title"><span>✨</span> Glow & Skin Vitality Check-in</div>
+          <span style="font-size: 11px; color: var(--rose); font-weight: 700;">Zero Medical Claims</span>
+        </div>
+        <p style="font-size: 13px; color: var(--text-soft); line-height: 1.5;">
+          Gentle daily beauty rituals for your skin barrier, hair vitality, and hand nourishment.
+        </p>
+
+        <!-- Mode Selectors -->
+        <div style="display: flex; gap: 8px; margin: 12px 0;">
+          <button onclick="setGlowMode('skin')" data-glow="skin" class="btn-habit-act" style="flex: 1; background: rgba(244, 114, 182, 0.2); border-color: var(--rose); color: var(--rose);">Face & Skin</button>
+          <button onclick="setGlowMode('hair')" data-glow="hair" class="btn-habit-act" style="flex: 1;">Hair & Scalp</button>
+          <button onclick="setGlowMode('nails')" data-glow="nails" class="btn-habit-act" style="flex: 1;">Nails & Hands</button>
+        </div>
+
+        <div style="background: var(--card-elevated); padding: 14px; border-radius: 14px;" id="glowRitual">
+          <h4 style="color: var(--gold-light); font-size: 14px;">☀️ Morning Skin Ritual</h4>
+          <p style="font-size: 12px; color: var(--text-soft); margin-top: 4px; line-height: 1.5;">
+            1. Splash face with lukewarm water<br>
+            2. Apply gentle hyaluronic serum onto damp skin<br>
+            3. Seal with barrier ceramides and broad-spectrum SPF 50+
+          </p>
+
+          <h4 style="color: var(--lavender); font-size: 14px; margin-top: 10px;">🌙 Evening Recovery Ritual</h4>
+          <p style="font-size: 12px; color: var(--text-soft); margin-top: 4px; line-height: 1.5;">
+            1. Double cleanse to remove sunscreen and city pollutants<br>
+            2. Centella asiatica (Cica) soothing essence<br>
+            3. Light peptide cream to assist skin cellular repair overnight
+          </p>
+        </div>
+
+        <div style="background: rgba(251, 113, 133, 0.1); border: 1px solid rgba(251, 113, 133, 0.3); border-radius: 12px; padding: 12px; margin-top: 12px; font-size: 11px; color: #FECDD3; line-height: 1.5;">
+          <strong>⚕️ Dermatologist Signpost:</strong> Wellness and cosmetic guidance only. For persistent irritation, cystic flares, or unusual pigmentation, always consult a qualified board-certified dermatologist.
+        </div>
+      </div>
+    </section>
+
+
+    <!-- ==================== TAB 5: ME & DOWNLOADS ==================== -->
+    <section id="tab-me" class="tab-content">
+      <!-- Profile Card -->
+      <div class="card" style="border-color: var(--gold);">
+        <div style="display: flex; align-items: center; gap: 14px;">
+          <div style="width: 52px; height: 52px; border-radius: 50%; background: var(--gold); color: #0D0A1E; display: flex; align-items: center; justify-content: center; font-size: 22px; font-weight: 800;"><span id="meInitial">S</span></div>
+          <div>
+            <div style="font-size: 18px; font-weight: 800; color: var(--text);" id="meName">Friend</div>
+            <div style="font-size: 12px; color: var(--gold);" id="meLevel">Level: Spark (0 pts)</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Prominent APK & Web App Download Section -->
+      <div class="card" style="background: linear-gradient(135deg, #241A4C, #150F33); border-color: var(--gold);">
+        <div class="card-header">
+          <div class="card-title"><span>📥</span> Download Android App & Web Options</div>
+        </div>
+        <p style="font-size: 13px; color: var(--text-soft); line-height: 1.5;">
+          Get Saathi permanently on all your devices:
+        </p>
+        <div style="display: flex; flex-direction: column; gap: 10px; margin-top: 12px;">
+          <a href="downloads/saathi.apk" class="btn-download-top" download="saathi.apk" style="justify-content: center; padding: 12px; font-size: 14px;">
+            <span>⬇️</span> Download Android APK Package (.apk)
+          </a>
+          <button onclick="promptPwaInstall()" style="background: var(--card-elevated); color: var(--cyan); border: 1px solid var(--cyan); padding: 10px; border-radius: 12px; font-size: 13px; font-weight: 700; cursor: pointer;">
+            📱 Add to Home Screen (Web App / PWA)
+          </button>
+        </div>
+        <p style="font-size: 11px; color: var(--text-muted); margin-top: 8px; text-align: center;">
+          The APK installs directly on any Android phone with zero Play Store requirement.
+        </p>
+      </div>
+
+      <!-- Big Five Personality: TIPI (10 questions) -->
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title"><span>🧠</span> Big Five Personality</div>
+          <span class="golden-sparkle">TIPI · 10 questions</span>
+        </div>
+        <div id="tipiBox" style="margin-top: 6px;"></div>
+        <p style="font-size: 10px; color: var(--text-muted); margin-top: 8px;">Ten-Item Personality Inventory (Gosling, Rentfrow &amp; Swann, 2003). A quick self-reflection tool, not a clinical test.</p>
+      </div>
+
+      <div class="card">
+        <div class="card-header"><div class="card-title"><span>🔒</span> Your data</div></div>
+        <p style="font-size: 12px; color: var(--text-soft); line-height: 1.5;">Everything you enter stays in this browser on this device. No account, no server, no AI key.</p>
+        <button onclick="resetAll()" style="margin-top: 10px; background: none; border: 1px solid var(--danger); color: var(--danger); padding: 8px 12px; border-radius: 10px; font-size: 12px; cursor: pointer;">Delete my data and start again</button>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Bottom Navigation Bar -->
+  <nav class="bottom-bar">
+    <button class="nav-btn active" onclick="switchTab('today')" id="nav-today">
+      <span class="nav-icon">✨</span>
+      <span>Today</span>
+    </button>
+    <button class="nav-btn" onclick="switchTab('stars')" id="nav-stars">
+      <span class="nav-icon">🪐</span>
+      <span>Stars</span>
+    </button>
+    <button class="nav-btn" onclick="switchTab('body')" id="nav-body">
+      <span class="nav-icon">🚶‍♂️</span>
+      <span>Body</span>
+    </button>
+    <button class="nav-btn" onclick="switchTab('glow')" id="nav-glow">
+      <span class="nav-icon">🌸</span>
+      <span>Glow</span>
+    </button>
+    <button class="nav-btn" onclick="switchTab('me')" id="nav-me">
+      <span class="nav-icon">👤</span>
+      <span>Me</span>
+    </button>
+  </nav>
+
+  <!-- Edit Birth Modal -->
+  <div id="birthModal" class="modal-overlay">
+    <div class="modal-box">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+        <h3 style="font-size: 17px; font-weight: 800; color: var(--text);" id="modalTitle">Edit Astrological Details</h3>
+        <button onclick="closeBirthModal()" style="background: none; border: none; color: var(--text-muted); font-size: 20px; cursor: pointer;">✕</button>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 12px;">
+        <div>
+          <label style="font-size: 12px; color: var(--text-muted);">Your Name</label>
+          <input type="text" id="modalInpName" value="" placeholder="What should Saathi call you?" style="width: 100%; padding: 10px; border-radius: 10px; border: 1px solid var(--border); background: var(--card-elevated); color: white;">
+        </div>
+        <div>
+          <label style="font-size: 12px; color: var(--text-muted);">Current City (for Rahu Kaal & Sunrise)</label>
+          <select id="modalInpCity" style="width: 100%; padding: 10px; border-radius: 10px; border: 1px solid var(--border); background: var(--card-elevated); color: white;"></select>
+        </div>
+        <div>
+          <label style="font-size: 12px; color: var(--text-muted);">Birth Date (optional, for your numbers and day score)</label>
+          <input type="date" id="modalInpDate" value="" style="width: 100%; padding: 10px; border-radius: 10px; border: 1px solid var(--border); background: var(--card-elevated); color: white;">
+        </div>
+        <label style="font-size: 12px; color: var(--text-soft); display: flex; gap: 8px; align-items: flex-start;">
+          <input type="checkbox" id="modalAdult" style="margin-top: 2px;"> I'm 18 or older. Saathi is for wellness and fun, not medical advice.
+        </label>
+        <p style="font-size: 11px; color: var(--text-muted);">Saved only in this browser on this device.</p>
+        <button onclick="saveBirthDetails()" class="btn-download-top" style="justify-content: center; padding: 12px; margin-top: 4px;">
+          Save &amp; Calculate My Day
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Audio Context Synthesizer (Zero-dependency authentic audio) -->
+  <script>
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    function playCookieCrackSound() {
+      if (!audioCtx) return;
+      try {
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(440, audioCtx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(110, audioCtx.currentTime + 0.15);
+        gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
+        gain.gain.linearRampToValueAtTime(0.01, audioCtx.currentTime + 0.15);
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start();
+        osc.stop(audioCtx.currentTime + 0.16);
+      } catch(e) {}
+    }
+  </script>
+
+  <!-- Saathi engine (real calculations) and app logic: offline, no server, no API key -->
+  <script src="js/saathi-core.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
