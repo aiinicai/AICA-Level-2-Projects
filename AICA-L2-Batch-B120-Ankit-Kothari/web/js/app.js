@@ -437,11 +437,14 @@
     window.updateBmiCalculations();
   }
 
-  window.addEventListener('load', () => {
+  function start() {
     initCanvas();
     window.setGlowMode('skin');
     renderAll();
     if (!state.profile) window.openBirthModal(true);
     setInterval(() => { renderSky(); renderHabits(); renderCookie(); }, 60000); // roll over at midnight and keep times fresh
-  });
+  }
+  // Start once the page is ready, even if this script was loaded late (e.g. by an online preview).
+  if (document.readyState === 'complete') start();
+  else window.addEventListener('load', start);
 })();

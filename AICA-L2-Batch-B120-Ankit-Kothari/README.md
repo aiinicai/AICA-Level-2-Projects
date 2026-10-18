@@ -1,9 +1,9 @@
 # Saathi: your daily companion for body, glow and stars
 
 **AICA Level 2 Capstone Project** · Participant: **Ankit Kothari** · Batch: **B120**
-Demo video: _add link_ · Live web app: _add link_
+**Open the live web app:** https://htmlpreview.github.io/?https://github.com/caexpert91/AICA-Level-2-Projects/blob/main/AICA-L2-Batch-B120-Ankit-Kothari/web/index.html
 
-> **Try it in 10 seconds, no install, no internet, no API key:** download this folder and double-click **`web/index.html`** (Chrome or Edge, phone or computer).
+> **Or offline, no install, no API key:** download this folder and double-click **`web/index.html`** (Chrome or Edge, phone or computer). The name you type in the welcome form is used; "Meera" in the screenshots is only the test user.
 
 ![Saathi screens](docs/screenshots/overview.jpg)
 
