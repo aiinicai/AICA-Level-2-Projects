@@ -6,11 +6,12 @@ All included examples are fictional.
 
 from pathlib import Path
 import json
+from io import BytesIO
 
 import pandas as pd
 import streamlit as st
 
-from src.reviewer import ELEMENTS, review_finding
+from src.reviewer import ELEMENTS, generate_ideal_issue, review_finding
 from src.guardrails import find_sensitive_looking_content, validate_review_input
 
 
@@ -59,6 +60,112 @@ def clean_text(value: object, fallback: str = "") -> str:
     if value is None or (isinstance(value, float) and pd.isna(value)):
         return fallback
     return str(value)
+
+
+MISSING_TEXT = "[Information missing in raw notes - Auditor to specify]"
+
+
+def ideal_issue_as_text(issue: dict[str, str]) -> str:
+    """Render the ideal issue in the requested 5-C report format."""
+    return "\n\n".join(
+        [
+            f"Observation Title: {issue['observation_title']}",
+            f"Risk Rating: {issue['risk_rating']}",
+            f"Process Owner: {issue['process_owner']}",
+            "Observation Summary\n" + issue["observation_summary"],
+            "Criteria (What should be)\n" + issue["criteria"],
+            "Condition (What is)\n" + issue["condition"],
+            "Cause (Why it happened)\n" + issue["cause"],
+            "Consequence / Impact (Why it matters)\n" + issue["consequence"],
+            "Corrective Action / Recommendation\n" + issue["corrective_action"],
+            "Risk rating basis (AI suggestion)\n" + issue["risk_rating_basis"],
+            "Auditor verification note\n" + issue["auditor_verification_note"],
+        ]
+    )
+
+
+def build_word_document(issue: dict[str, str]) -> bytes:
+    """Create a DOCX export in memory."""
+    from docx import Document
+
+    document = Document()
+    document.add_heading("AuditSense — Ideal Audit Issue", level=0)
+    document.add_paragraph(
+        "AI-generated advisory draft based only on fictional raw notes. "
+        "Auditor verification and approval are required."
+    )
+    document.add_heading(issue["observation_title"], level=1)
+    document.add_paragraph(f"Risk Rating: {issue['risk_rating']}")
+    document.add_paragraph(f"Process Owner: {issue['process_owner']}")
+    sections = [
+        ("Observation Summary", "observation_summary"),
+        ("Criteria (What should be)", "criteria"),
+        ("Condition (What is)", "condition"),
+        ("Cause (Why it happened)", "cause"),
+        ("Consequence / Impact (Why it matters)", "consequence"),
+        ("Corrective Action / Recommendation", "corrective_action"),
+        ("Risk rating basis (AI suggestion)", "risk_rating_basis"),
+        ("Auditor verification note", "auditor_verification_note"),
+    ]
+    for heading, key in sections:
+        document.add_heading(heading, level=2)
+        document.add_paragraph(issue[key])
+    output = BytesIO()
+    document.save(output)
+    return output.getvalue()
+
+
+def build_pdf_document(issue: dict[str, str]) -> bytes:
+    """Create a simple selectable-text PDF export in memory."""
+    from reportlab.lib.enums import TA_LEFT
+    from reportlab.lib.pagesizes import A4
+    from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
+    from reportlab.lib.units import inch
+    from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer
+
+    output = BytesIO()
+    document = SimpleDocTemplate(
+        output,
+        pagesize=A4,
+        rightMargin=0.8 * inch,
+        leftMargin=0.8 * inch,
+        topMargin=0.7 * inch,
+        bottomMargin=0.7 * inch,
+        title="AuditSense Ideal Audit Issue",
+    )
+    styles = getSampleStyleSheet()
+    body = ParagraphStyle(
+        "AuditBody", parent=styles["BodyText"], fontName="Helvetica", fontSize=10,
+        leading=14, alignment=TA_LEFT, spaceAfter=8,
+    )
+    heading = ParagraphStyle(
+        "AuditHeading", parent=styles["Heading2"], fontName="Helvetica-Bold",
+        fontSize=12, leading=15, spaceBefore=8, spaceAfter=4,
+    )
+    story = [
+        Paragraph("AuditSense — Ideal Audit Issue", styles["Title"]),
+        Paragraph(
+            "AI-generated advisory draft based only on fictional raw notes. "
+            "Auditor verification and approval are required.", body
+        ),
+        Paragraph(f"<b>Observation Title:</b> {issue['observation_title']}", body),
+        Paragraph(f"<b>Risk Rating:</b> {issue['risk_rating']}", body),
+        Paragraph(f"<b>Process Owner:</b> {issue['process_owner']}", body),
+    ]
+    sections = [
+        ("Observation Summary", "observation_summary"),
+        ("Criteria (What should be)", "criteria"),
+        ("Condition (What is)", "condition"),
+        ("Cause (Why it happened)", "cause"),
+        ("Consequence / Impact (Why it matters)", "consequence"),
+        ("Corrective Action / Recommendation", "corrective_action"),
+        ("Risk rating basis (AI suggestion)", "risk_rating_basis"),
+        ("Auditor verification note", "auditor_verification_note"),
+    ]
+    for heading_text, key in sections:
+        story.extend([Paragraph(heading_text, heading), Paragraph(issue[key], body)])
+    document.build(story)
+    return output.getvalue()
 
 
 st.title("🔎 AuditSense")
@@ -125,17 +232,22 @@ fictional_data_confirmed = st.checkbox(
     "I confirm that this input is fictional demonstration data and contains no customer, employee, or bank-confidential information.",
     value=False,
 )
-review_clicked = st.button("Review finding", type="primary", use_container_width=True)
+review_col, ideal_col = st.columns(2)
+with review_col:
+    review_clicked = st.button("Review finding", type="primary", use_container_width=True)
+with ideal_col:
+    ideal_issue_clicked = st.button("Generate ideal audit issue", use_container_width=True)
+
+request_payload = {
+    "title": title,
+    "process": process,
+    "draft_observation": draft_observation,
+    "evidence": evidence,
+    "criteria": criteria,
+}
 
 if review_clicked:
     st.session_state.pop("last_review", None)
-    request_payload = {
-        "title": title,
-        "process": process,
-        "draft_observation": draft_observation,
-        "evidence": evidence,
-        "criteria": criteria,
-    }
     input_errors = validate_review_input(request_payload)
     suspicious_patterns = find_sensitive_looking_content(request_payload)
     if not fictional_data_confirmed:
@@ -159,6 +271,27 @@ if review_clicked:
 
         if review:
             st.session_state["last_review"] = review
+
+if ideal_issue_clicked:
+    st.session_state.pop("last_ideal_issue", None)
+    input_errors = validate_review_input(request_payload)
+    suspicious_patterns = find_sensitive_looking_content(request_payload)
+    if not fictional_data_confirmed:
+        st.warning("Confirm that the input is fictional before generating an ideal audit issue.")
+    elif input_errors:
+        for message in input_errors:
+            st.error(message)
+    elif suspicious_patterns:
+        st.error("The ideal issue was blocked because the input looks potentially sensitive:")
+        for message in suspicious_patterns:
+            st.write(f"- {message}")
+        st.info("Remove the sensitive-looking content and use fictional examples only.")
+    else:
+        with st.spinner("Drafting the fictional ideal audit issue..."):
+            try:
+                st.session_state["last_ideal_issue"] = generate_ideal_issue(request_payload)
+            except Exception as error:
+                st.error(str(error))
 
 
 review = st.session_state.get("last_review")
@@ -211,7 +344,53 @@ if review:
     )
 
 
-st.markdown("### 4. Human review boundary")
+ideal_issue = st.session_state.get("last_ideal_issue")
+if ideal_issue:
+    st.markdown("### 4. Ideal audit issue — 5 C's format")
+    st.warning(
+        "This is an AI-generated advisory draft. Verify every fact, cause, impact, "
+        "risk rating, and recommendation against evidence before use."
+    )
+    st.markdown(f"**Observation Title:** {ideal_issue['observation_title']}")
+    st.markdown(f"**Risk Rating:** {ideal_issue['risk_rating']} *(AI suggestion — verify)*")
+    st.markdown(f"**Process Owner:** {ideal_issue['process_owner']}")
+    st.markdown("**Observation Summary**")
+    st.write(ideal_issue["observation_summary"])
+    for heading_text, key in [
+        ("Criteria (What should be)", "criteria"),
+        ("Condition (What is)", "condition"),
+        ("Cause (Why it happened)", "cause"),
+        ("Consequence / Impact (Why it matters)", "consequence"),
+        ("Corrective Action / Recommendation", "corrective_action"),
+    ]:
+        st.markdown(f"**{heading_text}**")
+        st.write(ideal_issue[key])
+    st.markdown("**Risk rating basis (AI suggestion)**")
+    st.write(ideal_issue["risk_rating_basis"])
+    st.markdown("**Auditor verification note**")
+    st.write(ideal_issue["auditor_verification_note"])
+
+    issue_text = ideal_issue_as_text(ideal_issue)
+    export_col_a, export_col_b, export_col_c = st.columns(3)
+    with export_col_a:
+        st.download_button(
+            "Download ideal issue TXT", data=issue_text,
+            file_name="auditsense_ideal_audit_issue.txt", mime="text/plain",
+        )
+    with export_col_b:
+        st.download_button(
+            "Download ideal issue Word", data=build_word_document(ideal_issue),
+            file_name="auditsense_ideal_audit_issue.docx",
+            mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        )
+    with export_col_c:
+        st.download_button(
+            "Download ideal issue PDF", data=build_pdf_document(ideal_issue),
+            file_name="auditsense_ideal_audit_issue.pdf", mime="application/pdf",
+        )
+
+
+st.markdown("### 5. Human review boundary")
 st.warning(
     "The auditor remains responsible for verifying evidence, assessing materiality "
     "and risk, deciding whether the finding is valid, and approving final wording."

@@ -83,6 +83,55 @@ risk assessment, professional judgment, and final approval.
 Return only the requested structured response.
 """.strip()
 
+IDEAL_ISSUE_SYSTEM_INSTRUCTIONS = """
+You are a seasoned Internal Audit Director and expert report writer.
+Transform only the supplied fictional raw field notes into a formal,
+executive-ready internal audit observation using the 5 Cs: Criteria,
+Condition, Cause, Consequence/Impact, and Corrective Action/Recommendation.
+
+Use a professional, objective, concise tone. Use passive voice for errors and
+active voice for recommendations. Do not invent data, metrics, policies,
+dates, causes, impacts, owners, or evidence. If critical information is not
+in the notes, write exactly:
+[Information missing in raw notes - Auditor to specify]
+
+Risk rating may be a cautious AI inference from the stated impact, but it is
+not an audit conclusion and must be verified by the auditor. Process owner
+must be extracted from the notes or use the required missing-information
+placeholder. Return only the requested structured response.
+""".strip()
+
+IDEAL_ISSUE_SCHEMA: dict[str, Any] = {
+    "type": "object",
+    "additionalProperties": False,
+    "properties": {
+        "observation_title": {"type": "string"},
+        "risk_rating": {"type": "string", "enum": ["High", "Medium", "Low"]},
+        "risk_rating_basis": {"type": "string"},
+        "process_owner": {"type": "string"},
+        "observation_summary": {"type": "string"},
+        "criteria": {"type": "string"},
+        "condition": {"type": "string"},
+        "cause": {"type": "string"},
+        "consequence": {"type": "string"},
+        "corrective_action": {"type": "string"},
+        "auditor_verification_note": {"type": "string"},
+    },
+    "required": [
+        "observation_title",
+        "risk_rating",
+        "risk_rating_basis",
+        "process_owner",
+        "observation_summary",
+        "criteria",
+        "condition",
+        "cause",
+        "consequence",
+        "corrective_action",
+        "auditor_verification_note",
+    ],
+}
+
 
 def _validate_review(review: dict[str, Any]) -> dict[str, Any]:
     """Apply a lightweight defensive check before displaying model output."""
@@ -160,3 +209,79 @@ def review_finding(payload: dict[str, str]) -> dict[str, Any]:
     except json.JSONDecodeError as error:
         raise RuntimeError("The model returned invalid JSON.") from error
     return _validate_review(parsed)
+
+
+def _validate_ideal_issue(issue: dict[str, Any]) -> dict[str, Any]:
+    """Validate the structured ideal-observation response before display/export."""
+    required = (
+        "observation_title",
+        "risk_rating",
+        "risk_rating_basis",
+        "process_owner",
+        "observation_summary",
+        "criteria",
+        "condition",
+        "cause",
+        "consequence",
+        "corrective_action",
+        "auditor_verification_note",
+    )
+    if set(issue) != set(required):
+        raise ValueError("The model returned an incomplete ideal audit issue.")
+    if issue["risk_rating"] not in {"High", "Medium", "Low"}:
+        raise ValueError("The model returned an invalid risk rating.")
+    if not all(isinstance(issue[key], str) and issue[key].strip() for key in required):
+        raise ValueError("The model returned incomplete ideal audit issue text.")
+    if len(issue["observation_title"].split()) > 10:
+        raise ValueError("The model returned a title longer than 10 words.")
+    return issue
+
+
+def generate_ideal_issue(payload: dict[str, str]) -> dict[str, Any]:
+    """Create a 5-C executive-ready issue from fictional raw notes."""
+    api_key = os.getenv("OPENAI_API_KEY", "").strip()
+    if not api_key:
+        raise RuntimeError(
+            "OPENAI_API_KEY is not configured. Add it to your local environment "
+            "before generating an ideal audit issue."
+        )
+
+    try:
+        from openai import OpenAI
+    except ImportError as error:
+        raise RuntimeError(
+            "The OpenAI package is not installed. Install requirements.txt first."
+        ) from error
+
+    model = os.getenv("OPENAI_MODEL", "gpt-4o-mini").strip() or "gpt-4o-mini"
+    client = OpenAI(api_key=api_key)
+    user_input = json.dumps(payload, ensure_ascii=False, indent=2)
+    response = client.responses.create(
+        model=model,
+        input=[
+            {"role": "system", "content": IDEAL_ISSUE_SYSTEM_INSTRUCTIONS},
+            {
+                "role": "user",
+                "content": (
+                    "Transform these fictional raw audit notes into the required "
+                    "5-C issue. Preserve unknowns explicitly.\n\n" + user_input
+                ),
+            },
+        ],
+        text={
+            "format": {
+                "type": "json_schema",
+                "name": "ideal_audit_issue",
+                "strict": True,
+                "schema": IDEAL_ISSUE_SCHEMA,
+            }
+        },
+    )
+    output_text = getattr(response, "output_text", "")
+    if not output_text:
+        raise RuntimeError("The model returned no structured ideal audit issue.")
+    try:
+        parsed = json.loads(output_text)
+    except json.JSONDecodeError as error:
+        raise RuntimeError("The model returned invalid ideal issue JSON.") from error
+    return _validate_ideal_issue(parsed)
