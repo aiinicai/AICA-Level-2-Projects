@@ -159,7 +159,7 @@ References and AED thresholds sit in `rules/law_refs.yaml` and `rules/params.yam
 | Evidence | Result |
 |---|---|
 | Automated tests (`pytest -q`) | **107 passed** |
-| Self-check (`python doctor.py`) | 19 passed, 2 warnings (optional OCR / LibreOffice), 0 failed |
+| Self-check (`python doctor.py`) | 0 failed; the warnings are optional tools (e.g. 18 passed, 1 warning on a PC with Tesseract OCR installed and LibreOffice missing) |
 | Seeded-error recall, FS pack | 22 of 22 seeded defect types found; the clean pack gives 0 exceptions |
 | Seeded-error recall, TP set | every seeded defect found; the clean set raises one expected ownership query |
 | Catalogue vs code | test fails if any check is marked implemented without a rule |
