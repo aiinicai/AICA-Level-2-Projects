@@ -163,11 +163,13 @@ def _show(json_path, docx_path):
               for r in data["results"] if r["status"] == "REVIEW" for f in r["findings"]]
     notrun = [{"Check": r["check"], "Why not run": r["note"]} for r in data["results"] if r["status"] == "NOTRUN"]
     sev = pd.Series([r["Severity"] for r in rows]).value_counts() if rows else pd.Series(dtype=int)
-    c = st.columns(4)
-    _card(c[0], "Exceptions", len(rows), NAVY)
-    _card(c[1], "High", int(sev.get("High", 0)), SEV["High"][1])
-    _card(c[2], "Medium", int(sev.get("Medium", 0)), SEV["Medium"][1])
-    _card(c[3], "Low", int(sev.get("Low", 0)), SEV["Low"][1])
+    n_exc = sum(1 for r in data["results"] if r["status"] == "EXC")
+    c = st.columns(5)
+    _card(c[0], "Checks with exceptions", n_exc, NAVY)
+    _card(c[1], "Findings", len(rows), NAVY)
+    _card(c[2], "High", int(sev.get("High", 0)), SEV["High"][1])
+    _card(c[3], "Medium", int(sev.get("Medium", 0)), SEV["Medium"][1])
+    _card(c[4], "Low", int(sev.get("Low", 0)), SEV["Low"][1])
     st.write("")
     if rows:
         def _paint(v):
@@ -183,10 +185,12 @@ def _show(json_path, docx_path):
     if notrun:
         with st.expander(f"Not checked - input missing or not readable ({len(notrun)})"):
             st.dataframe(pd.DataFrame(notrun), use_container_width=True, hide_index=True)
-    c1, c2 = st.columns(2)
+    c1, c2, c3 = st.columns(3)
     c1.download_button("⬇ Final Review Paper (DOCX)", Path(docx_path).read_bytes(), file_name=Path(docx_path).name)
     x = Path(docx_path).with_suffix(".xlsx")
     c2.download_button("⬇ Exception log (XLSX)", x.read_bytes(), file_name=x.name)
+    j = Path(json_path)
+    c3.download_button("⬇ Review run (JSON) for the Review workflow tab", j.read_bytes(), file_name=j.name, help="Upload this file on the Review workflow page (Load run into this round).")
     if data.get("milestones"):
         st.subheader("Clock schedule")
         st.dataframe(pd.DataFrame(data["milestones"]), use_container_width=True, hide_index=True)
