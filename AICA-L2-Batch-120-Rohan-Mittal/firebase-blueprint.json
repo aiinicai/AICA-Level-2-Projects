@@ -1,0 +1,285 @@
+{
+  "entities": {
+    "User": {
+      "title": "User Profile",
+      "description": "User profile with display name, email, phone number, and account status",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "email": { "type": "string", "maxLength": 255 },
+        "email_verified": { "type": "boolean" },
+        "display_name": { "type": "string", "maxLength": 80 },
+        "phone_number": { "type": "string", "maxLength": 30 },
+        "avatar_url": { "type": "string", "maxLength": 1000 },
+        "is_deleted": { "type": "boolean" },
+        "push_tokens": { "type": "array" },
+        "created_at": { "type": "string", "format": "date-time" },
+        "updated_at": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "email", "display_name", "created_at", "updated_at"]
+    },
+    "Friendship": {
+      "title": "Friendship",
+      "description": "Direct connection between two users for sharing non-group expenses",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "users": { "type": "array" },
+        "sender_id": { "type": "string", "maxLength": 128 },
+        "receiver_id": { "type": "string", "maxLength": 128 },
+        "receiver_email": { "type": "string", "maxLength": 255 },
+        "status": { "type": "string", "enum": ["pending", "accepted", "declined"] },
+        "created_at": { "type": "string", "format": "date-time" },
+        "updated_at": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "users", "sender_id", "status", "created_at", "updated_at"]
+    },
+    "Group": {
+      "title": "Expense Group",
+      "description": "A group with members, category, and shared expenses",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "name": { "type": "string", "maxLength": 80 },
+        "category": { "type": "string", "enum": ["Trip", "Office", "Friends", "Home", "Other"] },
+        "currency": { "type": "string", "maxLength": 3 },
+        "invite_code": { "type": "string", "maxLength": 32 },
+        "created_by": { "type": "string", "maxLength": 128 },
+        "member_ids": { "type": "array" },
+        "archived_at": { "type": "string", "format": "date-time" },
+        "created_at": { "type": "string", "format": "date-time" },
+        "updated_at": { "type": "string", "format": "date-time" }
+      },
+      "required": [
+        "id",
+        "name",
+        "category",
+        "currency",
+        "invite_code",
+        "created_by",
+        "member_ids",
+        "created_at",
+        "updated_at"
+      ]
+    },
+    "GroupMember": {
+      "title": "Group Member",
+      "description": "A participant in a group, optionally linked to a User account or a named placeholder",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "group_id": { "type": "string", "maxLength": 128 },
+        "user_id": { "type": "string", "maxLength": 128 },
+        "name": { "type": "string", "maxLength": 80 },
+        "email": { "type": "string", "maxLength": 255 },
+        "avatar_url": { "type": "string", "maxLength": 1000 },
+        "role": { "type": "string", "enum": ["admin", "member"] },
+        "claim_token": { "type": "string", "maxLength": 128 },
+        "claim_token_expires_at": { "type": "string", "format": "date-time" },
+        "joined_at": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "group_id", "name", "role", "joined_at"]
+    },
+    "Expense": {
+      "title": "Expense",
+      "description": "An expense in a group or directly between two friends",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "group_id": { "type": "string", "maxLength": 128 },
+        "friendship_id": { "type": "string", "maxLength": 128 },
+        "participant_uids": { "type": "array" },
+        "description": { "type": "string", "maxLength": 200 },
+        "amount_units": { "type": "integer" },
+        "currency": { "type": "string", "maxLength": 3 },
+        "category": {
+          "type": "string",
+          "enum": [
+            "Food & Drink",
+            "Transport",
+            "Accommodation",
+            "Entertainment",
+            "Groceries",
+            "Utilities",
+            "Other"
+          ]
+        },
+        "paid_by_member_id": { "type": "string", "maxLength": 128 },
+        "paid_by_uid": { "type": "string", "maxLength": 128 },
+        "split_type": { "type": "string", "enum": ["EQUAL", "EXACT", "PERCENTAGE"] },
+        "expense_date": { "type": "string", "maxLength": 10 },
+        "note": { "type": "string", "maxLength": 500 },
+        "created_by": { "type": "string", "maxLength": 128 },
+        "splits": { "type": "array" },
+        "created_at": { "type": "string", "format": "date-time" },
+        "updated_at": { "type": "string", "format": "date-time" }
+      },
+      "required": [
+        "id",
+        "participant_uids",
+        "description",
+        "amount_units",
+        "currency",
+        "category",
+        "paid_by_uid",
+        "split_type",
+        "expense_date",
+        "created_by",
+        "splits",
+        "created_at",
+        "updated_at"
+      ]
+    },
+    "Settlement": {
+      "title": "Settlement",
+      "description": "A payment settling debt in a group or directly between friends",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "group_id": { "type": "string", "maxLength": 128 },
+        "friendship_id": { "type": "string", "maxLength": 128 },
+        "participant_uids": { "type": "array" },
+        "from_member_id": { "type": "string", "maxLength": 128 },
+        "to_member_id": { "type": "string", "maxLength": 128 },
+        "from_uid": { "type": "string", "maxLength": 128 },
+        "to_uid": { "type": "string", "maxLength": 128 },
+        "amount_units": { "type": "integer" },
+        "currency": { "type": "string", "maxLength": 3 },
+        "settled_on": { "type": "string", "maxLength": 10 },
+        "note": { "type": "string", "maxLength": 500 },
+        "created_by": { "type": "string", "maxLength": 128 },
+        "created_at": { "type": "string", "format": "date-time" }
+      },
+      "required": [
+        "id",
+        "participant_uids",
+        "from_uid",
+        "to_uid",
+        "amount_units",
+        "currency",
+        "settled_on",
+        "created_by",
+        "created_at"
+      ]
+    },
+    "Notification": {
+      "title": "In-App Notification",
+      "description": "Notification for reminders, friend requests, and financial updates",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "recipient_uid": { "type": "string", "maxLength": 128 },
+        "sender_uid": { "type": "string", "maxLength": 128 },
+        "sender_name": { "type": "string", "maxLength": 80 },
+        "type": {
+          "type": "string",
+          "enum": [
+            "reminder",
+            "friend_request",
+            "friend_accepted",
+            "expense_added",
+            "settlement_recorded"
+          ]
+        },
+        "title": { "type": "string", "maxLength": 120 },
+        "message": { "type": "string", "maxLength": 500 },
+        "target_type": { "type": "string", "enum": ["group", "friend", "expense", "settlement"] },
+        "target_id": { "type": "string", "maxLength": 128 },
+        "currency": { "type": "string", "maxLength": 3 },
+        "amount_units": { "type": "integer" },
+        "is_read": { "type": "boolean" },
+        "created_at": { "type": "string", "format": "date-time" }
+      },
+      "required": [
+        "id",
+        "recipient_uid",
+        "sender_uid",
+        "type",
+        "title",
+        "message",
+        "is_read",
+        "created_at"
+      ]
+    },
+    "Activity": {
+      "title": "Activity Log",
+      "description": "Audit trail of group and friend expense activity",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "group_id": { "type": "string", "maxLength": 128 },
+        "friendship_id": { "type": "string", "maxLength": 128 },
+        "participant_uids": { "type": "array" },
+        "actor_uid": { "type": "string", "maxLength": 128 },
+        "actor_name": { "type": "string", "maxLength": 80 },
+        "action": { "type": "string", "maxLength": 50 },
+        "description": { "type": "string", "maxLength": 200 },
+        "currency": { "type": "string", "maxLength": 3 },
+        "amount_units": { "type": "integer" },
+        "created_at": { "type": "string", "format": "date-time" }
+      },
+      "required": [
+        "id",
+        "participant_uids",
+        "actor_uid",
+        "actor_name",
+        "action",
+        "description",
+        "created_at"
+      ]
+    },
+    "Invitation": {
+      "title": "Invitation",
+      "description": "Public group invite or friend link lookup",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "type": { "type": "string", "enum": ["group", "friend"] },
+        "code": { "type": "string", "maxLength": 32 },
+        "group_id": { "type": "string", "maxLength": 128 },
+        "sender_uid": { "type": "string", "maxLength": 128 },
+        "sender_name": { "type": "string", "maxLength": 80 },
+        "created_at": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "type", "code", "sender_uid", "created_at"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "User" },
+      "description": "User profiles"
+    },
+    "/friendships/{friendshipId}": {
+      "schema": { "$ref": "Friendship" },
+      "description": "Direct friendships between two users"
+    },
+    "/groups/{groupId}": {
+      "schema": { "$ref": "Group" },
+      "description": "Shared expense groups"
+    },
+    "/groups/{groupId}/members/{memberId}": {
+      "schema": { "$ref": "GroupMember" },
+      "description": "Group member records"
+    },
+    "/expenses/{expenseId}": {
+      "schema": { "$ref": "Expense" },
+      "description": "Group and friend expenses"
+    },
+    "/settlements/{settlementId}": {
+      "schema": { "$ref": "Settlement" },
+      "description": "Debt settlement records"
+    },
+    "/notifications/{notificationId}": {
+      "schema": { "$ref": "Notification" },
+      "description": "User notifications and reminders"
+    },
+    "/activity/{activityId}": {
+      "schema": { "$ref": "Activity" },
+      "description": "Activity timeline events"
+    },
+    "/invitations/{invitationId}": {
+      "schema": { "$ref": "Invitation" },
+      "description": "Shareable invite tokens"
+    }
+  }
+}
