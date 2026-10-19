@@ -2,7 +2,7 @@
 ### Partner / Manager Review Automation for UAE audit and tax files - AICA Level 2 Capstone Project
 
 **Participant:** Sijin.KR (M.No 217826) | **Batch:** AICA-L2-B120-Abu Dhabi | **Folder:** `AICA-L2-Batch-120-Sijin-KR`
-**Stack:** Python 3.10-3.13, Streamlit, python-docx, openpyxl, pdfplumber, PyYAML | **Status:** working prototype, 103 automated tests passing
+**Stack:** Python 3.10-3.13, Streamlit, python-docx, openpyxl, pdfplumber, PyYAML | **Status:** working prototype, 107 automated tests passing
 
 > **Software finds and records; the reviewer decides and signs.**
 > An **offline** tool (no cloud calls, no telemetry) that reads the working papers, runs a rule catalogue of **180 review checks**, and hands the Manager and Partner a **Final Review Paper that lists only exceptions, each with page or cell evidence**. A four-level workflow (Preparer > First reviewer > Manager > Partner) tracks corrections and sign-offs with date and time.
@@ -158,7 +158,7 @@ References and AED thresholds sit in `rules/law_refs.yaml` and `rules/params.yam
 ## 9. Quality assurance
 | Evidence | Result |
 |---|---|
-| Automated tests (`pytest -q`) | **103 passed** |
+| Automated tests (`pytest -q`) | **107 passed** |
 | Self-check (`python doctor.py`) | 19 passed, 2 warnings (optional OCR / LibreOffice), 0 failed |
 | Seeded-error recall, FS pack | 22 of 22 seeded defect types found; the clean pack gives 0 exceptions |
 | Seeded-error recall, TP set | every seeded defect found; the clean set raises one expected ownership query |
@@ -188,7 +188,7 @@ rules/          catalogue.yaml (180 checks), params.yaml, law_refs.yaml, workflo
 samples/        synthetic inputs (FS, liquidation, ABC TP set, locked CT demo, forensic) + generators
 sample_outputs/ ready-made review papers for each module
 templates/      blank fact sheet, liquidation tracker, BIRF
-tests/          103 tests         docs/  user guide, CT/TP steps, screenshots
+tests/          107 tests         docs/  user guide, CT/TP steps, screenshots
 ```
 
 ## 13. Licence and confidentiality
