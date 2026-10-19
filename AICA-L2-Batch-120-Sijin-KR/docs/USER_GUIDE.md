@@ -57,7 +57,7 @@ Every review file is re-opened after it is written (Word, Excel, JSON); a broken
 ## Review workflow (First review -> Manager -> Partner)
 Tab **Review workflow**. Levels, names, roles and who may waive a point are in `rules/workflow.yaml`.
 1. Create the engagement (reference, module, client, period).
-2. **L1 round:** the first reviewer loads the review run (.json from the module tab). Every exception becomes a numbered review point; add manual points for judgement items. Clear, reopen (reason) each point and **Close the round**.
+2. **L1 round:** the first reviewer loads the review run (the **Review run (JSON)** download on each module result, or the .json in `out/` from the command line). Every exception becomes a numbered review point; add manual points for judgement items. Clear, reopen (reason) each point and **Close the round**.
 3. Open points send the file **back to the preparer**, who answers each (Corrected / Disputed / Not applicable / Will correct next version, comment required for disputes) and submits.
 4. The reviewer loads the **re-run**: points no longer found are auto-cleared; points claimed corrected but still found are **reopened**; new findings are added.
 5. When no point is open the file passes to **Manager review**, then **Partner review**. Partner closing with nothing open = **sign-off** (locked). Manager/Partner may waive a point with a reason.
@@ -110,7 +110,7 @@ All are optional; a check whose input is missing shows **Not run**, never Pass. 
 |---|---|---|
 | Bank statement (Excel/CSV) | Date, Narration, Beneficiary Name, Beneficiary IBAN, Debit, Credit, Balance | FA-12: payments outside the vendor master or into another account, employee/related accounts, swept balance, pass-through, payments missing from the GL |
 | Authorised-signatory mandate | Name, Designation, Single signing limit, Joint signing above, Specimen (image file), Valid from, Valid to | FA-11 |
-| Signatures folder | `signature_register.xlsx` (Document, Date, Amount, Claimed Signatory, Second Signatory, Image) plus the image files | FA-11: authority, limits, copy-pasted images, resemblance to the specimen |
+| Signatures (upload box, or a folder with **Browse…**) | `signature_register.xlsx` (Document, Date, Amount, Claimed Signatory, Second Signatory, Image) plus the image files: PNG, JPG, TIF, BMP, WebP or PDF scans, specimens included, all selected together | FA-11: authority, limits, copy-pasted images, resemblance to the specimen |
 | FS data | Item, CY, PY with lines such as Revenue, Cost of sales, Receivables, Inventories, Payables, Net profit, Operating cash flow, Total assets | FA-13: ratios, Beneish M-score, FS vs GL, year-end cut-off |
 | Stock register | Item, Location, Opening Qty, GRN Qty, Issued Qty, Adjustment Qty, Closing Book Qty, Physical Count Qty, Unit Cost, Invoiced Sales Qty, Invoiced Purchases Qty | FA-14 |
 | Public holidays | dates `YYYY-MM-DD` (`--holidays`, or the box on the Forensic page) | FA-05; check them against the official UAE calendar |
