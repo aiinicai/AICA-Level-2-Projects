@@ -205,6 +205,58 @@ def convert_pr_to_po(db: Session, pr_id: int, vendor_code: str, tax_code: str = 
     db.refresh(po)
     return po
 
+def apply_po_inventory_receipt(db: Session, po: models.PurchaseOrder) -> None:
+    """
+    When a Purchase Order is approved, automatically increment inventory on hand
+    and append an incoming stock movement to the Stock Movement Ledger.
+    """
+    for pol in po.lines:
+        target_item = None
+        if pol.item_code:
+            target_item = db.query(models.InventoryItem).filter(models.InventoryItem.item_code == pol.item_code).first()
+        if not target_item and pol.description:
+            desc_clean = pol.description.strip().lower()
+            target_item = db.query(models.InventoryItem).filter(
+                (func.lower(models.InventoryItem.item_code) == desc_clean) |
+                (func.lower(models.InventoryItem.name) == desc_clean)
+            ).first()
+            if not target_item:
+                target_item = db.query(models.InventoryItem).filter(
+                    models.InventoryItem.name.ilike(f"%{pol.description.strip()}%")
+                ).first()
+
+        if target_item:
+            pol.item_code = target_item.item_code
+            existing_mov = db.query(models.StockMovement).filter(
+                models.StockMovement.reference_doc == po.po_number,
+                models.StockMovement.item_code == target_item.item_code
+            ).first()
+
+            if not existing_mov:
+                old_qty = target_item.stock_quantity or 0.0
+                target_item.stock_quantity = old_qty + pol.quantity
+                pol.received_qty = pol.quantity
+
+                # Recalculate weighted average unit cost
+                if target_item.stock_quantity > 0:
+                    old_cost = target_item.cost_price or 0.0
+                    new_val = (max(0.0, old_qty) * old_cost) + (pol.quantity * pol.unit_price)
+                    target_item.cost_price = round(new_val / target_item.stock_quantity, 2)
+
+                line_amt = round(pol.quantity * pol.unit_price, 2)
+                db.add(models.StockMovement(
+                    movement_date=po.po_date,
+                    item_code=target_item.item_code,
+                    item_name=target_item.name,
+                    movement_type="PURCHASE_RECEIPT",
+                    reference_doc=po.po_number,
+                    quantity=pol.quantity,
+                    unit_cost=pol.unit_price,
+                    total_cost=line_amt,
+                    notes=f"Purchased from {po.vendor_code} on PO {po.po_number}"
+                ))
+    db.commit()
+
 def approve_grn_and_post_gl(db: Session, grn_id: int, approver: str = "Checker (Finance Manager)") -> models.GoodsReceiptNote:
     grn = db.query(models.GoodsReceiptNote).filter(models.GoodsReceiptNote.id == grn_id).first()
     if not grn:
@@ -244,26 +296,47 @@ def approve_grn_and_post_gl(db: Session, grn_id: int, approver: str = "Checker (
         target_item = None
         if line.item_code:
             target_item = db.query(models.InventoryItem).filter(models.InventoryItem.item_code == line.item_code).first()
-        if not target_item:
-            target_item = db.query(models.InventoryItem).filter(models.InventoryItem.name.ilike(line.description.strip())).first()
+        if not target_item and line.description:
+            desc_clean = line.description.strip().lower()
+            target_item = db.query(models.InventoryItem).filter(
+                (func.lower(models.InventoryItem.item_code) == desc_clean) |
+                (func.lower(models.InventoryItem.name) == desc_clean)
+            ).first()
+            if not target_item:
+                target_item = db.query(models.InventoryItem).filter(
+                    models.InventoryItem.name.ilike(f"%{line.description.strip()}%")
+                ).first()
 
         if target_item:
-            target_item.stock_quantity += line.received_qty
-            # Update weighted average cost price
-            if target_item.stock_quantity > 0:
-                target_item.cost_price = line.unit_price
-            # Log stock movement
-            db.add(models.StockMovement(
-                movement_date=grn.grn_date,
-                item_code=target_item.item_code,
-                item_name=target_item.name,
-                movement_type="PURCHASE_RECEIPT",
-                reference_doc=grn.grn_number,
-                quantity=line.received_qty,
-                unit_cost=line.unit_price,
-                total_cost=line_amt,
-                notes=f"Purchase receipt via GRN {grn.grn_number} (PO: {grn.po_number})"
-            ))
+            line.item_code = target_item.item_code
+            # Check if stock movement for this PO & item was already recorded by PO creation
+            existing_mov = db.query(models.StockMovement).filter(
+                models.StockMovement.reference_doc == grn.po_number,
+                models.StockMovement.item_code == target_item.item_code
+            ).first()
+
+            if not existing_mov:
+                old_qty = target_item.stock_quantity or 0.0
+                target_item.stock_quantity = old_qty + line.received_qty
+                # Update weighted average cost price
+                if target_item.stock_quantity > 0:
+                    old_cost = target_item.cost_price or 0.0
+                    new_val = (max(0.0, old_qty) * old_cost) + (line.received_qty * line.unit_price)
+                    target_item.cost_price = round(new_val / target_item.stock_quantity, 2)
+                # Log stock movement
+                db.add(models.StockMovement(
+                    movement_date=grn.grn_date,
+                    item_code=target_item.item_code,
+                    item_name=target_item.name,
+                    movement_type="PURCHASE_RECEIPT",
+                    reference_doc=grn.grn_number,
+                    quantity=line.received_qty,
+                    unit_cost=line.unit_price,
+                    total_cost=line_amt,
+                    notes=f"Purchase receipt via GRN {grn.grn_number} (PO: {grn.po_number})"
+                ))
+            else:
+                existing_mov.notes = f"Purchase receipt verified via GRN {grn.grn_number} (PO: {grn.po_number})"
 
     voucher_lines.append({
         "account_code": "2010",  # GRN Accrual Account
@@ -528,27 +601,42 @@ def approve_ar_invoice_and_post_gl(db: Session, invoice_id: int, approver: str =
         target_item = None
         if line.item_code:
             target_item = db.query(models.InventoryItem).filter(models.InventoryItem.item_code == line.item_code).first()
-        if not target_item:
-            target_item = db.query(models.InventoryItem).filter(models.InventoryItem.name.ilike(line.description.strip())).first()
+        if not target_item and line.description:
+            desc_clean = line.description.strip().lower()
+            target_item = db.query(models.InventoryItem).filter(
+                (func.lower(models.InventoryItem.item_code) == desc_clean) |
+                (func.lower(models.InventoryItem.name) == desc_clean)
+            ).first()
+            if not target_item:
+                target_item = db.query(models.InventoryItem).filter(
+                    models.InventoryItem.name.ilike(f"%{line.description.strip()}%")
+                ).first()
 
         if target_item:
-            target_item.stock_quantity = max(0.0, target_item.stock_quantity - line.quantity)
-            line_cost = round(line.quantity * target_item.cost_price, 2)
-            total_cogs_amount += line_cost
-            cogs_breakdown.append(f"{target_item.name}: ${line_cost}")
+            line.item_code = target_item.item_code
+            existing_mov = db.query(models.StockMovement).filter(
+                models.StockMovement.reference_doc == inv.invoice_number,
+                models.StockMovement.item_code == target_item.item_code
+            ).first()
 
-            # Log stock movement
-            db.add(models.StockMovement(
-                movement_date=inv.invoice_date,
-                item_code=target_item.item_code,
-                item_name=target_item.name,
-                movement_type="SALES_DISPATCH",
-                reference_doc=inv.invoice_number,
-                quantity=-line.quantity,
-                unit_cost=target_item.cost_price,
-                total_cost=line_cost,
-                notes=f"Sold to {inv.customer_code} on Invoice {inv.invoice_number}"
-            ))
+            if not existing_mov:
+                target_item.stock_quantity = max(0.0, (target_item.stock_quantity or 0.0) - line.quantity)
+                line_cost = round(line.quantity * (target_item.cost_price or 0.0), 2)
+                total_cogs_amount += line_cost
+                cogs_breakdown.append(f"{target_item.name}: ${line_cost}")
+
+                # Log stock movement
+                db.add(models.StockMovement(
+                    movement_date=inv.invoice_date,
+                    item_code=target_item.item_code,
+                    item_name=target_item.name,
+                    movement_type="SALES_DISPATCH",
+                    reference_doc=inv.invoice_number,
+                    quantity=-line.quantity,
+                    unit_cost=target_item.cost_price or 0.0,
+                    total_cost=line_cost,
+                    notes=f"Sold to {inv.customer_code} on Invoice {inv.invoice_number}"
+                ))
 
     if total_cogs_amount > 0:
         cogs_vno = get_next_sequence_number(db, "GL-COGS", models.JournalVoucher, "voucher_no")

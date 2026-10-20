@@ -1282,7 +1282,7 @@ window.onGRNPOSelect = async () => {
       <td class="p-2.5 text-right font-mono">${l.quantity}</td>
       <td class="p-2.5 text-right font-mono">${l.received_qty}</td>
       <td class="p-2.5 text-right">
-        <input type="number" step="0.5" max="${remaining}" min="0.1" value="${remaining}" data-poline="${l.id}" data-acc="${l.account_code}" data-desc="${l.description}" data-price="${l.unit_price}" class="grn-line-qty w-full border rounded px-2 py-1 text-right font-mono bg-white focus:outline-none text-xs">
+        <input type="number" step="0.5" max="${remaining}" min="0.1" value="${remaining}" data-poline="${l.id}" data-itemcode="${l.item_code || ''}" data-acc="${l.account_code}" data-desc="${l.description}" data-price="${l.unit_price}" class="grn-line-qty w-full border rounded px-2 py-1 text-right font-mono bg-white focus:outline-none text-xs">
       </td>
     `;
     tbody.appendChild(tr);
@@ -1304,6 +1304,7 @@ window.submitGRN = async () => {
     if (qty > 0) {
       lines.push({
         po_line_id: Number(inp.getAttribute("data-poline")),
+        item_code: inp.getAttribute("data-itemcode") || null,
         account_code: inp.getAttribute("data-acc"),
         description: inp.getAttribute("data-desc"),
         received_qty: qty,
@@ -2236,11 +2237,19 @@ window.submitARInvoice = async () => {
   const price = Number(document.getElementById("ar-inv-price").value) || 0;
   const disc = Number(document.getElementById("ar-inv-discount").value) || 0;
   const tax = document.getElementById("ar-inv-tax").value;
-  const itemCode = document.getElementById("ar-inv-item-select")?.value || null;
+  let itemCode = document.getElementById("ar-inv-item-select")?.value || null;
 
   if (!cust || !desc || qty <= 0 || price <= 0) {
     alert("Please fill in Customer, Description, Quantity and Unit Price");
     return;
+  }
+
+  // Fallback: match by description against inventory items if dropdown was not chosen
+  if (!itemCode && window.ERP_STATE.inventory) {
+    const matched = window.ERP_STATE.inventory.find(
+      (it) => it.name.trim().toLowerCase() === desc.toLowerCase() || it.item_code.trim().toLowerCase() === desc.toLowerCase()
+    );
+    if (matched) itemCode = matched.item_code;
   }
 
   const payload = {
@@ -2273,8 +2282,11 @@ window.submitARInvoice = async () => {
 
     alert("Sales Invoice posted and GL & Inventory updated immediately!");
     window.closeARInvoiceModal();
-    window.loadARData();
-    window.loadInventory();
+    await window.loadARData();
+    await window.loadInventory();
+    await window.loadInventoryMovements();
+    await loadDashboardKPIs();
+    await window.loadVouchers();
   } catch (err) {
     alert("Error: " + err.message);
   }
@@ -4920,12 +4932,22 @@ window.openNewPOModal = () => {
     vSel.innerHTML += `<option value="${v.vendor_code}">${v.name} (${v.vendor_code})</option>`;
   });
 
+  // Populate Product (SKU) select dropdown for PO
+  const poItemSel = document.getElementById("po-form-item-select");
+  if (poItemSel) {
+    poItemSel.innerHTML = '<option value="">-- Choose Stock Product or Custom Item --</option>';
+    (window.ERP_STATE.inventory || []).forEach((it) => {
+      poItemSel.innerHTML += `<option value="${it.item_code}">${it.name} (${it.item_code}) - Stock: ${it.stock_quantity} ${it.unit} - Cost: $${it.cost_price.toFixed(2)}</option>`;
+    });
+  }
+
   const accSel = document.getElementById("po-form-account");
   accSel.innerHTML = "";
   window.ERP_STATE.accounts
     .filter((a) => a.account_type === "Expense" || a.account_type === "Asset")
     .forEach((a) => {
-      accSel.innerHTML += `<option value="${a.account_code}">${a.account_code} - ${a.account_name}</option>`;
+      const isSelected = a.account_code === "1200" ? "selected" : "";
+      accSel.innerHTML += `<option value="${a.account_code}" ${isSelected}>${a.account_code} - ${a.account_name}</option>`;
     });
 
   const tSel = document.getElementById("po-form-tax");
@@ -4935,7 +4957,44 @@ window.openNewPOModal = () => {
   });
 
   document.getElementById("po-form-delivery").value = new Date(Date.now() + 14 * 86400000).toISOString().split("T")[0];
+  document.getElementById("po-form-desc").value = "Merchandise Stock Purchase";
+  document.getElementById("po-form-qty").value = 1;
+  document.getElementById("po-form-price").value = 10.00;
+
+  window.calcPOLive();
   document.getElementById("modal-new-po").classList.remove("hidden");
+};
+
+window.onPOItemSelect = () => {
+  const code = document.getElementById("po-form-item-select")?.value;
+  if (!code) return;
+  const item = (window.ERP_STATE.inventory || []).find((i) => i.item_code === code);
+  if (item) {
+    document.getElementById("po-form-desc").value = item.name;
+    document.getElementById("po-form-price").value = item.cost_price > 0 ? item.cost_price : (item.selling_price * 0.7).toFixed(2);
+    const accSel = document.getElementById("po-form-account");
+    if (accSel) {
+      const invAccOpt = Array.from(accSel.options).find((o) => o.value === "1200");
+      if (invAccOpt) accSel.value = "1200";
+    }
+    window.calcPOLive();
+  }
+};
+
+window.calcPOLive = () => {
+  const qty = Number(document.getElementById("po-form-qty")?.value) || 0;
+  const price = Number(document.getElementById("po-form-price")?.value) || 0;
+  const taxCode = document.getElementById("po-form-tax")?.value || "VAT-STD-5";
+
+  const taxObj = (window.ERP_STATE.taxCodes || []).find((t) => t.code === taxCode);
+  const rate = taxObj ? taxObj.rate : 5.0;
+
+  const net = Math.max(0, qty * price);
+  const tax = Math.round(net * (rate / 100.0) * 100) / 100;
+  const tot = Math.round((net + tax) * 100) / 100;
+
+  const totalEl = document.getElementById("po-live-total");
+  if (totalEl) totalEl.textContent = fmtMoney(tot);
 };
 
 window.closeNewPOModal = () => {
@@ -4950,10 +5009,19 @@ window.submitDirectPO = async () => {
   const qty = Number(document.getElementById("po-form-qty").value) || 0;
   const price = Number(document.getElementById("po-form-price").value) || 0;
   const tax = document.getElementById("po-form-tax").value;
+  let itemCode = document.getElementById("po-form-item-select")?.value || null;
 
   if (!vendor || !desc || qty <= 0 || price <= 0) {
     alert("Please fill in Vendor, Description, Quantity, and Unit Price");
     return;
+  }
+
+  // Fallback: match by description against inventory items if dropdown was not chosen
+  if (!itemCode && window.ERP_STATE.inventory) {
+    const matched = window.ERP_STATE.inventory.find(
+      (it) => it.name.trim().toLowerCase() === desc.toLowerCase() || it.item_code.trim().toLowerCase() === desc.toLowerCase()
+    );
+    if (matched) itemCode = matched.item_code;
   }
 
   try {
@@ -4965,7 +5033,7 @@ window.submitDirectPO = async () => {
         delivery_date: delDate,
         vendor_code: vendor,
         tax_code: tax,
-        lines: [{ description: desc, account_code: acc, quantity: qty, unit_price: price }]
+        lines: [{ item_code: itemCode, description: desc, account_code: acc, quantity: qty, unit_price: price }]
       })
     });
     if (!res.ok) {
@@ -4973,9 +5041,13 @@ window.submitDirectPO = async () => {
       throw new Error(err.detail || "PO creation failed");
     }
 
-    alert("Purchase Order created and approved successfully!");
+    alert("Purchase Order created and approved successfully! Stock and movement ledger updated.");
     window.closeNewPOModal();
-    window.loadPOs();
+    await window.loadPOs();
+    await window.loadInventory();
+    await window.loadInventoryMovements();
+    await loadDashboardKPIs();
+    await window.loadVouchers();
   } catch (err) {
     alert("Error: " + err.message);
   }
@@ -5427,6 +5499,17 @@ window.loadInventory = async () => {
         arItemSel.innerHTML += `<option value="${it.item_code}">${it.name} (${it.item_code}) - Stock: ${it.stock_quantity} ${it.unit} - $${it.selling_price.toFixed(2)}</option>`;
       });
     }
+
+    const poItemSel = document.getElementById("po-form-item-select");
+    if (poItemSel) {
+      poItemSel.innerHTML = '<option value="">-- Choose Stock Product or Custom Item --</option>';
+      items.forEach((it) => {
+        poItemSel.innerHTML += `<option value="${it.item_code}">${it.name} (${it.item_code}) - Stock: ${it.stock_quantity} ${it.unit} - Cost: $${it.cost_price.toFixed(2)}</option>`;
+      });
+    }
+
+    // Keep movements ledger in sync
+    await window.loadInventoryMovements();
   } catch (err) {
     console.error("Error loading inventory:", err);
   }

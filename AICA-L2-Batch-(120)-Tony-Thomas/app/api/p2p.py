@@ -154,6 +154,10 @@ def create_po(
     db.add(po)
     db.commit()
     db.refresh(po)
+
+    if status == "Approved":
+        crud.apply_po_inventory_receipt(db, po)
+
     po.vendor_name = po.vendor.name if po.vendor else ""
     return po
 

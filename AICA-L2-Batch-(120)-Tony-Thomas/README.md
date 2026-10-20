@@ -19,6 +19,13 @@ Small businesses often keep separate records for invoices, supplier bills, inven
 - Trial balance, profit and loss, balance sheet and dashboard reports.
 - Browser-side print, PDF and spreadsheet export interfaces.
 
+## Latest application update
+
+- Purchase-order entry includes a product selector, default inventory account, unit cost and live totals with VAT.
+- Approved purchase orders update inventory, with protection against repeating the same receipt.
+- Sales invoices update stock and accounting entries; product matching and stock movement refreshes have been improved.
+- New company identifiers use the highest existing company number, avoiding collisions after companies are removed.
+
 ## Technology
 
 FastAPI, SQLAlchemy, SQLite, Pydantic and Jinja2 power the Python backend. The interface uses HTML/JavaScript and externally hosted libraries including Tailwind CSS, Chart.js, SheetJS and jsPDF. Internet access is needed for those interface assets; financial records are stored locally.
@@ -71,6 +78,8 @@ run.bat              Windows launcher
 ## Validation
 
 The sanitized submission was copied to an isolated scratch directory for validation. Checks passed for page rendering and ten application routes, including company/account lists, AR/AP lists, inventory and financial reports. Database checks confirmed 24 accounts and zero startup customers, vendors, invoices or journals. A balanced journal was saved and verified in a new database session; an unbalanced journal was rejected.
+
+The updated copy also passed fictional-data checks for an approved purchase order receiving ten units exactly once, a sales invoice deducting two units, the resulting stock movements and balanced journals, and company numbering after a gap in the registry. These checks cover a single-product scenario; they do not certify every procurement or inventory workflow.
 
 The original verification scripts are included as development aids. **Run them only in a disposable copy:** several reset the database, seed demo records or change company profiles. The complete legacy test suite and every export/UI workflow have not been certified by the submission preparation checks.
 

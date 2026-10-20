@@ -64,6 +64,7 @@ def process_approval_action(req: GlobalApprovalAction, db: Session = Depends(get
         if req.action == "approve":
             po.status = "Approved"
             po.approved_by = req.approved_by
+            crud.apply_po_inventory_receipt(db, po)
         else:
             po.status = "Rejected"
             po.rejection_comment = req.comment

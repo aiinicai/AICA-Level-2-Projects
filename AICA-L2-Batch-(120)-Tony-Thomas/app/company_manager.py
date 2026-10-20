@@ -107,7 +107,17 @@ def create_new_company(
         raise ValueError("Security PIN must be exactly 4 digits (e.g. 1234)")
     
     companies = load_companies()
-    new_id = f"comp_{len(companies) + 1}"
+    max_idx = 0
+    for c in companies:
+        cid = c.get("id", "")
+        if cid.startswith("comp_"):
+            try:
+                num = int(cid.split("_")[1])
+                if num > max_idx:
+                    max_idx = num
+            except (ValueError, IndexError):
+                pass
+    new_id = f"comp_{max_idx + 1}"
     db_file = os.path.join(COMPANIES_DIR, f"{new_id}.db")
     
     new_comp = {
