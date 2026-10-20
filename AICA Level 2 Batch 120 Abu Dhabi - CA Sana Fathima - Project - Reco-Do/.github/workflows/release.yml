@@ -1,0 +1,30 @@
+name: Release
+
+# Push a tag like v1.1.2 to build RecoDo-Setup.exe (installs Reco-Do) and RecoDo.exe (the app itself, no install)
+# and attach them to a GitHub Release. The release is versioned by its tag, so the file names carry no version.
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
+      # scripts/package.mjs builds straight into release/ on CI (CI=true).
+      - run: npm run dist
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            release/RecoDo-Setup.exe
+            release/RecoDo.exe
