@@ -49,4 +49,8 @@ Audio is stored only on device. It leaves the device once for analysis and is no
 
 ## Screenshots
 
-_Add screenshots of Home, Recording, Results and Progress here._
+| Home | Recording | Results | Progress |
+| --- | --- | --- | --- |
+| ![Home](docs/screenshots/home.png) | ![Recording](docs/screenshots/recording.png) | ![Results](docs/screenshots/results.png) | ![Progress](docs/screenshots/progress.png) |
+
+_Results and Progress show sample practice sessions._
