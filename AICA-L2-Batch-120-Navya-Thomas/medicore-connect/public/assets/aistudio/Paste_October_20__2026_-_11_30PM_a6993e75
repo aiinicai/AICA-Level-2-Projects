@@ -1,0 +1,239 @@
+# UPDATE PROMPT — MediCore Connect ERP (apply to the existing app; do NOT rebuild from scratch)
+
+## 0. HOW TO WORK ON THIS UPDATE
+
+You are the same principal architect and chartered accountant who built this app. I am reviewing the app and found defects and gaps. **Modify the existing codebase in place.** Keep the plum/amber design, the 15 business units, the chart of accounts, the posting engine, sequences, the seed data and everything that already works. Do not delete features. Where the data model changes, write a **one-time migration** that upgrades the data already stored in the browser (IndexedDB) and bump the data version. Also make **Reset Demo Data** produce the corrected data from scratch.
+
+Rules for this update:
+1. Fix the root cause, not the symptom. Business rules must be enforced in the service/posting layer, not only by hiding buttons.
+2. No half-done work: every button, link, tile, filter and form listed below must work end to end.
+3. After the changes, **run through the Test Checklist in section 10** and fix whatever fails. Finish with a short **Change Report** that lists what was changed per item (1 to 8) and which tests passed.
+4. If the work does not fit in one response, deliver it in the phases of section 11, finishing each fully before the next and ending with "Ready for Phase X".
+
+---
+
+## 1. ACCESS CONTROL: VIEW FOR ALL, ONE MAKER AND ONE APPROVER PER MODULE
+
+### 1.1 Rule
+- **Every signed-in user has view-only access to every module, report and document.**
+- **Each module has exactly one named Maker (creates and edits data) and exactly one named Approver (approves or rejects).** Nobody else can create, edit, submit, approve or reject in that module.
+- The Maker and the Approver of a module must be different people, and nobody can approve a document they created (keep the existing segregation-of-duties rule).
+- Enforce this in the service layer (reject the call with a clear error) and in the UI (hide or disable controls with a tooltip such as "Only the Payables Maker (Omar Haddad) can create invoices").
+
+### 1.2 Access matrix (seed exactly this; it is editable only by the CFO in Tools → Access and Roles)
+
+| Module | Maker (create/edit/submit) | Approver | Approval limit |
+|---|---|---|---|
+| Procurement (Requisitions, Purchase Orders) | Liam Carter | Daniel Reed | Unlimited |
+| Supply Chain Execution (Receiving/GRN, Inventory, Stock Transfers, Consumption, Adjustments) | Noah Bennett (new user, Store Controller) | Charlotte Davis | AED 250,000 (above this: Pending Higher Approval → Daniel Reed) |
+| Payables | Omar Haddad | Charlotte Davis | AED 250,000 (higher → Daniel Reed) |
+| Receivables | Sofia Marin | Charlotte Davis | AED 250,000 (higher → Daniel Reed) |
+| Fixed Assets | Henry Brooks | Daniel Reed | Unlimited |
+| Cash Management (Petty Cash, Main Cash, Bank Statements and Reconciliation) | Aisha Khan | Charlotte Davis | AED 250,000 (higher → Daniel Reed) |
+| Intercompany Accounting | Emma Collins (new user, Intercompany Accountant) | Daniel Reed | Unlimited |
+| General Accounting (Journals, COA changes) | Charlotte Davis | Daniel Reed | Unlimited |
+| Period Close, Access and Roles, Reset Demo Data | Daniel Reed (CFO) | n/a | n/a |
+| Reports, Tools (viewing) | View for everyone | n/a | n/a |
+
+Add the two new users: `noah.bennett / Noah@2026` and `emma.collins / Emma@2026`. Keep all existing users and passwords (Charlotte's login stays `charlotte.davis / Charlotte@2026`). Update the sign-in "Demo credentials" box to list all 8 users with their module roles. Charlotte is therefore Maker for General Accounting and Approver for Supply Chain Execution, Payables, Receivables and Cash Management. Re-assign the seed data's created-by and approved-by fields so they respect this matrix (for example, all AP invoices created by Omar and approved by Charlotte or Daniel).
+
+### 1.3 How access must be shown clearly
+- **Tools → Access and Roles** page: the matrix above as a table (Module, Maker, Approver, Limit) plus a "My Access" card for the signed-in user listing "Viewer on all modules; Maker on: …; Approver on: …".
+- **Every module page** shows a slim banner under the title: `Access: You are a Viewer | Maker: Omar Haddad | Approver: Charlotte Davis` (the current user's role is highlighted).
+- Create/Edit/Submit/Delete/Cancel buttons appear only for the Maker. Approve/Reject buttons appear only for the Approver. Everyone else sees read-only pages with the buttons hidden or disabled with a tooltip.
+- The home-page tiles still open for everyone (view mode). The Quick Actions that create data are shown with a small lock icon for non-makers and open a message explaining who can perform the action.
+- Notifications (bell) and Worklist (flag) show items awaiting **this user's** action only.
+
+---
+
+## 2. PROCUREMENT FIXES
+
+### 2.1 Routing problem
+The Procurement tab tiles and quick actions currently all open the Purchase Orders screen. Give every app and quick action its own route and screen:
+- **Purchase Requisitions** tile → Requisitions work area (own route).
+- **Purchase Orders** tile → Purchase Orders work area.
+- Quick actions: **Create Requisition** → requisition form; **Manage Requisitions** → requisitions list; **Create Order** → PO form; **Manage Orders** → PO list; **Approve Orders** → PO approval queue; **Approve Requisitions** → requisition approval queue.
+- Procurement Dashboard remains (open POs, GRNI, spend by category, top suppliers, requisitions awaiting approval).
+
+### 2.2 Create Requisition (Maker: Liam Carter)
+Open a full-page form (not a popup) with:
+- **Header:** Requisition number (auto, sequential REQ-2026-NNNNNN, shown read-only on save), Business Unit, Requester (default the user), Department, Requisition date (default today), Need-by date, Requisition type (Goods / Services / Capital Asset), Delivery location (sub-inventory or BU address), Priority (Normal/Urgent), Justification (required), Attachments (simulated).
+- **Lines (add/remove rows):** Item (lookup from item master; or free-text for services), Description, Item class, UoM, Quantity, Estimated unit price, Estimated amount (calculated), Suggested supplier (lookup, optional), Charge account (default from item class), Department, Capital item flag with Asset category (required when Capital), Need-by date.
+- **Totals:** subtotal, estimated VAT (by tax code), grand total.
+- **Buttons:** Save as Draft, Submit for Approval, Cancel. Validation: at least one line, quantity > 0, price ≥ 0, capital lines must have an asset category.
+- **Statuses:** Draft → Pending Approval → Approved / Rejected → Partially Converted → Converted to PO; Cancelled. A requisition creates **no accounting entries**.
+- **Requisition detail page** (click the number): header, lines, status history, approver comments, **related POs** (links), audit trail, and actions by role: Maker (Edit if Draft/Rejected, Submit, Cancel, **Create PO from Requisition** if Approved), Approver (Approve/Reject with reason).
+- **Manage Requisitions** list with filters (section 4) and status tiles.
+
+### 2.3 Create Order (Maker: Liam Carter)
+Full-page form:
+- **Header:** PO number (auto, PO-2026-NNNNNN), Business Unit, Supplier and Supplier site (lookup; only approved/active suppliers), Buyer (default the user), PO date, Order type (Goods / Services / Capital), Currency (AED), Payment terms (default from supplier), Delivery location, Required date, **Receipt matching** (Yes for goods and capital, optional for services), Notes, Attachments.
+- **Lines:** Item, Description, Item class, UoM, Quantity, Unit price, Tax code, Line amount, Charge account, Department, Capital flag with Asset category, Need-by date, **Source requisition number** (when created from a requisition).
+- **Create from requisition:** a button "Add lines from approved requisitions" opens a picker of approved, unconverted requisition lines for the BU; selecting lines copies them with quantities and updates the requisition's converted quantity/status. Direct creation without a requisition is allowed for the Maker.
+- **Totals and tax** summary. Save as Draft, Submit for Approval, Cancel. A PO is **received against and invoiced only after it is Approved**.
+- Statuses: Draft → Pending Approval → Approved → (Partially Received / Received) → (Partially Invoiced / Invoiced) → Closed; Rejected; Cancelled. A PO creates **no GL entries** (accounting starts at receipt or invoice).
+
+### 2.4 PO detail page (click the PO number anywhere)
+Open `/procurement/orders/:id` showing: header, supplier and site, status chip with maker/approver, lines with ordered / received / invoiced quantities and amounts, **Related documents** (source requisitions, receipts/GRNs, AP invoices, payments, with links), **View Accounting** (shows accounting from the related receipts and invoices), status history, audit trail, attachments, Print/Download PDF, and role-based actions (Edit/Submit/Cancel for Maker; Approve/Reject for Approver; **Create Receipt** for Supply Chain Maker; **Create Invoice** link for the Payables Maker).
+
+---
+
+## 3. SUPPLY CHAIN EXECUTION: GRN "VIEW ACCOUNTING" SHOWS NOTHING
+
+**Defect:** GRN/receipt rows show status Posted, but View Accounting is empty. This means status was set to Posted without running the posting engine (likely in the seed and/or the status update code).
+
+Fix it properly:
+1. **Status must be derived from the engine.** A receipt can be "Posted" only through `createAccounting()` + `postToGL()`; it must store its `subledgerEntryId` and `glJournalId`. Remove any code path that sets Posted directly.
+2. **Receipt flow with maker–checker:** Draft → Pending Approval → Approved → Posted (Noah Bennett creates; Charlotte approves; on approval the engine posts automatically). A receipt can be created only against an **Approved PO** and cannot exceed the open PO quantity (tolerance 0%).
+3. **Accounting per the template:** stock items Dr Inventory (1200/1210/1220/1230 by item class) / Cr GRNI 2010, valued at PO price; services/non-stock per PO receipt-matching flag; the BU on every line is the receiving BU.
+4. **View Accounting button on every supply-chain document** (Receipt, Stock Transfer, Consumption, Inventory Adjustment) opens a panel/table with the subledger lines (Account, Description, BU, Debit, Credit), totals, the **GL journal number as a link**, and posting date. For documents not yet posted show "Accounting will be created on approval" with a preview of the expected lines.
+5. **Repair existing data (one-time migration + corrected seed):** find every receipt, transfer, consumption and adjustment that is Posted/Received without an accounting entry and generate the correct entries and GL journals using the original document date (flag the journals as `Source: Seed Repair` in the audit log; this is allowed to post into already-closed seed periods). Update `Reset Demo Data` so the seed always routes these documents through the engine.
+6. Add these checks to the **System Integrity Check** page: (a) no Posted document without a GL journal, in any module; (b) GRNI balance = value of received-but-uninvoiced receipt lines; (c) inventory subledger value = GL 1200–1230 by BU.
+7. Also verify that **Inventory On-hand** and the item cost update when a receipt is posted, and that the AP invoice matched to that receipt clears GRNI (Dr 2010 / Dr 5040 PPV / Dr 1400 / Cr 2000).
+
+---
+
+## 4. FILTERS NOT WORKING IN ANY MODULE
+
+Build **one reusable DataTable + `useTableFilters` hook** and migrate **every list screen in every module** to it (Invoices, Payments, Transactions, Receipts, Requisitions, Orders, GRNs, Stock, Assets, Source Lines, Vouchers, Bank Statements, IC transactions, Journals, Audit Trail, Suppliers, Customers, Items, and all report preview tables). Required behaviour:
+- **Filter bar** above every table: free-text search (case-insensitive, partial match across number, counterparty, description, reference), Status, Business Unit (including "All"), Date From / Date To (inclusive), counterparty (supplier/customer), amount From / To, Maker, Approver, and module-specific fields (for example, Category for assets, Source for journals, Period for GL). Dropdown options come from actual data.
+- **Column header filters** (text, select, date range, number range) and sorting on every column.
+- **Summary tiles act as filters** (clicking "Pending 59" filters the table to exactly those 59; the tile count and the table count always agree). Show a highlighted active tile.
+- **Right-side Search panel** (as in the reference) uses the same engine, with **Search** and **Reset** buttons; keep the "at least one criterion" hint only where it is genuinely required, and never block a valid search.
+- **Active filter chips** with × to remove one filter, "Clear all", and a "N of M records" counter. Filters combine with AND. Changing a filter resets paging to page 1. Totals rows and exports (Excel/PDF/CSV) respect the active filters.
+- **Persist filters in the URL query string** so refresh/back keeps them.
+- Typical root causes to eliminate: comparing date strings instead of date values (use ISO dates/`Date` consistently and compare at day level), status label vs status code mismatches, BU id vs BU code mismatches, filtering only the current page, stale memoised data after a status change, case-sensitive matching, and unfiltered tile counts.
+- Report parameter screens (GL, Trial Balance, financial statements, module reports) must also honour **Year, Period, Date range, Account range, BU, "All Units", group selections, Status, Source** correctly. Test with known data and confirm totals tie to the unfiltered totals when the filter is "All".
+
+---
+
+## 5. EVERY DOCUMENT NUMBER IS A LINK
+
+Create a central **Document Link Registry** (prefix → route) and one `<DocLink number />` component, and use it **everywhere a document number appears**: list tables, summary tiles, dashboards, GL journal lines (source document), View Accounting panels, related-documents panels, reports shown on screen, notifications, worklist, global search results, audit trail, approval queues, reconciliation screens, and cross-references inside detail pages.
+
+| Prefix | Opens |
+|---|---|
+| REQ | Requisition detail |
+| PO | PO detail |
+| RCV (GRN) | Receipt detail |
+| STO / ADJ / CNS | Stock transfer / adjustment / consumption detail |
+| PINV / PCM | AP invoice / AP credit memo detail |
+| PAY | AP payment detail |
+| RINV / RCM | AR invoice / AR credit memo detail |
+| RCT | AR receipt detail |
+| PCV / MCV / CTR | Petty cash voucher / main cash voucher / cash transfer detail |
+| BST | Bank statement detail and reconciliation |
+| FA-nnnnnn / FAB | Asset detail / addition batch |
+| ICI / ICC / ICJ | Intercompany invoice / credit note / journal detail |
+| JV / SLA journal numbers | GL journal detail |
+
+**Every document has a detail page** (route per type, header, lines, status chip, Maker and Approver, approval actions, **Related Documents** with links in both directions, **View Accounting** with the GL journal link, audit trail, attachments, Print/PDF, "Back" breadcrumb). The GL journal detail shows its source document as a link back to the originating document. Ensure supplier and customer names link to their master/ledger pages and BU codes link to a BU summary.
+
+---
+
+## 6. AUDIT OF ALL "CREATE" OPTIONS AND FORMS
+
+Go through **every Create / Add / New / Import / Run button and Quick Action** in all modules and make sure it opens a proper form (full page or side drawer) with the required fields, validation, **Save as Draft** and **Submit for Approval**, automatic sequential numbering, and a success toast with the new number as a link. Forms and minimum fields:
+
+| Module | Form | Minimum fields |
+|---|---|---|
+| Procurement | Requisition | As section 2.2 |
+| Procurement | Purchase Order | As section 2.3 |
+| Supply Chain | Receipt (GRN) | BU, PO (lookup; Approved only), supplier (auto), receipt date, delivery note no., lines (PO line, ordered/received-to-date/receiving qty, lot, expiry date for expiry-tracked items, sub-inventory), notes |
+| Supply Chain | Stock Transfer | From BU/sub-inventory, To BU/sub-inventory, date, lines (item, qty, cost auto) → creates intercompany transaction for cross-BU |
+| Supply Chain | Consumption | BU, department, sub-inventory, date, lines (item, qty), purpose |
+| Supply Chain | Inventory Adjustment | BU, sub-inventory, date, reason (expiry, damage, count), lines (item, +/- qty) |
+| Supply Chain | Item / Supplier / Customer master | All master fields; new records are Inactive until the module Approver approves |
+| Payables | AP Invoice / Credit Memo | As section 8.1 of the original spec (header, PO-matched lines, tax, capital flag) |
+| Payables | Payment | BU, supplier, bank account, payment date, method, select approved unpaid invoices (full/partial), total |
+| Payables | Import Invoices | CSV template download, upload, validation report, create drafts |
+| Receivables | AR Invoice / Credit Memo | BU, customer, class, service line, reference, date, terms, lines, tax, insurance/patient split |
+| Receivables | Receipt | BU, customer, bank/cash, date, amount, method, apply to invoices |
+| Cash Management | Petty Cash Voucher | BU, fund, date, payee, expense account, description, amount, tax code, receipt flag |
+| Cash Management | Main Cash Expense / Deposit / Transfer / Replenishment | BU, accounts, date, amount, description, reference |
+| Cash Management | Bank Statement | BU, bank account, statement dates, opening/closing balance, lines or CSV import |
+| Fixed Assets | Add Asset (manual) / Prepare Source Lines / Adjust / Transfer / Retire / Run Depreciation | Category, cost, in-service date, life, location, units; adjustment reason; target BU; retirement type, proceeds, date; depreciation period |
+| Intercompany | IC Invoice / IC Credit Note / IC Journal | Provider BU, receiver BU, type, date, lines with accounts, tax, original invoice link (credit note) |
+| General Accounting | Manual Journal / Import Journals / Reverse | Header (BU(s), period, date, category, description), lines (BU, account, department, Dr, Cr), balance check, CSV upload, reversal date/reason |
+
+Any create action that currently opens the wrong page, an empty page, a list instead of a form, or errors out must be fixed. Forms must be restricted to the module Maker (section 1).
+
+---
+
+## 7. MAKER–CHECKER EVERYWHERE, INCLUDING GL JOURNALS
+
+**Defect:** manual GL journals currently post directly with no approval path. Fix it, and then review every module so nothing posts without a checker.
+
+**General Accounting:**
+- Manual Journal lifecycle: Draft → **Submit for Approval** → Pending Approval → Approved → Posted. Charlotte Davis (Maker) creates and submits; **Daniel Reed (Approver)** approves or rejects (reason mandatory). Posting to the GL happens **only on approval** and balances are not updated before that.
+- **Manage Approvals for Journals** screen: a queue of pending journals with lines preview, Approve/Reject (single and bulk), comments. Journals in Pending Approval are visible to all but read-only.
+- **Reverse Journal** and **Import Journals** also create Pending Approval journals.
+- Journals generated from subledgers (Payables, Receivables, Fixed Assets, Cash, Supply Chain, Intercompany) are already approved at source; show their approval status as "Approved at source: [document number]" with the approver's name, and post automatically as before.
+- Status filter and tiles on the Journals page: Draft, Pending Approval, Approved, Posted, Rejected, Reversed.
+
+**Make sure every one of these items has Maker and Checker (per the matrix in 1.2) and posts only after approval:** Requisition, Purchase Order, Receipt/GRN, Stock Transfer, Consumption, Inventory Adjustment, AP Invoice, AP Credit Memo, AP Payment, AR Invoice, AR Credit Memo, AR Receipt, Petty Cash Voucher, Main Cash Expense, Cash Deposit/Transfer, Petty Cash Replenishment, Bank Reconciliation (finalise), Fixed Asset Addition (validation then approval), Asset Adjustment/Transfer/Retirement, Depreciation Run, Intercompany Invoice (receiver acceptance plus Approver), Intercompany Credit Note, Intercompany Journal, Manual Journal, COA changes, new master records, Period Close/Re-open (CFO only).
+
+**Worklist:** the flag icon on the header opens "My Approvals" showing everything awaiting the signed-in user, grouped by module, with Approve/Reject buttons, bulk approve, filters and links to the document. Approvers see a count badge on the bell and on Things to Finish.
+
+---
+
+## 8. CHART OF ACCOUNTS SCREEN
+
+Add the COA under **General Accounting** (new app tile **Chart of Accounts** and new quick actions **Manage Chart of Accounts** and **Create Account**), and also link it from Tools → Administration.
+
+Build it like an enterprise COA page:
+- **Hierarchy/tree view** with collapsible rollup groups (for example: 1000–1099 Cash and Bank; 1100–1199 Receivables; 1200–1299 Inventories; 1300–1499 Prepayments and Other Current Assets; 1500 Intercompany; 1600–1699 CWIP; 1700–1799 PPE Cost; 1800–1899 Accumulated Depreciation; 2000–2099 Trade and Other Payables; 2100–2199 Tax Payables; 2200–2299 Employee Liabilities; 2300 Contract Liabilities; 2400 Tax; 2500 Intercompany; 2600 Leases; 2700 Borrowings; 3000 Equity; 4000–4999 Revenue; 5000–5999 Cost of Sales; 6000–6999 Operating Expenses; 7000–7999 Other Income/Expenses/Tax), plus a flat **table view** toggle.
+- Columns: Account code, Name, Account type, Normal balance (Dr/Cr), **IFRS statement line**, Current/Non-current, Subledger source (Payables, Receivables, Inventory, Fixed Assets, Cash, Intercompany, None), **Control account (Y/N)**, **Manual journal allowed (Y/N)**, Status (Active/Inactive), Current YTD balance for the selected BU.
+- **Filters** (using the reusable filter engine): code range, name search, type, IFRS line, control flag, status, BU (balance column updates).
+- **Account detail page:** definition, IFRS mapping, balance by BU and by period (table and chart), and a **drill-down to the account's ledger lines** (each line with its document number as a link).
+- **Segments tab:** Business Units list (15 units with type and status) and Departments list, so the full accounting flexfield (BU – Account – Department) is visible. Add an **Account Combination Inquiry** (BU × Account balances with filter).
+- **Create / Edit Account** (Maker: Charlotte Davis; Approver: Daniel Reed): code (4 digits, unique, within the type's range), name, type, normal balance, IFRS line (dropdown of the statement lines used by the financial statements), current/non-current, control flag, manual journal allowed, subledger source, status. Validation: cannot delete an account with transactions (inactivate only; inactivation blocked if balance ≠ 0), cannot change the type of an account with postings, changes go through approval and are logged.
+- **Export** the COA to Excel/PDF/CSV.
+- Make sure the Reports engine (Trial Balance, GL, IFRS statements) reads the COA and its IFRS mapping from this single source, so a mapping change flows into the financial statements.
+
+---
+
+## 9. CROSS-CUTTING REQUIREMENTS
+- **System Integrity Check** must be extended with: no posted document without a journal; every approved document has a distinct maker and approver per matrix; no journal posted without approval (except system-sourced); document-link coverage test (every document number rendered anywhere resolves to an existing detail page); filter consistency (tile counts equal filtered table counts).
+- **Audit Trail** logs every create, edit, submit, approve, reject, post, reverse and access-matrix change with user, time, module and document link.
+- Keep everything responsive and consistent with the existing design system; every new page needs loading, empty and error states.
+
+---
+
+## 10. TEST CHECKLIST (run all and fix failures before finishing)
+
+**Access**
+1. Sign in as `omar.haddad`: can create/edit AP invoices; cannot create AR invoices or POs; can view every module read-only; cannot approve.
+2. Sign in as `charlotte.davis`: can approve AP/AR/Cash/Supply-Chain items created by others; cannot approve her own journal; sees the Access and Roles page and the banner on every module.
+3. Attempt (via UI and via a direct service call) to approve a document as its creator, and to create data as a non-maker: both are rejected with a clear message.
+
+**Procurement**
+4. As Liam: Procurement → Purchase Requisitions opens the requisitions list (not POs); **Create Requisition** opens the full form; save draft, submit; Daniel approves; "Create PO from Requisition" pre-fills the PO form; submit and approve the PO.
+5. Click any PO number anywhere (list, GRN, invoice, dashboard, GL source) → PO detail with lines, related receipts and invoices.
+
+**GRN accounting**
+6. As Noah: create a receipt against the approved PO; Charlotte approves; **View Accounting shows Dr Inventory / Cr GRNI** and a GL journal link; inventory on-hand increases. Existing receipts that were "Posted" now show correct entries too, and the Integrity Check shows green for "no posted document without journal" and "GRNI = uninvoiced receipts".
+
+**Filters**
+7. On every list screen, apply Status, BU, date range, counterparty and text filters singly and combined; counts, tiles and exports agree; filters survive refresh; Clear all works. GL report with Account range + BU + dates returns correct lines; Trial Balance for "All Units" equals the sum of all individual BUs.
+
+**Links and forms**
+8. Click document numbers in at least 15 different places (tables, GL lines, notifications, View Accounting, related documents, dashboards, search) and confirm each opens the right detail page. Open every Create form listed in section 6 and save one draft in each module.
+
+**Maker–checker in GL**
+9. Charlotte creates and submits a manual journal; it shows Pending Approval and does not affect the Trial Balance; Daniel approves it in Manage Approvals for Journals; it posts, the TB updates, and the journal appears with status Posted. Rejection returns it to Charlotte with the reason.
+10. Walk one document of each type in the list in section 7 through Maker → Approver → GL and confirm the GL entry only appears after approval.
+
+**COA**
+11. Open General Accounting → Chart of Accounts; switch tree/table; filter by type and control flag; drill from an account to ledger lines and then to a source document; create a new account (pending approval), approve it, and confirm it is available in journals and appears in the right line of the Trial Balance and financial statements.
+
+---
+
+## 11. BUILD PHASES
+- **Phase A:** Access matrix, new users, enforcement layer, banners, Access and Roles page, My Approvals worklist; Document Link Registry, `<DocLink>`, and detail pages for all document types.
+- **Phase B:** Procurement routing, Requisition and PO forms, detail pages, requisition-to-PO conversion.
+- **Phase C:** Receipt workflow with approval, accounting fix, View Accounting everywhere, data repair migration and corrected seed.
+- **Phase D:** Reusable filter engine and migration of every list and report screen; audit and fix every Create form in section 6.
+- **Phase E:** GL journal maker–checker plus approvals screen, review of all modules' approval flows, Chart of Accounts screen, extended Integrity Check, run the Test Checklist, and produce the **Change Report**.
+
+**Start with Phase A now.**
