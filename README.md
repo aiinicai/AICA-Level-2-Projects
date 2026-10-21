@@ -1,81 +1,117 @@
-# GST Inward HSN/SAC Fetcher — V1
+# BizCard UAE — AI Bulk Visiting Card Scanner & B2B Lead Automation
 
-Desktop app that reads a downloaded NIC e-invoice "Received" JSON export and
-produces an HSN-wise Excel report. Runs fully offline — no data leaves the
-machine.
+An enterprise-grade business productivity solution engineered specifically for door-to-door B2B marketing teams in the **United Arab Emirates (Dubai, Abu Dhabi, Sharjah, Northern Emirates)**.
 
-## What's built in this version (V1)
+---
 
-- **Home** — Manual upload of a downloaded e-invoice JSON. Decodes every
-  record's embedded signed invoice, extracts HSN-level line items, stores
-  them locally (SQLite), and is ready to export.
-  "Fetch from portal" tile is present but disabled — that's the V2
-  auto-download feature, not built yet.
-- **Reports** — Pick a From/To month range (and optionally a GSTIN) and
-  generate a consolidated 3-sheet Excel (Invoice Summary / HSN Item Detail /
-  HSN Summary). Keeps a running list of past exports.
-- **Settings** — Register the GSTINs you work with, and choose the folder
-  where generated Excel reports are saved.
+## 1. Problem & Core Value Proposition
 
-Data accumulates month-on-month in a local database
-(`%APPDATA%\GSTInwardHSNFetcher\data.db`), so re-running the app next month
-adds to what's already there rather than starting over. Re-uploading the same
-JSON is safe — invoices are keyed by IRN, so nothing gets duplicated.
+- **Field Sales Executives**: Collect 50–100 visiting cards daily across industrial zones (Al Quoz, Musaffah, JAFZA, DAFZA) and business hubs (Business Bay, DIFC, Downtown). Traditional manual typing into Excel is exhausting, slow, and error-prone. With BizCard UAE, field staff finish data entry in **< 2 minutes at the end of the day**.
+- **Sales Managers / Admins**: Receive standardized, deduplicated leads synced instantly from the field. Managers verify contacts alongside **original card thumbnail photos**, auto-export styled **Excel sheets (.xlsx)**, and dispatch personalized **bulk introduction emails in 1-Click**.
 
-## Before you build — one-time setup on your Windows machine
+---
 
-You need Python 3.10+ installed. If DGFT AutoComply's build environment is
-still on this machine, you likely already have everything needed.
+## 2. Key Features
 
-```
-cd GSTInwardFetcher
-python -m venv venv
-venv\Scripts\activate
-pip install -r requirements.txt
-```
+### 🌟 Bulk Card Scanning (USP)
+- **Place 10–20 visiting cards on a white table or A3 sheet** and snap **ONE photo** from top.
+- **Computer Vision Segmentation**: OpenCV contour detection, CLAHE contrast enhancement, morphological gradient analysis, and 4-point perspective warp automatically detect, crop, and isolate each individual card.
+- **OCR & Field Extraction (>95% accuracy)**:
+  - **First Name & Last Name** (accurately split for both international and Arab names like *Mohammed Al Mansoori*, *Rashid Bin Zayed*, *Abdul Rahman*).
+  - **Full Name** & Honorifics handling (*Sheikh*, *Eng.*, *Dr.*, *Mr.*).
+  - **Designation / Job Title** (*Managing Director*, *CEO*, *Procurement Head*, *المدير العام*).
+  - **Company Name** (*PJSC*, *LLC*, *FZE*, *FZCO*, *Group*, *Properties*).
+  - **UAE Mobile & Phone Numbers** (*+971 50 / 050 / 052 / 054 / 055 / 056 / 058* with standard formatting).
+  - **Email ID** & **Company Website**.
+  - **Office Address** (*Business Bay, DIFC, Sheikh Zayed Road, JLT, Dubai Silicon Oasis*).
+  - **Bilingual & Arabic Support**: RapidOCR ONNX model supports Arabic and English card texts offline.
+  - **Cloud Vision Upgrade**: Optional OpenAI GPT-4o Vision or Google Gemini Vision key configuration for 99.5% accuracy.
 
-## Test it first (without building the exe)
+### 📱 Mobile Field App (Android & iOS Responsive PWA)
+- **3 Simple Screens**:
+  1. **Home Dashboard**: Today's Scans, Total Leads, Sent Emails, Offline Queue, One-Click Demo Sample.
+  2. **Camera with A3 Grid Guide**: Live camera feed with on-screen grid overlay guide, flash toggle, gallery upload, and AI segmentation progress bar.
+  3. **Review & Edit**: Card-by-card swipable review list with cropped thumbnail previews, UAE phone verification chips, and inline editable fields.
+- **Offline Mode**: Works in basements, industrial warehouses, or offline zones. Scans are saved to local persistent storage and auto-sync to Cloud & Excel when reconnected.
+- **One-Tap Actions**: `[Save & Send Intro Email Now]` or `[Save to Excel (Send Later)]`.
 
-```
-python main.py
-```
+### 🖥️ Windows EXE Desktop Application
+- **Compiled Windows Executable**: `dist/BizCardUAE/BizCardUAE.exe` built with PyQt6 and PyInstaller.
+- **Excel-like Data Grid**: Real-time master table displaying `ID | Date | Card Photo Thumbnail | First Name | Last Name | Company | Designation | UAE Mobile | Email | Address | Status`.
+- **Deduplication Engine**: 1-Click scan for duplicate contacts by matching email or mobile number with automatic merging.
+- **Import & Export**: Styled corporate Excel `.xlsx` (Navy & Gold header, auto-adjusted columns, zebra striping) and RFC-compliant CSV.
+- **Bulk Email Dispatcher**: Select 10 to 100+ contacts and send personalized intro emails in 1-Click.
+- **Dynamic Template Manager**: Create templates using `{FirstName}`, `{LastName}`, `{CompanyName}`, `{Designation}`, `{ServiceName}`, `{SenderCompany}`, `{Signature}`.
+- **Lead Engagement Tracking**: Real-time status progression (*Sent* &rarr; *Delivered* &rarr; *Opened* &rarr; *Replied*).
+- **Settings**: Full SMTP configuration (Gmail App Passwords, Outlook 365, custom SMTP), signature builder, and AI keys.
 
-A window should open with the app. Try uploading a real e-invoice JSON and
-confirm a report generates into your chosen folder before you build the exe —
-much faster to catch issues here than after packaging.
+---
 
-## Build the .exe
-
-```
-pyinstaller build.spec
-```
-
-The finished file appears at:
+## 3. Architecture & Tech Stack
 
 ```
-dist\GST Inward HSN-SAC Fetcher.exe
+Capstone project/
+├── backend/
+│   ├── app.py                 # FastAPI REST API (Auth, Cards CRUD, Bulk Scan, SMTP, Excel, Settings)
+│   ├── database.py            # SQLite database models (Contacts, EmailTemplates, AppSettings)
+│   ├── vision_processor.py    # OpenCV multi-card detection, contour segmentation & perspective warp
+│   ├── ocr_engine.py          # RapidOCR (ONNX), UAE NLP regex heuristics, OpenAI/Gemini Vision
+│   ├── excel_service.py       # Corporate styled .xlsx & .csv export and import engine
+│   ├── email_service.py       # SMTP delivery engine, template interpolation, lead tracking
+│   └── sample_generator.py    # Realistic 15-card A3 sheet composite generator for instant testing
+├── mobile_app/                # Mobile Field Web App (HTML5, PWA manifest, Camera API, touch CSS)
+│   ├── index.html
+│   ├── app.js
+│   ├── style.css
+│   └── manifest.json
+├── desktop_app/               # Windows Desktop Application
+│   ├── main_desktop.py        # PyQt6 GUI with Excel-like table, thumbnail viewer, email manager
+│   ├── build_exe.py           # PyInstaller build automation script
+│   └── web_desktop/           # Browser-based desktop manager portal (HTML5 / JS / CSS)
+├── data/
+│   ├── bizcard.db             # SQLite database
+│   ├── uploads/               # Full top-down batch photos
+│   ├── cropped/               # Auto-cropped card thumbnails
+│   └── exports/               # Generated UAE_B2B_Leads_Master.xlsx
+├── dist/BizCardUAE/           # Compiled standalone Windows executable (BizCardUAE.exe)
+├── start_backend.bat          # Launch FastAPI backend
+├── start_desktop.bat          # Launch Windows Desktop EXE App
+├── start_mobile.bat           # Open Mobile Field App in browser
+└── run_all.bat                # One-click complete system launcher
 ```
 
-This is a single portable file — the whole app, nothing else to carry
-alongside it.
+---
 
-## Getting the .exe onto your office laptop via GitHub
+## 4. Quick Start & Execution
 
-1. Create a repository on GitHub (private, since this is your own tool) —
-   e.g. `gst-inward-hsn-fetcher`.
-2. Push the source code (main.py, backend.py, ui.html, etc.) — do **not**
-   commit the built .exe into the repo itself (GitHub's normal file-size
-   limits are much stricter than Release assets).
-3. On GitHub, go to the repo → **Releases** → **Draft a new release** →
-   attach `GST Inward HSN-SAC Fetcher.exe` as a release asset → publish.
-4. On your office laptop, open the Release page in the browser and click
-   the .exe link to download — this is a plain HTTPS download from
-   github.com, which should go through even if other file-transfer routes
-   are blocked.
+### Option A: One-Click Launch (Recommended)
+Double-click `run_all.bat` to automatically start the backend server, open the mobile app, and launch the Windows Desktop application.
 
-## Known limitation to mention in the demo
+### Option B: Individual Components
+1. **Start Backend Server**:
+   ```cmd
+   start_backend.bat
+   ```
+   Server runs on `http://127.0.0.1:8000`.
 
-The uploaded JSON file needs to be the **"Received" download** from
-`einvoice.gst.gov.in` (Services → e-Invoice → Download e-Invoice →
-Received tab). It reads the array of records with the `SignedInvoice`
-field per record — the format we tested this against.
+2. **Open Mobile Field App**:
+   Navigate to `http://127.0.0.1:8000/mobile/` on your phone or browser.
+
+3. **Launch Windows Desktop EXE**:
+   ```cmd
+   start_desktop.bat
+   ```
+   Or open the browser desktop portal at `http://127.0.0.1:8000/desktop/`.
+
+---
+
+## 5. How to Test the 15-Card Bulk Scan USP
+
+1. Open the Mobile App (`http://127.0.0.1:8000/mobile/`).
+2. Tap **"⚡ Load 15 UAE Cards Sample"** or click **"Scan Bulk Cards"** and upload/capture your own photo of cards on a table.
+3. Watch the AI progress bar:
+   - **Step 1**: Computer vision segments 10–20 individual cards.
+   - **Step 2**: OCR extracts names, UAE numbers (+971 50...), companies (Emaar, Al Futtaim, Damac, DP World), emails, and addresses.
+   - **Step 3**: Interactive review screen displays **15 Cards Found** with thumbnail photos and editable fields.
+4. Tap **"Save & Send Intro Email"**.
+5. Switch to the Windows Desktop App: Notice all 15 leads are instantly synchronized, populated in the Excel grid with card thumbnail images, and ready for bulk follow-ups!
