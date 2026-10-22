@@ -1,0 +1,736 @@
+{
+  "_readme": "Maps the column names in marketplace reports to the standard field names used inside the app. Edit this file (no code changes needed) when Amazon renames a column or when you add a new report. Header matching ignores case, extra spaces and punctuation. 'verified' = headers copied from a real file. 'value_formats_verified' = real data rows have been seen (number signs, dates, status/type values). When value_formats_verified is false the app must show a value-mapping screen.",
+  "version": 2,
+  "reports": {
+    "amazon_mtr": {
+      "display_name": "Amazon Merchant Tax Report (MTR) - invoice-level sales",
+      "role": "sales",
+      "verified": true,
+      "verified_note": "Headers supplied from a real MTR export. The export has no buyer GSTIN column, so it is most likely the B2C MTR. A B2B MTR will have extra buyer columns; the app should warn if unknown columns appear. No data rows seen yet: date format, refund signs and Transaction Type values are unconfirmed.",
+      "file_types": [
+        "csv",
+        "xlsx"
+      ],
+      "header_row": "auto",
+      "header_detection_keywords": [
+        "Invoice Number",
+        "Order Id",
+        "Tax Exclusive Gross"
+      ],
+      "id_columns_as_text": [
+        "order_id",
+        "order_item_id",
+        "invoice_no",
+        "shipment_id",
+        "credit_note_no"
+      ],
+      "required": [
+        "order_id",
+        "invoice_no",
+        "invoice_date",
+        "txn_type",
+        "taxable_value",
+        "invoice_value"
+      ],
+      "match_key": [
+        "order_id",
+        "order_item_id"
+      ],
+      "columns": {
+        "seller_gstin": [
+          "Seller Gstin"
+        ],
+        "invoice_no": [
+          "Invoice Number"
+        ],
+        "invoice_date": [
+          "Invoice Date"
+        ],
+        "txn_type": [
+          "Transaction Type"
+        ],
+        "order_id": [
+          "Order Id"
+        ],
+        "shipment_id": [
+          "Shipment Id"
+        ],
+        "shipment_date": [
+          "Shipment Date"
+        ],
+        "order_date": [
+          "Order Date"
+        ],
+        "order_item_id": [
+          "Shipment Item Id"
+        ],
+        "quantity": [
+          "Quantity"
+        ],
+        "description": [
+          "Item Description"
+        ],
+        "asin": [
+          "Asin"
+        ],
+        "hsn": [
+          "Hsn/sac"
+        ],
+        "sku": [
+          "Sku"
+        ],
+        "ship_from_state": [
+          "Ship From State"
+        ],
+        "ship_to_state": [
+          "Ship To State"
+        ],
+        "invoice_value": [
+          "Invoice Amount"
+        ],
+        "taxable_value": [
+          "Tax Exclusive Gross"
+        ],
+        "total_tax": [
+          "Total Tax Amount"
+        ],
+        "cgst_rate": [
+          "Cgst Rate"
+        ],
+        "sgst_rate": [
+          "Sgst Rate"
+        ],
+        "utgst_rate": [
+          "Utgst Rate"
+        ],
+        "igst_rate": [
+          "Igst Rate"
+        ],
+        "cess_rate": [
+          "Compensatory Cess Rate"
+        ],
+        "principal_amount": [
+          "Principal Amount"
+        ],
+        "shipping_amount": [
+          "Shipping Amount"
+        ],
+        "gift_wrap_amount": [
+          "Gift Wrap Amount"
+        ],
+        "item_promo_discount": [
+          "Item Promo Discount"
+        ],
+        "shipping_promo_discount": [
+          "Shipping Promo Discount"
+        ],
+        "gift_wrap_promo_discount": [
+          "Gift Wrap Promo Discount"
+        ],
+        "warehouse_id": [
+          "Warehouse Id"
+        ],
+        "fulfilment_channel": [
+          "Fulfillment Channel"
+        ],
+        "payment_method": [
+          "Payment Method Code"
+        ],
+        "credit_note_no": [
+          "Credit Note No"
+        ],
+        "credit_note_date": [
+          "Credit Note Date"
+        ]
+      },
+      "sum_columns": {
+        "cgst": [
+          "Cgst Tax",
+          "Shipping Cgst Tax",
+          "Gift Wrap Cgst Tax"
+        ],
+        "sgst": [
+          "Sgst Tax",
+          "Shipping Sgst Tax",
+          "Gift Wrap Sgst Tax"
+        ],
+        "utgst": [
+          "Utgst Tax",
+          "Shipping Utgst Tax",
+          "Gift Wrap Utgst Tax"
+        ],
+        "igst": [
+          "Igst Tax",
+          "Shipping Igst Tax",
+          "Gift Wrap Igst Tax"
+        ],
+        "cess": [
+          "Compensatory Cess Tax",
+          "Shipping Cess Tax Amount",
+          "Gift Wrap Compensatory Cess Tax"
+        ],
+        "tcs_total": [
+          "Tcs Cgst Amount",
+          "Tcs Sgst Amount",
+          "Tcs Utgst Amount",
+          "Tcs Igst Amount"
+        ]
+      },
+      "txn_type_map": {
+        "Shipment": "Sale",
+        "Refund": "Return",
+        "Cancel": "Cancel",
+        "FreeReplacement": "Ignore"
+      },
+      "unknown_txn_type_action": "ask_user",
+      "sign_rule": "Return rows must be treated as negative for taxable_value, invoice_value and tax regardless of how the file stores them.",
+      "row_checks": [
+        "taxable_value + total_tax = invoice_value (within tolerance)",
+        "exactly one tax regime per row: (cgst+sgst) or igst or (utgst)",
+        "return rows should have credit_note_no and credit_note_date"
+      ],
+      "value_formats_verified": false
+    },
+    "amazon_gst_rtf": {
+      "display_name": "Amazon GST Ready-to-File Report (GSTR-1 format) - GST reported",
+      "role": "gst_reported",
+      "verified": true,
+      "verified_note": "Headers and sample rows read from a real downloaded workbook. B2C Small and HSN Summary had data; B2B, B2B CN, B2CL CN and B2C Large were empty (this seller has only small B2C sales). The workbook contains NO period/month field, so the user must enter the filing month on upload.",
+      "file_types": [
+        "xlsx"
+      ],
+      "ignore_sheets": [
+        "GSTIN"
+      ],
+      "merchant_gstin_location": "Sheet 'GSTIN', label in A2 ('Merchant GSTIN'); read the value from the adjacent cell or the cell below if present",
+      "header_row": 4,
+      "data_start_row": 5,
+      "ignore_rows": [
+        1,
+        2,
+        3
+      ],
+      "ignore_rows_note": "Rows 1-3 hold a title and summary formulas (counts and totals). Do not read them as data and do not trust their cached values. Recompute control totals from the detail rows and compare with the summary row when it is populated.",
+      "text_columns": [
+        "invoice_no",
+        "note_no",
+        "orig_invoice_no",
+        "recipient_gstin",
+        "eco_gstin",
+        "hsn"
+      ],
+      "sheets": {
+        "B2B": {
+          "section": "b2b",
+          "granularity": "invoice",
+          "match_to_sales_by": [
+            "invoice_no"
+          ],
+          "columns": {
+            "recipient_gstin": [
+              "GSTIN/UIN of Recipient"
+            ],
+            "receiver_name": [
+              "Receiver Name"
+            ],
+            "invoice_no": [
+              "Invoice Number"
+            ],
+            "invoice_date": [
+              "Invoice date"
+            ],
+            "invoice_value": [
+              "Invoice Value"
+            ],
+            "place_of_supply": [
+              "Place Of Supply"
+            ],
+            "reverse_charge": [
+              "Reverse Charge"
+            ],
+            "applicable_tax_pct": [
+              "Applicable % of Tax Rate"
+            ],
+            "invoice_type": [
+              "Invoice Type"
+            ],
+            "eco_gstin": [
+              "E-Commerce GSTIN"
+            ],
+            "rate": [
+              "Rate"
+            ],
+            "taxable_value": [
+              "Taxable Value"
+            ],
+            "cess": [
+              "Cess Amount"
+            ]
+          }
+        },
+        "B2B CN (cdnr)": {
+          "section": "cdnr",
+          "granularity": "note",
+          "match_to_sales_by": [
+            "note_no",
+            "orig_invoice_no"
+          ],
+          "columns": {
+            "recipient_gstin": [
+              "GSTIN/UIN of Recipient"
+            ],
+            "receiver_name": [
+              "Receiver Name"
+            ],
+            "note_no": [
+              "Note Number"
+            ],
+            "note_date": [
+              "Note Date"
+            ],
+            "note_type": [
+              "Note Type"
+            ],
+            "place_of_supply": [
+              "Place Of Supply"
+            ],
+            "reverse_charge": [
+              "Reverse Charge"
+            ],
+            "note_supply_type": [
+              "Note Supply Type"
+            ],
+            "note_value": [
+              "Note Value"
+            ],
+            "applicable_tax_pct": [
+              "Applicable % of Tax Rate"
+            ],
+            "rate": [
+              "Rate"
+            ],
+            "taxable_value": [
+              "Taxable Value"
+            ],
+            "cess": [
+              "Cess Amount"
+            ],
+            "orig_invoice_no": [
+              "Invoice/Advance Receipt Number"
+            ],
+            "orig_invoice_date": [
+              "Invoice/Advance Receipt Date"
+            ],
+            "reason": [
+              "Reason for Issuing Document"
+            ]
+          }
+        },
+        "B2CL CN (cdnur)": {
+          "section": "cdnur",
+          "granularity": "note",
+          "match_to_sales_by": [
+            "note_no",
+            "orig_invoice_no"
+          ],
+          "columns": {
+            "ur_type": [
+              "UR Type"
+            ],
+            "note_no": [
+              "Note Number"
+            ],
+            "note_date": [
+              "Note Date"
+            ],
+            "note_type": [
+              "Note Type"
+            ],
+            "place_of_supply": [
+              "Place Of Supply"
+            ],
+            "note_value": [
+              "Note Value"
+            ],
+            "applicable_tax_pct": [
+              "Applicable % of Tax Rate"
+            ],
+            "rate": [
+              "Rate"
+            ],
+            "taxable_value": [
+              "Taxable Value"
+            ],
+            "cess": [
+              "Cess Amount"
+            ],
+            "orig_invoice_no": [
+              "Invoice/Advance Receipt Number"
+            ],
+            "orig_invoice_date": [
+              "Invoice/Advance Receipt Date"
+            ],
+            "reason": [
+              "Reason for Issuing Document"
+            ]
+          }
+        },
+        "B2C Large": {
+          "section": "b2cl",
+          "granularity": "invoice",
+          "match_to_sales_by": [
+            "invoice_no"
+          ],
+          "columns": {
+            "invoice_no": [
+              "Invoice Number"
+            ],
+            "invoice_date": [
+              "Invoice date"
+            ],
+            "invoice_value": [
+              "Invoice Value"
+            ],
+            "place_of_supply": [
+              "Place Of Supply"
+            ],
+            "applicable_tax_pct": [
+              "Applicable % of Tax Rate"
+            ],
+            "rate": [
+              "Rate"
+            ],
+            "taxable_value": [
+              "Taxable Value"
+            ],
+            "cess": [
+              "Cess Amount"
+            ],
+            "eco_gstin": [
+              "E-Commerce GSTIN"
+            ]
+          }
+        },
+        "B2C Small": {
+          "section": "b2cs",
+          "granularity": "summary",
+          "summary_keys": [
+            "type",
+            "place_of_supply",
+            "rate"
+          ],
+          "net_of_credit_notes": true,
+          "note": "No invoice numbers. Amounts are summarised by state of supply and GST rate and are net of credit notes, so tie out by grouping the sales data on the same keys: (shipments minus refunds).",
+          "columns": {
+            "type": [
+              "Type"
+            ],
+            "place_of_supply": [
+              "Place Of Supply"
+            ],
+            "applicable_tax_pct": [
+              "Applicable % of Tax Rate"
+            ],
+            "rate": [
+              "Rate"
+            ],
+            "taxable_value": [
+              "Taxable Value"
+            ],
+            "cess": [
+              "Cess Amount"
+            ],
+            "eco_gstin": [
+              "E-Commerce GSTIN"
+            ]
+          },
+          "optional_keys": [
+            "eco_gstin"
+          ]
+        },
+        "HSN Summary": {
+          "section": "hsn",
+          "granularity": "summary",
+          "summary_keys": [
+            "hsn",
+            "rate"
+          ],
+          "columns": {
+            "hsn": [
+              "HSN"
+            ],
+            "description": [
+              "Description"
+            ],
+            "uqc": [
+              "UQC"
+            ],
+            "quantity": [
+              "Total Quantity"
+            ],
+            "rate": [
+              "Rate"
+            ],
+            "total_value": [
+              "Total Value"
+            ],
+            "taxable_value": [
+              "Taxable Value"
+            ],
+            "igst": [
+              "Integrated Tax Amount"
+            ],
+            "cgst": [
+              "Central Tax Amount"
+            ],
+            "sgst": [
+              "State/UT Tax Amount"
+            ],
+            "cess": [
+              "Cess Amount"
+            ]
+          },
+          "hsn_match": "exact_then_4digit_prefix",
+          "hsn_text_length_note": "A report row may use a 4-digit HSN while sales data holds the 8-digit code; match exact first, then on the first 4 digits, and show which method matched."
+        }
+      },
+      "value_formats_verified": true,
+      "observed_formats": {
+        "place_of_supply": "'<code>-<State name>' e.g. '33-Tamil Nadu'",
+        "rate": "fraction, e.g. 0.18 and 0.05 (not 18). Still accept whole numbers.",
+        "type_b2cs": "'E' (e-commerce)",
+        "applicable_tax_pct": "empty string in observed rows",
+        "eco_gstin_b2cs": "empty in observed rows - do not require it as a matching key",
+        "hsn": "text; mixed length (8-digit such as '33049930' and 4-digit such as '3304' and '3401')",
+        "amount_noise": "floating-point noise such as 11833.809999999996 - round to 2 decimals on load",
+        "description": "empty in observed rows"
+      },
+      "period_source": "user_input",
+      "round_decimals": 2,
+      "rate_format": "fraction_or_percent_auto",
+      "internal_checks": [
+        "B2C Small total taxable value equals HSN Summary total taxable value (observed equal: 25,338.22)",
+        "B2C Small taxable value by rate equals HSN Summary taxable value by rate (observed equal for 5% and 18%)",
+        "HSN: Total Value minus Taxable Value approximately equals Taxable Value x Rate (observed to hold)",
+        "HSN: Integrated + Central + State/UT tax amounts should equal Taxable Value x Rate. OBSERVED NOT TO HOLD: tax columns were about 291.94 lower than rate x taxable across 5 rows. Flag as 'HSN tax amounts lower than rate x taxable' and explain from the sales data; do not assume the cause."
+      ]
+    },
+    "amazon_payments": {
+      "display_name": "Amazon Payments - Date Range / Transaction report - payouts",
+      "role": "payout",
+      "verified": true,
+      "verified_note": "Headers and the report's own definitions copied from a real Amazon.in payments export (reports starting 1 Jan 2025 or later: indexed by posted date, include released AND deferred transactions, and carry Transaction Status and Transaction Release Date). No data rows seen yet, so signs, dates and the values in 'type' and 'Transaction Status' are unconfirmed.",
+      "file_types": [
+        "csv",
+        "xlsx"
+      ],
+      "header_row": "auto",
+      "header_detection_keywords": [
+        "settlement id",
+        "order id",
+        "Transaction Status"
+      ],
+      "id_columns_as_text": [
+        "order_id",
+        "settlement_id"
+      ],
+      "required": [
+        "order_id",
+        "txn_type",
+        "net_payout",
+        "settlement_date"
+      ],
+      "match_key": [
+        "order_id"
+      ],
+      "columns": {
+        "settlement_date": [
+          "date/time"
+        ],
+        "settlement_id": [
+          "settlement id"
+        ],
+        "txn_type": [
+          "type"
+        ],
+        "order_id": [
+          "order id"
+        ],
+        "sku": [
+          "Sku"
+        ],
+        "description": [
+          "description"
+        ],
+        "quantity": [
+          "quantity"
+        ],
+        "marketplace": [
+          "marketplace"
+        ],
+        "account_type": [
+          "account type"
+        ],
+        "fulfilment": [
+          "fulfillment"
+        ],
+        "order_city": [
+          "order city"
+        ],
+        "order_state": [
+          "order state"
+        ],
+        "order_postal": [
+          "order postal"
+        ],
+        "product_sales": [
+          "product sales"
+        ],
+        "shipping_credits": [
+          "shipping credits"
+        ],
+        "gift_wrap_credits": [
+          "gift wrap credits"
+        ],
+        "promo_rebates": [
+          "promotional rebates"
+        ],
+        "sales_tax_liable": [
+          "Total sales tax liable(GST before adjusting TCS)"
+        ],
+        "tcs_cgst": [
+          "TCS-CGST"
+        ],
+        "tcs_sgst": [
+          "TCS-SGST"
+        ],
+        "tcs_igst": [
+          "TCS-IGST"
+        ],
+        "tds": [
+          "TDS (Section 194-O)"
+        ],
+        "selling_fees": [
+          "selling fees"
+        ],
+        "fba_fees": [
+          "fba fees"
+        ],
+        "other_transaction_fees": [
+          "other transaction fees"
+        ],
+        "other": [
+          "other"
+        ],
+        "net_payout": [
+          "total"
+        ],
+        "transaction_status": [
+          "Transaction Status"
+        ],
+        "release_date": [
+          "Transaction Release Date"
+        ]
+      },
+      "txn_type_map": {
+        "Order": "Sale",
+        "Refund": "Refund",
+        "Service Fee": "Fee",
+        "Adjustment": "Adjustment",
+        "Transfer": "Transfer",
+        "Fulfilment Fee Refund": "Fee"
+      },
+      "unknown_txn_type_action": "ask_user",
+      "sign_rule": "Keep the signs of the file for the bridge (fees, TCS, TDS, rebates and refunds are normally negative). Also store absolute deduction amounts in separate columns for display.",
+      "value_formats_verified": false,
+      "preamble": "The sheet starts with several explanatory lines (definitions, a note about reports from 1 Jan 2025) before the header row. Detect the header row by keywords; never assume a row number.",
+      "column_definitions_from_report": {
+        "sales_tax_liable": "GST or sales tax collected from buyers for product sales, shipping and gift wrap",
+        "selling_fees": "variable closing fees and referral fees",
+        "other_transaction_fees": "shipping chargebacks, shipping holdbacks and sales tax collection fees",
+        "other": "non-order transaction amounts; see the type and description columns",
+        "tds": "TDS under Section 194-O of the Income-tax Act, 1961"
+      },
+      "component_columns_for_row_check": [
+        "product_sales",
+        "shipping_credits",
+        "gift_wrap_credits",
+        "promo_rebates",
+        "sales_tax_liable",
+        "tcs_cgst",
+        "tcs_sgst",
+        "tcs_igst",
+        "tds",
+        "selling_fees",
+        "fba_fees",
+        "other_transaction_fees",
+        "other"
+      ],
+      "row_checks": [
+        "sum of component columns equals 'total' within tolerance (signs as in the file); if it fails for many rows let the user choose which columns are included",
+        "settlement_date must be inside the selected period",
+        "rows with an order id must exist in the sales (MTR) data, except service fees and other non-order types"
+      ],
+      "txn_type_map_note": "Unverified guess. Show the distinct values of 'type' with counts and let the user map each one.",
+      "status_map": {
+        "Released": "Released",
+        "Deferred": "Deferred"
+      },
+      "status_map_note": "Unverified guess. Deferred transactions are NOT yet paid out: treat as Timing, not as Not paid. Use release_date for bank-credit timing.",
+      "unknown_status_action": "ask_user"
+    }
+  },
+  "state_normalisation": {
+    "place_of_supply_format": "GST portal style is '<2-digit code>-<State name>', e.g. '29-Karnataka'. Accept a bare code, a bare name, or code-name. Compare states using the 2-digit code.",
+    "gst_states": {
+      "01": "JAMMU & KASHMIR",
+      "02": "HIMACHAL PRADESH",
+      "03": "PUNJAB",
+      "04": "CHANDIGARH",
+      "05": "UTTARAKHAND",
+      "06": "HARYANA",
+      "07": "DELHI",
+      "08": "RAJASTHAN",
+      "09": "UTTAR PRADESH",
+      "10": "BIHAR",
+      "11": "SIKKIM",
+      "12": "ARUNACHAL PRADESH",
+      "13": "NAGALAND",
+      "14": "MANIPUR",
+      "15": "MIZORAM",
+      "16": "TRIPURA",
+      "17": "MEGHALAYA",
+      "18": "ASSAM",
+      "19": "WEST BENGAL",
+      "20": "JHARKHAND",
+      "21": "ODISHA",
+      "22": "CHHATTISGARH",
+      "23": "MADHYA PRADESH",
+      "24": "GUJARAT",
+      "25": "DADRA AND NAGAR HAVELI AND DAMAN AND DIU",
+      "26": "DADRA AND NAGAR HAVELI AND DAMAN AND DIU",
+      "27": "MAHARASHTRA",
+      "29": "KARNATAKA",
+      "30": "GOA",
+      "31": "LAKSHADWEEP",
+      "32": "KERALA",
+      "33": "TAMIL NADU",
+      "34": "PUDUCHERRY",
+      "35": "ANDAMAN AND NICOBAR ISLANDS",
+      "36": "TELANGANA",
+      "37": "ANDHRA PRADESH",
+      "38": "LADAKH",
+      "97": "OTHER TERRITORY"
+    },
+    "state_aliases": {
+      "ORISSA": "ODISHA",
+      "PONDICHERRY": "PUDUCHERRY",
+      "UTTARANCHAL": "UTTARAKHAND",
+      "JAMMU AND KASHMIR": "JAMMU & KASHMIR",
+      "NEW DELHI": "DELHI",
+      "DADRA AND NAGAR HAVELI": "DADRA AND NAGAR HAVELI AND DAMAN AND DIU",
+      "DAMAN AND DIU": "DADRA AND NAGAR HAVELI AND DAMAN AND DIU",
+      "ANDAMAN & NICOBAR ISLANDS": "ANDAMAN AND NICOBAR ISLANDS"
+    }
+  }
+}
