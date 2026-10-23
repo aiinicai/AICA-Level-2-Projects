@@ -1,306 +1,152 @@
-"""
-Configuration and Form Mapping Layer for TDS & TCS Certificate PDF Auto-Renamer.
-Supports certificates under:
-- Income-tax Act, 1961 (Form 16, 16A, 16B, 16C, 16D, 16E, 27D)
-- Income-tax Act, 2025 (Form 130, 131, 132, 133)
-"""
-
-import os
 import json
+import os
 from pathlib import Path
-from dataclasses import dataclass, asdict
-from typing import Dict, Any
 
-# ==============================================================================
-# 1. GOVERNING ACT DEFINITIONS
-# ==============================================================================
-ACT_1961 = "Income-tax Act, 1961"
-ACT_2025 = "Income-tax Act, 2025"
+BASE = Path(__file__).resolve().parent.parent
+DATA = BASE / "data"
+USER = BASE / "userdata"
+IMAGES = BASE / "images"
+USER.mkdir(exist_ok=True)
 
-CATEGORY_TDS = "TDS Certificate"
-CATEGORY_TCS = "TCS Certificate"
-
-# ==============================================================================
-# 2. CONFIGURABLE FORM REGISTRY & MAPPING LAYER
-# ==============================================================================
-FORM_REGISTRY: Dict[str, Dict[str, Any]] = {
-    # --------------------------------------------------------------------------
-    # Income-tax Act, 1961 Forms
-    # --------------------------------------------------------------------------
-    "16": {
-        "form_name": "Form 16",
-        "act": ACT_1961,
-        "category": CATEGORY_TDS,
-        "description": "Certificate for Tax Deducted at Source on Salary (Section 203)",
-        "target_party_label": "Employee",
-        "section_ref": "203",
-        "rule_ref": "Rule 31(1)(a)",
-        "detection_regex": [
-            r"FORM\s+NO\.?\s*16\b(?!A|B|C|D|E)",
-            r"FORM\s*16\b(?!A|B|C|D|E)",
-            r"Certificate\s+under\s+section\s+203.*?salary",
-            r"rule\s+31\s*\(\s*1\s*\)\s*\(\s*a\s*\)",
-        ]
-    },
-    "16A": {
-        "form_name": "Form 16A",
-        "act": ACT_1961,
-        "category": CATEGORY_TDS,
-        "description": "Certificate for Tax Deducted at Source on Payments other than Salary (Section 203)",
-        "target_party_label": "Deductee",
-        "section_ref": "203",
-        "rule_ref": "Rule 31(1)(b)",
-        "detection_regex": [
-            r"FORM\s+NO\.?\s*16A\b",
-            r"FORM\s*[-_]?\s*16A\b",
-            r"Certificate\s+under\s+section\s+203.*?payments\s+other\s+than\s+salary",
-            r"rule\s+31\s*\(\s*1\s*\)\s*\(\s*b\s*\)",
-        ]
-    },
-    "16B": {
-        "form_name": "Form 16B",
-        "act": ACT_1961,
-        "category": CATEGORY_TDS,
-        "description": "TDS Certificate on Sale of Immovable Property (Section 194-IA)",
-        "target_party_label": "Transferor (Seller / Deductee)",
-        "section_ref": "194-IA",
-        "rule_ref": "Rule 31(1)(c)",
-        "detection_regex": [
-            r"FORM\s+NO\.?\s*16B\b",
-            r"FORM\s*[-_]?\s*16B\b",
-            r"section\s+194\s*[-]?\s*IA\b",
-            r"rule\s+31\s*\(\s*1\s*\)\s*\(\s*c\s*\)",
-        ]
-    },
-    "16C": {
-        "form_name": "Form 16C",
-        "act": ACT_1961,
-        "category": CATEGORY_TDS,
-        "description": "TDS Certificate on Rent paid by Individuals/HUF (Section 194-IB)",
-        "target_party_label": "Payee (Landlord / Deductee)",
-        "section_ref": "194-IB",
-        "rule_ref": "Rule 31(1)(d)",
-        "detection_regex": [
-            r"FORM\s+NO\.?\s*16C\b",
-            r"FORM\s*[-_]?\s*16C\b",
-            r"section\s+194\s*[-]?\s*IB\b",
-            r"rule\s+31\s*\(\s*1\s*\)\s*\(\s*d\s*\)",
-        ]
-    },
-    "16D": {
-        "form_name": "Form 16D",
-        "act": ACT_1961,
-        "category": CATEGORY_TDS,
-        "description": "TDS Certificate on Payments by certain Individuals/HUF (Section 194M)",
-        "target_party_label": "Payee (Contractor/Professional)",
-        "section_ref": "194M",
-        "rule_ref": "Rule 31(1)(e)",
-        "detection_regex": [
-            r"FORM\s+NO\.?\s*16D\b",
-            r"FORM\s*[-_]?\s*16D\b",
-            r"section\s+194\s*M\b",
-            r"rule\s+31\s*\(\s*1\s*\)\s*\(\s*e\s*\)",
-        ]
-    },
-    "16E": {
-        "form_name": "Form 16E",
-        "act": ACT_1961,
-        "category": CATEGORY_TDS,
-        "description": "TDS Certificate on Transfer of Virtual Digital Assets (Section 194S)",
-        "target_party_label": "Transferor (Seller of VDA)",
-        "section_ref": "194S",
-        "rule_ref": "Rule 31(1)(f)",
-        "detection_regex": [
-            r"FORM\s+NO\.?\s*16E\b",
-            r"FORM\s*[-_]?\s*16E\b",
-            r"section\s+194\s*S\b",
-            r"Virtual\s+Digital\s+Assets?",
-        ]
-    },
-    "27D": {
-        "form_name": "Form 27D",
-        "act": ACT_1961,
-        "category": CATEGORY_TCS,
-        "description": "Certificate for Tax Collected at Source (Section 206C)",
-        "target_party_label": "Collectee (Buyer)",
-        "section_ref": "206C",
-        "rule_ref": "Rule 37D",
-        "detection_regex": [
-            r"FORM\s+NO\.?\s*27D\b",
-            r"FORM\s*[-_]?\s*27D\b",
-            r"Certificate\s+under\s+section\s+206C",
-            r"rule\s+37\s*D\b",
-            r"Tax\s+Collected\s+at\s+Source",
-        ]
-    },
-
-    # --------------------------------------------------------------------------
-    # Income-tax Act, 2025 Forms
-    # --------------------------------------------------------------------------
-    "130": {
-        "form_name": "Form 130",
-        "act": ACT_2025,
-        "category": CATEGORY_TDS,
-        "description": "TDS Certificate on Salary under Income-tax Act, 2025 (Corresponds to Form 16)",
-        "target_party_label": "Employee",
-        "section_ref": "395(1)",
-        "rule_ref": "Rule 215",
-        "detection_regex": [
-            r"FORM\s+NO\.?\s*130\b",
-            r"FORM\s*[-_]?\s*130\b",
-            r"Form\s+130\b",
-            r"section\s+395\s*\(\s*1\s*\)",
-            r"section\s+392\b",
-        ]
-    },
-    "131": {
-        "form_name": "Form 131",
-        "act": ACT_2025,
-        "category": CATEGORY_TDS,
-        "description": "TDS Certificate on Non-Salary payments under Income-tax Act, 2025 (Corresponds to Form 16A)",
-        "target_party_label": "Deductee",
-        "section_ref": "395(4)",
-        "rule_ref": "Rule 215(1)",
-        "detection_regex": [
-            r"FORM\s+NO\.?\s*131\b",
-            r"FORM\s*[-_]?\s*131\b",
-            r"Form\s+131\b",
-            r"section\s+395\s*\(\s*4\s*\)",
-            r"rule\s+215\s*\(\s*1\s*\)",
-            r"section\s+397\s*\(\s*3\s*\)\s*\(\s*b\s*\)",
-        ]
-    },
-    "132": {
-        "form_name": "Form 132",
-        "act": ACT_2025,
-        "category": CATEGORY_TDS,
-        "description": "TDS Certificate on Immovable Property / Specified Transactions under Income-tax Act, 2025 (Corresponds to Form 16B/16C/16D)",
-        "target_party_label": "Payee / Transferor",
-        "section_ref": "395",
-        "rule_ref": "Rule 215",
-        "detection_regex": [
-            r"FORM\s+NO\.?\s*132\b",
-            r"FORM\s*[-_]?\s*132\b",
-            r"Form\s+132\b",
-        ]
-    },
-    "133": {
-        "form_name": "Form 133",
-        "act": ACT_2025,
-        "category": CATEGORY_TCS,
-        "description": "TCS Certificate under Income-tax Act, 2025 (Corresponds to Form 27D)",
-        "target_party_label": "Collectee",
-        "section_ref": "398",
-        "rule_ref": "Rule 217",
-        "detection_regex": [
-            r"FORM\s+NO\.?\s*133\b",
-            r"FORM\s*[-_]?\s*133\b",
-            r"Form\s+133\b",
-            r"section\s+398\b",
-            r"rule\s+217\b",
-        ]
-    }
+DEFAULTS = {
+    "interval_min": 45,
+    "season_interval_min": 30,
+    "auto_season_days": 3,
+    "season_manual": False,
+    "water_every_min": 60,
+    "water_goal": 8,
+    "break_goal": 6,
+    "posture_every_min": 25,
+    "posture_on": True,
+    "eye_20_every_min": 20,
+    "eye_20_on": False,
+    "pomo_work_min": 25,
+    "pomo_break_min": 5,
+    "sound": True,
+    "voice": False,
+    "theme": "dark",
+    "app_monitor_on": True,
+    "monitor_window_titles": False,
+    "news_auto_refresh": True,
+    "work_start": "09:00",
+    "work_end": "21:00",
+    "enforce_work_hours": False,
+    "meals_on": True,
+    "meals": {"Lunch": "13:30", "Dinner": "20:30"},
+    "idle_limit_sec": 120,
+    "character": "Random",
+    "activity": "Auto rotate",
+    "use_tray": True,
+    "disabled_activities": [],
 }
 
-# ==============================================================================
-# 3. RENAMING TEMPLATES
-# ==============================================================================
-NAMING_TEMPLATES = [
-    {
-        "id": "name_only",
-        "name": "Deductee Name only (Default)",
-        "template": "{DeducteeName}",
-        "example": "RAJESH KUMAR SHARMA.pdf"
-    },
-    {
-        "id": "name_form_fy_q",
-        "name": "Deductee Name + Form + Quarter + FY",
-        "template": "{DeducteeName}_{FormType}_{Quarter}_{FinancialYear}",
-        "example": "RAJESH KUMAR SHARMA_Form 16A_Q2_2024-25.pdf"
-    },
-    {
-        "id": "name_pan_form",
-        "name": "Deductee Name + PAN + Form",
-        "template": "{DeducteeName}_{PAN}_{FormType}",
-        "example": "RAJESH KUMAR SHARMA_ABCDE1234F_Form 16A.pdf"
-    },
-    {
-        "id": "name_pan_q_fy",
-        "name": "Deductee Name + PAN + Quarter + FY",
-        "template": "{DeducteeName}_{PAN}_{Quarter}_{FinancialYear}",
-        "example": "RAJESH KUMAR SHARMA_ABCDE1234F_Q2_2024-25.pdf"
-    },
-    {
-        "id": "form_name_q_fy",
-        "name": "Form + Deductee Name + Quarter + FY",
-        "template": "{FormType}_{DeducteeName}_{Quarter}_{FinancialYear}",
-        "example": "Form 16A_RAJESH KUMAR SHARMA_Q2_2024-25.pdf"
-    },
-    {
-        "id": "name_certno",
-        "name": "Deductee Name + Certificate No",
-        "template": "{DeducteeName}_{CertificateNo}",
-        "example": "RAJESH KUMAR SHARMA_TR123456789.pdf"
-    }
-]
+THEMES = {
+    "dark": dict(
+        name="Midnight Slate",
+        bg="#0f172a",
+        sidebar="#090e1a",
+        card="#1e293b",
+        card_alt="#263349",
+        fg="#f8fafc",
+        sub="#94a3b8",
+        accent="#3b82f6",
+        accent2="#8b5cf6",
+        good="#10b981",
+        warn="#f43f5e",
+        gold="#f59e0b",
+        bar="#334155",
+        pop="#1e293b",
+        border="#334155"
+    ),
+    "light": dict(
+        name="Nordic Daylight",
+        bg="#f1f5f9",
+        sidebar="#0f172a",
+        card="#ffffff",
+        card_alt="#f8fafc",
+        fg="#0f172a",
+        sub="#64748b",
+        accent="#2563eb",
+        accent2="#7c3aed",
+        good="#059669",
+        warn="#e11d48",
+        gold="#d97706",
+        bar="#e2e8f0",
+        pop="#ffffff",
+        border="#cbd5e1"
+    ),
+    "cyber": dict(
+        name="Cyber Neon",
+        bg="#09090b",
+        sidebar="#050507",
+        card="#18181b",
+        card_alt="#27272a",
+        fg="#fafafa",
+        sub="#a1a1aa",
+        accent="#06b6d4",
+        accent2="#ec4899",
+        good="#22c55e",
+        warn="#ef4444",
+        gold="#eab308",
+        bar="#27272a",
+        pop="#18181b",
+        border="#3f3f46"
+    ),
+    "emerald": dict(
+        name="Emerald Executive",
+        bg="#061914",
+        sidebar="#03110d",
+        card="#0d2922",
+        card_alt="#133930",
+        fg="#ecfdf5",
+        sub="#6ee7b7",
+        accent="#10b981",
+        accent2="#34d399",
+        good="#22c55e",
+        warn="#fb7185",
+        gold="#fbbf24",
+        bar="#1f493d",
+        pop="#0d2922",
+        border="#1f493d"
+    ),
+    "warm": dict(
+        name="Warm Latte",
+        bg="#faf6f0",
+        sidebar="#29221e",
+        card="#ffffff",
+        card_alt="#f3ede2",
+        fg="#29221e",
+        sub="#786b5e",
+        accent="#d97706",
+        accent2="#b45309",
+        good="#15803d",
+        warn="#dc2626",
+        gold="#ca8a04",
+        bar="#e6dec8",
+        pop="#fffdf9",
+        border="#dcd2be"
+    ),
+}
 
-# ==============================================================================
-# 4. DUPLICATE & COLLISION POLICIES
-# ==============================================================================
-COLLISION_AUTO_INCREMENT = "auto_increment"      # append (1), (2), etc.
-COLLISION_DISAMBIGUATE = "disambiguate"          # append _{Quarter}_{PAN}
-COLLISION_SKIP = "skip"                          # skip renaming on collision
-COLLISION_OVERWRITE = "overwrite"                # overwrite existing (not recommended)
 
-# ==============================================================================
-# 5. EXECUTION MODES
-# ==============================================================================
-MODE_RENAME_IN_PLACE = "rename_in_place"
-MODE_COPY_TO_FOLDER = "copy_to_folder"
-MODE_MOVE_TO_FOLDER = "move_to_folder"
+def load_json(path, default):
+    try:
+        return json.loads(Path(path).read_text(encoding="utf-8"))
+    except Exception:
+        return default
 
-# ==============================================================================
-# 6. APPLICATION SETTINGS DATACLASS & PERSISTENCE
-# ==============================================================================
-@dataclass
-class AppConfig:
-    naming_template: str = "{DeducteeName}"
-    collision_policy: str = COLLISION_AUTO_INCREMENT
-    execution_mode: str = MODE_RENAME_IN_PLACE
-    output_folder: str = ""
-    include_subfolders: bool = False
-    enable_ocr_fallback: bool = True
-    tesseract_path: str = ""
-    sanitize_uppercase: bool = True
-    max_filename_length: int = 120
-    custom_replacements: Dict[str, str] = None
 
-    def __post_init__(self):
-        if self.custom_replacements is None:
-            self.custom_replacements = {}
-
-    @classmethod
-    def get_config_file_path(cls) -> Path:
-        app_dir = Path.home() / ".tds_renamer"
-        app_dir.mkdir(parents=True, exist_ok=True)
-        return app_dir / "settings.json"
-
-    @classmethod
-    def load(cls) -> "AppConfig":
-        config_path = cls.get_config_file_path()
-        if config_path.exists():
-            try:
-                with open(config_path, "r", encoding="utf-8") as f:
-                    data = json.load(f)
-                    return cls(**data)
-            except Exception:
-                pass
-        return cls()
-
-    def save(self):
-        config_path = self.get_config_file_path()
+def save_json(path, data):
+    """Atomic local save: interruptions won't leave a half-written JSON file."""
+    path = Path(path)
+    temp = path.with_name(path.name + ".tmp")
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        temp.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
+        os.replace(temp, path)
+    except Exception as ex:
+        print("save failed:", path, ex)
         try:
-            with open(config_path, "w", encoding="utf-8") as f:
-                json.dump(asdict(self), f, indent=4)
-        except Exception as e:
-            print(f"Warning: Could not save configuration: {e}")
+            temp.unlink(missing_ok=True)
+        except Exception:
+            pass
