@@ -1,339 +1,490 @@
-﻿import io
-import datetime
+"""
+Turns the JSON returned by the GST portal into clean pandas tables and
+formatted Excel workbooks. No network code here - easy to test offline.
+"""
+from __future__ import annotations
+
+import json
+from datetime import date, datetime
+from pathlib import Path
+
 import pandas as pd
-import openpyxl
-from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
-from reportlab.lib.pagesizes import letter, landscape, A4
-from reportlab.lib import colors
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
-from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-from typing import List, Dict, Any, Tuple
-import database as db
-import analytics
 
-EXCEL_COLUMNS_SPEC = [
-    ("Borrower Name", "borrower_name", True),
-    ("Bank Name", "bank_name", True),
-    ("Allotment Letter Date", "allotment_date", False),
-    ("Acceptance Letter Date", "acceptance_date", False),
-    ("Data Requirement Sent Date (Bank)", "data_req_bank_date", False),
-    ("Data Requirement Sent Date (Borrower)", "data_req_borrower_date", False),
-    ("Pending Details / Documents", "pending_details", False),
-    ("Team Person Name", "team_person_name", False),
-    ("Team Person Number", "team_person_number", False),
-    ("Target Visit Date", "target_visit_date", False),
-    ("Actual Visit Date", "actual_visit_date", False),
-    ("Audit Status", "audit_status", False),
-    ("Review with GC / Partner Date", "review_partner_date", False),
-    ("Report Target Date", "report_target_date", False),
-    ("Report Submission Date", "report_submission_date", False),
-    ("Remarks / Delay Reason", "remarks", False)
-]
+from portal_config import MONTHS, prd_label
 
-def format_date_for_db(val: Any) -> str:
-    if pd.isna(val) or val is None or str(val).strip() == "" or str(val).lower() == "nat":
-        return ""
-    if isinstance(val, (datetime.date, datetime.datetime)):
-        return val.strftime("%Y-%m-%d")
-    val_str = str(val).strip()
-    for fmt in ("%Y-%m-%d", "%d-%m-%Y", "%d/%m/%Y", "%Y/%m/%d", "%d-%b-%Y", "%Y-%m-%d %H:%M:%S"):
+TAX_COLS = ["Taxable value", "IGST", "CGST", "SGST", "Cess"]
+_KEYMAP = {"txval": "Taxable value", "iamt": "IGST", "camt": "CGST", "samt": "SGST", "csamt": "Cess",
+           "igst": "IGST", "cgst": "CGST", "sgst": "SGST", "cess": "Cess"}
+
+
+def _num(v):
+    try:
+        return float(v)
+    except (TypeError, ValueError):
+        return 0.0
+
+
+def _taxrow(d: dict | None) -> dict:
+    d = d or {}
+    return {c: _num(d.get(k)) for k, c in (("txval", "Taxable value"), ("iamt", "IGST"),
+                                          ("camt", "CGST"), ("samt", "SGST"), ("csamt", "Cess"))}
+
+
+def _data(js):
+    """Portal responses are {"status":1,"data":{...}} or {"data":{...},"chksum":..}."""
+    if isinstance(js, dict) and "data" in js and isinstance(js["data"], (dict, list)):
+        return js["data"]
+    return js
+
+
+def parse_dmy(s):
+    if not s:
+        return None
+    s = str(s).strip()
+    for fmt in ("%d/%m/%Y", "%d-%m-%Y", "%d/%m/%Y %H:%M:%S", "%Y-%m-%d"):
         try:
-            return datetime.datetime.strptime(val_str[:10] if len(val_str)>=10 else val_str, fmt).strftime("%Y-%m-%d")
+            return datetime.strptime(s, fmt).date()
+        except ValueError:
+            continue
+    return None
+
+
+# =============================================================== GSTR-3B
+OSUP = [("osup_det", "3.1(a) Outward taxable supplies"), ("osup_zero", "3.1(b) Zero rated supplies"),
+        ("osup_nil_exmp", "3.1(c) Nil rated / exempt"), ("isup_rev", "3.1(d) Inward supplies (reverse charge)"),
+        ("osup_nongst", "3.1(e) Non-GST outward supplies")]
+ITC_AVL = {"IMPG": "4A(1) Import of goods", "IMPS": "4A(2) Import of services",
+           "ISRC": "4A(3) Inward supplies liable to RCM", "ISD": "4A(4) Inward supplies from ISD",
+           "OTH": "4A(5) All other ITC"}
+ITC_REV = {"RUL": "4B(1) Reversed - Rules 38, 42, 43 & sec 17(5)", "OTH": "4B(2) Reversed - Others"}
+ITC_INELG = {"RUL": "4D(1) ITC reclaimed / ineligible (RUL)", "OTH": "4D(2) Ineligible ITC (OTH)"}
+
+
+def gstr3b_frames(data_by_prd: dict[str, dict]):
+    """Returns (detail_long_df, monthly_summary_df)."""
+    rows, summ = [], []
+    for prd, js in sorted(data_by_prd.items(), key=lambda kv: prd_label(kv[0])):
+        d = _data(js) or {}
+        r = d.get("r3b", d)
+        per = prd_label(prd)
+        arn, arndt = d.get("arn", ""), d.get("arnDt", "")
+        sup = r.get("sup_details", {}) or {}
+        for key, desc in OSUP:
+            rows.append({"Period": per, "Table": desc, **_taxrow(sup.get(key))})
+        itc = r.get("itc_elg", {}) or {}
+        for it in itc.get("itc_avl", []) or []:
+            rows.append({"Period": per, "Table": ITC_AVL.get(it.get("ty"), "4A " + str(it.get("ty"))), **_taxrow(it)})
+        for it in itc.get("itc_rev", []) or []:
+            rows.append({"Period": per, "Table": ITC_REV.get(it.get("ty"), "4B " + str(it.get("ty"))), **_taxrow(it)})
+        rows.append({"Period": per, "Table": "4C Net ITC available", **_taxrow(itc.get("itc_net"))})
+        for it in itc.get("itc_inelg", []) or []:
+            rows.append({"Period": per, "Table": ITC_INELG.get(it.get("ty"), "4D " + str(it.get("ty"))), **_taxrow(it)})
+        il = r.get("intr_ltfee", {}) or {}
+        rows.append({"Period": per, "Table": "5.1 Interest", **_taxrow(il.get("intr_details"))})
+        rows.append({"Period": per, "Table": "5.1 Late fee", **_taxrow(il.get("ltfee_details"))})
+        for k, lbl in (("unreg_details", "3.2 Inter-state to unregistered"), ("comp_details", "3.2 Inter-state to composition"),
+                       ("uin_details", "3.2 Inter-state to UIN holders")):
+            for it in (r.get("inter_sup", {}) or {}).get(k, []) or []:
+                rows.append({"Period": per, "Table": f"{lbl} (POS {it.get('pos', '')})", **_taxrow(it)})
+
+        a = _taxrow(sup.get("osup_det"))
+        z = _taxrow(sup.get("osup_zero"))
+        rc = _taxrow(sup.get("isup_rev"))
+        avl = [_taxrow(x) for x in itc.get("itc_avl", []) or []]
+        rev = [_taxrow(x) for x in itc.get("itc_rev", []) or []]
+        net = _taxrow(itc.get("itc_net"))
+        tax = lambda t: t["IGST"] + t["CGST"] + t["SGST"] + t["Cess"]
+        tt = r.get("tt_val", {}) or {}
+        nil_return = all(tax(_taxrow(sup.get(k))) == 0 and _taxrow(sup.get(k))["Taxable value"] == 0 for k, _ in OSUP) \
+            and sum(tax(x) for x in avl) == 0
+        summ.append({
+            "Period": per,
+            "Outward taxable value 3.1(a)": a["Taxable value"],
+            "Output tax 3.1(a)": tax(a),
+            "Zero rated value 3.1(b)": z["Taxable value"],
+            "RCM tax 3.1(d)": tax(rc),
+            "ITC available 4A": sum(tax(x) for x in avl),
+            "ITC reversed 4B": sum(tax(x) for x in rev),
+            "Net ITC 4C": tax(net),
+            "Interest paid": tax(_taxrow(il.get("intr_details"))),
+            "Late fee paid": tax(_taxrow(il.get("ltfee_details"))),
+            "Tax paid in cash": _num(tt.get("tt_csh_pd")),
+            "Tax paid through ITC": _num(tt.get("tt_itc_pd")),
+            "Nil return": "Yes" if nil_return else "No",
+            "ARN": arn, "ARN date": arndt,
+        })
+    return pd.DataFrame(rows), pd.DataFrame(summ)
+
+
+# =============================================================== GSTR-1
+def gstr1_frames(data_by_prd: dict[str, dict]):
+    """Returns (section_long_df, pivot_taxable_df, totals_df)."""
+    rows = []
+    for prd, js in sorted(data_by_prd.items(), key=lambda kv: prd_label(kv[0])):
+        d = _data(js) or {}
+        per = prd_label(prd)
+        if str(d.get("isnil", "")).upper() == "Y":
+            rows.append({"Period": per, "Section": "NIL RETURN", "Level": "Main", "Records": 0,
+                         "Taxable value": 0, "IGST": 0, "CGST": 0, "SGST": 0, "Cess": 0, "Invoice value": 0})
+            continue
+        for s in d.get("sec_sum", []) or []:
+            def row(x, name, level):
+                out = {"Period": per, "Section": name, "Level": level, "Records": _num(x.get("ttl_rec")),
+                       "Taxable value": _num(x.get("ttl_tax")), "IGST": _num(x.get("ttl_igst")),
+                       "CGST": _num(x.get("ttl_cgst")), "SGST": _num(x.get("ttl_sgst")),
+                       "Cess": _num(x.get("ttl_cess")), "Invoice value": _num(x.get("ttl_val"))}
+                for k in ("ttl_expt_amt", "ttl_ngsup_amt", "ttl_nilsup_amt", "ttl_doc_issued",
+                          "ttl_doc_cancelled", "net_doc_issued"):
+                    if k in x:
+                        out[k.replace("ttl_", "").replace("_", " ").title()] = _num(x.get(k))
+                return out
+            name = s.get("sec_nm", "")
+            rows.append(row(s, name, "Main"))
+            for sub in s.get("sub_sections", []) or []:
+                rows.append(row(sub, f"{name} > {sub.get('sec_nm') or sub.get('typ', '')}", "Sub"))
+    df = pd.DataFrame(rows)
+    if df.empty:
+        return df, df, df
+    main = df[df["Level"] == "Main"]
+    pivot = main.pivot_table(index="Section", columns="Period", values="Taxable value", aggfunc="sum", fill_value=0)
+    pivot = pivot.loc[(pivot != 0).any(axis=1)].reset_index()
+    tot = main[main["Section"] == "TTL_LIAB"][["Period"] + TAX_COLS + ["Invoice value"]].copy()
+    nil = main[main["Section"] == "NIL RETURN"][["Period"]]
+    if not nil.empty:
+        z = nil.assign(**{c: 0.0 for c in TAX_COLS + ["Invoice value"]})
+        tot = pd.concat([tot, z], ignore_index=True)
+    return df, pivot, tot.sort_values("Period").reset_index(drop=True)
+
+
+# =============================================================== GSTR-1 B2B (counterparty-wise)
+def _find_list(obj, key):
+    """Return the first list stored under `key` anywhere in a nested dict/list."""
+    if isinstance(obj, dict):
+        if isinstance(obj.get(key), list):
+            return obj[key]
+        for v in obj.values():
+            r = _find_list(v, key)
+            if r is not None:
+                return r
+    elif isinstance(obj, list):
+        for v in obj:
+            r = _find_list(v, key)
+            if r is not None:
+                return r
+    return None
+
+
+def _inv_tax(inv):
+    """Sum item-level tax for one invoice/note across its itms list."""
+    t = {c: 0.0 for c in TAX_COLS}
+    for it in inv.get("itms", []) or []:
+        det = it.get("itm_det", it) or {}
+        for k, c in (("txval", "Taxable value"), ("iamt", "IGST"), ("camt", "CGST"),
+                     ("samt", "SGST"), ("csamt", "Cess")):
+            t[c] += _num(det.get(k))
+    return t
+
+
+def gstr1_b2b_partywise(json_objs: list) -> pd.DataFrame:
+    """Recipient-GSTIN-wise taxable value + tax reported in GSTR-1, from one or more
+    GSTR-1 JSON objects (live or offline). Nets B2B invoices, B2B amendments (b2ba) and
+    credit/debit notes (cdnr/cdnra): credit notes reduce, debit notes add.
+    Returns columns: Party GSTIN, GSTR-1 invoices, Taxable value, IGST, CGST, SGST, Cess."""
+    agg: dict[str, dict] = {}
+
+    def add(ctin, taxd, n_inv=1, sign=1):
+        ctin = str(ctin or "").strip().upper()
+        if not ctin:
+            return
+        row = agg.setdefault(ctin, {"Party GSTIN": ctin, "GSTR-1 invoices": 0,
+                                    **{c: 0.0 for c in TAX_COLS}})
+        row["GSTR-1 invoices"] += n_inv
+        for c in TAX_COLS:
+            row[c] += sign * taxd[c]
+
+    for js in json_objs or []:
+        d = _data(js) or {}
+        for sec in ("b2b", "b2ba"):                       # invoices + amendments (add)
+            for party in _find_list(d, sec) or []:
+                invs = party.get("inv", []) or []
+                for inv in invs:
+                    add(party.get("ctin"), _inv_tax(inv), 1, +1)
+        for sec in ("cdnr", "cdnra"):                     # credit/debit notes
+            for party in _find_list(d, sec) or []:
+                for nt in party.get("nt", []) or []:
+                    # ntty: 'C' credit note (reduces), 'D' debit note (adds)
+                    sign = -1 if str(nt.get("ntty", "")).upper().startswith("C") else +1
+                    add(party.get("ctin"), _inv_tax(nt), 0, sign)
+
+    if not agg:
+        return pd.DataFrame(columns=["Party GSTIN", "GSTR-1 invoices"] + TAX_COLS)
+    out = pd.DataFrame(list(agg.values()))
+    return out.sort_values("Taxable value", ascending=False).reset_index(drop=True)
+
+
+def load_gstr1_b2b(folder) -> pd.DataFrame:
+    """Scan a year folder for GSTR-1 JSON files (the downloaded full-JSON offline files and
+    anything extracted from their zips) and build the counterparty-wise GSTR-1 table."""
+    folder = Path(folder)
+    objs, seen = [], set()
+    patterns = ["*GSTR1*json*.json", "*GSTR1*.json", "**/*GSTR1*.json",
+                "GSTR1_*extracted/**/*.json", "**/returns*.json"]
+    files = []
+    for pat in patterns:
+        files.extend(folder.glob(pat))
+    for f in files:
+        rp = str(f.resolve())
+        if rp in seen or not f.is_file():
+            continue
+        seen.add(rp)
+        try:
+            objs.append(json.loads(f.read_text(encoding="utf-8", errors="ignore")))
         except Exception:
             continue
-    return val_str[:10]
+    return gstr1_b2b_partywise(objs)
 
-def parse_and_import_excel(file_bytes: bytes, user_name: str) -> Tuple[int, int, List[str]]:
-    errors = []
-    imported = 0
-    skipped = 0
-    
-    try:
-        df = pd.read_excel(io.BytesIO(file_bytes))
-    except Exception as e:
-        return 0, 0, [f"Failed to read Excel file: {str(e)}"]
-        
-    if df.empty:
-        return 0, 0, ["Excel sheet is empty."]
-        
-    col_map = {}
-    for col in df.columns:
-        norm_col = str(col).strip().lower().replace(" ", "").replace("_", "").replace("-", "").replace("/", "")
-        for title, key, _ in EXCEL_COLUMNS_SPEC:
-            norm_target = title.strip().lower().replace(" ", "").replace("_", "").replace("-", "").replace("/", "")
-            if norm_col == norm_target or norm_target in norm_col or norm_col in norm_target:
-                col_map[key] = col
-                break
-                
-    if "borrower_name" not in col_map:
-        return 0, 0, ["Required column 'Borrower Name' not found in uploaded file."]
-    if "bank_name" not in col_map:
-        return 0, 0, ["Required column 'Bank Name' not found in uploaded file."]
-        
-    for idx, row in df.iterrows():
-        borrower = str(row.get(col_map.get("borrower_name"), "")).strip()
-        bank = str(row.get(col_map.get("bank_name"), "")).strip()
-        
-        if not borrower or borrower.lower() == "nan" or not bank or bank.lower() == "nan":
-            skipped += 1
+
+# =============================================================== GSTR-2B
+_2B_COLS = {"ctin": "Supplier GSTIN", "trdnm": "Supplier name", "supprd": "Supplier period",
+            "supfildt": "Supplier filing date", "inum": "Invoice no", "ntnum": "Note no", "docnum": "Document no",
+            "dt": "Date", "docdt": "Date", "typ": "Type", "suptyp": "Supply type", "val": "Invoice value",
+            "txval": "Taxable value", "igst": "IGST", "cgst": "CGST", "sgst": "SGST", "cess": "Cess",
+            "pos": "Place of supply", "rev": "Reverse charge", "itcavl": "ITC available", "itcelg": "ITC eligible",
+            "rsn": "Reason", "diffprcnt": "Diff %", "imsStatus": "IMS status", "boenum": "BoE no",
+            "boedt": "BoE date", "portcode": "Port code", "refdt": "Ref date", "isamd": "Amended",
+            "oinum": "Orig. invoice no", "oidt": "Orig. date", "ontnum": "Orig. note no", "ontdt": "Orig. note date"}
+
+
+def _flatten_section(records, period):
+    out = []
+    for rec in records or []:
+        if not isinstance(rec, dict):
             continue
-            
-        record = {
-            "borrower_name": borrower,
-            "bank_name": bank,
-            "allotment_date": format_date_for_db(row.get(col_map.get("allotment_date")) if "allotment_date" in col_map else ""),
-            "acceptance_date": format_date_for_db(row.get(col_map.get("acceptance_date")) if "acceptance_date" in col_map else ""),
-            "data_req_bank_date": format_date_for_db(row.get(col_map.get("data_req_bank_date")) if "data_req_bank_date" in col_map else ""),
-            "data_req_borrower_date": format_date_for_db(row.get(col_map.get("data_req_borrower_date")) if "data_req_borrower_date" in col_map else ""),
-            "pending_details": "" if pd.isna(row.get(col_map.get("pending_details"))) else str(row.get(col_map.get("pending_details"))),
-            "team_person_name": "" if pd.isna(row.get(col_map.get("team_person_name"))) else str(row.get(col_map.get("team_person_name"))).strip(),
-            "team_person_number": "" if pd.isna(row.get(col_map.get("team_person_number"))) else str(row.get(col_map.get("team_person_number"))).strip(),
-            "target_visit_date": format_date_for_db(row.get(col_map.get("target_visit_date")) if "target_visit_date" in col_map else ""),
-            "actual_visit_date": format_date_for_db(row.get(col_map.get("actual_visit_date")) if "actual_visit_date" in col_map else ""),
-            "audit_status": str(row.get(col_map.get("audit_status"))).strip() if (("audit_status" in col_map) and not pd.isna(row.get(col_map.get("audit_status")))) else "Not Started",
-            "review_partner_date": format_date_for_db(row.get(col_map.get("review_partner_date")) if "review_partner_date" in col_map else ""),
-            "report_target_date": format_date_for_db(row.get(col_map.get("report_target_date")) if "report_target_date" in col_map else ""),
-            "report_submission_date": format_date_for_db(row.get(col_map.get("report_submission_date")) if "report_submission_date" in col_map else ""),
-            "remarks": "" if pd.isna(row.get(col_map.get("remarks"))) else str(row.get(col_map.get("remarks"))).strip()
-        }
-        
-        if record["audit_status"] not in db.STATUS_CHOICES:
-            record["audit_status"] = "Not Started"
-            
-        try:
-            db.create_assignment(record, user_name=f"{user_name} (Excel Import)")
-            imported += 1
-        except Exception as e:
-            errors.append(f"Row {idx+2} ({borrower}): {str(e)}")
-            skipped += 1
-            
-    return imported, skipped, errors
+        parent = {k: v for k, v in rec.items() if not isinstance(v, (list, dict))}
+        children = [v for v in rec.values() if isinstance(v, list) and v and isinstance(v[0], dict)]
+        if children:
+            for lst in children:
+                for ch in lst:
+                    flat = {k: v for k, v in ch.items() if not isinstance(v, (list, dict))}
+                    # nested item lists (rate-wise) -> sum numeric tax fields
+                    for v in ch.values():
+                        if isinstance(v, list) and v and isinstance(v[0], dict):
+                            for it in v:
+                                det = it.get("itm_det", it)
+                                for k in ("txval", "igst", "cgst", "sgst", "cess"):
+                                    if k in det and k not in flat:
+                                        flat[k] = 0
+                                    if k in det:
+                                        flat[k] = _num(flat.get(k)) + _num(det.get(k))
+                    out.append({"2B period": period, **parent, **flat})
+        else:
+            out.append({"2B period": period, **parent})
+    return out
 
-def generate_sample_excel_template() -> bytes:
-    wb = openpyxl.Workbook()
-    ws = wb.active
-    ws.title = "Stock Audit Master"
-    
-    headers = [col[0] for col in EXCEL_COLUMNS_SPEC]
-    ws.append(headers)
-    
-    sample_rows = [
-        [
-            "Acme Steels Pvt Ltd", "State Bank of India", "2026-08-01", "2026-08-02",
-            "2026-08-03", "2026-08-03", "Stock statements for July 2026 pending",
-            "Priya Verma", "+91 98111 22334", "2026-08-10", "2026-08-10",
-            "Stock Verification Completed", "2026-08-14", "2026-08-18", "", "Partner review scheduled with CA Gaurav Chaudhary"
-        ],
-        [
-            "Bharat Textiles Ltd", "Punjab National Bank", "2026-08-05", "2026-08-06",
-            "2026-08-07", "2026-08-07", "Audited balance sheet FY 25-26 awaited",
-            "Amit Gupta", "+91 98222 33445", "2026-08-12", "",
-            "Data Awaited from Borrower", "", "2026-08-20", "", "Borrower requested 3 days extension"
-        ],
-        [
-            "Delta Pharmaceuticals", "HDFC Bank", "2026-07-20", "2026-07-21",
-            "2026-07-22", "2026-07-22", "None",
-            "Sneha Patel", "+91 98333 44556", "2026-07-28", "2026-07-28",
-            "Report Submitted", "2026-08-04", "2026-08-08", "2026-08-06", "Submitted to Circle Office on time"
-        ]
-    ]
-    
-    for r in sample_rows:
-        ws.append(r)
-        
-    header_fill = PatternFill(start_color="1E3A8A", end_color="1E3A8A", fill_type="solid")
-    header_font = Font(name="Calibri", size=11, bold=True, color="FFFFFF")
-    thin_border = Border(
-        left=Side(style="thin", color="CBD5E1"),
-        right=Side(style="thin", color="CBD5E1"),
-        top=Side(style="thin", color="CBD5E1"),
-        bottom=Side(style="thin", color="CBD5E1")
-    )
-    
-    for col_idx in range(1, len(headers) + 1):
-        cell = ws.cell(row=1, column=col_idx)
-        cell.fill = header_fill
-        cell.font = header_font
-        cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
-        
-    for row in ws.iter_rows(min_row=1, max_row=len(sample_rows)+1, min_col=1, max_col=len(headers)):
-        for cell in row:
-            cell.border = thin_border
-            
-    for col in ws.columns:
-        max_len = max(len(str(cell.value or '')) for cell in col)
-        col_letter = openpyxl.utils.get_column_letter(col[0].column)
-        ws.column_dimensions[col_letter].width = max(max_len + 4, 14)
-        
-    ws.row_dimensions[1].height = 30
-    
-    output = io.BytesIO()
-    wb.save(output)
-    output.seek(0)
-    return output.getvalue()
 
-def export_audits_to_excel(assignments: List[Dict[str, Any]], export_type: str = "Complete") -> bytes:
-    wb = openpyxl.Workbook()
-    ws = wb.active
-    ws.title = f"{export_type} Audits"
-    
-    title_cell = ws.cell(row=1, column=1, value=f"GS STOCK AUDIT TRACKER - {export_type.upper()} REPORT")
-    title_cell.font = Font(name="Calibri", size=14, bold=True, color="1E3A8A")
-    
-    gen_cell = ws.cell(row=2, column=1, value=f"Partner: CA Gaurav Chaudhary | Generated: {datetime.datetime.now().strftime('%d-%b-%Y %I:%M %p')} | Total: {len(assignments)}")
-    gen_cell.font = Font(name="Calibri", size=10, italic=True, color="64748B")
-    
-    display_cols = [
-        ("ID", "id"),
-        ("Borrower Name", "borrower_name"),
-        ("Bank Name", "bank_name"),
-        ("Allotment Date", "allotment_date"),
-        ("Acceptance Date", "acceptance_date"),
-        ("Data Req (Bank)", "data_req_bank_date"),
-        ("Data Req (Borrower)", "data_req_borrower_date"),
-        ("Pending Details", "pending_details"),
-        ("Team Person", "team_person_name"),
-        ("Team Mobile", "team_person_number"),
-        ("Target Visit Date", "target_visit_date"),
-        ("Actual Visit Date", "actual_visit_date"),
-        ("Audit Status", "audit_status"),
-        ("Partner Review Date", "review_partner_date"),
-        ("Report Target Date", "report_target_date"),
-        ("Submission Date", "report_submission_date"),
-        ("Remarks / Delay", "remarks")
-    ]
-    
-    start_row = 4
-    for col_idx, (col_title, _) in enumerate(display_cols, start=1):
-        cell = ws.cell(row=start_row, column=col_idx, value=col_title)
-        cell.fill = PatternFill(start_color="1E3A8A", end_color="1E3A8A", fill_type="solid")
-        cell.font = Font(name="Calibri", size=11, bold=True, color="FFFFFF")
-        cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
-        
-    thin_border = Border(
-        left=Side(style="thin", color="E2E8F0"),
-        right=Side(style="thin", color="E2E8F0"),
-        top=Side(style="thin", color="E2E8F0"),
-        bottom=Side(style="thin", color="E2E8F0")
-    )
-    
-    for row_idx, item in enumerate(assignments, start=start_row + 1):
-        for col_idx, (_, key) in enumerate(display_cols, start=1):
-            val = item.get(key, "")
-            cell = ws.cell(row=row_idx, column=col_idx, value=str(val if val is not None else ""))
-            cell.font = Font(name="Calibri", size=10)
-            cell.border = thin_border
-            
-            if key == "audit_status":
-                if val in ["Report Submitted", "Closed"]:
-                    cell.fill = PatternFill(start_color="D1FAE5", end_color="D1FAE5", fill_type="solid")
-                elif val == "Delayed":
-                    cell.fill = PatternFill(start_color="FEE2E2", end_color="FEE2E2", fill_type="solid")
-                elif val in ["Visit Planned", "Stock Verification Completed", "Report Preparation"]:
-                    cell.fill = PatternFill(start_color="FEF3C7", end_color="FEF3C7", fill_type="solid")
-                    
-    for col in ws.columns:
-        max_len = max(len(str(cell.value or '')) for cell in col)
-        col_letter = openpyxl.utils.get_column_letter(col[0].column)
-        ws.column_dimensions[col_letter].width = max(min(max_len + 3, 40), 12)
-        
-    output = io.BytesIO()
-    wb.save(output)
-    output.seek(0)
-    return output.getvalue()
+def _walk_tax(node, path, rows, period):
+    if not isinstance(node, dict):
+        return
+    if any(k in node for k in ("igst", "cgst", "sgst", "cess")):
+        rows.append({"2B period": period, "Head": path,
+                     "Taxable value": _num(node.get("txval")), "IGST": _num(node.get("igst")),
+                     "CGST": _num(node.get("cgst")), "SGST": _num(node.get("sgst")), "Cess": _num(node.get("cess"))})
+    for k, v in node.items():
+        if isinstance(v, dict):
+            _walk_tax(v, f"{path}.{k}" if path else k, rows, period)
 
-def generate_dashboard_pdf(assignments: List[Dict[str, Any]], partner_name: str = "CA Gaurav Chaudhary") -> bytes:
-    buffer = io.BytesIO()
-    doc = SimpleDocTemplate(buffer, pagesize=landscape(A4), rightMargin=30, leftMargin=30, topMargin=30, bottomMargin=30)
-    styles = getSampleStyleSheet()
-    
-    title_style = ParagraphStyle(
-        name="RepTitle",
-        parent=styles["Heading1"],
-        fontName="Helvetica-Bold",
-        fontSize=18,
-        textColor=colors.HexColor("#1E3A8A"),
-        spaceAfter=6
-    )
-    
-    sub_style = ParagraphStyle(
-        name="RepSub",
-        parent=styles["Normal"],
-        fontSize=10,
-        textColor=colors.HexColor("#64748B"),
-        spaceAfter=14
-    )
-    
-    cell_style = ParagraphStyle(
-        name="CellText",
-        parent=styles["Normal"],
-        fontSize=8,
-        leading=10
-    )
-    
-    elements = []
-    
-    elements.append(Paragraph("GS STOCK AUDIT TRACKER - EXECUTIVE MIS DASHBOARD", title_style))
-    elements.append(Paragraph(f"Lead Partner: {partner_name} | Date: {datetime.datetime.now().strftime('%d-%b-%Y %I:%M %p')} | Total Assignments: {len(assignments)}", sub_style))
-    
-    total = len(assignments)
-    completed = sum(1 for a in assignments if a.get("audit_status") in ["Report Submitted", "Closed"])
-    delayed = sum(1 for a in assignments if a.get("audit_status") == "Delayed")
-    pending = total - completed
-    reports_pending = sum(1 for a in assignments if a.get("audit_status") in ["Report Preparation", "Review Pending", "Partner Review Completed"])
-    visits_pending = sum(1 for a in assignments if a.get("audit_status") in ["Not Started", "Data Awaited from Bank", "Data Awaited from Borrower", "Documents Under Review", "Visit Planned"])
-    
-    summary_data = [
-        ["Total Assignments", "Completed Audits", "Pending Audits", "Delayed Audits", "Reports Pending", "Visits Pending"],
-        [str(total), str(completed), str(pending), str(delayed), str(reports_pending), str(visits_pending)]
-    ]
-    
-    sum_table = Table(summary_data, colWidths=[125, 125, 125, 125, 125, 125])
-    sum_table.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor("#1E3A8A")),
-        ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
-        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-        ('FONTSIZE', (0, 0), (-1, 0), 10),
-        ('BOTTOMPADDING', (0, 0), (-1, 0), 6),
-        ('BACKGROUND', (0, 1), (-1, 1), colors.HexColor("#F8FAFC")),
-        ('FONTNAME', (0, 1), (-1, 1), 'Helvetica-Bold'),
-        ('FONTSIZE', (0, 1), (-1, 1), 12),
-        ('TEXTCOLOR', (0, 1), (-1, 1), colors.HexColor("#0F172A")),
-        ('GRID', (0, 0), (-1, -1), 1, colors.HexColor("#CBD5E1")),
-    ]))
-    
-    elements.append(sum_table)
-    elements.append(Spacer(1, 16))
-    
-    table_headers = ["ID", "Borrower Name", "Bank", "Team Person", "Target Visit", "Actual Visit", "Report Target", "Status"]
-    table_rows = [table_headers]
-    
-    for a in assignments[:25]:
-        table_rows.append([
-            str(a.get("id")),
-            Paragraph(str(a.get("borrower_name", "")), cell_style),
-            Paragraph(str(a.get("bank_name", "")), cell_style),
-            str(a.get("team_person_name", "")),
-            str(a.get("target_visit_date", "") or "-"),
-            str(a.get("actual_visit_date", "") or "-"),
-            str(a.get("report_target_date", "") or "-"),
-            Paragraph(str(a.get("audit_status", "")), cell_style)
-        ])
-        
-    tbl = Table(table_rows, colWidths=[35, 170, 110, 110, 75, 75, 75, 100])
-    tbl.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor("#334155")),
-        ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
-        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-        ('FONTSIZE', (0, 0), (-1, 0), 9),
-        ('ALIGN', (0, 0), (0, -1), 'CENTER'),
-        ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor("#CBD5E1")),
-        ('TOPPADDING', (0, 0), (-1, -1), 4),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
-    ]))
-    
-    elements.append(tbl)
-    doc.build(elements)
-    buffer.seek(0)
-    return buffer.getvalue()
+
+def gstr2b_frames(data_by_prd: dict[str, dict]):
+    """Returns dict of sheet name -> DataFrame, plus monthly ITC totals df."""
+    sections: dict[str, list] = {}
+    itc_rows = []
+    for prd, js in sorted(data_by_prd.items(), key=lambda kv: prd_label(kv[0])):
+        d = _data(js) or {}
+        per = prd_label(prd)
+        for sec, recs in (d.get("docdata") or {}).items():
+            sections.setdefault(sec.upper(), []).extend(_flatten_section(recs, per))
+        _walk_tax(d.get("itcsumm") or {}, "", itc_rows, per)
+
+    sheets = {}
+    for sec, rows in sections.items():
+        df = pd.DataFrame(rows).rename(columns=_2B_COLS)
+        df = df.loc[:, ~df.columns.duplicated()]
+        for c in TAX_COLS + ["Invoice value"]:
+            if c in df:
+                df[c] = pd.to_numeric(df[c], errors="coerce").fillna(0.0)
+        sheets[f"2B_{sec}"] = df
+
+    itc = pd.DataFrame(itc_rows)
+    totals = pd.DataFrame()
+    if not itc.empty:
+        itc["Head"] = itc["Head"].str.replace("itcavl", "ITC available", regex=False) \
+                                 .str.replace("itcunavl", "ITC not available", regex=False) \
+                                 .str.replace("itcrev", "ITC reversal", regex=False)
+        sheets["2B_ITC_Summary"] = itc
+        lvl1 = itc[itc["Head"].str.count(r"\.") == 1]
+        avl = lvl1[lvl1["Head"].str.startswith("ITC available")].copy()
+        avl["Component"] = avl["Head"].str.split(".").str[1]
+        if not avl.empty:
+            avl["Tax"] = avl[["IGST", "CGST", "SGST", "Cess"]].sum(axis=1)
+            totals = avl.pivot_table(index="2B period", columns="Component", values="Tax", aggfunc="sum", fill_value=0)
+            add = [c for c in totals.columns if c != "othersup"]
+            totals["2B ITC (excl. othersup)"] = totals[add].sum(axis=1)
+            totals = totals.reset_index().rename(columns={"2B period": "Period"})
+
+    b2b = sheets.get("2B_B2B")
+    if b2b is not None and not b2b.empty and "Supplier GSTIN" in b2b:
+        grp = b2b.groupby(["Supplier GSTIN", "Supplier name"], dropna=False)
+        sup = grp.agg(Documents=("Taxable value", "size"),
+                      **{c: (c, "sum") for c in TAX_COLS if c in b2b}).reset_index()
+        sup["Total tax"] = sup[[c for c in ("IGST", "CGST", "SGST", "Cess") if c in sup]].sum(axis=1)
+        sheets["2B_Supplierwise"] = sup.sort_values("Total tax", ascending=False)
+    return sheets, totals
+
+
+# =============================================================== GSTR-9
+def gstr9_frame(js):
+    d = _data(js) or {}
+    rows = []
+    for tbl, items in d.items():
+        if not isinstance(items, dict):
+            continue
+        for item, vals in items.items():
+            if not isinstance(vals, dict):
+                continue
+            row = {"Table": tbl.replace("table", "Table "), "Item": item}
+            for k, v in vals.items():
+                row[_KEYMAP.get(k, k)] = _num(v)
+            rows.append(row)
+    return pd.DataFrame(rows)
+
+
+# =============================================================== RECONCILIATION
+def reconciliation(g1_tot: pd.DataFrame, g3b_sum: pd.DataFrame, g2b_tot: pd.DataFrame):
+    out = pd.DataFrame()
+    if g3b_sum is not None and not g3b_sum.empty:
+        out = g3b_sum[["Period", "Outward taxable value 3.1(a)", "Zero rated value 3.1(b)", "Output tax 3.1(a)",
+                       "ITC available 4A"]].copy()
+    if g1_tot is not None and not g1_tot.empty:
+        g1 = g1_tot.copy()
+        g1["GSTR-1 tax"] = g1[["IGST", "CGST", "SGST", "Cess"]].sum(axis=1)
+        g1 = g1.rename(columns={"Taxable value": "GSTR-1 taxable value"})[["Period", "GSTR-1 taxable value", "GSTR-1 tax"]]
+        out = g1 if out.empty else out.merge(g1, on="Period", how="outer")
+    if g2b_tot is not None and not g2b_tot.empty:
+        g2 = g2b_tot[["Period", "2B ITC (excl. othersup)"]]
+        out = g2 if out.empty else out.merge(g2, on="Period", how="outer")
+    if out.empty:
+        return out
+    out = out.fillna(0).sort_values("Period").reset_index(drop=True)
+    if {"GSTR-1 taxable value", "Outward taxable value 3.1(a)"} <= set(out):
+        out["Diff taxable (GSTR-1 - 3B)"] = out["GSTR-1 taxable value"] - out["Outward taxable value 3.1(a)"] \
+            - out.get("Zero rated value 3.1(b)", 0)
+        out["Diff tax (GSTR-1 - 3B)"] = out["GSTR-1 tax"] - out["Output tax 3.1(a)"]
+    if {"2B ITC (excl. othersup)", "ITC available 4A"} <= set(out):
+        out["Excess ITC in 3B over 2B"] = (out["ITC available 4A"] - out["2B ITC (excl. othersup)"]).round(2)
+
+    def flag(r):
+        f = []
+        if abs(r.get("Diff tax (GSTR-1 - 3B)", 0)) > 1:
+            f.append("Output tax mismatch")
+        if r.get("Excess ITC in 3B over 2B", 0) > 1:
+            f.append("3B ITC exceeds 2B")
+        return "; ".join(f) or "OK"
+    out["Flag"] = out.apply(flag, axis=1)
+    return out
+
+
+# =============================================================== NOTICES & ORDERS
+def _fy_of(d):
+    """date -> '2025-26'."""
+    if not d:
+        return ""
+    y = d.year if d.month >= 4 else d.year - 1
+    return f"{y}-{str(y + 1)[2:]}"
+
+
+def notices_frame(notices: list, cases: list, today: date | None = None):
+    """
+    notices: /services/auth/api/get/notices response (list)
+    cases:   /litserv/auth/api/case/task/get response (list of case tasks)
+    Returns (dataframe, summary dict). 'Pending' = unread, OPEN case, or a future
+    action due date.
+    """
+    today = today or date.today()
+    rows = []
+    for n in notices or []:
+        if not isinstance(n, dict):
+            continue
+        di = parse_dmy(n.get("dtOfIssue"))
+        due = parse_dmy(n.get("dueDate")) if str(n.get("dueDate", "")).upper() != "NA" else None
+        unread = str(n.get("isRead", "")).upper() == "N"
+        pending = unread or (due is not None and due >= today)
+        rows.append({
+            "FY": _fy_of(di), "Type": n.get("type", ""), "Reference": n.get("noticeOrderId", ""),
+            "Description": n.get("descr", ""), "Issued by": n.get("issuedBy", ""),
+            "Date of issue": di, "Due date": due,
+            "Status": "Pending" if pending else "Seen",
+            "Read": "No" if unread else "Yes",
+            "Amount": n.get("amount", ""), "Form": n.get("applnCd", ""),
+        })
+    for c in cases or []:
+        if not isinstance(c, dict):
+            continue
+        asg = c.get("assignmentDt")
+        di = date.fromtimestamp(asg / 1000) if isinstance(asg, (int, float)) and asg else None
+        st = str(c.get("status", "")).upper()
+        rows.append({
+            "FY": _fy_of(di), "Type": "Case: " + (c.get("caseTypeName") or c.get("caseTpeCd") or ""),
+            "Reference": c.get("refId") or c.get("arn", ""), "Description": c.get("taskDesc", ""),
+            "Issued by": "Tax authority", "Date of issue": di, "Due date": None,
+            "Status": "Pending" if st in ("OPEN", "PENDING", "") else "Closed",
+            "Read": "No" if str(c.get("isRead", "")).upper() == "N" else "Yes",
+            "Amount": "", "Form": c.get("caseTpeCd", ""),
+        })
+    df = pd.DataFrame(rows, columns=["FY", "Type", "Reference", "Description", "Issued by",
+                                     "Date of issue", "Due date", "Status", "Read", "Amount", "Form"])
+    if not df.empty:
+        df = df.sort_values("Date of issue", ascending=False, na_position="last").reset_index(drop=True)
+    summ = {"total": int(len(df)), "pending": int((df["Status"] == "Pending").sum()) if not df.empty else 0,
+            "unread": int((df["Read"] == "No").sum()) if not df.empty else 0,
+            "orders": int((df["Type"] == "Order").sum()) if not df.empty else 0}
+    return df, summ
+
+
+# =============================================================== EXCEL WRITER
+def write_excel(path: Path, sheets: dict[str, pd.DataFrame], title: str = ""):
+    from openpyxl.styles import Alignment, Font, PatternFill
+    from openpyxl.utils import get_column_letter
+
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    sheets = {k: v for k, v in sheets.items() if v is not None and not v.empty}
+    if not sheets:
+        return None
+    hdr_fill = PatternFill("solid", fgColor="1F4E79")
+    with pd.ExcelWriter(path, engine="openpyxl") as xw:
+        for name, df in sheets.items():
+            sname = name[:31]
+            df.to_excel(xw, sheet_name=sname, index=False, startrow=2)
+            ws = xw.sheets[sname]
+            ws["A1"] = f"{title} - {name}" if title else name
+            ws["A1"].font = Font(bold=True, size=12, color="1F4E79")
+            for c in ws[3]:
+                c.font = Font(bold=True, color="FFFFFF")
+                c.fill = hdr_fill
+                c.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+            for i, col in enumerate(df.columns, 1):
+                width = max([len(str(col))] + [len(f"{v:,.2f}") if isinstance(v, float) else len(str(v))
+                                               for v in df[col].head(300)]) + 2
+                ws.column_dimensions[get_column_letter(i)].width = min(max(width, 9), 48)
+                if pd.api.types.is_numeric_dtype(df[col]):
+                    for row in ws.iter_rows(min_row=4, min_col=i, max_col=i):
+                        row[0].number_format = "#,##0.00"
+            ws.freeze_panes = "B4"
+            ws.auto_filter.ref = f"A3:{get_column_letter(len(df.columns))}{len(df) + 3}"
+    return path
+
+
+def save_json(path: Path, obj):
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(obj, indent=1, ensure_ascii=False), encoding="utf-8")
