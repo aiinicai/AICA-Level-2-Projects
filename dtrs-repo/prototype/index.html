@@ -1,0 +1,1399 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DTRS prototype – Department Task &amp; Review System</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#F4F6F8}
+a{color:#1F4E78}a:hover{color:#163A5A}
+button{font-family:inherit}
+button:focus-visible,a:focus-visible,textarea:focus-visible{outline:2px solid #1F4E78;outline-offset:2px}
+table{border-collapse:collapse;width:100%}
+th{text-align:left;font-size:12px;font-weight:600;color:#5B6576;padding:10px 12px;border-bottom:1px solid #DDE2E8;white-space:nowrap;text-transform:uppercase;letter-spacing:.03em}
+td{font-size:14px;color:#1A2230;padding:10px 12px;border-bottom:1px solid #EEF1F4;vertical-align:top}
+</style>
+</head>
+<body>
+<!-- Standalone clickable prototype. Fictitious company and dummy data only. Open this file in any modern browser. -->
+<div id="app"></div>
+<template id="dc-template">
+<div style="min-height: 100vh; background: #F4F6F8; font-family: 'IBM Plex Sans', system-ui, sans-serif; color: #1A2230">
+
+<header style="background: #1F4E78; color: #FFFFFF; padding: 14px 24px; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px">
+<div style="display: flex; align-items: center; gap: 14px">
+<div style="width: 40px; height: 40px; border-radius: 10px; background: #FFFFFF; color: #1F4E78; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 15px">DT</div>
+<div>
+<div style="font-size: 18px; font-weight: 700; letter-spacing: .01em">Department Task &amp; Review System</div>
+<div style="font-size: 13px; color: #D6E2EE">Sample Manufacturing Industries Pvt Ltd · prototype with dummy data · as of 22-Oct-2026</div>
+</div>
+</div>
+<div style="display: flex; align-items: center; gap: 10px">
+<div style="text-align: right">
+<div style="font-size: 14px; font-weight: 600">{{me.n}}</div>
+<div style="font-size: 12px; color: #D6E2EE">{{me.d}}</div>
+</div>
+<div style="width: 38px; height: 38px; border-radius: 50%; background: #D6E2EE; color: #1F4E78; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 14px">{{me.ini}}</div>
+</div>
+</header>
+
+<div style="background: #FFFFFF; border-bottom: 1px solid #DDE2E8; padding: 10px 24px; display: flex; flex-wrap: wrap; align-items: center; gap: 8px">
+<span style="font-size: 13px; font-weight: 600; color: #5B6576; margin-right: 4px">View as:</span>
+<template data-sc="for" list="{{roles}}" as="r" hint-placeholder-count="6">
+<button type="button" onClick="{{r.pick}}" style="{{r.style}}">{{r.label}} <span style="font-weight: 400; opacity: .8">· {{r.who}}</span></button>
+</template>
+</div>
+
+<template data-sc="if" value="{{hasToast}}" hint-placeholder-val="{{ false }}">
+<div style="background: #E3F2E8; color: #1B6B3A; padding: 10px 24px; font-size: 14px; display: flex; justify-content: space-between; align-items: center; gap: 12px; border-bottom: 1px solid #BFE0CB">
+<span>{{toast}}</span>
+<button type="button" onClick="{{clearToast}}" aria-label="Dismiss message" style="border: 0; background: transparent; color: #1B6B3A; font-size: 18px; cursor: pointer; min-width: 44px; min-height: 32px">×</button>
+</div>
+</template>
+
+<div style="display: flex; flex-wrap: wrap; gap: 24px; padding: 24px; max-width: 1440px; margin: 0 auto; box-sizing: border-box">
+
+<nav aria-label="Main" style="flex: 1 1 200px; max-width: 240px; display: flex; flex-direction: column; gap: 4px">
+<template data-sc="for" list="{{nav}}" as="n" hint-placeholder-count="6">
+<template data-sc="if" value="{{n.isHead}}" hint-placeholder-val="{{ false }}"><div style="font-size: 11px; font-weight: 700; color: #5B6576; text-transform: uppercase; letter-spacing: .08em; padding: 14px 14px 4px">{{n.label}}</div></template>
+<template data-sc="if" value="{{n.isBtn}}" hint-placeholder-val="{{ true }}"><button type="button" onClick="{{n.go}}" style="{{n.style}}">{{n.label}}</button></template>
+</template>
+<div style="margin-top: 16px; padding: 12px; background: #FFFFFF; border: 1px solid #DDE2E8; border-radius: 10px; font-size: 12px; color: #5B6576; line-height: 1.5">
+<div style="font-weight: 600; color: #1A2230; margin-bottom: 4px">Access in this view</div>
+<div>{{accessNote}}</div>
+</div>
+</nav>
+
+<main style="flex: 999 1 560px; min-width: 0; display: flex; flex-direction: column; gap: 20px">
+
+<template data-sc="if" value="{{canCreate}}" hint-placeholder-val="{{ true }}">
+<div style="display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end">
+<button type="button" onClick="{{openTask}}" style="border: 0; background: #1F4E78; color: #FFFFFF; border-radius: 8px; padding: 10px 16px; font-size: 14px; font-weight: 600; cursor: pointer; min-height: 44px">+ New task</button>
+<button type="button" onClick="{{openReq}}" style="border: 1px solid #1F4E78; background: #FFFFFF; color: #1F4E78; border-radius: 8px; padding: 10px 16px; font-size: 14px; font-weight: 600; cursor: pointer; min-height: 44px">+ Raise request to another department</button>
+</div>
+</template>
+
+<template data-sc="if" value="{{tf.open}}" hint-placeholder-val="{{ false }}">
+<section style="background: #FFFFFF; border: 2px solid #1F4E78; border-radius: 12px; padding: 20px; display: flex; flex-direction: column; gap: 16px">
+<div>
+<h2 style="margin: 0 0 4px; font-size: 18px; font-weight: 700">New task or request</h2>
+<p style="margin: 0; font-size: 13px; color: #5B6576">{{tf.rule}}</p>
+</div>
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px">
+<div style="display: flex; flex-direction: column; gap: 6px; grid-column: 1 / -1">
+<label for="nt-title" style="font-size: 13px; font-weight: 600">Title</label>
+<input id="nt-title" type="text" value="{{tf.title}}" onChange="{{tf.onTitle}}" placeholder="e.g. Reconcile GST input credit for October" style="font-family: inherit; font-size: 14px; padding: 10px; border: 1px solid #C9D0D8; border-radius: 8px; min-height: 24px">
+</div>
+<div style="display: flex; flex-direction: column; gap: 6px">
+<label for="nt-cat" style="font-size: 13px; font-weight: 600">Category</label>
+<select id="nt-cat" value="{{tf.cat}}" onChange="{{tf.onCat}}" style="font-family: inherit; font-size: 14px; padding: 10px; border: 1px solid #C9D0D8; border-radius: 8px; background: #FFFFFF; min-height: 44px">
+<template data-sc="for" list="{{cats}}" as="o" hint-placeholder-count="6">
+<option value="{{o.v}}">{{o.label}}</option>
+</template>
+</select>
+<span style="font-size: 12px; color: #5B6576">{{tf.catHint}}</span>
+</div>
+<div style="display: flex; flex-direction: column; gap: 6px">
+<label for="nt-form" style="font-size: 13px; font-weight: 600">Raise as</label>
+<select id="nt-form" value="{{tf.form}}" onChange="{{tf.onForm}}" style="font-family: inherit; font-size: 14px; padding: 10px; border: 1px solid #C9D0D8; border-radius: 8px; background: #FFFFFF; min-height: 44px">
+<option value="Task">Task – work to be done; a senior reviews it</option>
+<option value="Request">Request – ask for data, confirmation or approval; you confirm closure</option>
+</select>
+</div>
+<div style="display: flex; flex-direction: column; gap: 6px">
+<label for="nt-assignee" style="font-size: 13px; font-weight: 600">Assign to</label>
+<select id="nt-assignee" value="{{tf.assignee}}" onChange="{{tf.onAssignee}}" style="font-family: inherit; font-size: 14px; padding: 10px; border: 1px solid #C9D0D8; border-radius: 8px; background: #FFFFFF; min-height: 44px">
+<template data-sc="for" list="{{assignees}}" as="o" hint-placeholder-count="4">
+<option value="{{o.v}}">{{o.label}}</option>
+</template>
+</select>
+</div>
+<div style="display: flex; flex-direction: column; gap: 6px">
+<label for="nt-prio" style="font-size: 13px; font-weight: 600">Priority</label>
+<select id="nt-prio" value="{{tf.prio}}" onChange="{{tf.onPrio}}" style="font-family: inherit; font-size: 14px; padding: 10px; border: 1px solid #C9D0D8; border-radius: 8px; background: #FFFFFF; min-height: 44px">
+<option value="Critical">Critical – accept same day</option>
+<option value="High">High – accept in 1 working day</option>
+<option value="Medium">Medium – accept in 2 working days</option>
+<option value="Low">Low – accept in 3 working days</option>
+</select>
+</div>
+<div style="display: flex; flex-direction: column; gap: 6px">
+<label for="nt-due" style="font-size: 13px; font-weight: 600">{{tf.dueLabel}}</label>
+<input id="nt-due" type="date" value="{{tf.due}}" onChange="{{tf.onDue}}" style="font-family: inherit; font-size: 14px; padding: 10px; border: 1px solid #C9D0D8; border-radius: 8px; min-height: 24px">
+</div>
+<div style="display: flex; flex-direction: column; gap: 6px">
+<span style="font-size: 13px; font-weight: 600">Reviewer (set by the system)</span>
+<div style="font-size: 14px; padding: 10px; background: #F4F6F8; border-radius: 8px">{{tf.reviewer}}</div>
+</div>
+<div style="display: flex; flex-direction: column; gap: 6px; grid-column: 1 / -1">
+<label for="nt-desc" style="font-size: 13px; font-weight: 600">Description and expected output</label>
+<textarea id="nt-desc" rows="3" value="{{tf.desc}}" onChange="{{tf.onDesc}}" style="font-family: inherit; font-size: 14px; padding: 10px; border: 1px solid #C9D0D8; border-radius: 8px; resize: vertical"></textarea>
+</div>
+<label for="nt-conf" style="display: flex; gap: 10px; align-items: center; font-size: 14px; grid-column: 1 / -1">
+<input id="nt-conf" type="checkbox" checked="{{tf.conf}}" onChange="{{tf.onConf}}" style="width: 20px; height: 20px">
+Confidential – visible only to the doer, the reviewer, the HOD and Management Viewers
+</label>
+</div>
+<template data-sc="if" value="{{tf.hasErr}}" hint-placeholder-val="{{ false }}">
+<div style="background: #FBE6E4; color: #A8231B; padding: 10px 12px; border-radius: 8px; font-size: 14px">{{tf.err}}</div>
+</template>
+<div style="display: flex; flex-wrap: wrap; gap: 8px">
+<button type="button" onClick="{{tf.create}}" style="border: 0; background: #1F4E78; color: #FFFFFF; border-radius: 8px; padding: 10px 16px; font-size: 14px; font-weight: 600; cursor: pointer; min-height: 44px">Create and assign</button>
+<button type="button" onClick="{{tf.cancel}}" style="border: 1px solid #C9D0D8; background: #FFFFFF; color: #1A2230; border-radius: 8px; padding: 10px 16px; font-size: 14px; font-weight: 600; cursor: pointer; min-height: 44px">Cancel</button>
+</div>
+</section>
+</template>
+
+<template data-sc="if" value="{{rf.open}}" hint-placeholder-val="{{ false }}">
+<section style="background: #FFFFFF; border: 2px solid #1F4E78; border-radius: 12px; padding: 20px; display: flex; flex-direction: column; gap: 16px">
+<div>
+<h2 style="margin: 0 0 4px; font-size: 18px; font-weight: 700">Raise a request to another department</h2>
+<p style="margin: 0; font-size: 13px; color: #5B6576">The receiving HOD or SPOC must accept it and commit a date within the acceptance time for its priority. It closes only when {{myDeptName}} confirms.</p>
+</div>
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px">
+<div style="display: flex; flex-direction: column; gap: 6px">
+<label for="rq-to" style="font-size: 13px; font-weight: 600">To department</label>
+<select id="rq-to" value="{{rf.to}}" onChange="{{rf.onTo}}" style="font-family: inherit; font-size: 14px; padding: 10px; border: 1px solid #C9D0D8; border-radius: 8px; background: #FFFFFF; min-height: 44px">
+<template data-sc="for" list="{{deptOptions}}" as="o" hint-placeholder-count="6">
+<option value="{{o.v}}">{{o.label}}</option>
+</template>
+</select>
+</div>
+<div style="display: flex; flex-direction: column; gap: 6px">
+<label for="rq-cat" style="font-size: 13px; font-weight: 600">Category</label>
+<select id="rq-cat" value="{{rf.cat}}" onChange="{{rf.onCat}}" style="font-family: inherit; font-size: 14px; padding: 10px; border: 1px solid #C9D0D8; border-radius: 8px; background: #FFFFFF; min-height: 44px">
+<template data-sc="for" list="{{cats}}" as="o" hint-placeholder-count="6">
+<option value="{{o.v}}">{{o.label}}</option>
+</template>
+</select>
+</div>
+<div style="display: flex; flex-direction: column; gap: 6px">
+<label for="rq-prio" style="font-size: 13px; font-weight: 600">Priority</label>
+<select id="rq-prio" value="{{rf.prio}}" onChange="{{rf.onPrio}}" style="font-family: inherit; font-size: 14px; padding: 10px; border: 1px solid #C9D0D8; border-radius: 8px; background: #FFFFFF; min-height: 44px">
+<option value="Critical">Critical</option>
+<option value="High">High</option>
+<option value="Medium">Medium</option>
+<option value="Low">Low</option>
+</select>
+</div>
+<div style="display: flex; flex-direction: column; gap: 6px">
+<label for="rq-need" style="font-size: 13px; font-weight: 600">Need-by date</label>
+<input id="rq-need" type="date" value="{{rf.need}}" onChange="{{rf.onNeed}}" style="font-family: inherit; font-size: 14px; padding: 10px; border: 1px solid #C9D0D8; border-radius: 8px; min-height: 24px">
+</div>
+<div style="display: flex; flex-direction: column; gap: 6px; grid-column: 1 / -1">
+<label for="rq-text" style="font-size: 13px; font-weight: 600">What do you need?</label>
+<textarea id="rq-text" rows="3" value="{{rf.text}}" onChange="{{rf.onText}}" placeholder="e.g. Share GRN copies for invoices pending over 30 days" style="font-family: inherit; font-size: 14px; padding: 10px; border: 1px solid #C9D0D8; border-radius: 8px; resize: vertical"></textarea>
+</div>
+</div>
+<template data-sc="if" value="{{rf.hasErr}}" hint-placeholder-val="{{ false }}">
+<div style="background: #FBE6E4; color: #A8231B; padding: 10px 12px; border-radius: 8px; font-size: 14px">{{rf.err}}</div>
+</template>
+<div style="display: flex; flex-wrap: wrap; gap: 8px">
+<button type="button" onClick="{{rf.create}}" style="border: 0; background: #1F4E78; color: #FFFFFF; border-radius: 8px; padding: 10px 16px; font-size: 14px; font-weight: 600; cursor: pointer; min-height: 44px">Send request</button>
+<button type="button" onClick="{{rf.cancel}}" style="border: 1px solid #C9D0D8; background: #FFFFFF; color: #1A2230; border-radius: 8px; padding: 10px 16px; font-size: 14px; font-weight: 600; cursor: pointer; min-height: 44px">Cancel</button>
+</div>
+</section>
+</template>
+
+<template data-sc="if" value="{{rsn.open}}" hint-placeholder-val="{{ false }}">
+<section role="dialog" aria-labelledby="rsn-title" style="background: #FFFFFF; border: 2px solid #A8231B; border-radius: 12px; padding: 20px; display: flex; flex-direction: column; gap: 12px">
+<h2 id="rsn-title" style="margin: 0; font-size: 18px; font-weight: 700">{{rsn.title}}</h2>
+<p style="margin: 0; font-size: 13px; color: #5B6576">Mandatory. The reason is saved in the history and sent with the alert to {{rsn.notify}}.</p>
+<label for="rsn-text" style="font-size: 13px; font-weight: 600">Reason (at least 10 characters)</label>
+<textarea id="rsn-text" rows="3" autoFocus="{{ true }}" value="{{rsn.text}}" onChange="{{rsn.onText}}" style="font-family: inherit; font-size: 14px; padding: 10px; border: 1px solid #C9D0D8; border-radius: 8px; resize: vertical"></textarea>
+<template data-sc="if" value="{{rsn.hasErr}}" hint-placeholder-val="{{ false }}"><div style="background: #FBE6E4; color: #A8231B; padding: 8px 12px; border-radius: 8px; font-size: 14px">{{rsn.err}}</div></template>
+<div style="display: flex; flex-wrap: wrap; gap: 8px"><button type="button" onClick="{{rsn.confirm}}" style="border: 0; background: #A8231B; color: #FFFFFF; border-radius: 8px; padding: 10px 16px; font-size: 14px; font-weight: 600; cursor: pointer; min-height: 44px">Confirm and send</button><button type="button" onClick="{{rsn.cancel}}" style="border: 1px solid #C9D0D8; background: #FFFFFF; color: #1A2230; border-radius: 8px; padding: 10px 16px; font-size: 14px; font-weight: 600; cursor: pointer; min-height: 44px">Cancel</button></div>
+</section>
+</template>
+
+<template data-sc="if" value="{{show.work}}" hint-placeholder-val="{{ true }}">
+<div style="display: flex; flex-direction: column; gap: 20px">
+<h1 style="margin: 0; font-size: 24px; font-weight: 700">Good morning, {{me.first}}</h1>
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 16px">
+<template data-sc="for" list="{{tiles}}" as="t" hint-placeholder-count="4">
+<div style="background: #FFFFFF; border: 1px solid #DDE2E8; border-radius: 12px; padding: 16px">
+<div style="font-size: 13px; color: #5B6576; font-weight: 500">{{t.label}}</div>
+<div style="{{t.numStyle}}">{{t.value}}</div>
+<div style="font-size: 12px; color: #5B6576">{{t.sub}}</div>
+</div>
+</template>
+</div>
+<section style="background: #FFFFFF; border: 1px solid #DDE2E8; border-radius: 12px; padding: 4px 0 8px">
+<h2 style="margin: 12px 16px 8px; font-size: 16px; font-weight: 600">My open tasks</h2>
+<template data-sc="if" value="{{noMyTasks}}" hint-placeholder-val="{{ false }}">
+<p style="margin: 8px 16px 12px; color: #5B6576; font-size: 14px">No open tasks assigned to you.</p>
+</template>
+<div style="overflow-x: auto">
+<table>
+<thead><tr><th>Task</th><th>Reviewer</th><th>Priority</th><th>Raised on</th><th>Due</th><th>Status</th></tr></thead>
+<tbody>
+<template data-sc="for" list="{{myTasks}}" as="t" hint-placeholder-count="4">
+<tr>
+<td><button type="button" onClick="{{t.open}}" style="border: 0; background: transparent; padding: 0; color: #1F4E78; font-size: 14px; font-weight: 600; cursor: pointer; text-align: left">{{t.title}}</button><div style="font-size: 12px; color: #5B6576">{{t.id}} · {{t.type}}</div></td>
+<td>{{t.revName}}</td>
+<td><span style="{{t.prioStyle}}">{{t.prio}}</span></td>
+<td style="white-space: nowrap"><div>{{t.raisedText}}</div><div style="font-size: 12px; color: #5B6576">by {{t.byName}}</div></td>
+<td><div>{{t.dueText}}</div><div style="{{t.dueNoteStyle}}">{{t.dueNote}}</div></td>
+<td><span style="{{t.statusStyle}}">{{t.status}}</span></td>
+</tr>
+</template>
+</tbody>
+</table>
+</div>
+</section>
+<template data-sc="if" value="{{hasReviews}}" hint-placeholder-val="{{ true }}">
+<section style="background: #FFFFFF; border: 1px solid #DDE2E8; border-radius: 12px; padding: 4px 0 8px">
+<h2 style="margin: 12px 16px 8px; font-size: 16px; font-weight: 600">Waiting for my review</h2>
+<div style="overflow-x: auto">
+<table>
+<thead><tr><th>Task</th><th>Doer</th><th>Priority</th><th>Raised on</th><th>Due</th><th>Status</th></tr></thead>
+<tbody>
+<template data-sc="for" list="{{reviewQ}}" as="t" hint-placeholder-count="2">
+<tr>
+<td><button type="button" onClick="{{t.open}}" style="border: 0; background: transparent; padding: 0; color: #1F4E78; font-size: 14px; font-weight: 600; cursor: pointer; text-align: left">{{t.title}}</button><div style="font-size: 12px; color: #5B6576">{{t.id}}</div></td>
+<td>{{t.doerName}}</td>
+<td><span style="{{t.prioStyle}}">{{t.prio}}</span></td>
+<td style="white-space: nowrap">{{t.raisedText}}</td>
+<td>{{t.dueText}}</td>
+<td><span style="{{t.statusStyle}}">{{t.status}}</span></td>
+</tr>
+</template>
+</tbody>
+</table>
+</div>
+</section>
+</template>
+</div>
+</template>
+
+<template data-sc="if" value="{{show.dashAny}}" hint-placeholder-val="{{ false }}">
+<div style="display: flex; flex-direction: column; gap: 20px">
+<div>
+<h1 style="margin: 0 0 4px; font-size: 24px; font-weight: 700">{{dashTitle}}</h1>
+<p style="margin: 0; color: #5B6576; font-size: 14px">{{dashSub}}</p>
+</div>
+<template data-sc="if" value="{{show.dash}}" hint-placeholder-val="{{ true }}">
+<div style="display: flex; flex-direction: column; gap: 20px">
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px">
+<template data-sc="for" list="{{dTiles}}" as="t" hint-placeholder-count="7">
+<div style="background: #FFFFFF; border: 1px solid #DDE2E8; border-radius: 12px; padding: 14px">
+<div style="font-size: 13px; color: #5B6576; font-weight: 500">{{t.label}}</div>
+<div style="{{t.numStyle}}">{{t.value}}</div>
+<div style="font-size: 12px; color: #5B6576">{{t.sub}}</div>
+</div>
+</template>
+</div>
+<template data-sc="if" value="{{noMyItems}}" hint-placeholder-val="{{ false }}"><p style="margin: 0; font-size: 14px; color: #5B6576">No items are assigned to you in the prototype data, so the breakdowns below are empty.</p></template>
+<div style="display: flex; flex-wrap: wrap; gap: 16px">
+<section style="flex: 1 1 240px; background: #FFFFFF; border: 1px solid #DDE2E8; border-radius: 12px; padding: 16px; display: flex; flex-direction: column; gap: 10px">
+<h2 style="margin: 0; font-size: 15px; font-weight: 600">My items by status</h2>
+<template data-sc="for" list="{{byStatus}}" as="b" hint-placeholder-count="4">
+<div><div style="display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 4px"><span>{{b.label}}</span><strong style="font-weight: 600">{{b.n}}</strong></div><div style="height: 10px; background: #EEF1F4; border-radius: 5px"><div style="{{b.bar}}"></div></div></div>
+</template>
+</section>
+<section style="flex: 1 1 240px; background: #FFFFFF; border: 1px solid #DDE2E8; border-radius: 12px; padding: 16px; display: flex; flex-direction: column; gap: 10px">
+<h2 style="margin: 0; font-size: 15px; font-weight: 600">My items by category</h2>
+<template data-sc="for" list="{{byCat}}" as="b" hint-placeholder-count="4">
+<div><div style="display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 4px"><span>{{b.label}}</span><strong style="font-weight: 600">{{b.n}}</strong></div><div style="height: 10px; background: #EEF1F4; border-radius: 5px"><div style="{{b.bar}}"></div></div></div>
+</template>
+</section>
+<section style="flex: 1 1 240px; background: #FFFFFF; border: 1px solid #DDE2E8; border-radius: 12px; padding: 16px; display: flex; flex-direction: column; gap: 10px">
+<h2 style="margin: 0; font-size: 15px; font-weight: 600">My items by priority</h2>
+<template data-sc="for" list="{{byPrio}}" as="b" hint-placeholder-count="3">
+<div><div style="display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 4px"><span>{{b.label}}</span><strong style="font-weight: 600">{{b.n}}</strong></div><div style="height: 10px; background: #EEF1F4; border-radius: 5px"><div style="{{b.bar}}"></div></div></div>
+</template>
+</section>
+</div>
+<section style="background: #FFFFFF; border: 1px solid #DDE2E8; border-radius: 12px; padding: 16px; display: flex; flex-direction: column; gap: 14px">
+<div style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-end; gap: 12px">
+<h2 style="margin: 0; font-size: 16px; font-weight: 600">My performance measures</h2>
+<div style="text-align: right"><div style="font-size: 12px; color: #5B6576">Indicative score</div><div style="font-size: 28px; font-weight: 700">{{myScore}}</div></div>
+</div>
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px">
+<template data-sc="for" list="{{dMeas}}" as="k" hint-placeholder-count="4">
+<div style="border: 1px solid #EEF1F4; border-radius: 10px; padding: 12px; display: flex; flex-direction: column; gap: 6px">
+<div style="font-size: 12px; color: #5B6576; font-weight: 600">{{k.code}} · weight {{k.w}}</div>
+<div style="font-size: 14px; font-weight: 600">{{k.name}}</div>
+<div style="font-size: 22px; font-weight: 700">{{k.val}}</div>
+<div style="height: 8px; background: #EEF1F4; border-radius: 4px"><div style="{{k.bar}}"></div></div>
+</div>
+</template>
+</div>
+<p style="margin: 0; font-size: 13px; color: #5B6576">{{scoreNote}}</p>
+</section>
+</div>
+</template>
+<template data-sc="if" value="{{teamDashOn}}" hint-placeholder-val="{{ false }}">
+<section style="background: #FFFFFF; border: 1px solid #DDE2E8; border-radius: 12px; padding: 16px; display: flex; flex-direction: column; gap: 14px">
+<h2 style="margin: 0; font-size: 16px; font-weight: 600">My team (everyone below me)</h2>
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px">
+<template data-sc="for" list="{{teamTiles}}" as="t" hint-placeholder-count="5">
+<div style="border: 1px solid #EEF1F4; border-radius: 10px; padding: 12px"><div style="font-size: 13px; color: #5B6576">{{t.label}}</div><div style="{{t.numStyle}}">{{t.value}}</div></div>
+</template>
+</div>
+<div style="overflow-x: auto">
+<table>
+<thead><tr><th>Person</th><th>Level</th><th>Reports</th><th>Items</th><th>Open</th><th>Overdue</th><th>Closed</th><th>On time</th><th>First-time right</th><th>Revised</th></tr></thead>
+<tbody>
+<template data-sc="for" list="{{teamDash}}" as="p" hint-placeholder-count="5">
+<tr><td><div style="font-weight: 600">{{p.n}}</div><div style="font-size: 12px; color: #5B6576">{{p.d}}</div></td><td>{{p.l}}</td><td>{{p.rel}}</td><td>{{p.total}}</td><td>{{p.open}}</td><td><span style="{{p.odStyle}}">{{p.od}}</span></td><td>{{p.closed}}</td><td>{{p.onTime}}</td><td>{{p.ftr}}</td><td>{{p.revised}}</td></tr>
+</template>
+</tbody>
+</table>
+</div>
+</section>
+</template>
+<template data-sc="if" value="{{ceoDashNote}}" hint-placeholder-val="{{ false }}">
+<p style="margin: 0; font-size: 14px; color: #5B6576">For your team, use Department Summary (department-level counts) and Management Cockpit (scores and vouching).</p>
+</template>
+</div>
+</template>
+
+<template data-sc="if" value="{{show.team}}" hint-placeholder-val="{{ false }}">
+<div style="display: flex; flex-direction: column; gap: 20px">
+<div>
+<h1 style="margin: 0 0 4px; font-size: 24px; font-weight: 700">Team Work</h1>
+<p style="margin: 0; color: #5B6576; font-size: 14px">Your reporting tree. You can see everyone below you; you review and close work only for your direct reportees (marked). {{teamNote}}</p>
+</div>
+<section style="background: #FFFFFF; border: 1px solid #DDE2E8; border-radius: 12px; padding: 8px 0">
+<div style="overflow-x: auto">
+<table>
+<thead><tr><th>Person</th><th>Level</th><th>Open</th><th>Overdue</th><th>Reviewed by</th></tr></thead>
+<tbody>
+<template data-sc="for" list="{{team}}" as="p" hint-placeholder-count="6">
+<tr style="{{p.rowStyle}}">
+<td><div style="{{p.indent}}"><button type="button" onClick="{{p.pick}}" style="border: 0; background: transparent; padding: 0; color: #1F4E78; font-size: 14px; font-weight: 600; cursor: pointer; text-align: left">{{p.n}}</button><div style="font-size: 12px; color: #5B6576">{{p.d}}</div></div></td>
+<td>{{p.l}}</td>
+<td>{{p.open}}</td>
+<td><span style="{{p.odStyle}}">{{p.overdue}}</span></td>
+<td><span style="{{p.revStyle}}">{{p.revBy}}</span></td>
+</tr>
+</template>
+</tbody>
+</table>
+</div>
+</section>
+<template data-sc="if" value="{{hasTeamPick}}" hint-placeholder-val="{{ false }}">
+<section style="background: #FFFFFF; border: 1px solid #DDE2E8; border-radius: 12px; padding: 4px 0 8px">
+<h2 style="margin: 12px 16px 8px; font-size: 16px; font-weight: 600">Tasks of {{teamPickName}}</h2>
+<div style="overflow-x: auto">
+<table>
+<thead><tr><th>Task</th><th>Priority</th><th>Raised on</th><th>Due</th><th>Status</th></tr></thead>
+<tbody>
+<template data-sc="for" list="{{teamTasks}}" as="t" hint-placeholder-count="3">
+<tr>
+<td><button type="button" onClick="{{t.open}}" style="border: 0; background: transparent; padding: 0; color: #1F4E78; font-size: 14px; font-weight: 600; cursor: pointer; text-align: left">{{t.title}}</button><div style="font-size: 12px; color: #5B6576">{{t.id}}</div></td>
+<td><span style="{{t.prioStyle}}">{{t.prio}}</span></td>
+<td style="white-space: nowrap">{{t.raisedText}}</td>
+<td><div>{{t.dueText}}</div><div style="{{t.dueNoteStyle}}">{{t.dueNote}}</div></td>
+<td><span style="{{t.statusStyle}}">{{t.status}}</span></td>
+</tr>
+</template>
+</tbody>
+</table>
+</div>
+</section>
+</template>
+</div>
+</template>
+
+<template data-sc="if" value="{{show.tasks}}" hint-placeholder-val="{{ false }}">
+<div style="display: flex; flex-direction: column; gap: 20px">
+<div style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-end; gap: 12px">
+<div>
+<h1 style="margin: 0 0 4px; font-size: 24px; font-weight: 700">All Tasks</h1>
+<p style="margin: 0; color: #5B6576; font-size: 14px">{{taskScope}}</p>
+</div>
+<div style="display: flex; flex-wrap: wrap; gap: 8px">
+<template data-sc="for" list="{{filters}}" as="f" hint-placeholder-count="5">
+<button type="button" onClick="{{f.pick}}" style="{{f.style}}">{{f.label}} ({{f.count}})</button>
+</template>
+<template data-sc="if" value="{{fl.active}}" hint-placeholder-val="{{ false }}"><button type="button" onClick="{{fl.clear}}" style="border: 1px solid #A8231B; background: #FFFFFF; color: #A8231B; border-radius: 999px; padding: 8px 14px; font-size: 13px; font-weight: 600; cursor: pointer; min-height: 36px">Clear column filters</button></template>
+</div>
+</div>
+
+<template data-sc="if" value="{{hasSel}}" hint-placeholder-val="{{ false }}">
+<section style="background: #FFFFFF; border: 2px solid #1F4E78; border-radius: 12px; padding: 20px; display: flex; flex-direction: column; gap: 16px">
+<div style="display: flex; flex-wrap: wrap; justify-content: space-between; gap: 12px">
+<div>
+<div style="font-size: 12px; color: #5B6576">{{sel.id}} · {{sel.type}} · {{sel.deptName}}</div>
+<h2 style="margin: 4px 0 0; font-size: 20px; font-weight: 700">{{sel.title}}</h2>
+</div>
+<div style="display: flex; gap: 8px; align-items: flex-start">
+<span style="{{sel.statusStyle}}">{{sel.status}}</span>
+<button type="button" onClick="{{closeSel}}" aria-label="Close task detail" style="border: 1px solid #DDE2E8; background: #FFFFFF; border-radius: 8px; min-width: 44px; min-height: 36px; cursor: pointer; font-size: 16px">×</button>
+</div>
+</div>
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px">
+<div><div style="font-size: 12px; color: #5B6576">Doer</div><div style="font-size: 14px; font-weight: 600">{{sel.doerName}}</div></div>
+<div><div style="font-size: 12px; color: #5B6576">Reviewer</div><div style="font-size: 14px; font-weight: 600">{{sel.revName}}</div></div>
+<div><div style="font-size: 12px; color: #5B6576">Priority</div><div><span style="{{sel.prioStyle}}">{{sel.prio}}</span></div></div>
+<div><div style="font-size: 12px; color: #5B6576">Raised on</div><div style="font-size: 14px; font-weight: 600">{{sel.raisedText}} by {{sel.byName}}</div></div>
+<div><div style="font-size: 12px; color: #5B6576">Current due date</div><div style="font-size: 14px; font-weight: 600">{{sel.dueText}}</div></div>
+<div><div style="font-size: 12px; color: #5B6576">Original due date</div><div style="font-size: 14px; font-weight: 600">{{sel.origText}}</div></div>
+<div><div style="font-size: 12px; color: #5B6576">Overdue</div><div style="{{sel.dueNoteStyle}}">{{sel.dueNote}}</div></div>
+<div><div style="font-size: 12px; color: #5B6576">Reworks</div><div style="font-size: 14px; font-weight: 600">{{sel.rework}}</div></div>
+</div>
+<template data-sc="if" value="{{sel.hasPending}}" hint-placeholder-val="{{ false }}">
+<div style="background: #FFF1D6; border-radius: 8px; padding: 12px; display: flex; flex-direction: column; gap: 8px">
+<div style="font-size: 14px; color: #1A2230"><strong style="font-weight: 600">Due date change requested:</strong> {{sel.pendingText}}</div>
+<template data-sc="if" value="{{sel.canApproveRev}}" hint-placeholder-val="{{ false }}">
+<div style="display: flex; flex-wrap: wrap; gap: 8px"><button type="button" onClick="{{sel.approveRev}}" style="border: 0; background: #1F4E78; color: #FFFFFF; border-radius: 8px; padding: 10px 16px; font-size: 14px; font-weight: 600; cursor: pointer; min-height: 44px">Approve new date</button><button type="button" onClick="{{sel.rejectRev}}" style="border: 1px solid #C9D0D8; background: #FFFFFF; color: #1A2230; border-radius: 8px; padding: 10px 16px; font-size: 14px; font-weight: 600; cursor: pointer; min-height: 44px">Reject</button></div>
+</template>
+<span style="font-size: 13px; color: #5B4300">{{sel.pendingHint}}</span>
+</div>
+</template>
+<template data-sc="if" value="{{ext.open}}" hint-placeholder-val="{{ false }}">
+<div style="border: 1px solid #C9D0D8; border-radius: 8px; padding: 14px; display: flex; flex-direction: column; gap: 12px">
+<div style="font-size: 15px; font-weight: 600">Request a new due date</div>
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px">
+<div style="display: flex; flex-direction: column; gap: 6px"><label for="ex-date" style="font-size: 13px; font-weight: 600">New due date</label><input id="ex-date" type="date" value="{{ext.date}}" onChange="{{ext.onDate}}" style="font-family: inherit; font-size: 14px; padding: 10px; border: 1px solid #C9D0D8; border-radius: 8px"></div>
+<div style="display: flex; flex-direction: column; gap: 6px"><label for="ex-reason" style="font-size: 13px; font-weight: 600">Reason</label><select id="ex-reason" value="{{ext.reason}}" onChange="{{ext.onReason}}" style="font-family: inherit; font-size: 14px; padding: 10px; border: 1px solid #C9D0D8; border-radius: 8px; background: #FFFFFF; min-height: 44px"><template data-sc="for" list="{{reasons}}" as="o" hint-placeholder-count="4"><option value="{{o.v}}">{{o.label}}</option></template></select></div>
+<div style="display: flex; flex-direction: column; gap: 6px"><label for="ex-note" style="font-size: 13px; font-weight: 600">Short note</label><input id="ex-note" type="text" value="{{ext.note}}" onChange="{{ext.onNote}}" style="font-family: inherit; font-size: 14px; padding: 10px; border: 1px solid #C9D0D8; border-radius: 8px"></div>
+</div>
+<template data-sc="if" value="{{ext.hasErr}}" hint-placeholder-val="{{ false }}"><div style="background: #FBE6E4; color: #A8231B; padding: 8px 12px; border-radius: 8px; font-size: 14px">{{ext.err}}</div></template>
+<div style="font-size: 13px; color: #5B6576">The original due date stays on record. A request made after the due date is recorded, but the task still counts as late.</div>
+<div style="display: flex; flex-wrap: wrap; gap: 8px"><button type="button" onClick="{{ext.submit}}" style="border: 0; background: #1F4E78; color: #FFFFFF; border-radius: 8px; padding: 10px 16px; font-size: 14px; font-weight: 600; cursor: pointer; min-height: 44px">Send for approval</button><button type="button" onClick="{{ext.cancel}}" style="border: 1px solid #C9D0D8; background: #FFFFFF; color: #1A2230; border-radius: 8px; padding: 10px 16px; font-size: 14px; font-weight: 600; cursor: pointer; min-height: 44px">Cancel</button></div>
+</div>
+</template>
+<template data-sc="if" value="{{sel.hasRev}}" hint-placeholder-val="{{ false }}">
+<div>
+<div style="font-size: 13px; font-weight: 600; margin-bottom: 6px">Due date revisions</div>
+<div style="overflow-x: auto"><table>
+<thead><tr><th>#</th><th>From</th><th>To</th><th>Reason</th><th>Requested</th><th>Approved by</th></tr></thead>
+<tbody><template data-sc="for" list="{{sel.revs}}" as="r" hint-placeholder-count="1"><tr><td>{{r.no}}</td><td style="white-space: nowrap">{{r.from}}</td><td style="white-space: nowrap">{{r.to}}</td><td>{{r.reason}}</td><td>{{r.req}}</td><td>{{r.appr}}</td></tr></template></tbody>
+</table></div>
+</div>
+</template>
+<template data-sc="if" value="{{sel.hasNote}}" hint-placeholder-val="{{ false }}">
+<div style="background: #F4F6F8; border-radius: 8px; padding: 10px 12px; font-size: 14px">{{sel.note}}</div>
+</template>
+<div>
+<div style="font-size: 13px; font-weight: 600; margin-bottom: 8px">Activity</div>
+<div style="display: flex; flex-direction: column; gap: 6px">
+<template data-sc="for" list="{{sel.log}}" as="e" hint-placeholder-count="3">
+<div style="display: flex; gap: 12px; font-size: 13px"><span style="color: #5B6576; min-width: 96px">{{e.d}}</span><span><strong style="font-weight: 600">{{e.who}}</strong> – {{e.txt}}</span></div>
+</template>
+</div>
+</div>
+<div style="display: flex; flex-wrap: wrap; gap: 8px; align-items: center">
+<template data-sc="for" list="{{sel.actions}}" as="a" hint-placeholder-count="2">
+<button type="button" onClick="{{a.run}}" style="{{a.style}}">{{a.label}}</button>
+</template>
+<span style="font-size: 13px; color: #5B6576">{{sel.actionHint}}</span>
+</div>
+</section>
+</template>
+
+<section style="background: #FFFFFF; border: 1px solid #DDE2E8; border-radius: 12px; padding: 4px 0 8px">
+<template data-sc="if" value="{{noDoerCol}}" hint-placeholder-val="{{ false }}">
+<div style="overflow-x: auto">
+<table>
+<thead><tr><th>Task</th><th>Reviewer</th><th>Priority</th><th>Raised on</th><th>Due</th><th>Status</th></tr>
+<tr>
+<th style="padding: 6px 8px"><select aria-label="Filter by category" value="{{fl.cat}}" onChange="{{fl.onCat}}" style="{{fl.style}}"><option value="">All categories</option><template data-sc="for" list="{{fopt.cat}}" as="o" hint-placeholder-count="3"><option value="{{o.v}}">{{o.label}}</option></template></select></th>
+<th style="padding: 6px 8px"><select aria-label="Filter by reviewer" value="{{fl.rev}}" onChange="{{fl.onRev}}" style="{{fl.style}}"><option value="">All reviewers</option><template data-sc="for" list="{{fopt.rev}}" as="o" hint-placeholder-count="3"><option value="{{o.v}}">{{o.label}}</option></template></select></th>
+<th style="padding: 6px 8px"><select aria-label="Filter by priority" value="{{fl.prio}}" onChange="{{fl.onPrio}}" style="{{fl.style}}"><option value="">All</option><option value="Critical">Critical</option><option value="High">High</option><option value="Medium">Medium</option><option value="Low">Low</option></select></th>
+<th style="padding: 6px 8px"></th>
+<th style="padding: 6px 8px"><select aria-label="Filter by due date" value="{{fl.due}}" onChange="{{fl.onDue}}" style="{{fl.style}}"><option value="">All due dates</option><option value="overdue">Overdue</option><option value="today">Due today</option><option value="week">Next 6 working days</option><option value="later">Later</option></select></th>
+<th style="padding: 6px 8px"><select aria-label="Filter by status" value="{{fl.status}}" onChange="{{fl.onStatus}}" style="{{fl.style}}"><option value="">All statuses</option><template data-sc="for" list="{{fopt.status}}" as="o" hint-placeholder-count="3"><option value="{{o.v}}">{{o.label}}</option></template></select></th>
+</tr></thead>
+<tbody>
+<template data-sc="for" list="{{taskRows}}" as="t" hint-placeholder-count="6">
+<tr>
+<td><button type="button" onClick="{{t.open}}" style="border: 0; background: transparent; padding: 0; color: #1F4E78; font-size: 14px; font-weight: 600; cursor: pointer; text-align: left">{{t.title}}</button><div style="font-size: 12px; color: #5B6576">{{t.id}} · {{t.type}}{{t.toLine}}</div></td>
+<td>{{t.revName}}</td>
+<td><span style="{{t.prioStyle}}">{{t.prio}}</span></td>
+<td style="white-space: nowrap"><div>{{t.raisedText}}</div><div style="font-size: 12px; color: #5B6576">by {{t.byName}}</div></td>
+<td><div>{{t.dueText}}</div><div style="{{t.dueNoteStyle}}">{{t.dueNote}}</div></td>
+<td><span style="{{t.statusStyle}}">{{t.status}}</span></td>
+</tr>
+</template>
+</tbody>
+</table>
+</div>
+</template>
+<template data-sc="if" value="{{showDoer}}" hint-placeholder-val="{{ true }}">
+<div style="overflow-x: auto">
+<table>
+<thead><tr><th>Task</th><th>Doer</th><th>Reviewer</th><th>Priority</th><th>Raised on</th><th>Due</th><th>Status</th></tr>
+<tr>
+<th style="padding: 6px 8px"><div style="display: flex; flex-direction: column; gap: 4px"><template data-sc="if" value="{{fl.showDept}}" hint-placeholder-val="{{ false }}"><select aria-label="Filter by department" value="{{fl.dept}}" onChange="{{fl.onDept}}" style="{{fl.style}}"><option value="">All departments</option><template data-sc="for" list="{{fopt.dept}}" as="o" hint-placeholder-count="3"><option value="{{o.v}}">{{o.label}}</option></template></select></template><select aria-label="Filter by category" value="{{fl.cat}}" onChange="{{fl.onCat}}" style="{{fl.style}}"><option value="">All categories</option><template data-sc="for" list="{{fopt.cat}}" as="o" hint-placeholder-count="3"><option value="{{o.v}}">{{o.label}}</option></template></select></div></th>
+<th style="padding: 6px 8px"><select aria-label="Filter by doer" value="{{fl.doer}}" onChange="{{fl.onDoer}}" style="{{fl.style}}"><option value="">All doers</option><template data-sc="for" list="{{fopt.doer}}" as="o" hint-placeholder-count="3"><option value="{{o.v}}">{{o.label}}</option></template></select></th>
+<th style="padding: 6px 8px"><select aria-label="Filter by reviewer" value="{{fl.rev}}" onChange="{{fl.onRev}}" style="{{fl.style}}"><option value="">All reviewers</option><template data-sc="for" list="{{fopt.rev}}" as="o" hint-placeholder-count="3"><option value="{{o.v}}">{{o.label}}</option></template></select></th>
+<th style="padding: 6px 8px"><select aria-label="Filter by priority" value="{{fl.prio}}" onChange="{{fl.onPrio}}" style="{{fl.style}}"><option value="">All</option><option value="Critical">Critical</option><option value="High">High</option><option value="Medium">Medium</option><option value="Low">Low</option></select></th>
+<th style="padding: 6px 8px"></th>
+<th style="padding: 6px 8px"><select aria-label="Filter by due date" value="{{fl.due}}" onChange="{{fl.onDue}}" style="{{fl.style}}"><option value="">All due dates</option><option value="overdue">Overdue</option><option value="today">Due today</option><option value="week">Next 6 working days</option><option value="later">Later</option></select></th>
+<th style="padding: 6px 8px"><select aria-label="Filter by status" value="{{fl.status}}" onChange="{{fl.onStatus}}" style="{{fl.style}}"><option value="">All statuses</option><template data-sc="for" list="{{fopt.status}}" as="o" hint-placeholder-count="3"><option value="{{o.v}}">{{o.label}}</option></template></select></th>
+</tr></thead>
+<tbody>
+<template data-sc="for" list="{{taskRows}}" as="t" hint-placeholder-count="8">
+<tr>
+<td><button type="button" onClick="{{t.open}}" style="border: 0; background: transparent; padding: 0; color: #1F4E78; font-size: 14px; font-weight: 600; cursor: pointer; text-align: left">{{t.title}}</button><div style="font-size: 12px; color: #5B6576">{{t.id}} · {{t.type}}</div></td>
+<td>{{t.doerName}}</td>
+<td>{{t.revName}}</td>
+<td><span style="{{t.prioStyle}}">{{t.prio}}</span></td>
+<td style="white-space: nowrap"><div>{{t.raisedText}}</div><div style="font-size: 12px; color: #5B6576">by {{t.byName}}</div></td>
+<td><div>{{t.dueText}}</div><div style="{{t.dueNoteStyle}}">{{t.dueNote}}</div></td>
+<td><span style="{{t.statusStyle}}">{{t.status}}</span></td>
+</tr>
+</template>
+</tbody>
+</table>
+</div>
+</template>
+<template data-sc="if" value="{{noTaskRows}}" hint-placeholder-val="{{ false }}">
+<p style="margin: 12px 16px; color: #5B6576; font-size: 14px">{{noRowsMsg}}</p>
+</template>
+</section>
+</div>
+</template>
+
+<template data-sc="if" value="{{show.deptsum}}" hint-placeholder-val="{{ false }}">
+<div style="display: flex; flex-direction: column; gap: 20px">
+<div>
+<h1 style="margin: 0 0 4px; font-size: 24px; font-weight: 700">Department Summary</h1>
+<p style="margin: 0; color: #5B6576; font-size: 14px">Open work by department as of 22-Oct-2026, counted in working days and sorted by overdue items. Select View tasks to drill down. Finance figures are live from this prototype; other departments show dummy figures.</p>
+</div>
+<section style="background: #FFFFFF; border: 1px solid #DDE2E8; border-radius: 12px; padding: 4px 0 8px">
+<div style="overflow-x: auto">
+<table>
+<thead><tr><th>Department</th><th>HOD</th><th>Open</th><th>Overdue</th><th>Critical overdue</th><th>Awaiting review</th><th>Due in 6 working days</th><th>Date revised</th><th></th></tr></thead>
+<tbody>
+<template data-sc="for" list="{{deptRows}}" as="d" hint-placeholder-count="8">
+<tr>
+<td><div style="font-weight: 600">{{d.name}}</div><div style="font-size: 12px; color: #5B6576">{{d.src}}</div></td>
+<td>{{d.hod}}</td>
+<td>{{d.open}}</td>
+<td><span style="{{d.odStyle}}">{{d.od}}</span></td>
+<td><span style="{{d.critStyle}}">{{d.crit}}</span></td>
+<td>{{d.rev}}</td>
+<td>{{d.week}}</td>
+<td>{{d.revised}}</td>
+<td><button type="button" onClick="{{d.view}}" style="border: 1px solid #1F4E78; background: #FFFFFF; color: #1F4E78; border-radius: 8px; padding: 8px 12px; font-size: 13px; font-weight: 600; cursor: pointer; min-height: 36px; white-space: nowrap">View tasks</button></td>
+</tr>
+</template>
+</tbody>
+</table>
+</div>
+</section>
+</div>
+</template>
+
+<template data-sc="if" value="{{show.requests}}" hint-placeholder-val="{{ false }}">
+<div style="display: flex; flex-direction: column; gap: 20px">
+<div>
+<h1 style="margin: 0 0 4px; font-size: 24px; font-weight: 700">Requests between departments</h1>
+<p style="margin: 0; color: #5B6576; font-size: 14px">A request closes only when the requesting department confirms it.</p>
+</div>
+<section style="background: #FFFFFF; border: 1px solid #DDE2E8; border-radius: 12px; padding: 4px 0 8px">
+<h2 style="margin: 12px 16px 8px; font-size: 16px; font-weight: 600">Inbox – requests to {{myDeptName}}</h2>
+<div style="overflow-x: auto">
+<table>
+<thead><tr><th>Request</th><th>From</th><th>Priority</th><th>Raised on</th><th>Need by</th><th>Committed</th><th>Status</th><th></th></tr>
+<tr>
+<th style="padding: 6px 8px"><select aria-label="Filter inbox by category" value="{{rfl.inCat}}" onChange="{{rfl.onInCat}}" style="{{fl.style}}"><option value="">All categories</option><template data-sc="for" list="{{rfl.inOpt.cat}}" as="o" hint-placeholder-count="3"><option value="{{o.v}}">{{o.label}}</option></template></select></th>
+<th style="padding: 6px 8px"><select aria-label="Filter inbox by department" value="{{rfl.inDept}}" onChange="{{rfl.onInDept}}" style="{{fl.style}}"><option value="">All departments</option><template data-sc="for" list="{{rfl.inOpt.dept}}" as="o" hint-placeholder-count="3"><option value="{{o.v}}">{{o.label}}</option></template></select></th>
+<th style="padding: 6px 8px"><select aria-label="Filter inbox by priority" value="{{rfl.inPrio}}" onChange="{{rfl.onInPrio}}" style="{{fl.style}}"><option value="">All</option><option value="Critical">Critical</option><option value="High">High</option><option value="Medium">Medium</option><option value="Low">Low</option></select></th>
+<th style="padding: 6px 8px"></th><th style="padding: 6px 8px"></th><th style="padding: 6px 8px"></th>
+<th style="padding: 6px 8px"><select aria-label="Filter inbox by status" value="{{rfl.inStatus}}" onChange="{{rfl.onInStatus}}" style="{{fl.style}}"><option value="">All statuses</option><template data-sc="for" list="{{rfl.inOpt.status}}" as="o" hint-placeholder-count="3"><option value="{{o.v}}">{{o.label}}</option></template></select></th>
+<th style="padding: 6px 8px"><template data-sc="if" value="{{rfl.inActive}}" hint-placeholder-val="{{ false }}"><button type="button" onClick="{{rfl.clearIn}}" style="border: 1px solid #A8231B; background: #FFFFFF; color: #A8231B; border-radius: 8px; padding: 6px 10px; font-size: 12px; font-weight: 600; cursor: pointer; min-height: 32px; text-transform: none; letter-spacing: 0">Clear</button></template></th>
+</tr></thead>
+<tbody>
+<template data-sc="for" list="{{inbox}}" as="r" hint-placeholder-count="3">
+<tr>
+<td><div style="font-weight: 600">{{r.text}}</div><div style="font-size: 12px; color: #5B6576">{{r.id}} · {{r.catName}}</div></td>
+<td>{{r.from}}</td>
+<td><span style="{{r.prioStyle}}">{{r.prio}}</span></td>
+<td style="white-space: nowrap">{{r.raisedOn}}</td>
+<td>{{r.need}}</td>
+<td>{{r.commit}}</td>
+<td><span style="{{r.statusStyle}}">{{r.status}}</span><div style="font-size: 12px; color: #A8231B; margin-top: 4px">{{r.reasonLine}}</div></td>
+<td><template data-sc="if" value="{{r.canAct}}" hint-placeholder-val="{{ false }}"><div style="display: flex; gap: 6px"><button type="button" onClick="{{r.accept}}" style="border: 0; background: #1F4E78; color: #FFFFFF; border-radius: 8px; padding: 8px 12px; font-size: 13px; font-weight: 600; cursor: pointer; min-height: 36px">Accept</button><button type="button" onClick="{{r.decline}}" style="border: 1px solid #DDE2E8; background: #FFFFFF; color: #1A2230; border-radius: 8px; padding: 8px 12px; font-size: 13px; cursor: pointer; min-height: 36px">Decline</button></div></template></td>
+</tr>
+</template>
+</tbody>
+</table>
+</div>
+</section>
+<section style="background: #FFFFFF; border: 1px solid #DDE2E8; border-radius: 12px; padding: 4px 0 8px">
+<h2 style="margin: 12px 16px 8px; font-size: 16px; font-weight: 600">Outbox – raised by {{myDeptName}}</h2>
+<div style="overflow-x: auto">
+<table>
+<thead><tr><th>Request</th><th>To</th><th>Priority</th><th>Raised on</th><th>Need by</th><th>Committed</th><th>Status</th></tr>
+<tr>
+<th style="padding: 6px 8px"><select aria-label="Filter outbox by category" value="{{rfl.outCat}}" onChange="{{rfl.onOutCat}}" style="{{fl.style}}"><option value="">All categories</option><template data-sc="for" list="{{rfl.outOpt.cat}}" as="o" hint-placeholder-count="3"><option value="{{o.v}}">{{o.label}}</option></template></select></th>
+<th style="padding: 6px 8px"><select aria-label="Filter outbox by department" value="{{rfl.outDept}}" onChange="{{rfl.onOutDept}}" style="{{fl.style}}"><option value="">All departments</option><template data-sc="for" list="{{rfl.outOpt.dept}}" as="o" hint-placeholder-count="3"><option value="{{o.v}}">{{o.label}}</option></template></select></th>
+<th style="padding: 6px 8px"><select aria-label="Filter outbox by priority" value="{{rfl.outPrio}}" onChange="{{rfl.onOutPrio}}" style="{{fl.style}}"><option value="">All</option><option value="Critical">Critical</option><option value="High">High</option><option value="Medium">Medium</option><option value="Low">Low</option></select></th>
+<th style="padding: 6px 8px"></th><th style="padding: 6px 8px"></th><th style="padding: 6px 8px"></th>
+<th style="padding: 6px 8px"><div style="display: flex; flex-direction: column; gap: 4px"><select aria-label="Filter outbox by status" value="{{rfl.outStatus}}" onChange="{{rfl.onOutStatus}}" style="{{fl.style}}"><option value="">All statuses</option><template data-sc="for" list="{{rfl.outOpt.status}}" as="o" hint-placeholder-count="3"><option value="{{o.v}}">{{o.label}}</option></template></select><template data-sc="if" value="{{rfl.outActive}}" hint-placeholder-val="{{ false }}"><button type="button" onClick="{{rfl.clearOut}}" style="border: 1px solid #A8231B; background: #FFFFFF; color: #A8231B; border-radius: 8px; padding: 6px 10px; font-size: 12px; font-weight: 600; cursor: pointer; min-height: 32px; text-transform: none; letter-spacing: 0">Clear</button></template></div></th>
+</tr></thead>
+<tbody>
+<template data-sc="for" list="{{outbox}}" as="r" hint-placeholder-count="2">
+<tr>
+<td><div style="font-weight: 600">{{r.text}}</div><div style="font-size: 12px; color: #5B6576">{{r.id}} · {{r.catName}}</div></td>
+<td>{{r.to}}</td>
+<td><span style="{{r.prioStyle}}">{{r.prio}}</span></td>
+<td style="white-space: nowrap">{{r.raisedOn}}</td>
+<td>{{r.need}}</td>
+<td>{{r.commit}}</td>
+<td><span style="{{r.statusStyle}}">{{r.status}}</span><div style="font-size: 12px; color: #A8231B; margin-top: 4px">{{r.reasonLine}}</div></td>
+</tr>
+</template>
+</tbody>
+</table>
+</div>
+</section>
+</div>
+</template>
+
+<template data-sc="if" value="{{show.dept}}" hint-placeholder-val="{{ false }}">
+<div style="display: flex; flex-direction: column; gap: 20px">
+<div style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-end; gap: 12px">
+<div>
+<h1 style="margin: 0 0 4px; font-size: 24px; font-weight: 700">Finance &amp; Accounts – September 2026 scorecard</h1>
+<p style="margin: 0; color: #5B6576; font-size: 14px">Frozen on working day 1. Dummy figures for the prototype.</p>
+</div>
+<div style="background: #FFFFFF; border: 1px solid #DDE2E8; border-radius: 12px; padding: 12px 20px; text-align: center">
+<div style="font-size: 12px; color: #5B6576">Department score</div>
+<div style="font-size: 32px; font-weight: 700; color: #1B6B3A">87.0</div>
+<div style="font-size: 12px; font-weight: 600; color: #1B6B3A">Good</div>
+</div>
+</div>
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 16px">
+<template data-sc="for" list="{{kpis}}" as="k" hint-placeholder-count="5">
+<div style="background: #FFFFFF; border: 1px solid #DDE2E8; border-radius: 12px; padding: 16px; display: flex; flex-direction: column; gap: 8px">
+<div style="font-size: 12px; color: #5B6576; font-weight: 600">{{k.code}} · weight {{k.w}}</div>
+<div style="font-size: 14px; font-weight: 600; min-height: 36px">{{k.name}}</div>
+<div style="font-size: 26px; font-weight: 700">{{k.val}}</div>
+<div style="height: 8px; background: #EEF1F4; border-radius: 4px"><div style="{{k.bar}}"></div></div>
+<div style="font-size: 12px; color: #5B6576">Contributes {{k.contrib}} points</div>
+</div>
+</template>
+</div>
+<div style="display: flex; flex-wrap: wrap; gap: 20px">
+<section style="flex: 1 1 320px; background: #FFFFFF; border: 1px solid #DDE2E8; border-radius: 12px; padding: 16px">
+<h2 style="margin: 0 0 12px; font-size: 16px; font-weight: 600">Score trend, last 6 months</h2>
+<div style="display: flex; align-items: flex-end; gap: 14px; height: 170px; border-bottom: 1px solid #DDE2E8">
+<template data-sc="for" list="{{trend}}" as="m" hint-placeholder-count="6">
+<div style="flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; height: 100%; gap: 4px">
+<div style="font-size: 12px; font-weight: 600">{{m.v}}</div>
+<div style="{{m.bar}}"></div>
+</div>
+</template>
+</div>
+<div style="display: flex; gap: 14px; margin-top: 6px">
+<template data-sc="for" list="{{trend}}" as="m" hint-placeholder-count="6">
+<div style="flex: 1; text-align: center; font-size: 12px; color: #5B6576">{{m.m}}</div>
+</template>
+</div>
+</section>
+<section style="flex: 1 1 320px; background: #FFFFFF; border: 1px solid #DDE2E8; border-radius: 12px; padding: 16px">
+<h2 style="margin: 0 0 12px; font-size: 16px; font-weight: 600">Open tasks overdue today, by age</h2>
+<div style="display: flex; flex-direction: column; gap: 12px">
+<template data-sc="for" list="{{ageing}}" as="a" hint-placeholder-count="3">
+<div>
+<div style="display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 4px"><span>{{a.label}}</span><strong style="font-weight: 600">{{a.n}}</strong></div>
+<div style="height: 10px; background: #EEF1F4; border-radius: 5px"><div style="{{a.bar}}"></div></div>
+</div>
+</template>
+</div>
+</section>
+</div>
+<section style="background: #FFFFFF; border: 1px solid #DDE2E8; border-radius: 12px; padding: 16px; display: flex; flex-direction: column; gap: 10px">
+<h2 style="margin: 0; font-size: 16px; font-weight: 600">HOD self-review (due by working day 5)</h2>
+<template data-sc="if" value="{{selfOpen}}" hint-placeholder-val="{{ true }}">
+<label for="selfreview" style="font-size: 13px; color: #5B6576">Achievements, reasons for delay, help needed from other departments, corrective actions</label>
+<textarea id="selfreview" value="{{selfText}}" onChange="{{onSelf}}" rows="4" style="font-family: inherit; font-size: 14px; padding: 10px; border: 1px solid #C9D0D8; border-radius: 8px; resize: vertical"></textarea>
+<div><button type="button" onClick="{{submitSelf}}" style="border: 0; background: #1F4E78; color: #FFFFFF; border-radius: 8px; padding: 10px 16px; font-size: 14px; font-weight: 600; cursor: pointer; min-height: 44px">Submit to management</button></div>
+</template>
+<template data-sc="if" value="{{selfDone}}" hint-placeholder-val="{{ false }}">
+<div style="font-size: 14px; background: #E3F2E8; color: #1B6B3A; padding: 10px 12px; border-radius: 8px">Submitted on 22-Oct-2026. Awaiting management vouching.</div>
+<div style="font-size: 14px; white-space: pre-line">{{selfText}}</div>
+</template>
+</section>
+</div>
+</template>
+
+<template data-sc="if" value="{{show.cockpit}}" hint-placeholder-val="{{ false }}">
+<div style="display: flex; flex-direction: column; gap: 20px">
+<div>
+<h1 style="margin: 0 0 4px; font-size: 24px; font-weight: 700">Management Cockpit – September 2026</h1>
+<p style="margin: 0; color: #5B6576; font-size: 14px">All departments ranked by score. Vouch each scorecard after reading the HOD's self-review. Dummy figures.</p>
+</div>
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 16px">
+<template data-sc="for" list="{{cockTiles}}" as="t" hint-placeholder-count="4">
+<div style="background: #FFFFFF; border: 1px solid #DDE2E8; border-radius: 12px; padding: 16px">
+<div style="font-size: 13px; color: #5B6576; font-weight: 500">{{t.label}}</div>
+<div style="{{t.numStyle}}">{{t.value}}</div>
+</div>
+</template>
+</div>
+<section style="background: #FFFFFF; border: 1px solid #DDE2E8; border-radius: 12px; padding: 4px 0 8px">
+<div style="overflow-x: auto">
+<table>
+<thead><tr><th>#</th><th>Department</th><th>HOD</th><th>Score</th><th>Band</th><th>Red flags</th><th>Review status</th><th></th></tr></thead>
+<tbody>
+<template data-sc="for" list="{{cockRows}}" as="d" hint-placeholder-count="8">
+<tr>
+<td style="color: #5B6576">{{d.rank}}</td>
+<td style="font-weight: 600">{{d.name}}</td>
+<td>{{d.hod}}</td>
+<td><div style="display: flex; align-items: center; gap: 8px"><div style="width: 90px; height: 8px; background: #EEF1F4; border-radius: 4px"><div style="{{d.bar}}"></div></div><strong style="font-weight: 600">{{d.score}}</strong></div></td>
+<td><span style="{{d.bandStyle}}">{{d.band}}</span></td>
+<td style="{{d.flagStyle}}">{{d.flag}}</td>
+<td>{{d.status}}</td>
+<td><template data-sc="if" value="{{d.canVouch}}" hint-placeholder-val="{{ false }}"><button type="button" onClick="{{d.vouch}}" style="border: 0; background: #1F4E78; color: #FFFFFF; border-radius: 8px; padding: 8px 12px; font-size: 13px; font-weight: 600; cursor: pointer; min-height: 36px">Vouch</button></template></td>
+</tr>
+</template>
+</tbody>
+</table>
+</div>
+</section>
+</div>
+</template>
+
+<template data-sc="if" value="{{show.admin}}" hint-placeholder-val="{{ false }}">
+<div style="display: flex; flex-direction: column; gap: 20px">
+<div>
+<h1 style="margin: 0 0 4px; font-size: 24px; font-weight: 700">Admin Console</h1>
+<p style="margin: 0; color: #5B6576; font-size: 14px">Functional Admin maintains masters and rules. Changes to roles, KPI weights and escalation need a Management Viewer's approval.</p>
+</div>
+<div style="display: flex; flex-wrap: wrap; gap: 8px">
+<template data-sc="for" list="{{adminTabs}}" as="a" hint-placeholder-count="3">
+<button type="button" onClick="{{a.pick}}" style="{{a.style}}">{{a.label}}</button>
+</template>
+</div>
+<template data-sc="if" value="{{adm.hier}}" hint-placeholder-val="{{ true }}">
+<section style="background: #FFFFFF; border: 1px solid #DDE2E8; border-radius: 12px; padding: 4px 0 8px">
+<h2 style="margin: 12px 16px 8px; font-size: 16px; font-weight: 600">Employees and reporting lines (Finance shown)</h2>
+<div style="overflow-x: auto">
+<table>
+<thead><tr><th>Code</th><th>Name</th><th>Designation</th><th>Level</th><th>Reports to</th><th>Roles</th></tr></thead>
+<tbody>
+<template data-sc="for" list="{{hierRows}}" as="p" hint-placeholder-count="8">
+<tr><td>{{p.c}}</td><td style="font-weight: 600">{{p.n}}</td><td>{{p.d}}</td><td>{{p.l}}</td><td>{{p.rn}}</td><td style="font-size: 13px; color: #5B6576">{{p.roles}}</td></tr>
+</template>
+</tbody>
+</table>
+</div>
+</section>
+</template>
+<template data-sc="if" value="{{adm.kpi}}" hint-placeholder-val="{{ false }}">
+<section style="background: #FFFFFF; border: 1px solid #DDE2E8; border-radius: 12px; padding: 4px 0 8px">
+<h2 style="margin: 12px 16px 8px; font-size: 16px; font-weight: 600">KPI weights</h2>
+<div style="overflow-x: auto">
+<table>
+<thead><tr><th>Code</th><th>Measure</th><th>Current weight</th><th>Proposed</th><th>Status</th></tr></thead>
+<tbody>
+<template data-sc="for" list="{{kpiRows}}" as="k" hint-placeholder-count="5">
+<tr><td>{{k.code}}</td><td style="font-weight: 600">{{k.name}}</td><td>{{k.w}}</td><td>{{k.p}}</td><td><span style="{{k.stStyle}}">{{k.st}}</span></td></tr>
+</template>
+</tbody>
+</table>
+</div>
+<p style="margin: 8px 16px 12px; font-size: 13px; color: #5B6576">Proposed by Priya Rao on 21-Oct-2026. Takes effect only after a Management Viewer approves (maker-checker).</p>
+</section>
+</template>
+<template data-sc="if" value="{{adm.cal}}" hint-placeholder-val="{{ false }}">
+<section style="background: #FFFFFF; border: 1px solid #DDE2E8; border-radius: 12px; padding: 16px; display: flex; flex-direction: column; gap: 16px">
+<div>
+<h2 style="margin: 0 0 4px; font-size: 16px; font-weight: 600">Working calendar</h2>
+<p style="margin: 0; font-size: 13px; color: #5B6576">Due dates, overdue days, turnaround times and escalations are all counted in working days from this calendar. With the current settings, October 2026 has {{workCount}} working days.</p>
+</div>
+<div>
+<div style="font-size: 13px; font-weight: 600; margin-bottom: 8px">Weekly pattern (click a day to switch it)</div>
+<div style="display: flex; flex-wrap: wrap; gap: 8px">
+<template data-sc="for" list="{{weekDays}}" as="w" hint-placeholder-count="7">
+<button type="button" onClick="{{w.toggle}}" style="{{w.style}}">{{w.label}}<span style="display: block; font-size: 12px; font-weight: 400">{{w.state}}</span></button>
+</template>
+</div>
+</div>
+<div>
+<div style="font-size: 13px; font-weight: 600; margin-bottom: 8px">Holidays</div>
+<div style="overflow-x: auto">
+<table>
+<thead><tr><th>Date</th><th>Day</th><th>Holiday</th><th>Applies to</th><th></th></tr></thead>
+<tbody>
+<template data-sc="for" list="{{holRows}}" as="h" hint-placeholder-count="5">
+<tr><td style="white-space: nowrap">{{h.date}}</td><td>{{h.day}}</td><td style="font-weight: 600">{{h.n}}</td><td>{{h.app}}</td><td><button type="button" onClick="{{h.remove}}" style="border: 1px solid #C9D0D8; background: #FFFFFF; color: #A8231B; border-radius: 8px; padding: 6px 12px; font-size: 13px; cursor: pointer; min-height: 36px">Remove</button></td></tr>
+</template>
+</tbody>
+</table>
+</div>
+</div>
+<div style="display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-end">
+<div style="display: flex; flex-direction: column; gap: 6px"><label for="hd-date" style="font-size: 13px; font-weight: 600">Date</label><input id="hd-date" type="date" value="{{hf.date}}" onChange="{{hf.onDate}}" style="font-family: inherit; font-size: 14px; padding: 10px; border: 1px solid #C9D0D8; border-radius: 8px"></div>
+<div style="display: flex; flex-direction: column; gap: 6px; flex: 1 1 200px"><label for="hd-name" style="font-size: 13px; font-weight: 600">Holiday name</label><input id="hd-name" type="text" value="{{hf.name}}" onChange="{{hf.onName}}" style="font-family: inherit; font-size: 14px; padding: 10px; border: 1px solid #C9D0D8; border-radius: 8px"></div>
+<div style="display: flex; flex-direction: column; gap: 6px"><label for="hd-app" style="font-size: 13px; font-weight: 600">Applies to</label><select id="hd-app" value="{{hf.app}}" onChange="{{hf.onApp}}" style="font-family: inherit; font-size: 14px; padding: 10px; border: 1px solid #C9D0D8; border-radius: 8px; background: #FFFFFF; min-height: 44px"><option value="All">All locations</option><option value="HO">HO</option><option value="Plant-1">Plant-1</option><option value="Plant-2">Plant-2</option></select></div>
+<button type="button" onClick="{{hf.add}}" style="border: 0; background: #1F4E78; color: #FFFFFF; border-radius: 8px; padding: 10px 16px; font-size: 14px; font-weight: 600; cursor: pointer; min-height: 44px">Add holiday</button>
+</div>
+<template data-sc="if" value="{{hf.hasErr}}" hint-placeholder-val="{{ false }}"><div style="background: #FBE6E4; color: #A8231B; padding: 8px 12px; border-radius: 8px; font-size: 14px">{{hf.err}}</div></template>
+<p style="margin: 0; font-size: 13px; color: #5B6576">In the live system the Admin can also upload the yearly holiday list from Excel (same columns as the Holidays sheet), or sync it from the company calendar. Plant-wise holidays then apply only to employees of that plant; this prototype treats every holiday as company-wide.</p>
+</section>
+</template>
+<template data-sc="if" value="{{adm.esc}}" hint-placeholder-val="{{ false }}">
+<section style="background: #FFFFFF; border: 1px solid #DDE2E8; border-radius: 12px; padding: 4px 0 8px">
+<h2 style="margin: 12px 16px 8px; font-size: 16px; font-weight: 600">Escalation rules (working days)</h2>
+<div style="overflow-x: auto">
+<table>
+<thead><tr><th>Trigger</th><th>Normal priority</th><th>Critical priority</th></tr></thead>
+<tbody>
+<template data-sc="for" list="{{escRows}}" as="e" hint-placeholder-count="5">
+<tr><td style="font-weight: 600">{{e.t}}</td><td>{{e.n}}</td><td>{{e.c}}</td></tr>
+</template>
+</tbody>
+</table>
+</div>
+</section>
+</template>
+</div>
+</template>
+
+<template data-sc="if" value="{{show.it}}" hint-placeholder-val="{{ false }}">
+<div style="display: flex; flex-direction: column; gap: 20px">
+<div>
+<h1 style="margin: 0 0 4px; font-size: 24px; font-weight: 700">IT Console</h1>
+<p style="margin: 0; color: #5B6576; font-size: 14px">Technical administration only. IT Admin cannot open tasks, dashboards or scores.</p>
+</div>
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 16px">
+<template data-sc="for" list="{{itTiles}}" as="t" hint-placeholder-count="4">
+<div style="background: #FFFFFF; border: 1px solid #DDE2E8; border-radius: 12px; padding: 16px">
+<div style="font-size: 13px; color: #5B6576; font-weight: 500">{{t.label}}</div>
+<div style="font-size: 20px; font-weight: 700; margin-top: 6px">{{t.value}}</div>
+<div style="font-size: 12px; color: #5B6576">{{t.sub}}</div>
+</div>
+</template>
+</div>
+<section style="background: #FFFFFF; border: 1px solid #DDE2E8; border-radius: 12px; padding: 4px 0 8px">
+<h2 style="margin: 12px 16px 8px; font-size: 16px; font-weight: 600">User accounts (sample)</h2>
+<div style="overflow-x: auto">
+<table>
+<thead><tr><th>Code</th><th>Name</th><th>Department</th><th>Login</th><th>Account</th></tr></thead>
+<tbody>
+<template data-sc="for" list="{{itUsers}}" as="u" hint-placeholder-count="6">
+<tr><td>{{u.c}}</td><td>{{u.n}}</td><td>{{u.dept}}</td><td>Windows (AD)</td><td><span style="display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 12px; font-weight: 600; background: #E3F2E8; color: #1B6B3A">Active</span></td></tr>
+</template>
+</tbody>
+</table>
+</div>
+</section>
+</div>
+</template>
+
+</main>
+</div>
+</div>
+</template>
+<script>
+
+// Minimal renderer for the prototype's template format: {{path}} holes, sc-for, sc-if, onClick / onChange.
+class DCLogic { constructor(props){ this.props = props || {}; this.state = {}; }
+  setState(u){ var p = typeof u === 'function' ? u(this.state, this.props) : u; this.state = Object.assign({}, this.state, p); scheduleRender(); }
+  forceUpdate(){ scheduleRender(); } }
+var HOLE = /\{\{\s*([^}]+?)\s*\}\}/g, WHOLE = /^\s*\{\{\s*([^}]+?)\s*\}\}\s*$/;
+function look(scope, path){ path = path.trim(); if (path==='true') return true; if (path==='false') return false; if (/^-?\d+(\.\d+)?$/.test(path)) return +path;
+  var parts = path.split('.'), v; for (var i = scope.length-1; i >= 0; i--) { if (scope[i] && Object.prototype.hasOwnProperty.call(scope[i], parts[0])) { v = scope[i][parts[0]]; break; } }
+  for (var j = 1; j < parts.length && v != null; j++) v = v[parts[j]]; return v; }
+function interp(str, scope){ return str.replace(HOLE, function(_, p){ var v = look(scope, p); return v == null ? '' : String(v); }); }
+function val(str, scope){ var m = str.match(WHOLE); return m ? look(scope, m[1]) : interp(str, scope); }
+function build(node, scope, out){
+  node.childNodes.forEach(function(n){
+    if (n.nodeType === 3) { out.appendChild(document.createTextNode(interp(n.nodeValue, scope))); return; }
+    if (n.nodeType !== 1) return;
+    if (n.tagName === 'TEMPLATE' && n.dataset.sc === 'for') { var list = val(n.getAttribute('list'), scope) || [], as = n.getAttribute('as');
+      list.forEach(function(item, i){ var s = {}; s[as] = item; s.$index = i; build(n.content, scope.concat([s]), out); }); return; }
+    if (n.tagName === 'TEMPLATE' && n.dataset.sc === 'if') { if (val(n.getAttribute('value'), scope)) build(n.content, scope, out); return; }
+    var el = document.createElement(n.tagName.toLowerCase()), post = {};
+    Array.prototype.forEach.call(n.attributes, function(a){
+      var name = a.name, v = val(a.value, scope);
+      if (name.indexOf('hint-') === 0) return;
+      if (name === 'onclick') { if (typeof v === 'function') el.addEventListener('click', v); return; }
+      if (name === 'onchange') { if (typeof v === 'function') { var t = (n.getAttribute('type')||'').toLowerCase(); var ev = (n.tagName === 'TEXTAREA' || (n.tagName === 'INPUT' && (t === 'text' || t === ''))) ? 'input' : 'change'; el.addEventListener(ev, v); } return; }
+      if (name === 'value' || name === 'checked') { post[name] = v; return; }
+      if (name === 'autofocus') { if (v) post.focus = true; return; }
+      el.setAttribute(name, v == null ? '' : v);
+    });
+    build(n.tagName === 'TEMPLATE' ? n.content : n, scope, el);
+    if ('value' in post) el.value = post.value == null ? '' : post.value;
+    if ('checked' in post) el.checked = !!post.checked;
+    if (post.focus) setTimeout(function(){ el.focus(); }, 0);
+    out.appendChild(el);
+  });
+}
+var app, root, tpl, queued = false;
+function scheduleRender(){ if (queued) return; queued = true; Promise.resolve().then(function(){ queued = false; render(); }); }
+function render(){
+  var a = document.activeElement, id = a && a.id, s1 = a && a.selectionStart, s2 = a && a.selectionEnd;
+  var frag = document.createDocumentFragment(); build(tpl.content, [app.renderVals()], frag);
+  root.replaceChildren(frag);
+  if (id) { var b = document.getElementById(id); if (b) { b.focus(); try { if (s1 != null) b.setSelectionRange(s1, s2); } catch(e){} } }
+}
+
+
+var ASOF = '2026-10-22';
+var DEPT = {MGT:'Management office',FIN:'Finance & Accounts',HRA:'HR & Admin',PUR:'Purchase',STR:'Stores',LOG:'Logistics',PRD:'Production',QAD:'Quality',MNT:'Maintenance',SAM:'Sales & Marketing',PRJ:'Projects & Engineering',ITD:'Information Technology',LEG:'Legal & Secretarial',EHS:'Environment, Health & Safety',IAD:'Internal Audit'};
+var PEOPLE = [
+ {c:'E101',n:'Arjun Raman',d:'Chief Executive Officer',l:'L6',dept:'MGT',r:null,roles:'Reviewer, Management Viewer'},
+ {c:'E102',n:'Priya Rao',d:'Assistant Manager – MIS (DTRS Administrator)',l:'L3',dept:'MGT',r:'E101',roles:'Functional Admin'},
+ {c:'E104',n:'Divya Iyer',d:'Head – Finance & Legal',l:'L5',dept:'FIN',r:'E101',roles:'Reviewer, HOD, Management Viewer'},
+ {c:'E105',n:'Suresh Shetty',d:'Deputy Manager – Accounts',l:'L4',dept:'FIN',r:'E104',roles:'Reviewer'},
+ {c:'E106',n:'Lakshmi Chandran',d:'Assistant Manager – Accounts',l:'L3',dept:'FIN',r:'E105',roles:'Reviewer'},
+ {c:'E107',n:'Rahul Natarajan',d:'Senior Executive – Accounts',l:'L2',dept:'FIN',r:'E106',roles:'Reviewer'},
+ {c:'E108',n:'Meena Reddy',d:'Executive – Accounts',l:'L1',dept:'FIN',r:'E107',roles:'Employee'},
+ {c:'E109',n:'Vignesh Murugan',d:'Executive – Accounts',l:'L1',dept:'FIN',r:'E107',roles:'Employee'},
+ {c:'E110',n:'Anitha Krishnan',d:'Assistant Manager – Taxation',l:'L3',dept:'FIN',r:'E104',roles:'Reviewer'},
+ {c:'E111',n:'Ramesh Nair',d:'Senior Executive – Taxation',l:'L2',dept:'FIN',r:'E110',roles:'Reviewer'},
+ {c:'E112',n:'Kavya Sekar',d:'Executive – Taxation',l:'L1',dept:'FIN',r:'E111',roles:'Employee'},
+ {c:'E113',n:'Prakash Subramani',d:'Deputy Manager – Treasury & Finance',l:'L4',dept:'FIN',r:'E104',roles:'Reviewer'},
+ {c:'E114',n:'Deepa Sharma',d:'Senior Executive – Treasury',l:'L2',dept:'FIN',r:'E113',roles:'Reviewer'},
+ {c:'E115',n:'Sanjay Balan',d:'Executive – Treasury',l:'L1',dept:'FIN',r:'E114',roles:'Employee'},
+ {c:'E116',n:'Revathi Pillai',d:'Head – HR & Admin',l:'L5',dept:'HRA',r:'E101',roles:'HOD'},
+ {c:'E123',n:'Senthil Varma',d:'Head – Purchase',l:'L5',dept:'PUR',r:'E101',roles:'HOD'},
+ {c:'E129',n:'Dinesh Murugan',d:'Manager – Stores (HOD)',l:'L5',dept:'STR',r:'E101',roles:'HOD'},
+ {c:'E135',n:'Naveen Balan',d:'Head – Logistics',l:'L5',dept:'LOG',r:'E101',roles:'HOD'},
+ {c:'E140',n:'Ramya Thomas',d:'Head – Production',l:'L5',dept:'PRD',r:'E101',roles:'HOD'},
+ {c:'E156',n:'Lakshmi Shetty',d:'Head – Quality',l:'L5',dept:'QAD',r:'E101',roles:'HOD'},
+ {c:'E164',n:'Deepa Subramani',d:'Head – Maintenance',l:'L5',dept:'MNT',r:'E101',roles:'HOD'},
+ {c:'E173',n:'Senthil Rao',d:'Head – Sales & Marketing',l:'L5',dept:'SAM',r:'E101',roles:'HOD'},
+ {c:'E183',n:'Rajesh Sekar',d:'Head – Projects & Engineering',l:'L5',dept:'PRJ',r:'E101',roles:'HOD'},
+ {c:'E188',n:'Aishwarya Joseph',d:'Manager – IT (HOD)',l:'L5',dept:'ITD',r:'E101',roles:'HOD, IT Admin'},
+ {c:'E191',n:'Vijay Thomas',d:'Company Secretary (HOD)',l:'L5',dept:'LEG',r:'E101',roles:'HOD'},
+ {c:'E194',n:'Nandhini Varma',d:'Head – EHS',l:'L5',dept:'EHS',r:'E101',roles:'HOD'},
+ {c:'E198',n:'Mythili Natarajan',d:'Head – Internal Audit',l:'L5',dept:'IAD',r:'E101',roles:'HOD, Auditor'}
+];
+function L(d, who, txt){ return {d:d, who:who, txt:txt}; }
+var TASKS = [
+ {id:'T-0101',title:'Bank reconciliation – all accounts (September)',type:'Assigned',doer:'E108',rev:'E107',prio:'High',status:'In Progress',due:'2026-10-15',rework:0,conf:false,note:'',log:[L('05-Oct-2026','Rahul Natarajan','assigned the task'),L('06-Oct-2026','Meena Reddy','accepted'),L('14-Oct-2026','Meena Reddy','HDFC statement pending from bank')]},
+ {id:'T-0102',title:'Vendor balance confirmation follow-up',type:'Assigned',doer:'E109',rev:'E107',prio:'Medium',status:'Submitted for Review',due:'2026-10-24',rework:0,conf:false,note:'',log:[L('10-Oct-2026','Rahul Natarajan','assigned the task'),L('21-Oct-2026','Vignesh Murugan','submitted for review – 42 of 50 confirmations received')]},
+ {id:'T-0103',title:'Fixed asset register – Q2 additions',type:'Self-initiated',doer:'E107',rev:'E106',prio:'Medium',status:'In Progress',due:'2026-10-28',rework:0,conf:false,note:'',log:[L('12-Oct-2026','Rahul Natarajan','created the task')]},
+ {id:'T-0104',title:'Monthly P&L and Balance Sheet – September',type:'Recurring',doer:'E107',rev:'E105',prio:'High',status:'Closed',due:'2026-10-06',rework:0,conf:false,note:'',log:[L('01-Oct-2026','System','created from template RT-01'),L('06-Oct-2026','Suresh Shetty','approved and closed')]},
+ {id:'T-0105',title:'Debtors and creditors ageing review',type:'Recurring',doer:'E108',rev:'E107',prio:'Medium',status:'Open',due:'2026-10-26',rework:0,conf:false,note:'',log:[L('22-Oct-2026','System','created from template RT-02')]},
+ {id:'T-0106',title:'Monthly GST return – September',type:'Recurring',doer:'E111',rev:'E110',prio:'Critical',status:'Closed',due:'2026-10-20',rework:0,conf:false,note:'',log:[L('01-Oct-2026','System','created from template RT-03'),L('19-Oct-2026','Anitha Krishnan','approved and closed')]},
+ {id:'T-0107',title:'TDS reconciliation – Q2',type:'Assigned',doer:'E112',rev:'E111',prio:'High',status:'In Progress',due:'2026-10-21',rework:0,conf:false,note:'',log:[L('08-Oct-2026','Ramesh Nair','assigned the task')]},
+ {id:'T-0108',title:'Income tax assessment reply – AY 2024-25',type:'Assigned',doer:'E110',rev:'E104',prio:'Critical',status:'In Progress',due:'2026-10-30',rework:0,conf:false,note:'',log:[L('09-Oct-2026','Divya Iyer','assigned the task')]},
+ {id:'T-0109',title:'Term loan documentation – new production line',type:'Assigned',doer:'E114',rev:'E113',prio:'High',status:'On Hold',due:'2026-10-17',rework:0,conf:false,note:'On hold: awaiting sanction letter from bank.',log:[L('01-Oct-2026','Prakash Subramani','assigned the task'),L('16-Oct-2026','Deepa Sharma','put on hold – awaiting bank sanction letter')]},
+ {id:'T-0110',title:'Monthly loan status summary',type:'Recurring',doer:'E115',rev:'E114',prio:'Medium',status:'Returned for Rework',due:'2026-10-23',rework:1,conf:false,note:'Returned: interest rates for two loans not updated.',log:[L('01-Oct-2026','System','created from template RT-05'),L('20-Oct-2026','Sanjay Balan','submitted for review'),L('21-Oct-2026','Deepa Sharma','returned for rework – update ROI for two loans')]},
+ {id:'T-0111',title:'Revise payment document cycle to 2 days a week',type:'Assigned',doer:'E105',rev:'E104',prio:'High',status:'In Progress',due:'2026-10-31',rework:0,conf:false,note:'',log:[L('03-Oct-2026','Divya Iyer','assigned the task')]},
+ {id:'T-0112',title:'Budget vs actual commentary – H1',type:'Assigned',doer:'E106',rev:'E105',prio:'Medium',status:'Submitted for Review',due:'2026-10-22',rework:0,conf:false,note:'',log:[L('07-Oct-2026','Suresh Shetty','assigned the task'),L('21-Oct-2026','Lakshmi Chandran','submitted for review')]},
+ {id:'T-0113',title:'Cash flow forecast – November',type:'Assigned',doer:'E113',rev:'E104',prio:'High',status:'Open',due:'2026-10-29',rework:0,conf:false,note:'',log:[L('20-Oct-2026','Divya Iyer','assigned the task')]},
+ {id:'T-0114',title:'Board note on capex funding options',type:'Management directive',doer:'E104',rev:'E101',prio:'High',status:'In Progress',due:'2026-10-27',rework:0,conf:true,note:'Confidential: visible only to the doer, the reviewer, the HOD and Management Viewers.',log:[L('15-Oct-2026','Arjun Raman','issued management directive')]},
+ {id:'T-0115',title:'Job descriptions per revised structure',type:'Assigned',doer:'E105',rev:'E104',prio:'Medium',status:'Closed',due:'2026-10-10',done:'2026-10-14',rework:0,conf:false,note:'',log:[L('01-Oct-2026','Divya Iyer','assigned the task'),L('14-Oct-2026','Divya Iyer','approved and closed – 4 days late')]},
+ {id:'T-0116',title:'Employee advance recovery – disciplinary case',type:'Assigned',doer:'E107',rev:'E106',prio:'Medium',status:'In Progress',due:'2026-10-30',rework:0,conf:true,note:'Confidential task.',log:[L('18-Oct-2026','Lakshmi Chandran','assigned the task')]}
+];
+var REQS = [
+ {id:'R-001',from:'FIN',to:'PUR',text:'PO copies for GRNI items older than 30 days',prio:'High',raised:'05-Oct-2026',need:'10-Oct-2026',commit:'12-Oct-2026',status:'In Progress'},
+ {id:'R-003',from:'SAM',to:'FIN',text:'Credit limit enhancement for dealer D-0231',prio:'Medium',raised:'08-Oct-2026',need:'15-Oct-2026',commit:'14-Oct-2026',status:'Closed – confirmed'},
+ {id:'R-006',from:'FIN',to:'HRA',text:'Payroll inputs for October',prio:'High',raised:'18-Oct-2026',need:'25-Oct-2026',commit:'25-Oct-2026',status:'In Progress'},
+ {id:'R-010',from:'IAD',to:'FIN',text:'Petty cash vouchers – Plant 1',prio:'Medium',raised:'12-Oct-2026',need:'16-Oct-2026',commit:'16-Oct-2026',status:'Closed – confirmed'},
+ {id:'R-011',from:'PRJ',to:'FIN',text:'Release mobilisation advance to civil contractor',prio:'High',raised:'21-Oct-2026',need:'24-Oct-2026',commit:'–',status:'Pending acceptance'},
+ {id:'R-002',from:'PRD',to:'MNT',text:'Repair hydraulic press – Line 2',prio:'Critical',raised:'14-Oct-2026',need:'15-Oct-2026',commit:'15-Oct-2026',status:'Closed – confirmed'},
+ {id:'R-009',from:'EHS',to:'MNT',text:'Install guard on conveyor C-4',prio:'Critical',raised:'19-Oct-2026',need:'20-Oct-2026',commit:'21-Oct-2026',status:'In Progress'}
+];
+var SCORES = [
+ {dept:'LEG',score:93.0,flag:''},{dept:'QAD',score:91.0,flag:''},{dept:'IAD',score:90.0,flag:''},{dept:'EHS',score:89.0,flag:''},
+ {dept:'FIN',score:87.0,flag:''},{dept:'ITD',score:86.0,flag:''},{dept:'PRD',score:84.0,flag:''},{dept:'HRA',score:81.0,flag:''},
+ {dept:'STR',score:79.0,flag:''},{dept:'LOG',score:76.0,flag:''},{dept:'SAM',score:74.0,flag:'2 requests not accepted in time'},
+ {dept:'PUR',score:72.0,flag:'GRNI request overdue (R-001)'},{dept:'MNT',score:68.0,flag:'2 critical tasks over 7 days overdue'},
+ {dept:'PRJ',score:63.0,flag:'1 disputed request'}
+];
+var ROLES = [
+ {k:'exec',code:'E108',label:'Executive'},
+ {k:'sr',code:'E107',label:'Senior Executive'},
+ {k:'hod',code:'E104',label:'HOD Finance'},
+ {k:'ceo',code:'E101',label:'CEO'},
+ {k:'admin',code:'E102',label:'Functional Admin'},
+ {k:'it',code:'E188',label:'IT Admin'}
+];
+var NAV = {exec:['#Overview','dash','#Work','work','tasks','requests'],sr:['#Overview','dash','teamdash','#Work','work','team','tasks','requests'],hod:['#Overview','dash','teamdash','dept','#Management','cockpit','#Work','work','team','tasks','requests'],ceo:['#Overview','dash','#Management','deptsum','cockpit','#Work','work','team','tasks'],admin:['#Overview','dash','#Work','work','#Administration','admin'],it:['#Administration','it']};
+var NAVLBL = {work:'My Work',team:'Team Work',teamdash:'Team Dashboard',tasks:'All Tasks',requests:'Inter-department Requests',dept:'Department Dashboard',cockpit:'Management Cockpit',deptsum:'Department Summary',dash:'My Dashboard',admin:'Admin Console',it:'IT Console'};
+var ACCESS = {
+ exec:'Sees own tasks and items raised to others. Can raise a task to a peer or one level up, and requests. Confirms closure of own requests; does not review anyone’s work.',
+ sr:'Sees own tasks and the whole sub-tree below. Reviews and closes direct reportees’ tasks. Can also raise to a peer or one level up.',
+ hod:'HOD: sees all of Finance and requests involving Finance. Also a Management Viewer: company cockpit and vouching – except Finance itself, which the CEO vouches.',
+ ceo:'Management Viewer: department-level summaries with drill-down to tasks; reviews HODs; vouches scorecards.',
+ admin:'Configures masters and rules. Key changes need management approval. No task review rights.',
+ it:'Logins, AD, backup and server only. No access to tasks, dashboards or scores.'
+};
+var MON = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+var CATS = [
+ {v:'DR',label:'Data / information request',form:'Request',tat:'2 working days'},
+ {v:'CF',label:'Confirmation / verification',form:'Request',tat:'2 working days'},
+ {v:'AP',label:'Approval / sign-off',form:'Request',tat:'1 working day'},
+ {v:'MD',label:'Master data creation / change',form:'Request',tat:'1 working day'},
+ {v:'DS',label:'Data compilation / sorting / cleansing',form:'Task',tat:'3 working days'},
+ {v:'RC',label:'Reconciliation',form:'Task',tat:'5 working days'},
+ {v:'RP',label:'Report / MIS preparation',form:'Task',tat:'as per report calendar'},
+ {v:'TX',label:'Transaction processing',form:'Task',tat:'2 working days'},
+ {v:'DC',label:'Document drafting / review',form:'Task',tat:'5 working days'},
+ {v:'CO',label:'Statutory compliance / filing',form:'Task',tat:'before the statutory due date'},
+ {v:'AU',label:'Audit query / observation closure',form:'Task',tat:'7 working days'},
+ {v:'IS',label:'Issue / complaint resolution',form:'Task',tat:'3 working days'},
+ {v:'FU',label:'Follow-up / coordination',form:'Task',tat:'2 working days'},
+ {v:'PI',label:'Process improvement / project',form:'Task',tat:'as agreed'},
+ {v:'OT',label:'Other',form:'Task',tat:'as agreed'}
+];
+var CATOPTS = CATS.map(function(c){ return {v:c.v, label:c.label}; });
+function catOf(v){ for (var i=0;i<CATS.length;i++){ if (CATS[i].v===v) return CATS[i]; } return CATS[CATS.length-1]; }
+function catHint(v){ var c = catOf(v); return 'Usually raised as a '+c.form+'. Proposed turnaround: '+c.tat+'.'; }
+var CATOF = {'T-0101':'RC','T-0102':'CF','T-0103':'DS','T-0104':'RP','T-0105':'RP','T-0106':'CO','T-0107':'RC','T-0108':'CO','T-0109':'DC','T-0110':'RP','T-0111':'PI','T-0112':'RP','T-0113':'RP','T-0114':'DC','T-0115':'DC','T-0116':'IS'};
+var RQCAT = {'R-001':'DR','R-003':'AP','R-006':'DR','R-010':'DR','R-011':'TX','R-002':'IS','R-009':'IS'};
+var REASONS = ['Waiting on another department','Waiting on an external party (bank, vendor, government, auditor)','Data or documents not received','Scope changed','Priority changed by a senior','Staff on leave or not available','System or IT issue','Other'];
+var REVS = {'T-0111':[{from:'2026-10-17',to:'2026-10-24',reason:'Staff on leave or not available',by:'Suresh Shetty',on:'15-Oct-2026',late:false,appr:'Divya Iyer, 15-Oct-2026'},{from:'2026-10-24',to:'2026-10-31',reason:'Waiting on another department',by:'Suresh Shetty',on:'21-Oct-2026',late:false,appr:'Divya Iyer, 21-Oct-2026'}],'T-0103':[{from:'2026-10-24',to:'2026-10-28',reason:'Data or documents not received',by:'Rahul Natarajan',on:'20-Oct-2026',late:false,appr:'Lakshmi Chandran, 20-Oct-2026'}],'T-0109':[{from:'2026-10-12',to:'2026-10-17',reason:'Waiting on an external party (bank, vendor, government, auditor)',by:'Deepa Sharma',on:'10-Oct-2026',late:false,appr:'Prakash Subramani, 10-Oct-2026'}]};
+var PEND = {'T-0111':{to:'2026-11-07',reason:'Scope changed',note:'Plant 2 payments added to scope',by:'Suresh Shetty',on:'22-Oct-2026',late:false},'T-0101':{to:'2026-10-26',reason:'Waiting on an external party (bank, vendor, government, auditor)',note:'HDFC statement awaited',by:'Meena Reddy',on:'22-Oct-2026',late:true}};
+function person(c){ for (var i=0;i<PEOPLE.length;i++){ if (PEOPLE[i].c===c) return PEOPLE[i]; } return {c:c,n:c,d:'',l:'',dept:''}; }
+function kids(c){ return PEOPLE.filter(function(p){ return p.r===c; }); }
+function subtree(c){ var out=[c]; kids(c).forEach(function(k){ out = out.concat(subtree(k.c)); }); return out; }
+function dnum(s){ var a=s.split('-'); return Date.UTC(+a[0],+a[1]-1,+a[2])/86400000; }
+function fmt(s){ var a=s.split('-'); return a[2]+'-'+MON[+a[1]-1]+'-'+a[0]; }
+function pill(bg, fg){ return 'display:inline-block;padding:2px 10px;border-radius:999px;font-size:12px;font-weight:600;white-space:nowrap;background:'+bg+';color:'+fg; }
+var ST = {'Open':['#ECEEF1','#3D4552'],'Accepted':['#E6EEF6','#1F4E78'],'In Progress':['#E6EEF6','#1F4E78'],'On Hold':['#ECEEF1','#3D4552'],'Submitted for Review':['#DFF1F1','#0F5E63'],'Returned for Rework':['#FCE8D9','#8A3B00'],'Closed':['#E3F2E8','#1B6B3A'],'Cancelled':['#ECEEF1','#3D4552']};
+var PR = {'Critical':['#FBE6E4','#A8231B'],'High':['#FFF1D6','#7A4A00'],'Medium':['#ECEEF1','#3D4552'],'Low':['#F4F6F8','#5B6576']};
+function stStyle(s){ var c = ST[s] || ['#ECEEF1','#3D4552']; return pill(c[0], c[1]); }
+function rqStyle(s){ if (s.indexOf('Closed')===0) return pill('#E3F2E8','#1B6B3A'); if (s==='Pending acceptance') return pill('#FFF1D6','#7A4A00'); if (s.indexOf('Declined')===0) return pill('#FBE6E4','#A8231B'); return pill('#E6EEF6','#1F4E78'); }
+function band(v){ if (v>=90) return ['Excellent','#E3F2E8','#1B6B3A','#2E8B57']; if (v>=75) return ['Good','#EAF5E3','#2F6B1B','#5DA03A']; if (v>=60) return ['Needs attention','#FFF1D6','#7A4A00','#C98A00']; return ['Critical','#FBE6E4','#A8231B','#C0392B']; }
+
+class Component extends DCLogic {
+ constructor(props){
+  super(props);
+  this.state = {role:'hod',screen:'dash',filter:'open',sel:null,teamPick:null,adminTab:'hier',tasks:TASKS.map(function(t){ return Object.assign({},t,{log:t.log.slice(), revs:(REVS[t.id]||[]).slice(), orig: REVS[t.id] ? REVS[t.id][0].from : t.due, pend: PEND[t.id]||null}); }),reqs:REQS.map(function(r){ return Object.assign({},r); }),vouched:{FIN:false},selfText:'September closed on time. Delay in bank reconciliation due to HDFC statement; term loan documentation on hold for bank sanction. Need Purchase to close GRNI request R-001.',selfDone:false,toast:'',tf:{open:false},rf:{open:false},ext:{open:false},fl:{},hf:{},cal:{off:[0],holidays:[{d:'2026-10-02',n:'Gandhi Jayanti',app:'All'},{d:'2026-10-20',n:'Ayudha Pooja (sample)',app:'All'},{d:'2026-11-08',n:'Deepavali (sample)',app:'All'},{d:'2026-12-25',n:'Christmas',app:'HO'},{d:'2027-01-15',n:'Pongal (sample)',app:'All'},{d:'2027-01-26',n:'Republic Day',app:'All'}]}};
+ }
+ act(id, status, txt, meName, extra){
+  this.setState(function(p){
+   return {toast: id+': '+txt, tasks: p.tasks.map(function(t){
+    if (t.id!==id) return t;
+    return Object.assign({}, t, {status:status, rework: t.rework + (status==='Returned for Rework'?1:0), done: status==='Closed'?ASOF:t.done, log: t.log.concat([L('22-Oct-2026', meName, txt)])}, extra||{});
+   })};
+  });
+ }
+ renderVals(){
+  var self = this, s = this.state;
+  var role = ROLES.filter(function(r){ return r.k===s.role; })[0];
+  var me = person(role.code);
+  var asof = dnum(ASOF);
+  var cal = s.cal || {off:[0], holidays:[]};
+  var hol = {}; cal.holidays.forEach(function(h){ hol[h.d] = true; });
+  var isoOf = function(dn){ return new Date(dn*86400000).toISOString().slice(0,10); };
+  var isWork = function(dn){ return cal.off.indexOf(new Date(dn*86400000).getUTCDay())<0 && !hol[isoOf(dn)]; };
+  var wdays = function(a, b){ var n = 0; for (var d=a+1; d<=b; d++) { if (isWork(d)) n++; } return n; };
+  var isMgmt = s.role==='ceo' || s.role==='hod';
+  var sub = subtree(me.c);
+  var screens = NAV[s.role].filter(function(k){ return k.charAt(0)!=='#'; });
+  var screen = screens.indexOf(s.screen)>=0 ? s.screen : screens[0];
+  var go = function(k){ return function(){ self.setState({screen:k, sel:null, teamPick:null}); }; };
+  var open = function(id){ return function(){ self.setState({screen:'tasks', sel:id, filter:'all', ext:{open:false}}); }; };
+
+  function deco(t){
+   var doer = person(t.doer), rev = person(t.rev);
+   var closed = t.status==='Closed' || t.status==='Cancelled';
+   var dueN = dnum(t.due);
+   var od = closed ? 0 : (asof > dueN ? Math.max(1, wdays(dueN, asof)) : 0);
+   var left = dueN === asof ? 0 : (dueN > asof ? Math.max(1, wdays(asof, dueN)) : -1);
+   var masked = t.conf && !(t.doer===me.c || t.rev===me.c || isMgmt);
+   var eff = (t.revs||[]).reduce(function(d, r){ return r.late ? d : r.to; }, t.orig||t.due);
+   var dueNote = closed ? (t.done && dnum(t.done)>dnum(eff) ? 'closed '+Math.max(1, wdays(dnum(eff), dnum(t.done)))+' working day(s) late' : 'closed on time') : (od>0 ? od+(od===1?' working day':' working days')+' overdue' : (left===0 ? 'due today' : 'in '+left+(left===1?' working day':' working days')));
+   var dueNoteStyle = 'font-size:12px;font-weight:600;color:' + (closed ? (t.done && dnum(t.done)>dnum(eff) ? '#8A3B00' : '#1B6B3A') : (od>0 ? '#A8231B' : (left<=2 ? '#7A4A00' : '#5B6576')));
+   return {id:t.id, title: masked ? 'Confidential task (restricted)' : (t.conf ? 'Confidential: '+t.title : t.title), type:t.type + ' · ' + catOf(t.cat || CATOF[t.id] || 'OT').label, doer:t.doer, rev:t.rev, raisedText: t.raised ? fmt(t.raised) : (t.log[0] ? t.log[0].d : ''), byName: t.by ? person(t.by).n : (t.log[0] ? t.log[0].who : ''), doerName:doer.n, revName:rev.n + (t.type==='Request' ? ' (requester)' : ''), prio:t.prio, prioStyle:pill(PR[t.prio][0],PR[t.prio][1]), status:t.status, statusStyle:stStyle(t.status), dueText:fmt(t.due) + (t.revs && t.revs.length ? ' · revised ×'+t.revs.length : ''), origText: fmt(t.orig||t.due), revs: (t.revs||[]).map(function(r,i){ return {no:i+1, from:fmt(r.from), to:fmt(r.to), reason:r.reason, req:r.by+', '+r.on+(r.late?' (after due date)':''), appr:r.appr}; }), hasRev: !!(t.revs && t.revs.length), toLine: t.doer!==me.c ? ' · assigned to '+doer.n : '', onTime: closed && !(t.done && dnum(t.done)>dnum(eff)), dueNote:dueNote, dueNoteStyle:dueNoteStyle, od:od, left:left, closed:closed, rework:t.rework, note: masked ? '' : t.note, hasNote: !masked && !!t.note, log: masked ? [] : t.log, deptName: DEPT[doer.dept]||'', deptCode: doer.dept, catCode: t.cat || CATOF[t.id] || 'OT', open: open(t.id), raw:t};
+  }
+
+  var visible = s.tasks.filter(function(t){ return s.role==='ceo' || sub.indexOf(t.doer)>=0 || t.rev===me.c || t.by===me.c; }).map(deco);
+  if (s.role==='admin' || s.role==='it') visible = visible.filter(function(t){ return t.doer===me.c; });
+  visible.sort(function(a,b){ return dnum(a.raw.due)-dnum(b.raw.due); });
+
+  var mine = visible.filter(function(t){ return t.doer===me.c && !t.closed; });
+  var reviewQ = visible.filter(function(t){ return t.rev===me.c && t.status==='Submitted for Review'; });
+  var tiles = [
+   {label:'Due today', value: mine.filter(function(t){ return t.od===0 && t.left===0; }).length, sub:'my open tasks', color:'#7A4A00'},
+   {label:'Overdue', value: mine.filter(function(t){ return t.od>0; }).length, sub:'my open tasks', color:'#A8231B'},
+   {label:'Due in next 6 working days', value: mine.filter(function(t){ return t.left>0 && t.left<=6; }).length, sub:'my open tasks', color:'#1A2230'},
+   {label:'Waiting for my review', value: reviewQ.length, sub:'tasks to review and requests to confirm', color:'#0F5E63'}
+  ].map(function(x){ x.numStyle = 'font-size:32px;font-weight:700;margin:4px 0;color:'+(x.value>0?x.color:'#1A2230'); return x; });
+
+  var FL = [['all','All'],['open','Open'],['overdue','Overdue'],['review','For my review'],['closed','Closed']];
+  var test = {all:function(){return true;},open:function(t){return !t.closed;},overdue:function(t){return t.od>0;},review:function(t){return t.rev===me.c && t.status==='Submitted for Review';},closed:function(t){return t.closed;}};
+  var fls = s.fl || {};
+  var setF = function(k){ return function(e){ var v = e.target.value; self.setState(function(p){ var f = Object.assign({}, p.fl); f[k] = v; return {fl:f, sel:null}; }); }; };
+  var dueOk = function(t){ var d = fls.due; if (!d) return true; if (d==='overdue') return t.od>0; if (t.closed) return false; if (d==='today') return t.left===0 && t.od===0; if (d==='week') return t.left>0 && t.left<=6; return t.left>6; };
+  var base = visible.filter(function(t){ return (!fls.cat || t.catCode===fls.cat) && (!fls.doer || t.doer===fls.doer) && (!fls.rev || t.rev===fls.rev) && (!fls.prio || t.prio===fls.prio) && (!fls.status || t.status===fls.status) && (!fls.dept || t.deptCode===fls.dept) && dueOk(t); });
+  var distinct = function(key, lab){ var seen = {}, out = []; visible.forEach(function(t){ var v = t[key]; if (!seen[v]) { seen[v] = 1; out.push({v:v, label:lab(t)}); } }); return out.sort(function(a,b){ return a.label < b.label ? -1 : 1; }); };
+  var fl = {cat: fls.cat||'', doer: fls.doer||'', rev: fls.rev||'', prio: fls.prio||'', status: fls.status||'', dept: fls.dept||'', due: fls.due||'',
+   onCat: setF('cat'), onDoer: setF('doer'), onRev: setF('rev'), onPrio: setF('prio'), onStatus: setF('status'), onDept: setF('dept'), onDue: setF('due'),
+   active: !!(fls.cat||fls.doer||fls.rev||fls.prio||fls.status||fls.dept||fls.due), clear: function(){ self.setState({fl:{}}); }, showDept: s.role==='ceo',
+   style: 'width:100%;min-width:104px;font-family:inherit;font-size:12px;font-weight:400;text-transform:none;letter-spacing:0;color:#1A2230;padding:6px;border:1px solid #C9D0D8;border-radius:6px;background:#FFFFFF;min-height:32px'};
+  var fopt = {cat: distinct('catCode', function(t){ return catOf(t.catCode).label; }), doer: distinct('doer', function(t){ return person(t.doer).n; }), rev: distinct('rev', function(t){ return person(t.rev).n; }), status: distinct('status', function(t){ return t.status; }), dept: Object.keys(DEPT).filter(function(k){ return k!=='MGT'; }).map(function(k){ return {v:k, label:DEPT[k]}; })};
+  var filters = FL.map(function(f){ var on = s.filter===f[0]; return {label:f[1], count: base.filter(test[f[0]]).length, pick: function(){ self.setState({filter:f[0]}); }, style: 'border:1px solid '+(on?'#1F4E78':'#C9D0D8')+';background:'+(on?'#1F4E78':'#FFFFFF')+';color:'+(on?'#FFFFFF':'#1A2230')+';border-radius:999px;padding:8px 14px;font-size:13px;font-weight:600;cursor:pointer;min-height:36px'}; });
+  var taskRows = base.filter(test[s.filter] || test.all);
+
+  var selT = null;
+  if (s.sel) { var found = visible.filter(function(t){ return t.id===s.sel; })[0]; if (found) selT = found; }
+  if (selT) {
+   var acts = [], hint = '';
+   var btn = function(label, primary, st, txt){ return {label:label, style: primary ? 'border:0;background:#1F4E78;color:#FFFFFF;border-radius:8px;padding:10px 16px;font-size:14px;font-weight:600;cursor:pointer;min-height:44px' : 'border:1px solid #C9D0D8;background:#FFFFFF;color:#1A2230;border-radius:8px;padding:10px 16px;font-size:14px;font-weight:600;cursor:pointer;min-height:44px', run: function(){ self.act(selT.id, st, txt, me.n); }}; };
+   var btnR = function(label, st, txt, title, lbl, notify){ return {label:label, style:'border:1px solid #C9D0D8;background:#FFFFFF;color:#1A2230;border-radius:8px;padding:10px 16px;font-size:14px;font-weight:600;cursor:pointer;min-height:44px', run: function(){ self.setState({rsn:{open:true, target:'task', id:selT.id, st:st, txt:txt, title:title, label:lbl, notify:notify}}); }}; };
+   var requesterName = person(selT.raw.by || selT.rev).n;
+   if (selT.doer===me.c) {
+    if (selT.status==='Open') acts.push(btn('Accept', true, 'Accepted', 'accepted the task'));
+    if (selT.status==='Open' && ['Peer task','Task to next level','Request'].indexOf(selT.raw.type)>=0) acts.push(btnR('Decline', 'Cancelled', 'declined', 'Reason for declining '+selT.id, 'Declined', requesterName));
+    if (selT.status==='Accepted') acts.push(btn('Start work', true, 'In Progress', 'started work'));
+    if (selT.status==='In Progress' || selT.status==='Returned for Rework') acts.push(selT.raw.type==='Request' ? btn('Send response', true, 'Submitted for Review', 'sent the response') : btn('Submit for review', true, 'Submitted for Review', 'submitted for review'));
+    if (selT.status==='In Progress') acts.push(btnR('Put on hold', 'On Hold', 'put on hold', 'Reason for putting '+selT.id+' on hold', 'On hold', selT.revName));
+    if (selT.status==='On Hold') acts.push(btn('Resume', true, 'In Progress', 'resumed work'));
+    if (false) acts.push({label:'Request extension', style:'border:1px solid #C9D0D8;background:#FFFFFF;color:#1A2230;border-radius:8px;padding:10px 16px;font-size:14px;font-weight:600;cursor:pointer;min-height:44px', run:function(){ self.setState({toast: selT.id+': extension requested after due date – it will still count as late (BRD section 7).'}); }});
+   }
+   if (selT.rev===me.c && selT.status==='Submitted for Review') {
+    acts.push(selT.raw.type==='Request' ? btn('Confirm and close', true, 'Closed', 'confirmed the response and closed') : btn('Approve and close', true, 'Closed', 'approved and closed'));
+    acts.push(selT.raw.type==='Request' ? btnR('Reopen – not sufficient', 'Returned for Rework', 'reopened', 'Why is the response not sufficient?', 'Reopened', selT.doerName) : btnR('Return for rework', 'Returned for Rework', 'returned for rework', 'What needs to be reworked in '+selT.id+'?', 'Returned for rework', selT.doerName));
+   }
+   if (acts.length===0) hint = selT.closed ? 'This task is closed.' : (selT.rev!==me.c && selT.doer!==me.c ? 'View only: only '+selT.revName+' can '+(selT.raw.type==='Request'?'confirm':'review')+' this item. You can comment.' : 'Waiting for the other party.');
+   var tr = selT.raw, pd = tr.pend;
+   if (selT.doer===me.c && !selT.closed && !pd && selT.status!=='Submitted for Review') acts.push({label:'Request new due date', style:'border:1px solid #C9D0D8;background:#FFFFFF;color:#1A2230;border-radius:8px;padding:10px 16px;font-size:14px;font-weight:600;cursor:pointer;min-height:44px', run:function(){ self.setState({ext:{open:true}}); }});
+   if (acts.length>0 && hint==='Waiting for the other party.') hint = '';
+   var needHod = !!pd && (tr.revs||[]).length>=2;
+   var amHod = s.role==='hod' && person(tr.doer).dept===me.dept;
+   var finalStep = !!pd && (!needHod || !!pd.revOk || (tr.rev===me.c && amHod));
+   selT.hasPending = !!pd;
+   selT.pendingText = pd ? fmt(tr.due)+' → '+fmt(pd.to)+' · '+pd.reason+(pd.note?' – '+pd.note:'')+' · requested by '+pd.by+' on '+pd.on+(pd.late?' (after the due date: still counts as late)':'') : '';
+   selT.canApproveRev = !!pd && (needHod ? (pd.revOk ? amHod : tr.rev===me.c) : tr.rev===me.c);
+   selT.pendingHint = pd ? (needHod ? 'Revision no. '+((tr.revs||[]).length+1)+': needs the '+(tr.type==='Request'?'requester':'reviewer')+' and then the HOD. '+(pd.revOk ? 'First approval done; waiting for the HOD.' : (tr.rev===me.c && amHod ? 'You are both, so one approval completes it.' : 'Waiting for '+(tr.rev===me.c?'you':person(tr.rev).n)+' first.')) : (tr.rev===me.c ? 'You approve this as the '+(tr.type==='Request'?'requester':'reviewer')+'.' : 'Waiting for '+person(tr.rev).n+' to approve.')) : '';
+   selT.approveRev = function(){ if (!finalStep) { self.setState(function(p){ return {toast: tr.id+': first approval recorded; sent to the HOD', tasks: p.tasks.map(function(t){ return t.id!==tr.id ? t : Object.assign({}, t, {pend: Object.assign({}, t.pend, {revOk:true}), log: t.log.concat([L('22-Oct-2026', me.n, 'approved due date change (step 1 of 2)')])}); })}; }); return; } self.setState(function(p){ return {toast: tr.id+': new due date '+fmt(pd.to)+' approved', tasks: p.tasks.map(function(t){ if (t.id!==tr.id) return t; return Object.assign({}, t, {due: pd.to, pend: null, revs: (t.revs||[]).concat([{from:t.due, to:pd.to, reason:pd.reason, by:pd.by, on:pd.on, late:pd.late, appr:me.n+', 22-Oct-2026'}]), log: t.log.concat([L('22-Oct-2026', me.n, 'approved due date change to '+fmt(pd.to))])}); })}; }); };
+   selT.rejectRev = function(){ self.setState({rsn:{open:true, target:'rev', id:tr.id, title:'Reason for rejecting the new due date for '+tr.id, notify: pd.by}}); };
+   selT.rejectRevOld = function(){ self.setState(function(p){ return {toast: tr.id+': due date change rejected', tasks: p.tasks.map(function(t){ if (t.id!==tr.id) return t; return Object.assign({}, t, {pend: null, log: t.log.concat([L('22-Oct-2026', me.n, 'rejected due date change')])}); })}; }); };
+   selT.actions = acts; selT.actionHint = hint;
+  }
+
+  var team = [];
+  if (screen==='team') {
+   var walk = function(c, depth){
+    kids(c).forEach(function(k){
+     if (s.role==='ceo' && depth>1) return;
+     var kst = subtree(k.c); var kt = s.tasks.filter(function(t){ return s.role==='ceo' ? kst.indexOf(t.doer)>=0 : t.doer===k.c; }).map(deco);
+     var o = kt.filter(function(t){ return !t.closed; }).length, odn = kt.filter(function(t){ return t.od>0; }).length;
+     var direct = k.r===me.c;
+     team.push({n:k.n, d:k.d, l:k.l, open:o, overdue:odn, odStyle: odn>0 ? pill('#FBE6E4','#A8231B') : 'color:#5B6576', revBy: direct ? 'You' : person(k.r).n, revStyle: direct ? pill('#E6EEF6','#1F4E78') : 'color:#5B6576;font-size:13px', indent:'padding-left:'+((depth-1)*24)+'px', rowStyle: s.teamPick===k.c ? 'background:#F0F5FA' : '', pick: function(){ self.setState({teamPick:k.c}); }});
+     walk(k.c, depth+1);
+    });
+   };
+   walk(me.c, 1);
+  }
+  var teamTasks = s.teamPick ? visible.filter(function(t){ return t.doer===s.teamPick; }) : [];
+
+  var myDept = me.dept;
+  var reqDeco = function(r, inbox){
+   var canAct = inbox && r.status==='Pending acceptance' && s.role==='hod' && r.to===me.dept;
+   return {id:r.id, text:r.text, from:DEPT[r.from], to:DEPT[r.to], prio:r.prio, prioStyle:pill(PR[r.prio][0],PR[r.prio][1]), raisedOn:r.raised, catName:catOf(r.cat || RQCAT[r.id] || 'OT').label, need:r.need, commit:r.commit, status:r.status, statusStyle:rqStyle(r.status), canAct:canAct, fromCode:r.from, toCode:r.to, catCode:r.cat || RQCAT[r.id] || 'OT', reasonLine: r.reason ? 'Reason: '+r.reason : '',
+    accept:function(){ self.setState(function(p){ return {toast:r.id+': accepted, assigned to Prakash Subramani, committed date 24-Oct-2026', reqs:p.reqs.map(function(x){ return x.id===r.id ? Object.assign({},x,{status:'In Progress',commit:'24-Oct-2026'}) : x; })}; }); },
+    decline:function(){ self.setState({rsn:{open:true, target:'req', id:r.id, title:'Reason for declining request '+r.id, notify:'HOD, '+DEPT[r.from]}}); },
+    declineOld:function(){ self.setState(function(p){ return {toast:r.id+': declined – reason: contractor bank details missing', reqs:p.reqs.map(function(x){ return x.id===r.id ? Object.assign({},x,{status:'Declined – details missing'}) : x; })}; }); }};
+  };
+  var inAll = s.reqs.filter(function(r){ return s.role==='ceo' ? true : r.to===myDept; }).map(function(r){ return reqDeco(r,true); });
+  var outAll = s.reqs.filter(function(r){ return s.role==='ceo' ? false : r.from===myDept; }).map(function(r){ return reqDeco(r,false); });
+  var rfls = s.rfl || {};
+  var setR = function(k){ return function(e){ var v = e.target.value; self.setState(function(p){ var f = Object.assign({}, p.rfl); f[k] = v; return {rfl:f}; }); }; };
+  var rqF = function(list, pre, deptKey){ return list.filter(function(r){ return (!rfls[pre+'Dept'] || r[deptKey]===rfls[pre+'Dept']) && (!rfls[pre+'Cat'] || r.catCode===rfls[pre+'Cat']) && (!rfls[pre+'Prio'] || r.prio===rfls[pre+'Prio']) && (!rfls[pre+'Status'] || r.status===rfls[pre+'Status']); }); };
+  var dOpt = function(list, key, lab){ var seen = {}, out = []; list.forEach(function(r){ var v = r[key]; if (!seen[v]) { seen[v] = 1; out.push({v:v, label:lab(v)}); } }); return out.sort(function(a,b){ return a.label < b.label ? -1 : 1; }); };
+  var inbox = rqF(inAll, 'in', 'fromCode'), outbox = rqF(outAll, 'out', 'toCode');
+  var rfl = {inDept: rfls.inDept||'', inCat: rfls.inCat||'', inPrio: rfls.inPrio||'', inStatus: rfls.inStatus||'', outDept: rfls.outDept||'', outCat: rfls.outCat||'', outPrio: rfls.outPrio||'', outStatus: rfls.outStatus||'',
+   onInDept: setR('inDept'), onInCat: setR('inCat'), onInPrio: setR('inPrio'), onInStatus: setR('inStatus'), onOutDept: setR('outDept'), onOutCat: setR('outCat'), onOutPrio: setR('outPrio'), onOutStatus: setR('outStatus'),
+   inOpt: {dept: dOpt(inAll, 'fromCode', function(v){ return DEPT[v]; }), cat: dOpt(inAll, 'catCode', function(v){ return catOf(v).label; }), status: dOpt(inAll, 'status', function(v){ return v; })},
+   outOpt: {dept: dOpt(outAll, 'toCode', function(v){ return DEPT[v]; }), cat: dOpt(outAll, 'catCode', function(v){ return catOf(v).label; }), status: dOpt(outAll, 'status', function(v){ return v; })},
+   inActive: !!(rfls.inDept||rfls.inCat||rfls.inPrio||rfls.inStatus), outActive: !!(rfls.outDept||rfls.outCat||rfls.outPrio||rfls.outStatus),
+   clearIn: function(){ self.setState(function(p){ var f = Object.assign({}, p.rfl); delete f.inDept; delete f.inCat; delete f.inPrio; delete f.inStatus; return {rfl:f}; }); },
+   clearOut: function(){ self.setState(function(p){ var f = Object.assign({}, p.rfl); delete f.outDept; delete f.outCat; delete f.outPrio; delete f.outStatus; return {rfl:f}; }); },
+   noIn: inbox.length===0, noOut: outbox.length===0};
+
+  var K = [['K1','On-time completion',40,86],['K2','Overdue control',20,82],['K3','First-time right',15,90],['K4','Responsiveness to other departments',15,88],['K5','Recurring and compliance adherence',10,95]];
+  var kpis = K.map(function(k){ return {code:k[0], name:k[1], w:k[2]+'%', val:k[3]+'%', contrib:(k[2]*k[3]/100).toFixed(1), bar:'height:8px;border-radius:4px;background:#1F4E78;width:'+k[3]+'%'}; });
+  var trend = [['Apr',78],['May',80],['Jun',83],['Jul',82],['Aug',85],['Sep',87]].map(function(m){ return {m:m[0], v:m[1], bar:'width:100%;max-width:44px;border-radius:6px 6px 0 0;background:'+(m[0]==='Sep'?'#1F4E78':'#9FB8D0')+';height:'+Math.round((m[1]-50)*2.6)+'px'}; });
+  var finOpen = s.tasks.map(deco).filter(function(t){ return person(t.doer).dept==='FIN' && t.od>0; });
+  var ag = [['1–3 days',1,3],['4–7 days',4,7],['More than 7 days',8,9999]];
+  var ageing = ag.map(function(a){ var n = finOpen.filter(function(t){ return t.od>=a[1] && t.od<=a[2]; }).length; return {label:a[0], n:n, bar:'height:10px;border-radius:5px;width:'+Math.min(100,n*25)+'%;background:'+(a[1]>7?'#A8231B':(a[1]>3?'#C98A00':'#1F4E78'))}; });
+
+  var hodOf = {}; PEOPLE.forEach(function(p){ if (p.l==='L5') hodOf[p.dept]=p.n; });
+  var cockRows = SCORES.map(function(x, i){
+   var b = band(x.score), v = !!s.vouched[x.dept];
+   var ready = x.dept!=='FIN' || s.selfDone;
+   return {rank:i+1, name:DEPT[x.dept], hod:hodOf[x.dept], score:x.score.toFixed(1), band:b[0], bandStyle:pill(b[1],b[2]), bar:'height:8px;border-radius:4px;width:'+x.score+'%;background:'+b[3], flag: x.flag || '–', flagStyle: x.flag ? 'color:#A8231B;font-weight:600;font-size:13px' : 'color:#5B6576', status: v ? 'Vouched 22-Oct-2026' : (x.dept===me.dept ? (ready ? 'Own department – the CEO vouches' : 'Own department – submit self-review') : (ready ? 'HOD review in – ready to vouch' : 'Awaiting HOD self-review')), canVouch: !v && ready && isMgmt && x.dept!==me.dept,
+    vouch: function(){ self.setState(function(p){ var nv = Object.assign({}, p.vouched); nv[x.dept]=true; return {vouched:nv, toast: DEPT[x.dept]+' scorecard vouched and locked'}; }); }};
+  });
+  var vouchedN = SCORES.filter(function(x){ return s.vouched[x.dept]; }).length;
+  var avg = SCORES.reduce(function(a,x){ return a+x.score; },0)/SCORES.length;
+  var cockTiles = [
+   {label:'Average score', value: avg.toFixed(1), numStyle:'font-size:28px;font-weight:700;margin-top:4px'},
+   {label:'Departments below 75', value: SCORES.filter(function(x){ return x.score<75; }).length, numStyle:'font-size:28px;font-weight:700;margin-top:4px;color:#7A4A00'},
+   {label:'Red flags', value: SCORES.filter(function(x){ return x.flag; }).length, numStyle:'font-size:28px;font-weight:700;margin-top:4px;color:#A8231B'},
+   {label:'Scorecards vouched', value: vouchedN+' of '+SCORES.length, numStyle:'font-size:28px;font-weight:700;margin-top:4px'}
+  ];
+
+  var DSUM = {HRA:[9,1,0,2,4,1],PUR:[14,5,1,3,6,3],STR:[8,2,0,1,3,1],LOG:[7,2,0,1,3,2],PRD:[22,4,1,5,9,3],QAD:[11,0,0,2,5,1],MNT:[16,7,2,2,6,4],SAM:[13,4,0,3,5,3],PRJ:[12,6,1,1,4,5],ITD:[6,1,0,1,2,0],LEG:[5,0,0,1,2,0],EHS:[7,1,0,1,3,1],IAD:[6,0,0,1,2,0]};
+  var finD = s.tasks.map(deco).filter(function(t){ return t.deptCode==='FIN'; });
+  var fo = finD.filter(function(t){ return !t.closed; });
+  var finArr = [fo.length, fo.filter(function(t){ return t.od>0; }).length, fo.filter(function(t){ return t.od>0 && t.prio==='Critical'; }).length, fo.filter(function(t){ return t.status==='Submitted for Review'; }).length, fo.filter(function(t){ return t.left>0 && t.left<=6; }).length, finD.filter(function(t){ return t.hasRev; }).length];
+  var deptRows = Object.keys(DEPT).filter(function(k){ return k!=='MGT'; }).map(function(k){ var v = k==='FIN' ? finArr : DSUM[k]; return {code:k, name:DEPT[k], hod:hodOf[k], src: k==='FIN' ? 'Live from prototype' : 'Dummy figures', open:v[0], od:v[1], crit:v[2], rev:v[3], week:v[4], revised:v[5], odStyle: v[1]>0 ? pill('#FBE6E4','#A8231B') : 'color:#5B6576', critStyle: v[2]>0 ? pill('#A8231B','#FFFFFF') : 'color:#5B6576', view: function(){ self.setState({screen:'tasks', fl:{dept:k}, filter:'open', sel:null}); }}; }).sort(function(a,b){ return b.od - a.od; });
+  var AT = [['hier','Employees and hierarchy'],['cal','Working calendar'],['kpi','KPI weights'],['esc','Escalation rules']];
+  var adminTabs = AT.map(function(a){ var on = s.adminTab===a[0]; return {label:a[1], pick:function(){ self.setState({adminTab:a[0]}); }, style:'border:1px solid '+(on?'#1F4E78':'#C9D0D8')+';background:'+(on?'#1F4E78':'#FFFFFF')+';color:'+(on?'#FFFFFF':'#1A2230')+';border-radius:8px;padding:10px 14px;font-size:14px;font-weight:600;cursor:pointer;min-height:44px'}; });
+  var hierRows = PEOPLE.filter(function(p){ return p.dept==='FIN' || p.dept==='MGT'; }).map(function(p){ return {c:p.c, n:p.n, d:p.d, l:p.l, rn: p.r ? person(p.r).n+' ('+p.r+')' : '– top of tree', roles:p.roles}; });
+  var kpiRows = [['K1','On-time completion','40%','35%'],['K2','Overdue control','20%','20%'],['K3','First-time right','15%','15%'],['K4','Responsiveness to other departments','15%','15%'],['K5','Recurring and compliance adherence','10%','15%']].map(function(k){ var ch = k[2]!==k[3]; return {code:k[0], name:k[1], w:k[2], p:k[3], st: ch ? 'Pending approval' : 'No change', stStyle: ch ? pill('#FFF1D6','#7A4A00') : 'color:#5B6576;font-size:13px'}; });
+  var escRows = [{t:'2 days before due',n:'Doer (reminder)',c:'Doer (3 days before)'},{t:'On due date',n:'Doer',c:'Doer + reviewer'},{t:'1 day overdue',n:'Reviewer',c:'HOD'},{t:'3 days overdue',n:'HOD',c:'Management Viewers'},{t:'7 days overdue',n:'Management Viewers',c:'Management Viewers, daily'},{t:'Request not accepted in time',n:'Receiving HOD',c:'Receiving HOD + Management'}];
+
+  var itTiles = [{label:'Active user accounts',value:'100',sub:'from Employees master'},{label:'Login method',value:'Windows (AD)',sub:'to be configured by IT'},{label:'Last backup',value:'22-Oct-2026 02:00',sub:'dummy value'},{label:'Server',value:'Windows Server',sub:'Waitress + IIS, HTTPS'}];
+  var itUsers = PEOPLE.slice(0,8).map(function(p){ return {c:p.c, n:p.n, dept:DEPT[p.dept]}; });
+
+  // ---- new task form
+  var allowed;
+  if (s.role==='hod') allowed = PEOPLE.filter(function(p){ return p.dept===me.dept; }).map(function(p){ return p.c; });
+  else if (s.role==='ceo') allowed = [me.c].concat(kids(me.c).filter(function(p){ return p.l==='L5'; }).map(function(p){ return p.c; }));
+  else if (s.role==='sr' || s.role==='exec') { var nextL = 'L' + (+me.l.charAt(1) + 1); allowed = sub.concat(PEOPLE.filter(function(p){ return p.dept===me.dept && sub.indexOf(p.c)<0 && (p.l===me.l || p.l===nextL); }).map(function(p){ return p.c; })); }
+  else allowed = [me.c];
+  var assignees = allowed.map(function(c){ var p = person(c); return {v:c, label: c===me.c ? 'Myself ('+p.n+')' : p.n+' – '+p.d}; });
+  var defAssignee = allowed.length>1 ? allowed[1] : allowed[0];
+  var defCat = defAssignee===me.c ? 'FU' : 'DR';
+  var RULE = {exec:'You can assign to yourself, or to a peer at your level or the next level up in your department – not to anyone more senior. The doer’s immediate senior reviews it, and the doer can accept or decline.', sr:'You can assign downward to anyone in your sub-tree (you review it), or to a peer at your level or the next level up in your department – not more senior (the doer’s immediate senior reviews it).', hod:'As HOD you can assign within Finance & Accounts. When you assign to someone, you are the reviewer.', ceo:'As CEO you assign to HODs. Tasks you assign are flagged as management directives.', admin:'You can create tasks for yourself only.'};
+  var revFor = function(a, form){ if (form==='Request') return me.c; if (a===me.c) return me.r || me.c; if (sub.indexOf(a)>=0) return me.c; return person(a).r; };
+  var typeFor = function(a, form){ if (form==='Request') return 'Request'; if (a===me.c) return 'Self-initiated'; if (sub.indexOf(a)>=0) return s.role==='ceo' ? 'Management directive' : 'Assigned'; return person(a).l===me.l ? 'Peer task' : 'Task to next level'; };
+  var tfs = s.tf || {open:false};
+  var revCode = (tfs.assignee===me.c) ? (me.r || me.c) : me.c;
+  var upd = function(key, which){ return function(e){ var v = e.target.type==='checkbox' ? e.target.checked : e.target.value; self.setState(function(p){ var f = Object.assign({}, p[which]); f[key]=v; f.err=''; var o = {}; o[which]=f; return o; }); }; };
+  var tf = {open: !!tfs.open, cat: tfs.cat||defCat, form: tfs.form||catOf(tfs.cat||defCat).form, catHint: catHint(tfs.cat||defCat), dueLabel: (tfs.form||catOf(tfs.cat||defCat).form)==='Request' ? 'Need-by date' : 'Due date', onCat: function(e){ var v = e.target.value, c = catOf(v); self.setState(function(p){ return {tf:Object.assign({}, p.tf, {cat:v, form:c.form, err:''})}; }); }, onForm: upd('form','tf'), title: tfs.title||'', assignee: tfs.assignee||defAssignee, prio: tfs.prio||'Medium', due: tfs.due||'2026-10-29', desc: tfs.desc||'', conf: !!tfs.conf, err: tfs.err||'', hasErr: !!tfs.err, rule: RULE[s.role]||'',
+   reviewer: (function(){ var a = tfs.assignee||defAssignee, f = tfs.form||catOf(tfs.cat||defCat).form, rv = revFor(a, f); if (f==='Request') return 'You – you confirm closure when the response meets your need'; if (a===me.c) return me.r ? person(me.r).n+' (your immediate senior)' : 'No senior – CEO self-task'; return rv===me.c ? me.n+' (you, as assigner)' : person(rv).n+' (doer’s immediate senior)'; })(),
+   onTitle: upd('title','tf'), onAssignee: upd('assignee','tf'), onPrio: upd('prio','tf'), onDue: upd('due','tf'), onDesc: upd('desc','tf'), onConf: upd('conf','tf'),
+   cancel: function(){ self.setState({tf:{open:false}}); },
+   create: function(){
+    var a = tfs.assignee||defAssignee, title = (tfs.title||'').trim(), due = tfs.due||'2026-10-29';
+    if (!title) { self.setState(function(p){ return {tf:Object.assign({}, p.tf, {err:'Please enter a task title.'})}; }); return; }
+    if (dnum(due) < dnum(ASOF)) { self.setState(function(p){ return {tf:Object.assign({}, p.tf, {err:'Due date cannot be earlier than today.'})}; }); return; }
+    if (!isWork(dnum(due))) { self.setState(function(p){ return {tf:Object.assign({}, p.tf, {err:'That date is a Sunday or a company holiday. Choose a working day.'})}; }); return; }
+    var fm = tfs.form||catOf(tfs.cat||defCat).form, rv = revFor(a, fm), ty = typeFor(a, fm);
+    if (fm==='Request' && a===me.c) { self.setState(function(p){ return {tf:Object.assign({}, p.tf, {err:'A request must go to someone else. Choose Task for your own work.'})}; }); return; }
+    var nid = 'T-0' + (117 + s.tasks.length - TASKS.length);
+    var t = {id:nid, title:title, type:ty, doer:a, rev:rv, by:me.c, raised:ASOF, cat:tfs.cat||defCat, prio:tfs.prio||'Medium', status:'Open', due:due, rework:0, conf:!!tfs.conf, note:tfs.desc||'', log:[L('22-Oct-2026', me.n, a===me.c ? 'created the task' : 'assigned the task to '+person(a).n)]};
+    self.setState(function(p){ return {tasks:p.tasks.concat([t]), tf:{open:false}, screen:'tasks', filter:'all', sel:nid, toast:nid+' created and assigned to '+person(a).n+'. Reviewer: '+person(rv).n+'. An email alert goes to the doer.'}; });
+   }};
+  // ---- new request form
+  var rfs = s.rf || {open:false};
+  var deptOptions = Object.keys(DEPT).filter(function(k){ return k!==me.dept && k!=='MGT'; }).map(function(k){ return {v:k, label:DEPT[k]}; });
+  var rf = {open: !!rfs.open, cat: rfs.cat||'DR', onCat: upd('cat','rf'), to: rfs.to||deptOptions[0].v, prio: rfs.prio||'Medium', need: rfs.need||'2026-10-27', text: rfs.text||'', err: rfs.err||'', hasErr: !!rfs.err,
+   onTo: upd('to','rf'), onPrio: upd('prio','rf'), onNeed: upd('need','rf'), onText: upd('text','rf'),
+   cancel: function(){ self.setState({rf:{open:false}}); },
+   create: function(){
+    var txt = (rfs.text||'').trim(), need = rfs.need||'2026-10-27', to = rfs.to||deptOptions[0].v;
+    if (!txt) { self.setState(function(p){ return {rf:Object.assign({}, p.rf, {err:'Please describe what you need.'})}; }); return; }
+    if (dnum(need) < dnum(ASOF)) { self.setState(function(p){ return {rf:Object.assign({}, p.rf, {err:'Need-by date cannot be earlier than today.'})}; }); return; }
+    if (!isWork(dnum(need))) { self.setState(function(p){ return {rf:Object.assign({}, p.rf, {err:'That date is a Sunday or a company holiday. Choose a working day.'})}; }); return; }
+    var nid = 'R-0' + (12 + s.reqs.length - REQS.length);
+    var r = {id:nid, cat:rfs.cat||'DR', from:me.dept, to:to, text:txt, prio:rfs.prio||'Medium', raised:'22-Oct-2026', need:fmt(need), commit:'–', status:'Pending acceptance'};
+    self.setState(function(p){ return {reqs:p.reqs.concat([r]), rf:{open:false}, screen:'requests', toast:nid+' sent to '+DEPT[to]+'. Their HOD must accept and commit a date; it escalates if not accepted in time.'}; });
+   }};
+  var canCreate = s.role!=='it' && !tf.open && !rf.open;
+  var openTask = function(){ self.setState({tf:{open:true}, rf:{open:false}}); };
+  var openReq = function(){ self.setState({rf:{open:true}, tf:{open:false}}); };
+
+  var exs = s.ext || {open:false};
+  var ext = {open: !!exs.open && !!selT, date: exs.date||'', reason: exs.reason||REASONS[0], note: exs.note||'', err: exs.err||'', hasErr: !!exs.err,
+   onDate: upd('date','ext'), onReason: upd('reason','ext'), onNote: upd('note','ext'),
+   cancel: function(){ self.setState({ext:{open:false}}); },
+   submit: function(){
+    var tr = selT.raw;
+    if (!exs.date) { self.setState(function(p){ return {ext:Object.assign({}, p.ext, {err:'Pick the new due date.'})}; }); return; }
+    if (dnum(exs.date) <= dnum(tr.due)) { self.setState(function(p){ return {ext:Object.assign({}, p.ext, {err:'The new date must be later than the current due date.'})}; }); return; }
+    if (!isWork(dnum(exs.date))) { self.setState(function(p){ return {ext:Object.assign({}, p.ext, {err:'That date is a Sunday or a company holiday. Choose a working day.'})}; }); return; }
+    var late = asof > dnum(tr.due), rsn = exs.reason||REASONS[0];
+    self.setState(function(p){ return {ext:{open:false}, toast: tr.id+': due date change sent to '+person(tr.rev).n+' for approval', tasks: p.tasks.map(function(t){ return t.id!==tr.id ? t : Object.assign({}, t, {pend:{to:exs.date, reason:rsn, note:exs.note||'', by:me.n, on:'22-Oct-2026', late:late}, log: t.log.concat([L('22-Oct-2026', me.n, 'requested due date change to '+fmt(exs.date))])}); })}; });
+   }};
+  // ---- level-based dashboard
+  var pct = function(a, b){ return b ? Math.round(a*100/b)+'%' : '–'; };
+  var allD = s.tasks.map(deco);
+  var st = function(codes){ var lst = allD.filter(function(t){ return codes.indexOf(t.doer)>=0 && t.status!=='Cancelled'; }); var cl = lst.filter(function(t){ return t.closed; }); var op = lst.filter(function(t){ return !t.closed; }); var rec = lst.filter(function(t){ return t.raw.type==='Recurring' && dnum(t.raw.due)<=asof; });
+   return {total:lst.length, open:op.length, closed:cl.length, od:op.filter(function(t){ return t.od>0; }).length, onTime:cl.filter(function(t){ return t.onTime; }).length, ftr:cl.filter(function(t){ return !t.rework; }).length, revised:lst.filter(function(t){ return t.hasRev; }).length, recDue:rec.length, recOk:rec.filter(function(t){ return t.closed && t.onTime; }).length, list:lst}; };
+  var ms = st([me.c]);
+  var raisedOpen = allD.filter(function(t){ return t.raw.by===me.c && t.doer!==me.c && !t.closed; }).length;
+  var dTiles = [
+   {label:'Assigned to me', value: ms.total, sub:'October 2026 to date'},
+   {label:'Closed', value: ms.closed, sub: ms.onTime+' of them on time'},
+   {label:'Open now', value: ms.open, sub: ms.od+' overdue'},
+   {label:'Closed on time', value: pct(ms.onTime, ms.closed), sub:'of closed items'},
+   {label:'First-time right', value: pct(ms.ftr, ms.closed), sub:'closed without rework'},
+   {label:'Raised by me, still open', value: raisedOpen, sub:'with peers or seniors'},
+   {label:'Due dates revised', value: ms.revised, sub:'items with a revision'}
+  ].map(function(x){ x.numStyle = 'font-size:28px;font-weight:700;margin:4px 0;color:'+((x.label==='Open now' && ms.od>0) ? '#A8231B' : '#1A2230'); return x; });
+  var brk = function(lst, keyFn, labFn){ var m = {}, order = []; lst.forEach(function(t){ var k = keyFn(t); if (!m[k]) { m[k] = 0; order.push(k); } m[k]++; }); var mx = Math.max.apply(null, order.map(function(k){ return m[k]; }).concat([1])); return order.sort(function(a,b){ return m[b]-m[a]; }).map(function(k){ return {label: labFn(k), n: m[k], bar:'height:10px;border-radius:5px;background:#1F4E78;width:'+Math.round(m[k]*100/mx)+'%'}; }); };
+  var byStatus = brk(ms.list, function(t){ return t.status; }, function(k){ return k; });
+  var byCat = brk(ms.list, function(t){ return t.catCode; }, function(k){ return catOf(k).label; });
+  var byPrio = brk(ms.list, function(t){ return t.prio; }, function(k){ return k; });
+  var kv = function(a, b){ return b ? a/b : null; };
+  var meas = [['K1','On-time completion',40,kv(ms.onTime, ms.closed)],['K2','Overdue control',20,ms.open ? 1 - ms.od/ms.open : null],['K3','First-time right',15,kv(ms.ftr, ms.closed)],['K5','Recurring and compliance adherence',10,kv(ms.recOk, ms.recDue)]];
+  var wsum = 0, ssum = 0; meas.forEach(function(m){ if (m[3]!==null) { wsum += m[2]; ssum += m[2]*m[3]; } });
+  var myScore = wsum ? (ssum/wsum*100).toFixed(1) : '–';
+  var dMeas = meas.map(function(m){ return {code:m[0], name:m[1], w:m[2]+'%', val: m[3]===null ? 'No items yet' : Math.round(m[3]*100)+'%', bar:'height:8px;border-radius:4px;background:#1F4E78;width:'+(m[3]===null ? 0 : Math.round(m[3]*100))+'%'}; });
+  var scoreNote = (ms.closed < 10 ? 'Indicative only: '+ms.closed+' item(s) closed so far this month. A score counts for review only from 10 closed items (BRD section 11). ' : '') + 'K4 (responsiveness to other departments) applies to HODs and SPOCs only, so the other weights are scaled to 100. Measures with no items are left out.';
+  var teamCodes = s.role==='ceo' ? [] : sub.filter(function(c){ return c!==me.c; });
+  var teamDash = teamCodes.map(function(c){ var p = person(c), x = st([c]); return {n:p.n, d:p.d, l:p.l, rel: p.r===me.c ? 'Direct' : 'Indirect', total:x.total, open:x.open, od:x.od, odStyle: x.od>0 ? pill('#FBE6E4','#A8231B') : 'color:#5B6576', closed:x.closed, onTime:pct(x.onTime, x.closed), ftr:pct(x.ftr, x.closed), revised:x.revised}; });
+  var tt = st(teamCodes);
+  var teamTiles = [{label:'Team items', value: tt.total},{label:'Open now', value: tt.open},{label:'Overdue now', value: tt.od},{label:'Closed on time', value: pct(tt.onTime, tt.closed)},{label:'Waiting for my review', value: reviewQ.length}].map(function(x){ x.numStyle = 'font-size:24px;font-weight:700;margin-top:4px;color:'+((x.label==='Overdue now' && x.value>0) ? '#A8231B' : '#1A2230'); return x; });
+  var LVN = {L1:'Executive',L2:'Senior Executive',L3:'Assistant Manager',L4:'Deputy Manager',L5:'Department Head',L6:'CEO'};
+  var DOW = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+  var weekDays = [1,2,3,4,5,6,0].map(function(d){ var off = cal.off.indexOf(d)>=0; return {label:DOW[d], state: off ? 'Weekly off' : 'Working day', style:'border:1px solid '+(off?'#A8231B':'#1B6B3A')+';background:'+(off?'#FBE6E4':'#E3F2E8')+';color:'+(off?'#A8231B':'#1B6B3A')+';border-radius:8px;padding:8px 12px;font-size:13px;font-weight:600;cursor:pointer;min-height:44px;min-width:110px;text-align:left', toggle: function(){ self.setState(function(p){ var o = p.cal.off.slice(), i = o.indexOf(d); if (i>=0) o.splice(i,1); else o.push(d); return {cal:Object.assign({}, p.cal, {off:o}), toast:DOW[d]+' is now '+(i>=0?'a working day':'a weekly off')+'. Due dates and overdue days are recalculated.'}; }); }}; });
+  var holRows = cal.holidays.slice().sort(function(a,b){ return a.d<b.d ? -1 : 1; }).map(function(h){ return {date:fmt(h.d), day:DOW[new Date(dnum(h.d)*86400000).getUTCDay()], n:h.n, app:h.app, remove:function(){ self.setState(function(p){ return {cal:Object.assign({}, p.cal, {holidays:p.cal.holidays.filter(function(x){ return x.d!==h.d; })}), toast:h.n+' removed from the calendar. Working days are recalculated.'}; }); }}; });
+  var hfs = s.hf || {};
+  var hf = {date:hfs.date||'', name:hfs.name||'', app:hfs.app||'All', err:hfs.err||'', hasErr:!!hfs.err, onDate:upd('date','hf'), onName:upd('name','hf'), onApp:upd('app','hf'),
+   add:function(){
+    var nm = (hfs.name||'').trim();
+    if (!hfs.date || !nm) { self.setState(function(p){ return {hf:Object.assign({}, p.hf, {err:'Enter both the date and the holiday name.'})}; }); return; }
+    if (cal.holidays.some(function(h){ return h.d===hfs.date; })) { self.setState(function(p){ return {hf:Object.assign({}, p.hf, {err:'That date is already in the holiday list.'})}; }); return; }
+    self.setState(function(p){ return {cal:Object.assign({}, p.cal, {holidays:p.cal.holidays.concat([{d:hfs.date, n:nm, app:hfs.app||'All'}])}), hf:{}, toast:nm+' added on '+fmt(hfs.date)+'. Working days are recalculated.'}; });
+   }};
+  var workCount = (function(){ var n = 0; for (var d=dnum('2026-10-01'); d<=dnum('2026-10-31'); d++) { if (isWork(d)) n++; } return n; })();
+  var rss = s.rsn || {open:false};
+  var rsn = {open: !!rss.open, title: rss.title||'', notify: rss.notify||'', text: rss.text||'', err: rss.err||'', hasErr: !!rss.err, onText: upd('text','rsn'),
+   cancel: function(){ self.setState({rsn:{open:false}}); },
+   confirm: function(){
+    var tx = (rss.text||'').trim();
+    if (tx.length < 10) { self.setState(function(p){ return {rsn:Object.assign({}, p.rsn, {err:'A reason is mandatory. Please write at least 10 characters so the other party knows what to do next.'})}; }); return; }
+    var sent = ' Intimation sent to '+rss.notify+'.';
+    if (rss.target==='task') { self.act(rss.id, rss.st, rss.txt+' – reason: '+tx, me.n, {note: rss.label+' by '+me.n+': '+tx}); self.setState({rsn:{open:false}, toast: rss.id+' '+rss.txt+'. Reason recorded.'+sent}); return; }
+    if (rss.target==='rev') { self.setState(function(p){ return {rsn:{open:false}, toast: rss.id+': due date change rejected. Reason recorded.'+sent, tasks: p.tasks.map(function(t){ return t.id!==rss.id ? t : Object.assign({}, t, {pend:null, log: t.log.concat([L('22-Oct-2026', me.n, 'rejected due date change – reason: '+tx)])}); })}; }); return; }
+    if (rss.target==='req') { self.setState(function(p){ return {rsn:{open:false}, toast: rss.id+': declined. Reason recorded.'+sent, reqs: p.reqs.map(function(x){ return x.id!==rss.id ? x : Object.assign({}, x, {status:'Declined', reason: tx}); })}; }); return; }
+   }};
+  var showDoer = kids(me.c).length>0;
+
+  var roles = ROLES.map(function(r){ var on = r.k===s.role; return {label:r.label, who: person(r.code).n, pick:function(){ self.setState({role:r.k, screen:NAV[r.k].filter(function(k){ return k.charAt(0)!=='#'; })[0], sel:null, teamPick:null, filter:'open', tf:{open:false}, rf:{open:false}, ext:{open:false}, fl:{}}); }, style:'border:1px solid '+(on?'#1F4E78':'#C9D0D8')+';background:'+(on?'#1F4E78':'#FFFFFF')+';color:'+(on?'#FFFFFF':'#1A2230')+';border-radius:999px;padding:8px 14px;font-size:13px;font-weight:600;cursor:pointer;min-height:36px'}; });
+  var nav = NAV[s.role].map(function(k){ if (k.charAt(0)==='#') return {isHead:true, isBtn:false, label:k.slice(1)}; var on = k===screen; return {isHead:false, isBtn:true, label:(k==='tasks' && s.role==='ceo') ? 'Task Drill-down' : NAVLBL[k], go:go(k), style:'text-align:left;border:0;border-radius:8px;padding:12px 14px;font-size:14px;cursor:pointer;min-height:44px;font-weight:'+(on?'600':'500')+';background:'+(on?'#1F4E78':'transparent')+';color:'+(on?'#FFFFFF':'#1A2230')}; });
+  var show = {}; ['work','dash','teamdash','team','deptsum','tasks','requests','dept','cockpit','admin','it'].forEach(function(k){ show[k] = k===screen; }); show.dashAny = show.dash || show.teamdash;
+
+  return {
+   me: {n:me.n, d:me.d, first:me.n.split(' ')[0], ini: me.n.split(' ').map(function(w){ return w[0]; }).join('')},
+   roles: roles, nav: nav, show: show, accessNote: ACCESS[s.role],
+   toast: s.toast, hasToast: !!s.toast, clearToast: function(){ self.setState({toast:''}); },
+   tiles: tiles, myTasks: mine, noMyTasks: mine.length===0, reviewQ: reviewQ, hasReviews: reviewQ.length>0,
+   team: team, hasTeamPick: !!s.teamPick, teamPickName: s.teamPick ? person(s.teamPick).n : '', teamTasks: teamTasks,
+   taskScope: s.role==='ceo' ? 'Drill-down across departments. Start from Department Summary or use the column filters.' : (s.role==='hod' ? 'All of Finance & Accounts, plus tasks you review.' : (s.role==='exec' ? 'Your own tasks, plus items you raised to others.' : 'Your tasks, your sub-tree, and items you raised to others.')),
+   teamNote: s.role==='ceo' ? 'Open and overdue counts for each HOD cover their whole department.' : 'Counts are each person’s own open items.',
+   filters: filters, taskRows: taskRows, noTaskRows: taskRows.length===0,
+   hasSel: !!selT, sel: selT || {log:[],actions:[]}, closeSel: function(){ self.setState({sel:null}); },
+   myDeptName: s.role==='ceo' ? 'all departments' : DEPT[myDept], inbox: inbox, outbox: outbox,
+   kpis: kpis, trend: trend, ageing: ageing,
+   selfText: s.selfText, selfOpen: !s.selfDone, selfDone: s.selfDone,
+   onSelf: function(e){ self.setState({selfText: e.target.value}); },
+   submitSelf: function(){ self.setState({selfDone:true, toast:'Self-review submitted to management'}); },
+   cockRows: cockRows, cockTiles: cockTiles,
+   adminTabs: adminTabs, adm: {hier: s.adminTab==='hier', cal: s.adminTab==='cal', kpi: s.adminTab==='kpi', esc: s.adminTab==='esc'}, hierRows: hierRows, kpiRows: kpiRows, escRows: escRows,
+   itTiles: itTiles, itUsers: itUsers,
+   rsn: rsn, rfl: rfl,
+   teamDashOn: screen==='teamdash' && teamDash.length>0, dashTitle: screen==='teamdash' ? 'Team Dashboard' : 'My Dashboard',
+   dTiles: dTiles, byStatus: byStatus, byCat: byCat, byPrio: byPrio, dMeas: dMeas, myScore: myScore, scoreNote: scoreNote, teamDash: teamDash, hasTeamDash: teamDash.length>0, teamTiles: teamTiles, ceoDashNote: s.role==='ceo', noMyItems: ms.total===0,
+   dashSub: screen==='teamdash' ? 'Everyone below '+me.n+' in the reporting tree · October 2026 to date · working days · prototype data' : me.n+' · '+(LVN[me.l]||'')+' ('+me.l+') · October 2026 to date · counted in working days · prototype data',
+   fl: fl, fopt: fopt, deptRows: deptRows, weekDays: weekDays, holRows: holRows, hf: hf, workCount: workCount,
+   noRowsMsg: (s.role==='ceo' && fls.dept && fls.dept!=='FIN') ? 'No task data for this department in the prototype – dummy tasks exist for Finance only.' : 'No tasks match these filters.',
+   ext: ext, reasons: REASONS.map(function(r){ return {v:r, label:r}; }), showDoer: showDoer, noDoerCol: !showDoer,
+   cats: CATOPTS, canCreate: canCreate, openTask: openTask, openReq: openReq, tf: tf, rf: rf, assignees: assignees, deptOptions: deptOptions
+  };
+ }
+}
+
+
+window.addEventListener('DOMContentLoaded', function(){ tpl = document.getElementById('dc-template'); root = document.getElementById('app'); app = new Component({}); render(); });
+
+</script>
+</body>
+</html>
