@@ -1,0 +1,197 @@
+TICKTRAIL ON YOUR OWN SERVER
+Setup guide for a Windows server, with access over the internet
+==================================================================
+
+TickTrail runs on your own computer. Client data, audit files and the scanned
+PDFs are stored only on that computer, in the "data" folder. Staff open it in
+any web browser (Chrome, Edge, Firefox) and log in with their own user name
+and password. No Claude account is needed.
+
+
+WHAT YOU NEED
+-------------
+- A Windows 10, Windows 11 or Windows Server computer that stays switched on.
+  4 GB of memory and 20 GB of free disk space is plenty for a small firm.
+- Node.js, version 22.13 or later (free, from https://nodejs.org).
+- For access from outside the office:
+    * a web address you control, for example ticktrail.yourfirm.in
+    * a fixed (static) public IP address on the office internet connection
+      (ask your internet provider), and access to the router's settings
+    * Caddy, a free program that adds HTTPS (https://caddyserver.com)
+  If you cannot get a fixed IP address, see "No fixed IP address?" below.
+
+
+STEP 1  Install Node.js
+-----------------------
+Download the "LTS" version for Windows from https://nodejs.org and run the
+installer with its default choices.
+
+
+STEP 2  Copy TickTrail to the server
+------------------------------------
+Unzip this package to  C:\TickTrail  so that server.js sits at
+C:\TickTrail\server.js. Avoid a desktop or Downloads folder, because the
+automatic start runs before anyone logs in.
+
+
+STEP 3  Try it and create the owner login
+-----------------------------------------
+Double-click  "1 - Try TickTrail now.cmd". A black window opens and your
+browser shows the setup page. Create the owner login: your name, a user
+name, and a password of at least 8 characters with letters and numbers.
+
+The owner is the firm's administrator and cannot be removed. The checklist
+library (all 33 modules, with the 17 sector modules) and your existing admin
+record are already loaded.
+
+Look around, then close the black window to stop TickTrail.
+
+
+STEP 4  Make it start by itself
+-------------------------------
+Double-click  "2 - Install to run automatically (as administrator).cmd" and
+answer Yes when Windows asks for permission. This will:
+- start TickTrail whenever the computer starts, and restart it if it stops;
+- take a backup every evening at 8:30 pm;
+- restrict the data folder so that only administrators can open it.
+
+On the server itself, TickTrail is now at  http://localhost:8080
+
+Desktop icon: double-click  "Create desktop shortcut.cmd". A TickTrail icon
+appears on this computer's desktop and opens TickTrail in its own window.
+Run it once for each Windows user who works on the server.
+
+
+STEP 5  Internet access with HTTPS
+----------------------------------
+HTTPS encrypts everything between a browser and the server, including
+passwords and client figures. Do not open TickTrail to the internet without it.
+
+a) Web address. In your domain's DNS settings, add an "A" record for the name
+   you want (for example ticktrail.yourfirm.in) pointing to the office's
+   fixed public IP address.
+
+b) Router. Forward TCP ports 80 and 443 to this computer's local IP address.
+   (Port 8080 must NOT be forwarded. TickTrail only answers on this computer
+   and is reached through Caddy.)
+
+c) Caddy. Download "Windows amd64" from https://caddyserver.com/download,
+   rename the file to  caddy.exe  and put it in  C:\TickTrail\caddy
+
+d) Open  C:\TickTrail\caddy\Caddyfile  in Notepad and replace
+   ticktrail.example.in with your web address. Save.
+
+e) Double-click  "3 - Set up HTTPS for internet access (as administrator).cmd".
+   It checks the settings, opens ports 80 and 443 in Windows Firewall, and
+   starts Caddy now and at every start-up. Caddy obtains and renews the
+   certificate by itself.
+
+Staff then use  https://ticktrail.yourfirm.in  from anywhere.
+
+No fixed IP address?
+   Cloudflare Tunnel (free with a Cloudflare account) connects the server to
+   the internet without a fixed IP or router changes. Point the tunnel at
+   http://localhost:8080 and skip steps (b) to (e). Cloudflare then provides
+   the HTTPS.
+
+
+ADDING STAFF
+------------
+1. Send them the web address. On the login page they click "Create your
+   login", choose a user name and password, then send an access request with
+   their designation.
+2. You see the request under  Settings > Team & access. Choose Staff or
+   Reviewer, enter the hourly rate, and click Approve. They get in straight
+   away.
+3. To make someone an admin, set their role to Admin in the Team list and
+   click "Save team changes".
+
+Until you approve them, a new login can see nothing: no clients, no audit
+files and no checklist.
+
+If you prefer that nobody can create a login unless you are expecting them,
+set "allowSignup" to false in config.json (see Settings below). Turn it on
+again when someone joins.
+
+
+PASSWORDS
+---------
+- Anyone can change their own password from the profile menu.
+- Forgotten password: in Team & access, click "Reset password" next to the
+  person. TickTrail shows a temporary password once. Give it to them in
+  person or by phone; they choose their own when they log in.
+- Five wrong passwords lock that login for 15 minutes.
+- If the owner is locked out: on the server, right-click
+  "Reset a password.cmd", choose "Run as administrator", and type the owner's
+  user name.
+
+
+BACKUPS
+-------
+A backup is saved every evening in  C:\TickTrail\backups  and the newest 30
+are kept. To take one at any time, right-click "Backup now.cmd" and choose
+"Run as administrator".
+
+A backup on the same computer does not protect against a failed disk, theft
+or fire. At least once a week, copy the backups folder to an external drive
+or an encrypted cloud folder kept off the premises.
+
+To restore a backup:
+1. Run "Uninstall (as administrator).cmd" to stop TickTrail (your data stays).
+2. From the chosen backup folder, copy  ticktrail.db  over
+   C:\TickTrail\data\ticktrail.db, and delete  ticktrail.db-wal  and
+   ticktrail.db-shm  in the data folder if they are there.
+3. Copy the backup's  blobs  folder over  C:\TickTrail\data\blobs
+4. Run "2 - Install to run automatically" again.
+
+
+SETTINGS (config.json)
+----------------------
+Open config.json in Notepad. Restart TickTrail after any change (restart the
+computer, or run step 4 again).
+
+  "port"            The port TickTrail uses on this computer (8080). If you
+                    change it, change it in caddy\Caddyfile too.
+  "host"            Leave as 127.0.0.1 when Caddy is used.
+                    For office-network-only use without Caddy, set "0.0.0.0",
+                    set "trustProxy" to false, and allow port 8080 through
+                    Windows Firewall for the local network only.
+  "allowSignup"     true or false: whether new people can create a login.
+  "idleMinutes"     Log out after this many idle minutes (30).
+  "maxSessionHours" Log out after this many hours in any case (12).
+
+
+TESTING MODE
+------------
+Testing mode is still on, as in the online app: workflow locks are relaxed so
+you can try everything. When you are ready for real audits, an admin clicks
+"Lock all controls" on the yellow banner.
+
+
+YOUR ONLINE COPY
+----------------
+The online TickTrail at claude.ai is separate and is not changed or synced.
+When this package was made, it held the checklist library and your admin
+record, and both are included here. If you add clients or audit files online
+before moving, export them again before switching. The command
+  node server.js --import <folder>
+loads exported files.
+
+
+KEEPING IT SAFE
+---------------
+- Keep Windows and Node.js updated.
+- Use a strong owner password, and do not share logins between people.
+- Disable or delete people who leave, from Team & access.
+- The log of the server is in  C:\TickTrail\data\server.log
+
+
+QUICK REFERENCE
+---------------
+  1 - Try TickTrail now.cmd             run in a window (for testing)
+  2 - Install to run automatically      start with the computer, nightly backup
+  Create desktop shortcut.cmd           TickTrail icon on this computer's desktop
+  3 - Set up HTTPS                      internet access through Caddy
+  Backup now.cmd                        take a backup immediately
+  Reset a password.cmd                  owner lock-out recovery
+  Uninstall (as administrator).cmd      stop and remove the start-up tasks
