@@ -1,0 +1,71 @@
+Write a complete, single-file Python desktop application named `bankdoc_processor.py` ("BankDoc Processor & Renamer v1.0") designed as an offline utility for an Indian Chartered Accountant (CA) office. Provide the full, uninterrupted Python code without placeholders or omissions.
+
+### 1. TECH STACK & DEPENDENCIES
+- Python 3.9+ using `customtkinter`, `tkinter` (`ttk`), `pymupdf` (`fitz`), `pillow` (`PIL`), `openpyxl`, and `reportlab`.
+- Include a startup dependency check that catches missing libraries and shows a friendly message (both in console and a Tkinter messagebox) with the exact `pip install customtkinter pymupdf pillow openpyxl reportlab` command before exiting.
+- Use a background `TaskRunner` (thread + `queue.Queue` polled via `.after(80, ...)`) so the GUI never freezes during folder scans, LLM requests, exports, backups, or batch renaming.
+
+### 2. STRICT OFFLINE & PRIVACY DESIGN
+- **Loopback-Only Network Guard:** Strictly validate all LLM server URLs so only `127.0.0.1` or `localhost` are permitted (`LoopbackViolation` raised otherwise). Rebuild URLs from validated parts, disable system proxies (`urllib.request.ProxyHandler({})`), and block all HTTP redirects.
+- **In-Memory PDF Unlocking (`DecryptedCache`):** Password-protected PDFs must be unlocked in memory only (`doc.tobytes(encryption=fitz.PDF_ENCRYPT_NONE)`), keyed by file path, size, and `mtime_ns`. Never write passwords to disk, logs, JSON, or Excel, and immediately clear password variables after use. Include a sidebar button to clear unlocked PDF copies from memory.
+- **Zero Hallucination Cross-Check:** For text-layer PDFs, cross-check extracted dates, amounts, transaction IDs, payer, payee, and remarks against the PDF's actual text. Flag any unverified or conflicting values for manual review.
+
+### 3. OVERALL UI & NAVIGATION
+- Light mode CustomTkinter window (`1380x900`, starts maximized/`zoomed`), with a left indigo sidebar (`width=250`) and a 3-step workflow:
+  - **Step 1:** `1   Files & passwords`
+  - **Step 2:** `2   Detect AI model`
+  - **Step 3:** `3   Read, review & rename`
+- Include small orange `?` help buttons throughout the UI that explain features in plain English via `messagebox.showinfo`.
+- At the bottom-left of the sidebar, display the label: `"🔒 Offline utility\nTalks only with offline LLM"`.
+
+### 4. STEP 1: FILES & PASSWORDS (`PageFiles`)
+- **Top Card:** Folder picker (`Browse...`), optional switch to include sub-folders, supported extensions notice (`.pdf`, `.png`, `.jpg`, `.jpeg`, `.tif`, `.tiff`, `.bmp`, `.webp`), `"🔍 Check all files"` button, progress bar, and status label. Ignore system/log files (`thumbs.db`, `desktop.ini`, `.ds_store`, `rename_session.json`, or files starting with `bankdoc_`, `~$`, `.`).
+- **Conditional Password Security Warning Banner:** Display the red/pink warning banner (`"⚠️ Security Warning: Do not share highly sensitive or primary banking passwords here. They may be cached in memory during the session. Use at your own risk."`) **ONLY when at least one password-protected file (`n_lock > 0`) is found** during the scan. Hide it (`grid_forget()`) when no locked files are present.
+- **Side-by-Side File Panes (Left & Right):** Place the two file preview tables side by side in a 2-column grid (`uniform="panes"`) so they can be viewed in parallel:
+  - **Left Card (`② NOT accessible files`):** Columns `File name`, `Sub-folder`, `Why it cannot be used`. Highlights locked files vs. broken/unsupported files. Includes buttons: `"☑ Select locked"`, `"🔑 Enter password..."` (opens `PasswordDialog` to try one password across all selected locked PDFs), and `"🔄 Re-check"`.
+  - **Right Card (`③ Accessible files`):** Columns `File name`, `Sub-folder`, `Type`, `Size`, `Note` (shows if unlocked in memory this session).
+- **Dynamic Bottom Proceed Button:**
+  - If there are NO non-accessible files (`n_bad == 0`), the button text must be `"Proceed to Step 2  ▶"`.
+  - If `n_bad > 0`, show a warning label and update the button text to `"Skip X non-accessible file(s) & proceed to Step 2  ▶"` (with a confirmation dialog on click).
+
+### 5. STEP 2: DETECT LOCAL AI MODEL (`PageLLM`)
+- Auto-probe local ports on `127.0.0.1` for **LM Studio** (`1234`), **Ollama** (`11434`), **llama.cpp / OpenAI-compatible** (`8080`), **Jan** (`1337`), and **GPT4All** (`4891`), plus allow adding custom `localhost`/`127.0.0.1` URLs.
+- Detect model IDs and whether they support vision (`vlm` / `"vision" in capabilities`), skipping embedding-only models.
+- Let the user pick one model via radio buttons and warn them if they pick a text-only model when processing scanned PDFs or images.
+
+### 6. AI PROMPTING & EXTRACTION RULES (CRITICAL FOR JPG/IMAGES)
+- Extract payload from PDFs using direct text if `>= 40` non-whitespace characters exist (up to 6 pages); otherwise render up to 3 pages as PNG base64 images for vision models. For image files, apply EXIF transpose and convert to PNG base64.
+- Ask the LLM to return a single JSON object with: `is_bank_transfer_receipt`, `transaction_id`, `date_candidates`, `amount_candidates`, `payee_name`, `payer_name`, `remarks`, `mode` (`NEFT`, `RTGS`, `IMPS`, `UPI`, `OTHER`).
+- **Prevent Payer/Payee Confusion on JPGs & Screenshots:**
+  - Explicitly instruct the LLM in `SYSTEM_PROMPT` and `USER_PROMPT` how to distinguish `payee_name` (Receiver / Beneficiary / "Paid to" / "To" / "Credited to" — typically prominent at the top of Indian UPI/bank app screenshots like GPay, PhonePe, Paytm, HDFC, ICICI, SBI, Axis) from `payer_name` (Sender / Remitter / "From" / "Debited from" / "Paid by").
+  - Instruct the LLM that if a screenshot only shows `"Paid to [Name]"` and shows only a bank name + masked account number under `"Debited from"` without the sender's personal/company name, `payer_name` MUST be `null` — never copy `payee_name` into `payer_name`, and never put a bank name, branch, IFSC, or account number in either field.
+  - In `apply_llm_result`, if `payer` looks like a bank/account label, clear it; if `payer` and `payee` are identical on an image file, automatically clear `payer` and add a warning note.
+- **Indian Date & Amount Formatting:**
+  - Parse numeric dates using the Indian convention `DD/MM/YYYY` (plus `DD-MMM-YYYY`, `YYYY-MM-DD`, etc.) and store internally as ISO `YYYY-MM-DD`, displayed as `DD-MMM-YYYY`.
+  - Canonicalize amounts: whole numbers format as `"Rs.1000"` (strip `.00`), while decimals format as `"Rs.1000.25"`.
+
+### 7. STEP 3: PROCESS, INTERACTIVE FILTERS, SPLIT VIEWER, EXPORT & RENAME (`PageProcess`)
+- **Top Bar:** `"▶ Start reading the files"`, `"■ Stop"`, progress bar, and summary status.
+- **Toolbar & Working Status Filter Buttons:**
+  - Left side: `"✅ Approve all verified"`, `"✔ Approve selected"`, `"✖ Un-approve selected"`.
+  - Top-right side: Interactive status filter buttons that filter the Treeview rows when clicked:
+    - `All`
+    - `🟩 Verified` (`S_VERIFIED`)
+    - `🟨 Check visually` (`S_UNVERIFIED`)
+    - `🟧 Review` (`S_MISMATCH`, `S_INCOMPLETE`)
+    - `🟥 Ambiguous / Failed` (`S_AMBIG`, `S_FAILED`, `S_NOTRECEIPT`)
+    - `🟦 Edited by you` (`S_EDITED`)
+- **Table & Real-File Split-Screen Preview (`DocViewer`):**
+  - Left side of horizontal `PanedWindow`: Treeview with columns `✔` (approval toggle), `Original file name`, `Status`, `Date`, `Recipient / Payee`, `Amount`, `Remarks / Narration`, `Transaction ID`, `Payer / Sender`, `Mode`, `Proposed new name` (shown when previewing rename), `Name edited?`, and `Warnings / notes`. Double-clicking any data cell or proposed name opens an inline `tk.Entry` editor.
+  - Right side of horizontal `PanedWindow` (`DocViewer`): Opens automatically when a single row is selected. Must render the **actual PDF page or image** on a scrollable/draggable `tk.Canvas` with page navigation (`◀`, `▶`), zoom controls (`−`, `+`, `Fit width`, `100%`, `Ctrl+MouseWheel`), and quick-pick orange buttons when multiple date or amount candidates exist. Ensure `<Configure>` handling (`_auto_fit_pending`) is used so the image renders at full width even when the viewer pane is first mapped.
+- **Compact Bottom Pane (`CTkTabview`) — No Unnecessary Scrolling:**
+  - Size the vertical `PanedWindow` sash (`_place_vsash`) and compact the controls so the bottom `CTkTabview` (`📤 Export data`, `✏️ Rename files`, `📜 Processing log`) fits cleanly without requiring a vertical scrollbar inside the Rename tab:
+  - **Tab 1 (`📤 Export data`):** Export `All rows` or `Approved rows only` to formatted Excel (`.xlsx` via `openpyxl` with header styling, auto-filter, frozen panes, formula-injection protection, and a Summary sheet) or landscape A4 PDF (`.pdf` via `reportlab`).
+  - **Tab 2 (`✏️ Rename files`):**
+    - 4 dropdown parts (`Part 1 - Part 2 - Part 3 - Part 4`) with options: `(leave blank)`, `ddmmyy`, `ddmmmyy`, `yymmdd`, `yymmmdd`, `Payee / Recipient name`, `Amount (Rs.xx)`, `Remarks / Narration`, `Transaction ID`, `Payer / Sender name`, `Payment mode (NEFT/RTGS/IMPS)`. Show a live example filename next to the label.
+    - Sanitize invalid filename characters (`< > : " / \ | ? *`) by replacing them with `"+"`, handle Windows reserved names and path length limits, and resolve duplicate target names by appending `_1`, `_2`, etc.
+    - Checkboxes on one compact row: `"Take a backup copy before renaming"` (with folder picker; backup folder must be outside the root folder and verified via SHA-256) and `"Save a detailed rename log (CSV)"`.
+    - Action buttons: `"👁 Preview before renaming"`, `"✅ RENAME NOW"`, and `"↩ Undo last batch"`.
+    - Safe batch rename workflow: preflight checks -> SHA-256 hashing -> verified backup -> atomic `rename_session.json` crash-recovery journal -> `safe_rename` (never overwrites existing files; stops batch immediately on any error).
+    - Safe Undo workflow: reads `rename_session.json`, verifies each file still exists under the new name, checks the old name is free, and verifies the SHA-256 hash matches before restoring.
+  - **Tab 3 (`📜 Processing log`):** Live read-only log viewer synced with `bankdoc_processing_log.txt` in the working folder.
