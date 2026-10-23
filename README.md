@@ -1,81 +1,87 @@
-# GST Inward HSN/SAC Fetcher — V1
+# Audit Support Tool — Stage 1
 
-Desktop app that reads a downloaded NIC e-invoice "Received" JSON export and
-produces an HSN-wise Excel report. Runs fully offline — no data leaves the
-machine.
+A local Streamlit tool for SAP Day Book and Trial Balance analysis. It has no cloud-storage or data-upload feature: the app runs on your Windows PC and opens in your normal browser.
 
-## What's built in this version (V1)
+## Folder structure
 
-- **Home** — Manual upload of a downloaded e-invoice JSON. Decodes every
-  record's embedded signed invoice, extracts HSN-level line items, stores
-  them locally (SQLite), and is ready to export.
-  "Fetch from portal" tile is present but disabled — that's the V2
-  auto-download feature, not built yet.
-- **Reports** — Pick a From/To month range (and optionally a GSTIN) and
-  generate a consolidated 3-sheet Excel (Invoice Summary / HSN Item Detail /
-  HSN Summary). Keeps a running list of past exports.
-- **Settings** — Register the GSTINs you work with, and choose the folder
-  where generated Excel reports are saved.
-
-Data accumulates month-on-month in a local database
-(`%APPDATA%\GSTInwardHSNFetcher\data.db`), so re-running the app next month
-adds to what's already there rather than starting over. Re-uploading the same
-JSON is safe — invoices are keyed by IRN, so nothing gets duplicated.
-
-## Before you build — one-time setup on your Windows machine
-
-You need Python 3.10+ installed. If DGFT AutoComply's build environment is
-still on this machine, you likely already have everything needed.
-
-```
-cd GSTInwardFetcher
-python -m venv venv
-venv\Scripts\activate
-pip install -r requirements.txt
+```text
+audit_support_stage1/
+├── app.py                     Main application screen
+├── loaders.py                 Excel reading, cleanup, mapping and validation
+├── analysis.py                Dashboard calculations and charts
+├── sampling.py                Reproducible random sampling
+├── generate_dummy_data.py     Makes safe test Excel files
+├── requirements.txt           Libraries to install
+├── run_audit_tool.bat         Double-click Windows launcher
+└── README.md                  Instructions
 ```
 
-## Test it first (without building the exe)
+## Beginner setup on Windows
 
+1. Install Python 3.11 or newer from https://www.python.org/downloads/windows/. During installation, tick **Add Python to PATH**. Close and reopen Command Prompt afterwards.
+2. Create `C:\AuditSupportTool` and copy all files from this folder into it.
+3. Open Command Prompt (Windows key, type `cmd`, Enter), then run:
+   ```bat
+   cd /d C:\AuditSupportTool
+   ```
+4. Install the needed libraries once:
+   ```bat
+   py -3.11 -m pip install -r requirements.txt
+   ```
+   If Windows cannot find `py -3.11`, use:
+   ```bat
+   python -m pip install -r requirements.txt
+   ```
+5. Start the app:
+   ```bat
+   py -3.11 -m streamlit run app.py
+   ```
+   Your browser should open. Otherwise, copy the Local URL shown in Command Prompt (normally `http://localhost:8501`) into your browser.
+6. Stop the tool with `Ctrl` + `C` in Command Prompt.
+
+### Double-click launch
+
+After the one-time library-install step, double-click `run_audit_tool.bat`. Keep its Command Prompt window open while using the app.
+
+## Test it first
+
+From the app folder run:
+```bat
+py -3.11 generate_dummy_data.py
 ```
-python main.py
-```
+This creates safe test files in `dummy_data`. Upload them in **Upload & Validate**.
 
-A window should open with the app. Try uploading a real e-invoice JSON and
-confirm a report generates into your chosen folder before you build the exe —
-much faster to catch issues here than after packaging.
+## How to use Stage 1
 
-## Build the .exe
+1. Open **Upload & Validate** in the sidebar.
+2. Set the period under review, normally 1 April to 31 March.
+3. Upload your Day Book and, where available, the current and previous Trial Balance files.
+4. Confirm the detected sheet, header row and column mapping. The mapping is retained in `audit_column_mapping.json` in the same folder, on your PC only.
+5. Select **Process files and run validation** and review every item marked “Review”. A flag is an audit prompt, not proof of an error.
+6. Open **Comparative Dashboard** for transaction trends, top ledgers and parties, voucher mix, group view and TB comparison. Periods are compared exactly as uploaded—there is no annualising.
+7. Open **Sampling**, select a size and retain the displayed seed and method note. Same population plus same seed produces the same sample.
 
-```
-pyinstaller build.spec
-```
+## SAP handling included
 
-The finished file appears at:
+- SAP `S` is debit and `H` is credit.
+- Excel serial dates and DD-MM-YYYY text dates are recognised.
+- SAP trailing-minus values, such as `1,096,358.00-`, are treated as negative.
+- Report headers and TB total rows are ignored.
+- Voucher codes show friendly labels (for example, `KR – Vendor Invoice`).
+- Provisional grouping is 1 assets, 2 liabilities, 3 equity, 4 income and 5–6 expenses.
 
-```
-dist\GST Inward HSN-SAC Fetcher.exe
-```
+## Common problems
 
-This is a single portable file — the whole app, nothing else to carry
-alongside it.
+| Problem | Fix |
+|---|---|
+| `py is not recognized` | Reinstall Python with **Add Python to PATH**, or use `python` in place of `py -3.11`. |
+| `No module named streamlit` | Run `py -3.11 -m pip install -r requirements.txt` in the app folder. |
+| Wrong preview / “Column Date not found” | Choose the correct worksheet and heading row; then remap the columns. |
+| Dates invalid or outside the period | Confirm Posting Date is mapped and check the selected period. |
+| TB values are zero | Set the TB header row to the row containing `G/L Account`, `Debit (Report Period)`, etc. |
+| Day Book and TB do not reconcile | Ensure both files cover the same company, dates, ledger scope and source filters. |
+| Browser does not open | Use the Local URL shown in Command Prompt, normally `http://localhost:8501`. |
 
-## Getting the .exe onto your office laptop via GitHub
+## Audit note
 
-1. Create a repository on GitHub (private, since this is your own tool) —
-   e.g. `gst-inward-hsn-fetcher`.
-2. Push the source code (main.py, backend.py, ui.html, etc.) — do **not**
-   commit the built .exe into the repo itself (GitHub's normal file-size
-   limits are much stricter than Release assets).
-3. On GitHub, go to the repo → **Releases** → **Draft a new release** →
-   attach `GST Inward HSN-SAC Fetcher.exe` as a release asset → publish.
-4. On your office laptop, open the Release page in the browser and click
-   the .exe link to download — this is a plain HTTPS download from
-   github.com, which should go through even if other file-transfer routes
-   are blocked.
-
-## Known limitation to mention in the demo
-
-The uploaded JSON file needs to be the **"Received" download** from
-`einvoice.gst.gov.in` (Services → e-Invoice → Download e-Invoice →
-Received tab). It reads the array of records with the `SignedInvoice`
-field per record — the format we tested this against.
+This is an audit-support aid. All validation flags, analyses and samples require professional review and do not replace audit judgement or your firm’s methodology.
