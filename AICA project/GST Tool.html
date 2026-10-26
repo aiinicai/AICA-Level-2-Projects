@@ -1,0 +1,3269 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GST Reconciliation Tool</title>
+<style>
+  :root{
+    --bg:#f6f7f9; --panel:#ffffff; --ink:#15181d; --muted:#616b7a;
+    --line:#dfe3e9; --accent:#1a4f8a; --accent-soft:#eaf1f9;
+    --ok:#17663a; --ok-soft:#e7f4ec; --warn:#8a5a00; --warn-soft:#fdf3e0;
+    --err:#a11d28; --err-soft:#fdeced;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font:14px/1.5 "Segoe UI",system-ui,-apple-system,sans-serif}
+  .wrap{max-width:1080px;margin:0 auto;padding:28px 20px 60px}
+  header h1{margin:0 0 4px;font-size:22px;letter-spacing:-.2px}
+  header p{margin:0 0 22px;color:var(--muted)}
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;
+    padding:18px;margin-bottom:16px}
+  .panel h2{margin:0 0 10px;font-size:14px;text-transform:uppercase;
+    letter-spacing:.6px;color:var(--muted);font-weight:600}
+  #drop{border:2px dashed #c2cad6;border-radius:10px;padding:34px 18px;text-align:center;
+    background:#fbfcfd;cursor:pointer;transition:.15s;display:block}
+  #drop:hover,#drop.over{border-color:var(--accent);background:var(--accent-soft)}
+  #drop strong{display:block;font-size:15px;margin-bottom:4px}
+  #drop span{color:var(--muted);font-size:13px}
+  #picker,#tallyPicker{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none;overflow:hidden}
+  label.ghost{font-weight:600;border-radius:7px;border:1px solid var(--line);padding:8px 14px;cursor:pointer}
+  label.ghost:hover{border-color:var(--accent);background:var(--accent-soft)}
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  th,td{text-align:left;padding:7px 9px;border-bottom:1px solid var(--line);
+    vertical-align:top}
+  th{font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);
+    font-weight:600;border-bottom:2px solid var(--line)}
+  td.num{text-align:right;font-variant-numeric:tabular-nums}
+  .tag{display:inline-block;padding:1px 7px;border-radius:20px;font-size:11px;
+    font-weight:600;white-space:nowrap}
+  .t-g1{background:#e8eefc;color:#1d3f91}
+  .t-3b{background:#e9f3e9;color:#1f6b33}
+  .t-2b{background:#fdf0e3;color:#8a5312}
+  .t-tl{background:#efe8fb;color:#5b2d91}
+  .t-bad{background:var(--err-soft);color:var(--err)}
+  button{font:inherit;font-weight:600;border-radius:7px;border:1px solid transparent;
+    padding:10px 18px;cursor:pointer}
+  .primary{background:var(--accent);color:#fff}
+  .primary:disabled{background:#aab4c2;cursor:not-allowed}
+  .ghost{background:#fff;border-color:var(--line);color:var(--ink)}
+  .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+  #log{font:12px/1.6 ui-monospace,Consolas,monospace;background:#11151b;color:#d7dee8;
+    border-radius:8px;padding:12px 14px;max-height:280px;overflow:auto;white-space:pre-wrap}
+  #log .e{color:#ff9d9d}
+  #log .w{color:#ffd28a}
+  #log .s{color:#8ee6a8}
+  .note{background:var(--accent-soft);border-left:3px solid var(--accent);
+    padding:10px 13px;border-radius:0 6px 6px 0;font-size:13px;color:#2b3a4d;margin-top:12px}
+  .hide{display:none}
+  .muted{color:var(--muted)}
+  a.dl{display:inline-block;background:var(--ok);color:#fff;text-decoration:none;
+    padding:10px 18px;border-radius:7px;font-weight:600}
+  /* Preview tables */
+  .pv2{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+  @media(max-width:680px){.pv2{grid-template-columns:1fr}}
+  .pvtitle{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;
+    color:var(--accent);margin:0 0 7px}
+  .pvt{border-collapse:collapse;width:100%;font-size:12.5px}
+  .pvt th{font-size:11px;text-transform:uppercase;letter-spacing:.4px;color:var(--muted);
+    font-weight:600;border-bottom:2px solid var(--line);padding:5px 8px;text-align:left}
+  .pvt td{padding:5px 8px;border-bottom:1px solid var(--line)}
+  .pvt td.r{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+  .pvt tr:last-child td{border-bottom:none}
+  .pvt tfoot td{font-weight:700;background:var(--accent-soft);border-top:2px solid var(--line)}
+  .pv-nil{color:var(--muted);font-size:11px}
+  .bk{display:inline-block;padding:1px 6px;border-radius:3px;font-size:11px;font-weight:600}
+  .bk-ok{background:var(--ok-soft);color:var(--ok)}
+  .bk-warn{background:var(--warn-soft);color:var(--warn)}
+  .bk-miss{background:var(--line);color:var(--muted)}
+  .bk-diff{background:var(--err-soft);color:var(--err)}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header>
+  <h1>GST Reconciliation Tool</h1>
+  <p>Drop in GSTR&#8209;1, GSTR&#8209;3B and GSTR&#8209;2B downloads — get one comparison workbook for audit.</p>
+</header>
+
+<div class="panel">
+  <h2>1 &middot; Add returns</h2>
+  <label id="drop" for="picker">
+    <strong>Drop files here, or click to browse</strong>
+    <span>GSTR&#8209;1 PDF &nbsp;&middot;&nbsp; GSTR&#8209;3B PDF &nbsp;&middot;&nbsp; GSTR&#8209;2B / 2B&#8209;Quarterly XLSX &nbsp;&middot;&nbsp; whole year at once</span>
+    <input type="file" id="picker" multiple accept=".pdf,.xlsx,.xls,.json,.zip">
+  </label>
+  <div class="row" style="margin-top:12px">
+    <label class="ghost" for="tallyPicker">+ Add Tally Sales / Purchase Register</label>
+    <span class="muted" style="font-size:12px">Excel export of the columnar register from Tally &mdash; fills the &ldquo;As per books&rdquo; columns month-wise</span>
+    <input type="file" id="tallyPicker" multiple accept=".xlsx,.xls">
+  </div>
+  <div class="note">Everything is processed inside your browser on this PC. No file, figure or client name is ever uploaded anywhere.
+    <span style="float:right"><a id="dlServe" href="#" style="font-size:12px;color:var(--accent)">↓ Download serve.ps1</a></span>
+  </div>
+</div>
+
+<div class="panel hide" id="filesPanel">
+  <h2>2 &middot; Files read</h2>
+  <table id="fileTable">
+    <thead><tr><th>File</th><th>Form</th><th>GSTIN</th><th>FY</th><th>Period</th><th>Status</th></tr></thead>
+    <tbody></tbody>
+  </table>
+  <div class="row" style="margin-top:14px">
+    <button class="primary" id="gen" disabled>Generate comparison workbook</button>
+    <button class="ghost" id="clear">Clear all</button>
+    <span id="dlHolder"></span>
+  </div>
+</div>
+
+<div class="panel hide" id="previewPanel">
+  <h2>3 &middot; Summary preview</h2>
+  <div id="previewContent"></div>
+</div>
+
+<div class="panel">
+  <h2>Activity</h2>
+  <div id="log">Ready. Waiting for files&hellip;</div>
+</div>
+</div>
+
+<script src="lib/pdf.min.js"></script>
+<script src="lib/xlsx.full.min.js"></script>
+<script src="lib/exceljs.min.js"></script>
+<script src="lib/jszip.min.js"></script>
+<script>
+"use strict";
+
+/* ── library guard ─────────────────────────────────────────────── */
+(function checkLibs(){
+  const missing = [];
+  if(typeof pdfjsLib  === "undefined") missing.push("lib/pdf.min.js");
+  if(typeof XLSX      === "undefined") missing.push("lib/xlsx.full.min.js");
+  if(typeof ExcelJS   === "undefined") missing.push("lib/exceljs.min.js");
+  if(typeof JSZip     === "undefined") missing.push("lib/jszip.min.js");
+  if(missing.length){
+    document.getElementById("log").innerHTML =
+      '<span class="e">⚠ Required library files not loaded: ' + missing.join(", ") + '.<br>' +
+      'Make sure the lib/ folder is present alongside gst-recon.html, ' +
+      'and open the tool via the local HTTP server (serve.ps1), not by double-clicking the file.</span>';
+    document.getElementById("drop").style.pointerEvents = "none";
+    document.getElementById("drop").style.opacity = "0.4";
+    return;
+  }
+  if(window.pdfjsLib) pdfjsLib.GlobalWorkerOptions.workerSrc = "lib/pdf.worker.min.js";
+})();
+
+const logEl = document.getElementById("log");
+let logStarted = false;
+function log(msg, cls){
+  if(!logStarted){ logEl.textContent = ""; logStarted = true; }
+  const s = document.createElement("span");
+  if(cls) s.className = cls;
+  s.textContent = msg + "\n";
+  logEl.appendChild(s);
+  logEl.scrollTop = logEl.scrollHeight;
+}
+const logErr  = m => log("✗ " + m, "e");
+const logWarn = m => log("! " + m, "w");
+const logOk   = m => log("✓ " + m, "s");
+
+const MONTHS = ["April","May","June","July","August","September",
+                "October","November","December","January","February","March"];
+const MON3   = {apr:"April",may:"May",jun:"June",jul:"July",aug:"August",sep:"September",
+                oct:"October",nov:"November",dec:"December",jan:"January",feb:"February",mar:"March"};
+
+/** Regex source fragment matching any full month name (used to prevent period regex catching arbitrary words). */
+const MONTH_NAME_PAT = '(?:January|February|March|April|May|June|July|August|September|October|November|December)';
+
+const MONTH_TO_NUM = {january:1,february:2,march:3,april:4,may:5,june:6,
+                      july:7,august:8,september:9,october:10,november:11,december:12};
+const MON_SHORT    = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+
+/**
+ * Given a raw period ("May") and FY string ("2025-26"), returns "May-25".
+ * For quarterly periods like "April-June" returns "Apr-Jun-25".
+ * Returns the original string unchanged if it cannot be resolved.
+ */
+function formatPeriod(period, fy){
+  if(!period || !fy) return period || "";
+  const fyM = String(fy).match(/(\d{4})-(\d{2,4})/);
+  if(!fyM) return period;
+  const y1 = parseInt(fyM[1]);
+  const y2 = fyM[2].length === 2 ? y1 + 1 : parseInt(fyM[2]);
+
+  const parts = String(period).toLowerCase().split(/[\s\-–]+/).filter(Boolean)
+                               .filter(p => MONTH_TO_NUM[p]);  // keep only month words
+  if(!parts.length) return period;
+
+  const resolveYear = mon => mon >= 4 ? y1 : y2;  // Apr-Dec → first year, Jan-Mar → second
+  const fmt = name => MON_SHORT[MONTH_TO_NUM[name] - 1] +
+                      "-" + String(resolveYear(MONTH_TO_NUM[name])).slice(2);
+
+  if(parts.length === 1) return fmt(parts[0]);
+  // quarterly: "Apr-Jun-25"
+  return fmt(parts[0]).split("-")[0] + "-" +
+         fmt(parts[parts.length - 1]).split("-")[0] + "-" +
+         String(resolveYear(MONTH_TO_NUM[parts[0]])).slice(2);
+}
+
+/** Position of a period label within the April→March financial year.
+ *  For quarterly "April-June" the FIRST month is used so Q1 sorts before Q2. */
+function fyOrder(period){
+  if(!period) return 99;
+  // "to" must be a whole word: inside a character class it split "oct"/"nov" apart
+  const parts = String(period).toLowerCase().split(/\s+to\s+|[-–—\s]+/).filter(Boolean);
+  // use FIRST month for quarterly ranges (otherwise Q2 "July" sorts before Q1 "April-June")
+  const target = parts[0] || parts[parts.length-1];
+  const full   = MON3[target.slice(0,3)];
+  const idx    = MONTHS.indexOf(full);
+  return idx < 0 ? 99 : idx;
+}
+
+/** Canonical period key for grouping (strips trailing spaces, normalises dashes). */
+function periodKey(p){
+  return String(p||"").replace(/\s*[-–]\s*/g,"-").trim();
+}
+
+/* ═══════════════════════ small helpers ═══════════════════════ */
+
+/** Squash a label to letters+digits only — survives the PDF's broken word wrapping. */
+const sq = s => String(s||"").toLowerCase().replace(/[^a-z0-9]/g,"");
+const norm = s => String(s||"").replace(/\s+/g," ").trim();
+
+const VALUE_TOKEN = /^-?[\d,]*\.?\d+$|^[-–—]$/;
+
+function toNum(tok){
+  if(tok===null || tok===undefined) return null;
+  if(typeof tok === "number") return isFinite(tok) ? tok : null;
+  let t = String(tok).replace(/[₹,\s]/g,"").trim();
+  if(t==="" || t==="-" || t==="–" || t==="—" || /^na$/i.test(t)) return null;
+  const v = parseFloat(t);
+  return isFinite(v) ? v : null;
+}
+
+/**
+ * Collect the run of numeric (or dash) tokens at the end of a line.
+ * Returns them in natural left→right order. Dashes become null.
+ */
+function tailValues(line){
+  const toks = norm(line).split(" ");
+  const out = [];
+  for(let i = toks.length - 1; i >= 0; i--){
+    if(VALUE_TOKEN.test(toks[i])) out.push(toNum(toks[i]));
+    else break;
+  }
+  return out.reverse();
+}
+
+const n0 = v => (v === null || v === undefined || !isFinite(v)) ? 0 : v;
+
+/** Zero-filled tax bucket. */
+const bucket = () => ({taxable:0, igst:0, cgst:0, sgst:0, cess:0});
+
+function addInto(dst, src, sign){
+  const k = sign === undefined ? 1 : sign;
+  dst.taxable += k * n0(src.taxable);
+  dst.igst    += k * n0(src.igst);
+  dst.cgst    += k * n0(src.cgst);
+  dst.sgst    += k * n0(src.sgst);
+  dst.cess    += k * n0(src.cess);
+  return dst;
+}
+
+/** Interpret a trailing-value run as a tax bucket, based on how many figures the table carries. */
+function asBucket(vals){
+  const b = bucket();
+  if(!vals || !vals.length) return b;
+  if(vals.length >= 5){
+    const v = vals.slice(-5);
+    b.taxable=n0(v[0]); b.igst=n0(v[1]); b.cgst=n0(v[2]); b.sgst=n0(v[3]); b.cess=n0(v[4]);
+  } else if(vals.length === 4){
+    b.taxable=n0(vals[0]); b.igst=n0(vals[1]); b.cgst=n0(vals[2]); b.sgst=n0(vals[3]);
+  } else if(vals.length === 3){
+    // value / integrated tax / cess  (B2CL, exports, SEZ)
+    b.taxable=n0(vals[0]); b.igst=n0(vals[1]); b.cess=n0(vals[2]);
+  } else if(vals.length === 2){
+    b.taxable=n0(vals[0]); b.igst=n0(vals[1]);
+  } else {
+    b.taxable=n0(vals[0]);
+  }
+  return b;
+}
+
+/** Four-head ITC row (no taxable value): igst / cgst / sgst / cess. */
+function asItc(vals){
+  const b = {igst:0,cgst:0,sgst:0,cess:0};
+  if(!vals || !vals.length) return b;
+  const v = vals.slice(-4);
+  b.igst=n0(v[0]); b.cgst=n0(v[1]); b.sgst=n0(v[2]); b.cess=n0(v[3]);
+  return b;
+}
+const itcTotal = b => n0(b.igst)+n0(b.cgst)+n0(b.sgst)+n0(b.cess);
+
+function colLetter(n){           // 1 → A
+  let s = "";
+  while(n > 0){ const m = (n-1)%26; s = String.fromCharCode(65+m) + s; n = (n-1-m)/26; }
+  return s;
+}
+
+function fmtDate(v){
+  if(v === null || v === undefined || v === "") return "";
+  if(v instanceof Date && !isNaN(v)){
+    const p = k => String(k).padStart(2,"0");
+    return p(v.getDate())+"/"+p(v.getMonth()+1)+"/"+v.getFullYear();
+  }
+  return String(v).trim();
+}
+
+/* ═══════════════════════ PDF → positioned lines ═══════════════════════ */
+
+async function pdfLines(arrayBuffer){
+  const pdf = await pdfjsLib.getDocument({data:new Uint8Array(arrayBuffer)}).promise;
+  const pages = [];
+  for(let p = 1; p <= pdf.numPages; p++){
+    const page = await pdf.getPage(p);
+    const tc   = await page.getTextContent();
+    const items = tc.items
+      .filter(it => it.str && it.str.trim())
+      .map(it => ({x:it.transform[4], y:it.transform[5], s:it.str.trim()}))
+      .sort((a,b) => (b.y - a.y) || (a.x - b.x));
+
+    // cluster into visual rows (tolerance absorbs sub-pixel baseline drift)
+    const rows = [];
+    let cur = null;
+    for(const it of items){
+      if(!cur || Math.abs(cur.y - it.y) > 2.5){
+        cur = {y:it.y, items:[it]};
+        rows.push(cur);
+      } else {
+        cur.items.push(it);
+      }
+    }
+    for(const r of rows){
+      r.items.sort((a,b) => a.x - b.x);
+      const line = r.items.map(i => i.s).join(" ").replace(/\s+/g," ").trim();
+      if(line) pages.push({line, items: r.items});
+    }
+  }
+  return pages;
+}
+
+/* ═══════════════════════ GSTR-3B 6.1 X-coordinate parser ════════════════ */
+
+function _parse61(allItems){
+  if(!allItems || !allItems.length) return {};
+
+  // Stop at (B) Reverse charge — label appears at x < 80
+  const bIdx = allItems.findIndex(it => it.x < 80 && /reverse/i.test(it.s));
+  const items = bIdx >= 0 ? allItems.slice(0, bIdx) : allItems;
+
+  // Identify data-row label items (left edge, tax type labels)
+  const ROW_DEFS = [
+    {test: s => /^integrat/i.test(s),              key:"igst"},
+    {test: s => /^central/i.test(s),               key:"cgst"},
+    {test: s => /^state|^utgst/i.test(s),          key:"sgst"},
+    {test: s => /^cess$/i.test(s.split(" ")[0]),   key:"cess"},
+  ];
+
+  const dataRows = [];
+  for(const it of items){
+    if(it.x > 80) continue;
+    const w = it.s.trim().replace(/[\s\/\(\)]/g,"");
+    for(const def of ROW_DEFS){
+      if(def.test(w)){ dataRows.push({key:def.key, y:it.y}); break; }
+    }
+  }
+  if(!dataRows.length) return {};
+
+  // Sort top-to-bottom (highest y = top of page in PDF coords)
+  dataRows.sort((a,b) => b.y - a.y);
+
+  // Collect value items (numbers or dashes) to the right of labels
+  const valItems = items.filter(it => it.x > 80 && VALUE_TOKEN.test(it.s.trim()));
+
+  const t61 = {};
+  for(let i = 0; i < dataRows.length; i++){
+    const row = dataRows[i];
+    // Y range: from midpoint to next label's midpoint (or -40px for last row)
+    const yHi = i === 0 ? row.y + 25 : (dataRows[i-1].y + row.y) / 2;
+    const yLo = i+1 < dataRows.length ? (row.y + dataRows[i+1].y) / 2 : row.y - 40;
+
+    // Collect value items in Y range, sorted left to right
+    const rv = valItems.filter(it => it.y >= yLo && it.y <= yHi).sort((a,b) => a.x - b.x);
+    if(!rv.length) continue;
+
+    // Positional mapping after sorting by X:
+    // 0=taxPayable, 1=adj, 2=netPayable, 3=itcIgst, 4=itcCgst, 5=itcSgst, 6=itcCess,
+    // 7=cashPd, 8=interest, 9=lateFee
+    const g = idx => (rv[idx] ? toNum(rv[idx].s) : null);
+    t61[row.key] = {
+      taxPayable:g(0), adjustment:g(1), netPayable:g(2),
+      itcIgst:g(3), itcCgst:g(4), itcSgst:g(5), itcCess:g(6),
+      cashPd:g(7), interest:g(8), lateFee:g(9)
+    };
+  }
+  return t61;
+}
+
+/* ═══════════════════════ GSTR-3B parser ═══════════════════════ */
+
+function parse3B(lines){
+  const r = {
+    form:"GSTR-3B", gstin:"", legal:"", trade:"", fy:"", period:"", arn:"", arnDate:"",
+    t31:{}, t311:{}, t32:{}, t4A:{}, t4B:{}, t4C:null, t4D:{}, t5:{}, t51:{}, t61:{},
+    _t31pend:null, _t31acc:[], _t61Items:[]
+  };
+
+  let sec = "", sub = "";
+  let seekPeriod = false, seekFY = false;   // ← look-ahead flags
+
+  for(let i = 0; i < lines.length; i++){
+    const L    = lines[i];
+    const raw  = typeof L === "string" ? L : L.line;
+    const rawItems = typeof L === "string" ? null : L.items;
+    const s   = sq(raw);
+    const vals = tailValues(raw);
+
+    /* ---- look-ahead: period/FY value may land on the line after its label ---- */
+    if(seekPeriod && !r.period){
+      const mp = raw.match(/(\S+(?:\s*[-–]\s*\S+)?)/);
+      if(mp){ r.period = mp[1].trim(); seekPeriod = false; }
+      else if(raw.trim()) seekPeriod = false;
+    }
+    if(seekFY && !r.fy){
+      const fp = raw.match(/(\d{4}-\d{2,4})/);
+      if(fp){ r.fy = fp[1]; seekFY = false; }
+      else if(raw.trim()) seekFY = false;
+    }
+
+    /* ---- identity ---- */
+    let m;
+    if((m = raw.match(/GSTIN\s+of\s+the\s+(?:supplier|registered\s+person)\s+([0-9A-Z]{15})/i))) r.gstin = m[1];
+    if(!r.gstin && (m = raw.match(/GSTIN\s*[:\-]?\s*([0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][0-9A-Z][Z][0-9A-Z])/i))) r.gstin = m[1];
+    if(!r.gstin && (m = raw.match(/\b(\d{2}[A-Z]{5}\d{4}[A-Z][0-9A-Z][Z][0-9A-Z])\b/)))       r.gstin = m[1];
+    if(!r.fy && (m = raw.match(/^Year\s+(\d{4}-\d{2,4})/i)))                                   r.fy = m[1];
+    if(!r.fy && (m = raw.match(/Financial\s+Year\s+(\d{4}-\d{2,4})/i)))                        r.fy = m[1];
+    if(!r.fy   && /^Year\s*$/i.test(raw.trim()))   seekFY = true;
+    if(!r.period && (m = raw.match(/\bPeriod\s*:?\s*(\S+(?:\s*[-–]\s*\S+)?)/i))) r.period = m[1].trim();
+    if(!r.period && /\bPeriod\s*:?\s*$/i.test(raw.trim())) seekPeriod = true;
+    if((m = raw.match(/Legal\s+name\s+of\s+the\s+registered\s+person\s+(.+)$/i))) r.legal = m[1].trim();
+    if((m = raw.match(/Trade\s+name,?\s+if\s+any\s+(.+)$/i))) r.trade = m[1].trim();
+    if((m = raw.match(/ARN\s+([A-Z0-9]{15})/i))) r.arn = m[1];
+    if((m = raw.match(/Date\s+of\s+ARN\s+([\d\/]+)/i))) r.arnDate = m[1];
+
+    /* ---- section switches ---- */
+    // Flush any pending 3.1 accumulator when leaving the section
+    const _flush31 = () => { if(r._t31pend && r._t31acc.length >= 2){ r.t31[r._t31pend]=asBucket(r._t31acc); r._t31pend=null; r._t31acc=[]; } };
+    if(/^31detailsofoutwardsupplies/.test(s) || (/^31/.test(s) && s.includes("outward") && !s.includes("311"))){ _flush31(); sec="3.1";   sub=""; continue; }
+    if(/^311detailsofsupplies/.test(s) || (/^311/.test(s) && s.includes("supplies")))                         { _flush31(); sec="3.1.1"; sub=""; continue; }
+    if(/^32outofsuppliesmadein/.test(s) || (/^32/.test(s) && s.includes("interstate")))                       { _flush31(); sec="3.2";   sub=""; continue; }
+    if(/^4eligibleitc/.test(s) || (s.startsWith("4") && s.includes("eligibleitc")))                           { _flush31(); sec="4";     sub=""; continue; }
+    if(/^51interestandlatefee/.test(s) || (/^51/.test(s) && s.includes("interest")))                          { _flush31(); sec="5.1";   sub=""; continue; }
+    if(/^5valuesofexempt/.test(s) || (s.startsWith("5") && s.includes("exempt") && !s.startsWith("51")))      { _flush31(); sec="5";     sub=""; continue; }
+    if(/^61paymentoftax/.test(s) || (/^61/.test(s) && s.includes("paymenttax")))                              { _flush31(); sec="6.1";   sub=""; continue; }
+    if(/^breakup/.test(s))                   { _flush31(); sec="";      sub=""; continue; }
+
+    if(sec === "4"){
+      if(/^aitcavailable/.test(s))   { sub="A"; continue; }
+      if(/^bitcreversed/.test(s))    { sub="B"; continue; }
+      if(/^cnetitcavailable/.test(s)){ sub="C"; r.t4C = asItc(vals); continue; }
+      if(/^dotherdetails/.test(s))   { sub="D"; continue; }
+    }
+
+    if(!vals.length) continue;
+
+    /* ---- value rows ---- */
+    if(sec === "3.1"){
+      const k = raw.match(/^\(\s*([a-e])\s*\)/i);
+      if(k){
+        // Flush previous pending if accumulated enough
+        if(r._t31pend && r._t31acc.length >= 2) r.t31[r._t31pend] = asBucket(r._t31acc);
+        r._t31pend = k[1].toLowerCase();
+        r._t31acc = [...vals];
+        // If this label line already has all 4+ values, store immediately
+        if(r._t31acc.length >= 4){ r.t31[r._t31pend] = asBucket(r._t31acc); r._t31pend = null; r._t31acc = []; }
+      } else if(r._t31pend){
+        // Continuation line: append more values and store when we have ≥4
+        r._t31acc = [...r._t31acc, ...vals];
+        if(r._t31acc.length >= 4){ r.t31[r._t31pend] = asBucket(r._t31acc); r._t31pend = null; r._t31acc = []; }
+      }
+    }
+    else if(sec === "3.1.1"){
+      const k = raw.match(/^\(\s*(i{1,2})\s*\)/i);
+      if(k) r.t311[k[1].toLowerCase()] = asBucket(vals);
+    }
+    else if(sec === "3.2"){
+      const two = vals.slice(-2);
+      const val = {taxable:n0(two[0]), igst:n0(two[1])};
+      if(/suppliesmadetounregisteredpersons/.test(s))  r.t32.unreg = val;
+      else if(/suppliesmadetocompositiontaxable/.test(s)) r.t32.comp = val;
+      else if(/suppliesmadetouinholders/.test(s))     r.t32.uin  = val;
+    }
+    else if(sec === "4" && sub){
+      const k = raw.match(/^\(\s*(\d)\s*\)/);
+      if(k){
+        const itc = asItc(vals);
+        if(sub === "A") r.t4A[k[1]] = itc;
+        else if(sub === "B") r.t4B[k[1]] = itc;
+        else if(sub === "D") r.t4D[k[1]] = itc;
+      }
+    }
+    else if(sec === "5"){
+      const two = vals.slice(-2);
+      const val = {inter:n0(two[0]), intra:n0(two[1])};
+      if(/fromasupplierundercompositionscheme/.test(s) || s.includes("compositionscheme")) r.t5.compExempt = val;
+      else if(s.includes("nongstsupply") || s.includes("nongstsupplies")) r.t5.nonGst = val;
+    }
+    else if(sec === "5.1"){
+      if(/^interestpaid/.test(s)) r.t51.interestPaid = asItc(vals);
+      else if(/^latefee/.test(s)) r.t51.lateFee      = asItc(vals);
+    }
+    else if(sec === "6.1"){
+      // Collect raw items for X-coordinate based column parsing in _parse61
+      if(rawItems) for(const it of rawItems) r._t61Items.push(it);
+    }
+  }
+
+  /* ---- parse 6.1 using X-coordinate based column detection ---- */
+  if(r._t61Items.length) r.t61 = _parse61(r._t61Items);
+
+  /* ---- derived roll-ups ---- */
+  // Flush any last pending 3.1 row (e.g. row (e) has no subsequent section switch)
+  if(r._t31pend && r._t31acc.length >= 2){ r.t31[r._t31pend]=asBucket(r._t31acc); }
+  const t31 = k => r.t31[k] || bucket();
+  r.outwardTaxable = t31("a");                 // 3.1(a) — compared against GSTR-1
+  r.outwardZero    = t31("b");                 // 3.1(b)
+  r.outwardNilExempt = {taxable: n0(t31("c").taxable) + n0(t31("e").taxable)};
+  r.inwardRcm      = t31("d");
+
+  const a = {igst:0,cgst:0,sgst:0,cess:0};
+  for(const k of ["1","2","3","4","5"]){
+    const v = r.t4A[k]; if(!v) continue;
+    a.igst+=n0(v.igst); a.cgst+=n0(v.cgst); a.sgst+=n0(v.sgst); a.cess+=n0(v.cess);
+  }
+  r.itcAvailed = a;                             // 4(A) total
+
+  const b = {igst:0,cgst:0,sgst:0,cess:0};
+  for(const k of ["1","2"]){
+    const v = r.t4B[k]; if(!v) continue;
+    b.igst+=n0(v.igst); b.cgst+=n0(v.cgst); b.sgst+=n0(v.sgst); b.cess+=n0(v.cess);
+  }
+  r.itcReversed = b;                            // 4(B) total
+  r.itcNet = r.t4C || {igst:a.igst-b.igst, cgst:a.cgst-b.cgst, sgst:a.sgst-b.sgst, cess:a.cess-b.cess};
+
+  return r;
+}
+
+/* ═══════════════════════ GSTR-1 parser ═══════════════════════ */
+
+/* Heading matchers, evaluated in order — first hit wins. */
+const G1_SECTIONS = [
+  {key:"4A",       label:"4A · B2B Regular",                          t:s=>s.startsWith("4a") && s.includes("b2bregular")},
+  {key:"4B",       label:"4B · B2B Reverse charge",                   t:s=>s.startsWith("4b") && s.includes("b2breversecharge")},
+  {key:"9A_B2B_R", label:"9A · Amendment to B2B Regular",             t:s=>s.startsWith("9a") && s.includes("intable4") && s.includes("b2bregular")},
+  {key:"9A_B2B_RC",label:"9A · Amendment to B2B Reverse charge",      t:s=>s.startsWith("9a") && s.includes("intable4") && s.includes("b2breversecharge")},
+  {key:"9A_B2CL",  label:"9A · Amendment to B2CL",                    t:s=>s.startsWith("9a") && s.includes("intable5")},
+  {key:"9A_EXP",   label:"9A · Amendment to Exports",                 t:s=>s.startsWith("9a") && s.includes("intable6a")},
+  {key:"9A_SEZ",   label:"9A · Amendment to SEZ",                     t:s=>s.startsWith("9a") && s.includes("intable6b")},
+  {key:"9A_DE",    label:"9A · Amendment to Deemed Exports",          t:s=>s.startsWith("9a") && s.includes("intable6c")},
+  {key:"9C_CDNRA", label:"9C · Amended CDN (Registered)",             t:s=>s.startsWith("9c") && s.includes("registered") && !s.includes("unregistered")},
+  {key:"9C_CDNURA",label:"9C · Amended CDN (Unregistered)",           t:s=>s.startsWith("9c") && s.includes("unregistered")},
+  {key:"9B_CDNR",  label:"9B · Credit/Debit Notes (Registered)",      t:s=>s.startsWith("9b") && s.includes("registered") && !s.includes("unregistered")},
+  {key:"9B_CDNUR", label:"9B · Credit/Debit Notes (Unregistered)",    t:s=>s.startsWith("9b") && s.includes("unregistered")},
+  {key:"5",        label:"5 · B2CL (Large)",                          t:s=>s.startsWith("5") && (s.includes("b2cllarge") || (s.includes("b2c") && s.includes("large")) || s.includes("b2cl"))},
+  {key:"6A",       label:"6A · Exports",                              t:s=>s.startsWith("6a") && (s.includes("exports") || s.includes("export"))},
+  {key:"6B",       label:"6B · SEZ supplies",                         t:s=>s.startsWith("6b") && s.includes("sez")},
+  {key:"6C",       label:"6C · Deemed Exports",                       t:s=>s.startsWith("6c") && (s.includes("deemedexports") || s.includes("deemed"))},
+  {key:"7",        label:"7 · B2CS (Others)",                         t:s=>s.startsWith("7") && (s.includes("b2csothers") || s.includes("b2cothers") || s.includes("b2cs") || (s.includes("b2c") && !s.includes("large") && !s.includes("b2cl")))},
+  {key:"8",        label:"8 · Nil rated / exempt / non-GST",          t:s=>s.startsWith("8") && (s.includes("nilrated") || s.includes("exempt") || s.includes("nilexempt"))},
+  {key:"10",       label:"10 · Amendment to B2CS",                    t:s=>s.startsWith("10") && s.includes("b2cothers")},
+  {key:"11A_AMD",  label:"11A · Amendment to advances received",      t:s=>s.startsWith("11a") && s.includes("amendmenttoadvancesreceived")},
+  {key:"11B_AMD",  label:"11B · Amendment to advances adjusted",      t:s=>s.startsWith("11b") && s.includes("amendmenttoadvancesadjusted")},
+  {key:"11A",      label:"11A · Advances received",                   t:s=>s.startsWith("11a1")},
+  {key:"11B",      label:"11B · Advances adjusted",                   t:s=>s.startsWith("11b1")},
+  {key:"12",       label:"12 · HSN-wise summary",                     t:s=>s.startsWith("12") && s.includes("hsnwisesummary")},
+  {key:"13",       label:"13 · Documents issued",                     t:s=>s.startsWith("13") && s.includes("documentsissued")},
+  {key:"14A",      label:"14A · Amended supplies through ECO",        t:s=>s.startsWith("14a")},
+  {key:"14",       label:"14 · Supplies through ECO",                 t:s=>s.startsWith("14") && s.includes("ecommerceoperators")},
+];
+
+function parseG1(lines){
+  const r = {
+    form:"GSTR-1", gstin:"", legal:"", trade:"", fy:"", period:"", arn:"", arnDate:"",
+    sections:{}
+  };
+
+  let cur = null;
+  let seekPeriod = false, seekFY = false;   // ← look-ahead flags
+
+  for(let i = 0; i < lines.length; i++){
+    const raw = typeof lines[i] === "string" ? lines[i] : lines[i].line;
+    const s = sq(raw);
+    let m;
+
+    /* ---- look-ahead: period/FY value may land on the line after its label ---- */
+    if(seekPeriod && !r.period){
+      const mp = raw.match(/(\S+(?:\s*[-–]\s*\S+)?)/);
+      if(mp){ r.period = mp[1].trim(); seekPeriod = false; }
+      else if(raw.trim()) seekPeriod = false;
+    }
+    if(seekFY && !r.fy){
+      const fp = raw.match(/(\d{4}-\d{2,4})/);
+      if(fp){ r.fy = fp[1]; seekFY = false; }
+      else if(raw.trim()) seekFY = false;
+    }
+
+    if((m = raw.match(/^1\s+GSTIN\s+([0-9A-Z]{15})/i)))           r.gstin = m[1];
+    if(!r.gstin && (m = raw.match(/GSTIN\s*[:\-]?\s*([0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][0-9A-Z][Z][0-9A-Z])/i))) r.gstin = m[1];
+    if(!r.gstin && (m = raw.match(/\b(\d{2}[A-Z]{5}\d{4}[A-Z][0-9A-Z][Z][0-9A-Z])\b/))) r.gstin = m[1];
+    if(!r.fy && (m = raw.match(/Financial\s+year\s+(\d{4}-\d{2,4})/i)))    r.fy = m[1];
+    if(!r.fy && (m = raw.match(/FY\s*[:\-]?\s*(\d{4}-\d{2,4})/i)))         r.fy = m[1];
+    if(!r.fy   && /^Financial\s+year\s*$/i.test(raw.trim()))                seekFY = true;
+    if(!r.period && (m = raw.match(/\bTax\s+period\s*:?\s*(\S+(?:\s*[-–]\s*\S+)?)/i))) r.period = m[1].trim();
+    if(!r.period && /\bTax\s+period\s*:?\s*$/i.test(raw.trim()))            seekPeriod = true;
+    if((m = raw.match(/Legal\s+name\s+of\s+the\s+registered\s+person\s+(.+)$/i))) r.legal = m[1].trim();
+    if((m = raw.match(/Trade\s+name\s+if\s+any\s+(.+)$/i)))  r.trade = m[1].trim();
+    if((m = raw.match(/\(c\)\s*ARN\s+([A-Z0-9]{15})/i)))     r.arn = m[1];
+    if((m = raw.match(/\(d\)\s*ARN\s+date\s+([\d\/]+)/i)))   r.arnDate = m[1];
+
+    // skip the repeating column-header band
+    if(s.startsWith("noofdocument") || s.startsWith("descriptionvalue") || s.startsWith("records")) continue;
+    if(s.startsWith("ipaddress") || s === "final" || s === "filed") continue;
+
+    const hit = G1_SECTIONS.find(d => d.t(s));
+    if(hit){
+      cur = hit.key;
+      if(!r.sections[cur]) r.sections[cur] = {label:hit.label, rows:[]};
+      continue;
+    }
+    if(!cur) continue;
+
+    const vals = tailValues(raw);
+    if(!vals.length) continue;
+
+    // strip the trailing value run to recover the row's own label
+    const toks = norm(raw).split(" ");
+    let cut = toks.length;
+    while(cut > 0 && VALUE_TOKEN.test(toks[cut-1])) cut--;
+    const label = toks.slice(0, cut).join(" ").replace(/\s*[-–—]\s*$/,"").trim();
+
+    const cm = raw.match(/(\d+)\s+(Invoice|Note|Net\s+Value|NA|All\s+Documents)\b/i);
+
+    r.sections[cur].rows.push({
+      label : label || "Total",
+      lsq   : sq(label),
+      count : cm ? parseInt(cm[1],10) : null,
+      vals  : vals,
+      b     : asBucket(vals)
+    });
+  }
+
+  /* ---- pick the one row per section that represents the section's net figure ---- */
+  const AMENDMENT = new Set(["9A_B2B_R","9A_B2B_RC","9A_B2CL","9A_EXP","9A_SEZ","9A_DE",
+                             "9C_CDNRA","9C_CDNURA","10","11A_AMD","11B_AMD"]);
+
+  for(const key of Object.keys(r.sections)){
+    const sec = r.sections[key];
+    const rows = sec.rows;
+    let pick = null;
+
+    if(AMENDMENT.has(key)){
+      pick = rows.find(x => x.lsq.startsWith("netdifferentialamount"))
+          || rows.find(x => x.lsq.startsWith("netdifferential"))
+          || rows.find(x => x.lsq.startsWith("nettotal"))
+          // "Amended amount - Total" is gross; a bare "Total" after it is the differential
+          || rows.filter(x => x.lsq === "total").pop()
+          || null;
+    } else {
+      pick = rows.find(x => x.lsq.startsWith("total") && !x.lsq.startsWith("totalnet"))
+          || rows.find(x => x.lsq.startsWith("total"))
+          || rows.find(x => x.lsq.startsWith("netissueddocuments"))
+          || rows[0] || null;
+    }
+
+    sec.net   = pick ? pick.b : bucket();
+    sec.count = pick ? pick.count : null;
+    sec.picked = pick ? pick.label : "(none)";
+  }
+
+  /* ---- liability roll-up, mirroring GSTR-3B table 3.1 ---- */
+  const get = k => (r.sections[k] ? r.sections[k].net : bucket());
+
+  const taxable = bucket();
+  for(const k of ["4A","5","6C","7","9B_CDNR","9B_CDNUR",
+                  "9A_B2B_R","9A_B2CL","9A_DE","9C_CDNRA","9C_CDNURA","10","11A"]){
+    addInto(taxable, get(k), 1);
+  }
+  addInto(taxable, get("11B"), -1);          // advances adjusted reduce liability
+  r.outwardTaxable = taxable;                 // ≈ 3B 3.1(a)
+
+  const zero = bucket();
+  for(const k of ["6A","6B","9A_EXP","9A_SEZ"]) addInto(zero, get(k), 1);
+  r.outwardZero = zero;                       // ≈ 3B 3.1(b)
+
+  r.outwardNilExempt = {taxable: n0(get("8").taxable)};   // ≈ 3B 3.1(c) + 3.1(e)
+  r.rcmOutward = get("4B");                   // supplier reports, recipient pays
+
+  return r;
+}
+
+/* ═══════════════════════ GSTR-2B parser ═══════════════════════ */
+
+const SHEET_SECTIONS = [
+  {sheet:"B2B",                  label:"B2B — Invoices",                    cat:"available"},
+  {sheet:"B2BA",                 label:"B2BA — Invoice amendments",         cat:"available"},
+  {sheet:"B2B-CDNR",             label:"CDNR — Credit/Debit notes",         cat:"available"},
+  {sheet:"B2B-CDNRA",            label:"CDNRA — CDN amendments",            cat:"available"},
+  {sheet:"B2B-DNR",              label:"DNR — Debit notes",                 cat:"available"},
+  {sheet:"B2B-DNRA",             label:"DNRA — Debit note amendments",      cat:"available"},
+  {sheet:"ECO",                  label:"ECO — Documents u/s 9(5)",          cat:"available"},
+  {sheet:"ECOA",                 label:"ECOA — ECO amendments",             cat:"available"},
+  {sheet:"ISD",                  label:"ISD — Credits",                     cat:"available"},
+  {sheet:"ISDA",                 label:"ISDA — ISD amendments",             cat:"available"},
+  {sheet:"IMPG",                 label:"IMPG — Import of goods",            cat:"available"},
+  {sheet:"IMPGA",                label:"IMPGA — Import amendments",         cat:"available"},
+  {sheet:"IMPGSEZ",              label:"IMPGSEZ — Import from SEZ",         cat:"available"},
+  {sheet:"IMPGSEZA",             label:"IMPGSEZA — SEZ import amendments",  cat:"available"},
+  {sheet:"B2B (ITC Reversal)",   label:"B2B — ITC Reversal",                cat:"reversal"},
+  {sheet:"B2BA (ITC Reversal)",  label:"B2BA — ITC Reversal (amendment)",   cat:"reversal"},
+  {sheet:"B2B(Rejected)",        label:"B2B — ITC Rejected",                cat:"rejected"},
+  {sheet:"B2BA(Rejected)",       label:"B2BA — ITC Rejected (amendment)",   cat:"rejected"},
+  {sheet:"B2B-CDNR(Rejected)",   label:"CDNR — ITC Rejected",               cat:"rejected"},
+  {sheet:"B2B-CDNRA(Rejected)",  label:"CDNRA — ITC Rejected (amendment)",  cat:"rejected"},
+  {sheet:"ECO(Rejected)",        label:"ECO — ITC Rejected",                cat:"rejected"},
+  {sheet:"ECOA(Rejected)",       label:"ECOA — ITC Rejected (amendment)",   cat:"rejected"},
+  {sheet:"ISD(Rejected)",        label:"ISD — ITC Rejected",                cat:"rejected"},
+  {sheet:"ISDA(Rejected)",       label:"ISDA — ITC Rejected (amendment)",   cat:"rejected"},
+];
+
+/** Locate the two-row header band and build a merged column-label map. */
+function headerMap(grid){
+  let h1 = -1;
+  for(let i = 0; i < Math.min(grid.length, 15); i++){
+    const row = (grid[i]||[]).map(c => norm(c).toLowerCase());
+    if(row.some(c => c === "trade/legal name" || c === "icegate reference date")){ h1 = i; break; }
+  }
+  if(h1 < 0) return null;
+
+  const r1 = grid[h1] || [], r2 = grid[h1+1] || [];
+  const width = Math.max(r1.length, r2.length);
+  const merged = [];
+  for(let c = 0; c < width; c++){
+    const a = norm(r1[c]), b = norm(r2[c]);
+    merged[c] = (b || a || "").replace(/\s*\(₹\)\s*$/,"").trim();
+  }
+
+  // amendment sheets repeat field names — anything before "Revised Details" is the original doc
+  let revisedAt = 0;
+  for(let i = Math.max(0,h1-2); i <= h1; i++){
+    const row = grid[i] || [];
+    for(let c = 0; c < row.length; c++){
+      if(norm(row[c]).toLowerCase() === "revised details"){ revisedAt = c; }
+    }
+  }
+
+  // tax block: the 4 (or 2) columns sitting under the row-1 group header
+  let taxAt = -1;
+  for(let c = 0; c < r1.length; c++){
+    const t = norm(r1[c]).toLowerCase();
+    if(/^tax amount|^amount of tax|^input tax distribution/.test(t)){ taxAt = c; break; }
+  }
+  const tax = {igst:-1, cgst:-1, sgst:-1, cess:-1};
+  if(taxAt >= 0){
+    for(let c = taxAt; c < Math.min(taxAt+4, width); c++){
+      const t = (merged[c]||"").toLowerCase();
+      if(/integrated/.test(t)) tax.igst = c;
+      else if(/central/.test(t)) tax.cgst = c;
+      else if(/state\/ut|state/.test(t)) tax.sgst = c;
+      else if(/cess/.test(t)) tax.cess = c;
+    }
+  }
+
+  const find = (pats, from) => {
+    const start = from === undefined ? revisedAt : from;
+    for(let c = start; c < width; c++){
+      const t = (merged[c]||"").toLowerCase();
+      if(pats.some(p => p.test(t))) return c;
+    }
+    return -1;
+  };
+
+  return {
+    dataFrom : h1 + 2,
+    merged, tax, revisedAt,
+    gstin    : find([/^gstin of/]),
+    name     : find([/^trade\/legal name/]),
+    docNo    : find([/^invoice number$/, /^note number$/, /^document number$/, /^isd document number$/, /^number$/]),
+    docType  : find([/^invoice type$/, /^note type$/, /^document type$/, /^isd document type$/]),
+    docDate  : find([/^invoice date$/, /^note date$/, /^document date$/, /^isd document date$/, /^date$/]),
+    docValue : find([/^invoice value/, /^note value/, /^document value/]),
+    taxable  : find([/^taxable value/, /^taxable_value/]),
+    pos      : find([/^place of supply/]),
+    rcm      : find([/^supply attract reverse charge/]),
+    itcAvail : find([/^itc availability/, /^eligibility of itc/]),
+    reason   : find([/^reason/]),
+    rate     : find([/^applicable % of tax rate/, /^rate/]),
+    source   : find([/^source/]),
+    irn      : find([/^irn$/]),
+    irnDate  : find([/^irn date/]),
+    g1Period : find([/period$/]),
+    g1Filed  : find([/filing date$/]),
+    origNo   : revisedAt > 0 ? find([/^invoice number$/, /^note number$/, /^document number$/, /^number$/], 0) : -1,
+  };
+}
+
+function parse2B(workbook, fileName){
+  const r = {
+    form:"GSTR-2B", gstin:"", legal:"", trade:"", fy:"", period:"", genDate:"",
+    quarterly:false, summary:{}, ledger:[]
+  };
+
+  /* ---- Read me / cover sheet ---- */
+  const README_NAMES = ["Read me","Read Me","README","Readme","Home","GSTR2B","Cover","Header"];
+  const readmeSheet  = README_NAMES.find(n => workbook.Sheets[n]) || workbook.SheetNames[0];
+  const readme       = workbook.Sheets[readmeSheet];
+  if(readme){
+    const g = XLSX.utils.sheet_to_json(readme, {header:1, raw:false, defval:null});
+    for(const row of (g||[]).slice(0,30)){
+      if(!row) continue;
+      // Labels may be in any column — portal puts them in col B (index 1), not col A
+      for(let ci = 0; ci < row.length; ci++){
+        const key = norm(row[ci]).toLowerCase();
+        if(!key) continue;
+        // Value = first non-empty cell to the right of the label
+        let val = '';
+        for(let vi = ci + 1; vi < row.length; vi++){
+          const v = norm(row[vi]); if(v){ val = v; break; }
+        }
+        if(!val) continue;
+        if(/financial\s*year/i.test(key) && !r.fy)       r.fy      = val;
+        else if(/tax\s*period/i.test(key) && !r.period)  r.period  = val;
+        else if(/^gstin$/i.test(key) && !r.gstin)        r.gstin   = val;
+        else if(/legal\s*name/i.test(key) && !r.legal)   r.legal   = val;
+        else if(/trade\s*name/i.test(key) && !r.trade)   r.trade   = val;
+        else if(/date\s*of\s*gen/i.test(key) && !r.genDate) r.genDate = val;
+        if(/quarterly/i.test(norm(row[ci]))) r.quarterly = true;
+      }
+    }
+    // also scan full text for GSTIN if not found above
+    if(!r.gstin){
+      const flat = XLSX.utils.sheet_to_csv(readme);
+      const gm   = flat.match(/\b(\d{2}[A-Z]{5}\d{4}[A-Z][0-9A-Z][Z][0-9A-Z])\b/);
+      if(gm) r.gstin = gm[1];
+    }
+  }
+  if(/2BQ/i.test(fileName) || /[-–\s]/.test(r.period)) r.quarterly = true;
+
+  /* ---- the four summary sheets ---- */
+  const SUMS = [
+    {sheet:"ITC Available",     key:"available"},
+    {sheet:"ITC not available", key:"notAvailable"},
+    {sheet:"ITC Reversal",      key:"reversal"},
+    {sheet:"ITC Rejected",      key:"rejected"},
+  ];
+  for(const s of SUMS){
+    const ws = workbook.Sheets[s.sheet];
+    if(!ws) continue;
+    const g = XLSX.utils.sheet_to_json(ws, {header:1, raw:true, defval:null});
+    const out = {};
+    let part = "";
+    for(const row of g){
+      if(!row) continue;
+      const a = norm(row[0]);
+      if(/^part\s+a$/i.test(a)){ part = "A"; continue; }
+      if(/^part\s+b$/i.test(a)){ part = "B"; continue; }
+      if(!part) continue;
+      if(/^(I|II|III|IV|V)$/i.test(a)){
+        out[part + "-" + a.toUpperCase()] = {
+          heading : norm(row[1]),
+          table3b : norm(row[2]).replace(/\s+/g," "),
+          igst : n0(toNum(row[3])), cgst : n0(toNum(row[4])),
+          sgst : n0(toNum(row[5])), cess : n0(toNum(row[6])),
+        };
+      }
+    }
+    r.summary[s.key] = out;
+  }
+
+  /* ---- invoice-level ledger ---- */
+  for(const sec of SHEET_SECTIONS){
+    const ws = workbook.Sheets[sec.sheet];
+    if(!ws) continue;
+    const grid = XLSX.utils.sheet_to_json(ws, {header:1, raw:true, defval:null});
+    const H = headerMap(grid);
+    if(!H) continue;
+
+    for(let i = H.dataFrom; i < grid.length; i++){
+      const row = grid[i];
+      if(!row || !row.length) continue;
+      const cell = c => (c >= 0 && row[c] !== undefined) ? row[c] : null;
+
+      const gstin = norm(cell(H.gstin));
+      const docNo = norm(cell(H.docNo));
+      if(!gstin && !docNo) continue;                 // blank / spacer row
+      if(/^total$/i.test(docNo)) continue;
+
+      const rawIgst = n0(toNum(cell(H.tax.igst)));
+      const rawCgst = n0(toNum(cell(H.tax.cgst)));
+      const rawSgst = n0(toNum(cell(H.tax.sgst)));
+      const rawCess = n0(toNum(cell(H.tax.cess)));
+
+      // Credit notes reduce ITC — negate values so ledger totals are correct
+      // Note type "C" = credit note; "D" = debit note (stays positive).
+      // CDNR/CDNRA sheets from 2B always represent credit notes unless docType says D.
+      const rawDocType = norm(cell(H.docType));
+      const isCN = /cdnr/i.test(sec.sheet) &&
+                   !/^d(ebit)?/i.test(rawDocType);  // treat as credit note unless explicitly Debit
+      const sign = isCN ? -1 : 1;
+
+      const igst = sign * rawIgst;
+      const cgst = sign * rawCgst;
+      const sgst = sign * rawSgst;
+      const cess = sign * rawCess;
+
+      r.ledger.push({
+        period      : r.period,
+        fy          : r.fy,
+        section     : sec.label,
+        category    : sec.cat,
+        isCreditNote: isCN,
+        gstin,
+        name     : norm(cell(H.name)),
+        docType  : rawDocType,
+        docNo,
+        docDate  : fmtDate(cell(H.docDate)),
+        docValue : toNum(cell(H.docValue)),
+        pos      : norm(cell(H.pos)),
+        rcm      : norm(cell(H.rcm)),
+        rate     : norm(cell(H.rate)),
+        taxable  : sign * n0(toNum(cell(H.taxable))),
+        igst, cgst, sgst, cess,
+        totalTax : igst + cgst + sgst + cess,
+        itcAvail : norm(cell(H.itcAvail)),
+        reason   : norm(cell(H.reason)),
+        g1Period : norm(cell(H.g1Period)),
+        g1Filed  : fmtDate(cell(H.g1Filed)),
+        source   : norm(cell(H.source)),
+        irn      : norm(cell(H.irn)),
+        origNo   : norm(cell(H.origNo)),
+      });
+    }
+  }
+
+  /* ---- derived: net ITC available per 2B ---- */
+  const A = r.summary.available || {};
+  const net = {igst:0,cgst:0,sgst:0,cess:0};
+  let hasSummary = false;
+  for(const k of ["A-I","A-II","A-III","A-IV"]){
+    const v = A[k]; if(!v) continue;
+    net.igst+=v.igst; net.cgst+=v.cgst; net.sgst+=v.sgst; net.cess+=v.cess;
+    hasSummary = true;
+  }
+  const cn = A["B-I"];
+  if(cn){ net.igst-=cn.igst; net.cgst-=cn.cgst; net.sgst-=cn.sgst; net.cess-=cn.cess; }
+
+  // fallback: if no summary sheets found, aggregate directly from the invoice ledger
+  // Credit note entries already have negative values so they naturally reduce the total
+  if(!hasSummary){
+    for(const d of r.ledger){
+      if(d.category !== "available" && d.category !== "reversal") continue;
+      const sign = d.category === "reversal" ? -1 : 1;
+      net.igst += sign * n0(d.igst); net.cgst += sign * n0(d.cgst);
+      net.sgst += sign * n0(d.sgst); net.cess += sign * n0(d.cess);
+    }
+  }
+  r.netItc = net;
+
+  return r;
+}
+
+/* ═══════════════════════ Tally register parser ═══════════════════════ */
+
+/** Find the sheet holding a Tally Sales / Purchase Register export ("Sales Register" title in the top rows). */
+function findTallySheet(workbook){
+  for(const name of workbook.SheetNames){
+    const g = XLSX.utils.sheet_to_json(workbook.Sheets[name], {header:1, raw:true, defval:null});
+    for(const row of g.slice(0, 12)){
+      for(const c of (row||[])){
+        const m = norm(c).match(/^(sales|purchase)\s+register$/i);
+        if(m) return {grid:g, side:m[1].toLowerCase()};
+      }
+    }
+  }
+  return null;
+}
+
+/** Tally date cell → Date. Nudged to midday so SheetJS's timezone drift can't push 1-Apr back into March. */
+function tallyDate(v){
+  if(v instanceof Date && !isNaN(v)) return new Date(v.getTime() + 12*3600*1000);
+  const m = String(v||"").trim().match(/^(\d{1,2})-([A-Za-z]{3})-(\d{2}|\d{4})$/);
+  if(!m || !MON3[m[2].toLowerCase()]) return null;
+  const y = m[3].length === 2 ? 2000 + parseInt(m[3],10) : parseInt(m[3],10);
+  return new Date(y, MONTH_TO_NUM[MON3[m[2].toLowerCase()].toLowerCase()] - 1, parseInt(m[1],10), 12);
+}
+
+function parseTally(found){
+  const {grid, side} = found;
+  const r = {
+    form: side === "sales" ? "Tally Sales Register" : "Tally Purchase Register",
+    side, gstin:"", fy:"", period:"", books:{}, vouchers:0
+  };
+
+  let h = -1;
+  for(let i = 0; i < Math.min(grid.length, 30); i++){
+    const row = (grid[i]||[]).map(c => norm(c).toLowerCase());
+    if(row[0] === "date" && row.includes("particulars")){ h = i; break; }
+  }
+  if(h < 0) throw new Error(r.form + ": header row (Date / Particulars) not found");
+
+  // Every ledger column is either a tax head or part of the taxable value
+  const hdr  = (grid[h]||[]).map(c => norm(c));
+  const SKIP = /^(date|particulars|voucher\s*type|voucher\s*no\.?|voucher\s*ref.*|gstin.*|narration|value|addl\.?\s*cost|gross\s*total|quantity|rate)$/i;
+  const tax  = (hd, k) => !/sales|purchase/i.test(hd) && new RegExp("(^|[^a-z])" + k, "i").test(hd);
+  const cols = hdr.map(hd => {
+    if(!hd || SKIP.test(hd)) return null;
+    if(tax(hd, "igst"))         return "igst";
+    if(tax(hd, "cgst"))         return "cgst";
+    if(tax(hd, "(sgst|utgst)")) return "sgst";
+    if(tax(hd, "cess"))         return "cess";
+    if(/round|tds|tcs/i.test(hd)) return null;
+    return "taxable";
+  });
+  const vtCol = hdr.findIndex(x => /^voucher\s*type$/i.test(x));
+
+  let first = null, last = null;
+  for(let i = h + 1; i < grid.length; i++){
+    const row = grid[i] || [];
+    const d = tallyDate(row[0]);
+    if(!d) continue;                               // Grand Total and anything typed below the register
+    const p = MON_SHORT[d.getMonth()] + "-" + String(d.getFullYear()).slice(2);
+    const sign = vtCol >= 0 && /credit\s*note|debit\s*note|return/i.test(norm(row[vtCol])) ? -1 : 1;
+    const b = r.books[p] || (r.books[p] = bucket());
+    cols.forEach((k, c) => { if(k && typeof row[c] === "number") b[k] += sign * row[c]; });
+    r.vouchers++;
+    if(!first || d < first) first = d;
+    if(!last  || d > last)  last  = d;
+  }
+  if(!r.vouchers) throw new Error(r.form + ": no dated vouchers found");
+
+  for(const b of Object.values(r.books))
+    for(const k of Object.keys(b)) b[k] = Math.round(b[k] * 100) / 100;
+  const mon = d => MON_SHORT[d.getMonth()] + "-" + String(d.getFullYear()).slice(2);
+  r.period = mon(first) === mon(last) ? mon(first) : mon(first) + " to " + mon(last);
+  return r;
+}
+
+/* ═══════════════════════ file intake ═══════════════════════ */
+
+const store = [];           // {name, kind, data, ok, err}
+
+async function ingest(file){
+  const buf   = await file.arrayBuffer();
+  const lower = file.name.toLowerCase();
+
+  /** Derive period from filename pattern MMYYYY or MMYY, e.g. 052025 → May. */
+  function periodFromFilename(){
+    const m = file.name.match(/(?:^|[_\-])(\d{2})(\d{4})(?:[_\-.]|$)/)
+           || file.name.match(/(?:^|[_\-])(\d{2})(\d{2})(?:[_\-.]|$)/);
+    if(!m) return "";
+    const mon = parseInt(m[1], 10);
+    const yr  = parseInt(m[2], 10);
+    if(mon < 1 || mon > 12) return "";
+    return MON_SHORT[mon - 1] + "-" + String(yr).slice(-2);
+  }
+
+  if(lower.endsWith(".pdf")){
+    const lines = await pdfLines(buf);
+    const head  = sq(lines.slice(0,60).map(l=>l.line).join(" "));
+    if(head.includes("formgstr3b") || head.includes("gstr3b")){
+      const data = parse3B(lines);
+      data.period = periodFromFilename() || data.period;
+      data.period = formatPeriod(data.period, data.fy) || data.period;
+      return {kind:"3B", data};
+    }
+    if(head.includes("formgstr1") || head.includes("detailsofoutwardsupplies")){
+      const data = parseG1(lines);
+      data.period = periodFromFilename() || data.period;
+      data.period = formatPeriod(data.period, data.fy) || data.period;
+      return {kind:"G1", data};
+    }
+    throw new Error("PDF is not a GSTR-1 or GSTR-3B return");
+  }
+
+  if(lower.endsWith(".xlsx") || lower.endsWith(".xls")){
+    const wb    = XLSX.read(new Uint8Array(buf), {type:"array", cellDates:true});
+    const names = wb.SheetNames.map(n => n.toLowerCase());
+    const is2B  = names.some(n =>
+      n === "itc available" || n === "read me" || n === "read me " ||
+      n === "b2b" || n === "b2ba" || n.includes("gstr-2b") || n.includes("gstr2b") ||
+      n === "home" || n === "itc not available" || n === "itc reversal"
+    );
+    if(is2B){
+      const data = parse2B(wb, file.name);
+      data.period = periodFromFilename() || data.period;
+      data.period = formatPeriod(data.period, data.fy) || data.period;
+      return {kind:"2B", data};
+    }
+    const tally = findTallySheet(wb);
+    if(tally) return {kind:"TL", src:"tally", data:parseTally(tally)};
+    throw new Error("Workbook is not a GSTR-2B download or Tally register (no recognised sheet names: " + wb.SheetNames.slice(0,4).join(", ") + ")");
+  }
+
+  if(lower.endsWith(".json")){
+    const txt = new TextDecoder().decode(buf);
+    let obj;
+    try{ obj = JSON.parse(txt); } catch(e){ throw new Error("Invalid JSON: " + e.message); }
+    // Capture Winman metadata before unwrapping
+    const winMeta = obj.winreq || null;
+    // Winman wraps in {winreq, resp} — unwrap if present
+    if(obj.resp) obj = obj.resp;
+    if(obj.gstin && (obj.b2b || obj.b2cs || obj.b2cl || obj.cdnr || obj.exp)){
+      const data = parseG1Json(obj, winMeta);
+      data.period = periodFromFilename() || data.period;
+      return {kind:"G1", src:"json", data};
+    }
+    // Winman GSTR-3B: resp = {details:{gstin,ret_period,sup_details,...}, cash_itc:{...}}
+    if(obj.details && obj.details.sup_details){
+      const data = parse3BJson(obj.details, winMeta, obj);
+      data.period = periodFromFilename() || data.period;
+      return {kind:"3B", src:"json", data};
+    }
+    // Raw portal GSTR-3B (gstin + sup_details at root)
+    if(obj.gstin && obj.sup_details){
+      const data = parse3BJson(obj, winMeta, obj);
+      data.period = periodFromFilename() || data.period;
+      return {kind:"3B", src:"json", data};
+    }
+    throw new Error("JSON is not a recognised GSTR-1 or GSTR-3B response");
+  }
+
+  throw new Error("Unsupported file type");
+}
+
+/* ═══════════════════ JSON parsers ═══════════════════ */
+
+/** Flatten whatever structure the portal puts in r.hsn into a simple array of HSN items. */
+function normaliseHsn(hsn){
+  if(!hsn) return [];
+  const items = [];
+
+  // Format A: {hsn_b2b:[...], hsn_b2c:[...]} directly on hsn (August-style)
+  if(Array.isArray(hsn.hsn_b2b) || Array.isArray(hsn.hsn_b2c)){
+    for(const x of (hsn.hsn_b2b||[])) if(x && x.hsn_sc) items.push(x);
+    for(const x of (hsn.hsn_b2c||[])) if(x && x.hsn_sc) items.push(x);
+    return items;
+  }
+
+  // Format B: {data:[{hsn_b2b:[...], hsn_b2c:[...]}]} (April-style)
+  // Format C: {data:[{hsn_sc,...}]} or [{hsn_sc,...}] — flat items
+  const arr = Array.isArray(hsn) ? hsn : (hsn.data || []);
+  for(const entry of arr){
+    if(!entry) continue;
+    if(Array.isArray(entry.hsn_b2b) || Array.isArray(entry.hsn_b2c)){
+      for(const x of (entry.hsn_b2b||[])) if(x && x.hsn_sc) items.push(x);
+      for(const x of (entry.hsn_b2c||[])) if(x && x.hsn_sc) items.push(x);
+    } else if(entry.hsn_sc){
+      items.push(entry);
+    }
+  }
+  return items;
+}
+
+function parseG1Json(r, winMeta){
+  /* Period from fp field "MMYYYY" */
+  function fpToPeriod(fp){
+    if(!fp || fp.length < 6) return "";
+    const mon = parseInt(fp.slice(0,2), 10);
+    const yr  = parseInt(fp.slice(2), 10);
+    if(mon < 1 || mon > 12) return "";
+    return MON_SHORT[mon-1] + "-" + String(yr).slice(-2);
+  }
+
+  /* Sum itms array — only entries that have txval */
+  function sumItms(itms){
+    let txval=0, iamt=0, camt=0, samt=0, csamt=0;
+    for(const it of (itms||[])){
+      const d = it.itm_det || {};
+      if(d.txval == null) continue;
+      txval += d.txval||0; iamt += d.iamt||0;
+      camt  += d.camt||0;  samt += d.samt||0; csamt += d.csamt||0;
+    }
+    return {taxable:txval, igst:iamt, cgst:camt, sgst:samt, cess:csamt};
+  }
+
+  const gstin = r.gstin || (winMeta && winMeta.gstin) || "";
+  const legal = (winMeta && winMeta.AssesseeName) || "";
+  const fy    = (winMeta && winMeta.Fyear) || "";
+  const result = {
+    form:"GSTR-1", gstin, legal, trade:"", fy, period:"",
+    arn:"", arnDate:"", sections:{},
+    /* raw arrays for the DB sheets */
+    raw:{ b2b:r.b2b||[], b2cs:r.b2cs||[], b2cl:r.b2cl||[],
+          cdnr:r.cdnr||[], cdnur:r.cdnur||[], exp:r.exp||[],
+          b2ba:r.b2ba||[], cdnra:r.cdnra||[], cdnura:r.cdnura||[], b2cla:r.b2cla||[],
+          hsn:normaliseHsn(r.hsn), doc_issue:r.doc_issue||[] }
+  };
+  result.period = fpToPeriod(r.fp || (winMeta && winMeta.fp) || "");
+
+  /* Helper: add a bucket into a named section */
+  function addSec(key, label, bkt){
+    if(!result.sections[key]) result.sections[key] = {label, net:bucket(), count:0};
+    addInto(result.sections[key].net, bkt, 1);
+    result.sections[key].count++;
+  }
+
+  /* B2B → section 4A */
+  for(const sup of (r.b2b||[])){
+    for(const inv of (sup.inv||[])){
+      if(inv.rchrg === "Y") addSec("4B","B2B RCM", sumItms(inv.itms));
+      else                   addSec("4A","B2B", sumItms(inv.itms));
+    }
+  }
+  /* B2CL → section 5 */
+  for(const entry of (r.b2cl||[])){
+    for(const inv of (entry.inv||[])){
+      addSec("5","B2C Large", sumItms(inv.itms));
+    }
+  }
+  /* B2CS → section 7 */
+  for(const row of (r.b2cs||[])){
+    addSec("7","B2C Small", {taxable:row.txval||0, igst:row.iamt||0,
+                              cgst:row.camt||0, sgst:row.samt||0, cess:row.csamt||0});
+  }
+  /* Exports → 6A (WPAY) and 6B (WOPAY) */
+  for(const entry of (r.exp||[])){
+    const key = (entry.exp_typ||"").toUpperCase() === "WPAY" ? "6A" : "6B";
+    for(const inv of (entry.inv||[])){
+      addSec(key, key==="6A"?"Export WPAY":"Export WOPAY", sumItms(inv.itms));
+    }
+  }
+  /* CDNR → 9B_CDNR (credit notes negate, debit notes add) */
+  for(const sup of (r.cdnr||[])){
+    for(const note of (sup.nt||[])){
+      const s = (note.ntty||"").toUpperCase() === "C" ? -1 : 1;
+      const b = sumItms(note.itms);
+      addSec("9B_CDNR","CDNR", {taxable:s*b.taxable,igst:s*b.igst,cgst:s*b.cgst,sgst:s*b.sgst,cess:s*b.cess});
+    }
+  }
+  /* CDNUR → 9B_CDNUR */
+  for(const note of (r.cdnur||[])){
+    const s = (note.ntty||"").toUpperCase() === "C" ? -1 : 1;
+    const b = sumItms(note.itms);
+    addSec("9B_CDNUR","CDNUR", {taxable:s*b.taxable,igst:s*b.igst,cgst:s*b.cgst,sgst:s*b.sgst,cess:s*b.cess});
+  }
+  /* B2BA → 9A_B2B_R (amendments to B2B invoices) */
+  for(const sup of (r.b2ba||[])){
+    for(const inv of (sup.inv||[])){
+      const s = (inv.rchrg==="Y") ? "4B" : "4A";
+      addSec("9A_B2B_R","9A · Amended B2B", sumItms(inv.itms));
+    }
+  }
+  /* B2CLA → 9A_B2CL */
+  for(const entry of (r.b2cla||[])){
+    for(const inv of (entry.inv||[])){
+      addSec("9A_B2CL","9A · Amended B2CL", sumItms(inv.itms));
+    }
+  }
+  /* CDNRA → 9C_CDNRA */
+  for(const sup of (r.cdnra||[])){
+    for(const nt of (sup.nt||[])){
+      const s = (nt.ntty||"").toUpperCase()==="C" ? -1 : 1;
+      const b = sumItms(nt.itms);
+      addSec("9C_CDNRA","9C · Amended CDN (Reg.)", {taxable:s*b.taxable,igst:s*b.igst,cgst:s*b.cgst,sgst:s*b.sgst,cess:s*b.cess});
+    }
+  }
+  /* CDNURA → 9C_CDNURA */
+  for(const nt of (r.cdnura||[])){
+    const s = (nt.ntty||"").toUpperCase()==="C" ? -1 : 1;
+    const b = sumItms(nt.itms);
+    addSec("9C_CDNURA","9C · Amended CDN (Unreg.)", {taxable:s*b.taxable,igst:s*b.igst,cgst:s*b.cgst,sgst:s*b.sgst,cess:s*b.cess});
+  }
+  /* NIL / exempt */
+  if(r.nil){
+    for(const inv of (r.nil.inv||[])){
+      const b = {taxable:(inv.expt_amt||0)+(inv.nil_amt||0)+(inv.ngsup_amt||0),
+                 igst:0, cgst:0, sgst:0, cess:0};
+      addSec("8","Nil/Exempt", b);
+    }
+  }
+
+  /* Liability roll-up (mirror of parseG1) */
+  const get = k => (result.sections[k] ? result.sections[k].net : bucket());
+  const taxable = bucket();
+  for(const k of ["4A","5","7","9B_CDNR","9B_CDNUR","9A_B2B_R","9A_B2CL","9C_CDNRA","9C_CDNURA","10","11A"])
+    addInto(taxable, get(k), 1);
+  addInto(taxable, get("11B"), -1);
+  result.outwardTaxable = taxable;
+
+  const zero = bucket();
+  for(const k of ["6A","6B"]) addInto(zero, get(k), 1);
+  result.outwardZero = zero;
+  result.outwardNilExempt = {taxable: n0(get("8").taxable)};
+  result.rcmOutward = get("4B");
+
+  return result;
+}
+
+function parse3BJson(r, winMeta, rawObj){
+  const gstin  = r.gstin || (winMeta && winMeta.gstin) || "";
+  const legal  = (winMeta && winMeta.AssesseeName) || "";
+  const fy     = (winMeta && winMeta.Fyear) || "";
+  const result = {
+    form:"GSTR-3B", gstin, legal, trade:"",
+    fy, period:"", arn:"", arnDate:"",
+    t31:{}, t311:{}, t32:{}, t4A:{}, t4B:{}, t4C:null, t4D:{}, t5:{}, t51:{}, t61:{}
+  };
+  const retPeriod = r.ret_period || (winMeta && winMeta.retnprd) || "";
+  if(retPeriod && retPeriod.length >= 6){
+    const mon = parseInt(retPeriod.slice(0,2),10);
+    const yr  = parseInt(retPeriod.slice(2),10);
+    if(mon>=1&&mon<=12) result.period = MON_SHORT[mon-1]+"-"+String(yr).slice(-2);
+  }
+
+  const sd = r.sup_details || {};
+  const b2 = f => ({taxable:f.txval||0, igst:f.iamt||0, cgst:f.camt||0, sgst:f.samt||0, cess:f.csamt||0});
+  result.t31  = b2(sd.osup_det     || {});
+  result.t311 = b2(sd.osup_nil_exmp|| {});
+  result.t32  = b2(sd.isup_rev     || {});
+
+  const ie = r.itc_elg || {};
+  function sumArr(arr){ // sum an array of {iamt,camt,samt,csamt}
+    let igst=0,cgst=0,sgst=0,cess=0;
+    for(const x of (arr||[])){ igst+=x.iamt||0; cgst+=x.camt||0; sgst+=x.samt||0; cess+=x.csamt||0; }
+    return {igst,cgst,sgst,cess};
+  }
+  result.t4A = sumArr(ie.itc_avl);
+  result.t4B = sumArr(ie.itc_rev);
+  result.t4D = sumArr(ie.itc_inelg);
+
+  result.outwardTaxable = result.t31;
+  result.itcAvailed     = result.t4A;
+  result.itcNet = { igst : (result.t4A.igst||0)-(result.t4B.igst||0),
+                    cgst : (result.t4A.cgst||0)-(result.t4B.cgst||0),
+                    sgst : (result.t4A.sgst||0)-(result.t4B.sgst||0),
+                    cess : (result.t4A.cess||0)-(result.t4B.cess||0) };
+
+  /* Table 6.1 — Payment of Tax (portal: r.tax_pay; Winman extra: rawObj.cash_itc) */
+  const tp = r.tax_pay || (rawObj && rawObj.cash_itc) || null;
+  if(tp && typeof tp === "object"){
+    const pr = row => row ? {
+      taxPayable : n0(row.tax_payble),
+      itcIgst    : n0(row.itc_pd_igst),
+      itcCgst    : n0(row.itc_pd_cgst),
+      itcSgst    : n0(row.itc_pd_sgst),
+      itcCess    : n0(row.itc_pd_cess),
+      cashPd     : n0(row.cash_pd),
+      interest   : n0(row.intr),
+      lateFee    : n0(row.ltfee)
+    } : null;
+    if(tp.igst) result.t61.igst = pr(tp.igst);
+    if(tp.cgst) result.t61.cgst = pr(tp.cgst);
+    if(tp.sgst) result.t61.sgst = pr(tp.sgst);
+    if(tp.cess) result.t61.cess = pr(tp.cess);
+  }
+
+  return result;
+}
+
+function renderFiles(){
+  const panel = document.getElementById("filesPanel");
+  const tb = document.querySelector("#fileTable tbody");
+  tb.innerHTML = "";
+  panel.classList.toggle("hide", store.length === 0);
+
+  for(const f of store){
+    const tr = document.createElement("tr");
+    const tagCls = f.kind === "G1" ? "t-g1" : f.kind === "3B" ? "t-3b" : f.kind === "2B" ? "t-2b" : f.kind === "TL" ? "t-tl" : "t-bad";
+    const tagTxt = (f.kind === "G1" ? "GSTR-1" : f.kind === "3B" ? "GSTR-3B" : f.kind === "2B" ? "GSTR-2B" : f.kind === "TL" ? f.data.form : "—")
+                 + (f.src === "json" ? " (JSON)" : "");
+    const d = f.data || {};
+    tr.innerHTML =
+      "<td>" + esc(f.name) + "</td>" +
+      '<td><span class="tag ' + tagCls + '">' + tagTxt + "</span></td>" +
+      "<td>" + esc(d.gstin || "") + "</td>" +
+      "<td>" + esc(d.fy || "") + "</td>" +
+      "<td>" + esc(d.period || "") + "</td>" +
+      '<td>' + (f.ok ? '<span style="color:var(--ok)">read</span>'
+                     : '<span style="color:var(--err)">' + esc(f.err||"failed") + "</span>") + "</td>";
+    tb.appendChild(tr);
+  }
+  document.getElementById("gen").disabled = !store.some(f => f.ok);
+}
+const esc = s => String(s==null?"":s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+
+function renderPreview(){
+  const panel  = document.getElementById("previewPanel");
+  const good   = store.filter(f => f.ok);
+  if(!good.length){ panel.classList.add("hide"); return; }
+  panel.classList.remove("hide");
+
+  /* lightweight maps — same logic as buildContext but no side-effects */
+  const g1={}, b3={}, b2={};
+  for(const f of good){
+    const p = f.data.period || "?";
+    if(f.kind==="G1") g1[p]=f.data;
+    else if(f.kind==="3B") b3[p]=f.data;
+    else if(f.kind==="2B") b2[p]=f.data;
+  }
+  const all = new Set([...Object.keys(g1),...Object.keys(b3),...Object.keys(b2)]);
+  const periods = [...all].sort((a,b_)=>{
+    const ya=parseInt((a.match(/-(\d{2})$/)||[])[1]||"0"),yb=parseInt((b_.match(/-(\d{2})$/)||[])[1]||"0");
+    if(ya!==yb) return ya-yb;
+    return fyOrder(a)-fyOrder(b_)||a.localeCompare(b_);
+  });
+
+  const fmt  = v => (v==null||isNaN(v)) ? "" : Math.round(v).toLocaleString("en-IN");
+  const fmtD = v => (v==null||isNaN(v)) ? "" : (v>=0?"+":"")+Math.round(v).toLocaleString("en-IN");
+  const nil  = "<span class='pv-nil'>—</span>";
+  const sum4 = bkt => bkt ? n0(bkt.igst)+n0(bkt.cgst)+n0(bkt.sgst)+n0(bkt.cess) : null;
+
+  function badge(diff, hasA, hasB){
+    if(!hasA&&!hasB) return "<span class='bk bk-miss'>No data</span>";
+    if(!hasA)        return "<span class='bk bk-miss'>No GSTR-1</span>";
+    if(!hasB)        return "<span class='bk bk-miss'>No 3B</span>";
+    const a = Math.abs(diff);
+    if(a<1)    return "<span class='bk bk-ok'>&#10003; Match</span>";
+    if(a<5000) return "<span class='bk bk-warn'>Minor diff</span>";
+    return             "<span class='bk bk-diff'>&#9888; Diff</span>";
+  }
+  function badge2(diff, hasA, hasB){
+    if(!hasA&&!hasB) return "<span class='bk bk-miss'>No data</span>";
+    if(!hasA)        return "<span class='bk bk-miss'>No 2B</span>";
+    if(!hasB)        return "<span class='bk bk-miss'>No 3B</span>";
+    const a = Math.abs(diff);
+    if(a<1)    return "<span class='bk bk-ok'>&#10003; Match</span>";
+    if(a<5000) return "<span class='bk bk-warn'>Minor diff</span>";
+    return             "<span class='bk bk-diff'>&#9888; Diff</span>";
+  }
+
+  /* ---- Table 1: GSTR-1 vs GSTR-3B ---- */
+  let tot1Txbl=0, tot1Tax=0, tot3Tax=0;
+  let rows1 = periods.map(p => {
+    const gd=g1[p], bd=b3[p];
+    const txbl  = gd ? n0(gd.outwardTaxable?.taxable) : null;
+    const g1tax = gd ? sum4(gd.outwardTaxable) : null;
+    const b3tax = bd ? sum4(bd.outwardTaxable) : null;
+    const diff  = (g1tax!=null&&b3tax!=null) ? b3tax-g1tax : null;
+    if(txbl!=null) tot1Txbl+=txbl;
+    if(g1tax!=null) tot1Tax+=g1tax;
+    if(b3tax!=null) tot3Tax+=b3tax;
+    const diffStyle = diff!=null&&Math.abs(diff)>=1 ? " style='color:var(--err)'" : "";
+    const misses = (!gd?"<br><span class='pv-nil'>No GSTR-1</span>":"")+(!bd?"<br><span class='pv-nil'>No 3B</span>":"");
+    return `<tr>
+      <td><b>${esc(p)}</b>${misses}</td>
+      <td class="r">${txbl!=null?fmt(txbl):nil}</td>
+      <td class="r">${g1tax!=null?fmt(g1tax):nil}</td>
+      <td class="r">${b3tax!=null?fmt(b3tax):nil}</td>
+      <td class="r"${diffStyle}>${diff!=null?fmtD(diff):nil}</td>
+      <td>${badge(diff,!!gd,!!bd)}</td>
+    </tr>`;
+  }).join("");
+  const totDiff1 = tot3Tax-tot1Tax;
+  const tStyle1  = Math.abs(totDiff1)>=1?" style='color:var(--err)'":" style='color:var(--ok)'";
+  const t1 = `<p class="pvtitle">GSTR-1 vs GSTR-3B &mdash; Outward Liability</p>
+  <table class="pvt">
+  <thead><tr><th>Period</th><th class="r">G1 Taxable</th><th class="r">G1 Tax</th>
+    <th class="r">3B Tax</th><th class="r">Diff (Tax)</th><th>Status</th></tr></thead>
+  <tbody>${rows1}</tbody>
+  <tfoot><tr><td><b>Total</b></td><td class="r">${fmt(tot1Txbl)}</td>
+    <td class="r">${fmt(tot1Tax)}</td><td class="r">${fmt(tot3Tax)}</td>
+    <td class="r"${tStyle1}>${fmtD(totDiff1)}</td>
+    <td>${badge(totDiff1,tot1Tax>0,tot3Tax>0)}</td></tr></tfoot>
+  </table>`;
+
+  /* ---- Table 2: 2B vs 3B ITC ---- */
+  let tot2B=0, tot3I=0;
+  let rows2 = periods.map(p => {
+    const b2d=b2[p], b3d=b3[p];
+    const b2itc = b2d ? sum4(b2d.netItc) : null;
+    const b3itc = b3d ? sum4(b3d.itcAvailed) : null;
+    const diff  = (b2itc!=null&&b3itc!=null) ? b3itc-b2itc : null;
+    if(b2itc!=null) tot2B+=b2itc;
+    if(b3itc!=null) tot3I+=b3itc;
+    const diffStyle = diff!=null&&Math.abs(diff)>=1?" style='color:var(--err)'":"";
+    const misses = (!b2d?"<br><span class='pv-nil'>No 2B</span>":"")+(!b3d?"<br><span class='pv-nil'>No 3B</span>":"");
+    return `<tr>
+      <td><b>${esc(p)}</b>${misses}</td>
+      <td class="r">${b2itc!=null?fmt(b2itc):nil}</td>
+      <td class="r">${b3itc!=null?fmt(b3itc):nil}</td>
+      <td class="r"${diffStyle}>${diff!=null?fmtD(diff):nil}</td>
+      <td>${badge2(diff,!!b2d,!!b3d)}</td>
+    </tr>`;
+  }).join("");
+  const totDiff2 = tot3I-tot2B;
+  const tStyle2  = Math.abs(totDiff2)>=1?" style='color:var(--err)'":" style='color:var(--ok)'";
+  const t2 = `<p class="pvtitle">GSTR-2B vs GSTR-3B &mdash; ITC</p>
+  <table class="pvt">
+  <thead><tr><th>Period</th><th class="r">2B ITC</th><th class="r">3B ITC</th>
+    <th class="r">Diff</th><th>Status</th></tr></thead>
+  <tbody>${rows2}</tbody>
+  <tfoot><tr><td><b>Total</b></td><td class="r">${fmt(tot2B)}</td>
+    <td class="r">${fmt(tot3I)}</td>
+    <td class="r"${tStyle2}>${fmtD(totDiff2)}</td>
+    <td>${badge2(totDiff2,tot2B>0,tot3I>0)}</td></tr></tfoot>
+  </table>`;
+
+  document.getElementById("previewContent").innerHTML =
+    `<div class="pv2"><div>${t1}</div><div>${t2}</div></div>`;
+}
+
+async function handleFiles(list){
+  document.getElementById("dlHolder").innerHTML = "";
+  for(const file of list){
+    if(file.name.toLowerCase().endsWith(".zip")){
+      await handleZip(file);
+    } else {
+      await ingestOne(file);
+    }
+    renderFiles();
+    renderPreview();
+  }
+  validate();
+}
+
+async function handleZip(file){
+  logOk(file.name + "  →  extracting ZIP…");
+  let zip;
+  try{
+    zip = await JSZip.loadAsync(await file.arrayBuffer());
+  }catch(e){
+    store.push({name:file.name, kind:"?", data:null, ok:false, err:"ZIP error: "+e.message});
+    logErr(file.name + "  →  " + e.message);
+    return;
+  }
+  const jsonFiles = Object.values(zip.files).filter(f => !f.dir && f.name.toLowerCase().endsWith(".json"));
+  if(!jsonFiles.length){
+    store.push({name:file.name, kind:"?", data:null, ok:false, err:"No JSON files found inside ZIP"});
+    logErr(file.name + "  →  No JSON files found inside ZIP");
+    return;
+  }
+  for(const entry of jsonFiles){
+    const txt  = await entry.async("string");
+    const blob = new Blob([txt], {type:"application/json"});
+    const synthetic = new File([blob], entry.name.split("/").pop(), {type:"application/json"});
+    await ingestOne(synthetic);
+  }
+}
+
+async function ingestOne(file){
+  try{
+    const res = await ingest(file);
+    store.push({name:file.name, kind:res.kind, src:res.src||"pdf", data:res.data, ok:true});
+    const d = res.data;
+    logOk(file.name + "  →  " + res.kind + "  " + (d.gstin||"?") + "  " + (d.period||"?") + " " + (d.fy||"")
+          + (res.kind === "2B" ? "  (" + d.ledger.length + " documents)" : "")
+          + (res.kind === "TL" ? "  (" + d.form + ", " + d.vouchers + " vouchers)" : ""));
+  }catch(err){
+    store.push({name:file.name, kind:"?", data:null, ok:false, err:err.message});
+    logErr(file.name + "  →  " + err.message);
+  }
+}
+
+function validate(){
+  const good = store.filter(f => f.ok);
+  const gstins = [...new Set(good.map(f => f.data.gstin).filter(Boolean))];
+  if(gstins.length > 1)
+    logWarn("More than one GSTIN in this batch: " + gstins.join(", ") + " — check you have not mixed clients.");
+
+  const fys = [...new Set(good.map(f => f.data.fy).filter(Boolean))];
+  if(fys.length > 1)
+    logWarn("More than one financial year: " + fys.join(", ") + ".");
+
+  for(const kind of ["G1","3B","2B"]){
+    const seen = {};
+    for(const f of good.filter(x => x.kind === kind)){
+      const p = f.data.period || "?";
+      if(seen[p]) logWarn(kind + " for " + p + " supplied more than once — the later file wins.");
+      seen[p] = true;
+    }
+  }
+}
+
+/* ═══════════════════════ workbook builder ═══════════════════════ */
+
+/**
+ * Write a period string ("May-25") into an Excel cell as a real Date value
+ * formatted as "mmm-yy" so Excel sorts it correctly as a date column.
+ * Falls back to plain text for quarterly or unresolvable strings.
+ */
+function writePCell(ws, rowNo, colNo, periodStr){
+  const cell = ws.getRow(rowNo).getCell(colNo);
+  cell.value = periodStr || "";
+  cell.alignment = {horizontal:"center"};
+}
+
+const HDR_FILL   = "FF1A4F8A";
+const SUB_FILL   = "FFEAF1F9";
+const TOT_FILL   = "FFF2F4F7";
+const BOOK_FILL  = "FFFFFBEA";
+const MONEY      = '#,##0.00;[Red]-#,##0.00';
+
+function styleHeader(row, fill){
+  row.eachCell({includeEmpty:true}, c => {
+    c.font = {bold:true, color:{argb:"FFFFFFFF"}, size:10};
+    c.fill = {type:"pattern", pattern:"solid", fgColor:{argb:fill || HDR_FILL}};
+    c.alignment = {vertical:"middle", horizontal:"center", wrapText:true};
+    c.border = {
+      top:{style:"thin",color:{argb:"FFFFFFFF"}}, left:{style:"thin",color:{argb:"FFFFFFFF"}},
+      bottom:{style:"thin",color:{argb:"FFFFFFFF"}}, right:{style:"thin",color:{argb:"FFFFFFFF"}}
+    };
+  });
+}
+
+function money(ws, rowNo, from, to){
+  for(let c = from; c <= to; c++){
+    const cell = ws.getRow(rowNo).getCell(c);
+    cell.numFmt = MONEY;
+    cell.alignment = {horizontal:"right"};
+  }
+}
+
+function shadeBooks(ws, rowNo, from, to){
+  for(let c = from; c <= to; c++){
+    ws.getRow(rowNo).getCell(c).fill =
+      {type:"pattern", pattern:"solid", fgColor:{argb:BOOK_FILL}};
+  }
+}
+
+/** Two-tier header: merged group band over per-column labels. */
+function buildHeader(ws, groups){
+  const r1 = ws.getRow(1), r2 = ws.getRow(2);
+  let c = 1;
+  for(const g of groups){
+    const span = g.cols.length;
+    if(g.name){
+      r1.getCell(c).value = g.name;
+      if(span > 1) ws.mergeCells(1, c, 1, c + span - 1);
+    } else {
+      r1.getCell(c).value = g.cols[0];
+      if(span > 1) ws.mergeCells(1, c, 1, c + span - 1);
+    }
+    for(let i = 0; i < span; i++) r2.getCell(c + i).value = g.cols[i];
+    c += span;
+  }
+  styleHeader(r1);
+  styleHeader(r2, "FF2E6BAF");
+  r1.height = 26; r2.height = 34;
+  ws.views = [{state:"frozen", xSplit:1, ySplit:2}];
+  return c - 1;
+}
+
+/* ═══════════════════════ CDN & Amendments sheet ═══════════════════════ */
+function cdnSheet(wb, ctx){
+  const ws = wb.addWorksheet("CDN & Amendments", {properties:{tabColor:{argb:"FFC0392B"}}});
+
+  /* FY start date for PY detection */
+  let fyStart = null;
+  if(ctx.fy){
+    const m = ctx.fy.match(/(\d{4})/);
+    if(m){ const yr = parseInt(m[1]); fyStart = new Date(yr, 3, 1); } // April 1
+  }
+  function parseInDate(s){
+    if(!s) return null;
+    const p = s.split("-");
+    if(p.length === 3) return new Date(parseInt(p[2]), parseInt(p[1])-1, parseInt(p[0]));
+    return null;
+  }
+  function isPY(s){ const d=parseInDate(s); return !!(fyStart && d && d < fyStart); }
+
+  ws.columns = [
+    {width:10},{width:10},{width:22},{width:22},{width:20},{width:13},
+    {width:8},{width:20},{width:13},{width:16},{width:13},{width:13},{width:13},{width:11},{width:28}
+  ];
+  const HDR_COLS = ["Period","Table","Type","Counterparty GSTIN",
+    "Note / Doc No.","Note / Doc Date","PY","Orig. Inv No.","Orig. Inv Date",
+    "Taxable Value","IGST","CGST","SGST/UTGST","Cess","Remarks"];
+  const h = ws.getRow(1);
+  HDR_COLS.forEach((v,i) => { h.getCell(i+1).value = v; });
+  styleHeader(h); h.height = 22;
+  ws.views = [{state:"frozen", xSplit:0, ySplit:1}];
+
+  let r = 2;
+
+  function sumItmsRaw(itms){
+    let tv=0,ig=0,cg=0,sg=0,cs=0;
+    for(const it of (itms||[])){ const d=it.itm_det||{}; if(d.txval==null) continue;
+      tv+=d.txval||0; ig+=d.iamt||0; cg+=d.camt||0; sg+=d.samt||0; cs+=d.csamt||0; }
+    return {taxable:tv,igst:ig,cgst:cg,sgst:sg,cess:cs};
+  }
+
+  function writeRow(period, table, type, gstin, docNo, docDate, origNo, origDate, bkt, remarks){
+    const py = isPY(docDate) || isPY(origDate);
+    const row = ws.getRow(r);
+    [period,table,type,gstin||"",docNo||"",docDate||"",py?"PY ⚑":"",
+     origNo||"",origDate||"",
+     bkt.taxable||null,bkt.igst||null,bkt.cgst||null,bkt.sgst||null,bkt.cess||null,
+     remarks||""].forEach((v,i) => { row.getCell(i+1).value = v; });
+    money(ws, r, 10, 14);
+    if(py){
+      row.eachCell({includeEmpty:true}, c => {
+        c.fill={type:"pattern",pattern:"solid",fgColor:{argb:"FFFFF0F0"}};
+      });
+      row.getCell(7).font={bold:true,color:{argb:"FFCC0000"}};
+    }
+    r++;
+  }
+
+  function applySign(bkt, ntty){
+    const s = (ntty||"").toUpperCase()==="C" ? -1 : 1;
+    return {taxable:s*bkt.taxable, igst:s*bkt.igst, cgst:s*bkt.cgst, sgst:s*bkt.sgst, cess:s*bkt.cess};
+  }
+
+  for(const p of ctx.periods){
+    const g1 = ctx.g1[p]; if(!g1||!g1.raw) continue;
+    /* Credit/Debit Notes — registered */
+    for(const sup of (g1.raw.cdnr||[]))
+      for(const nt of (sup.nt||[]))
+        writeRow(p,"9B CDNR",(nt.ntty||"C").toUpperCase()==="C"?"Credit Note":"Debit Note",
+          sup.ctin, nt.nt_num, nt.nt_dt, "", "", applySign(sumItmsRaw(nt.itms),nt.ntty), "");
+    /* CDN — unregistered */
+    for(const nt of (g1.raw.cdnur||[]))
+      writeRow(p,"9B CDNUR",(nt.ntty||"C").toUpperCase()==="C"?"Credit Note (UR)":"Debit Note (UR)",
+        "", nt.nt_num, nt.nt_dt, "", "", applySign(sumItmsRaw(nt.itms),nt.ntty), "");
+    /* B2B Amendments */
+    for(const sup of (g1.raw.b2ba||[]))
+      for(const inv of (sup.inv||[]))
+        writeRow(p,"9A B2BA","B2B Amendment", sup.ctin,
+          inv.inum, inv.idt, inv.oinum||"", inv.oidt||"", sumItmsRaw(inv.itms), "");
+    /* B2CL Amendments */
+    for(const entry of (g1.raw.b2cla||[]))
+      for(const inv of (entry.inv||[]))
+        writeRow(p,"9A B2CLA","B2CL Amendment", "",
+          inv.inum, inv.idt, inv.oinum||"", inv.oidt||"", sumItmsRaw(inv.itms), "");
+    /* CDN Amendments — registered */
+    for(const sup of (g1.raw.cdnra||[]))
+      for(const nt of (sup.nt||[]))
+        writeRow(p,"9C CDNRA","CDN Amend (Reg.)", sup.ctin,
+          nt.nt_num, nt.nt_dt, nt.ont_num||"", nt.ont_dt||"",
+          applySign(sumItmsRaw(nt.itms),nt.ntty), "");
+    /* CDN Amendments — unregistered */
+    for(const nt of (g1.raw.cdnura||[]))
+      writeRow(p,"9C CDNURA","CDN Amend (UR.)", "",
+        nt.nt_num, nt.nt_dt, nt.ont_num||"", nt.ont_dt||"",
+        applySign(sumItmsRaw(nt.itms),nt.ntty), "");
+  }
+
+  if(r > 2) totalRow(ws, r, 2, 14, [1,2,3,4,5,6,7,8,9,15]);
+  ws.autoFilter = {from:{row:1,column:1}, to:{row:r, column:15}};
+}
+
+/* ═══════════════════════ GSTR-9 Draft ═══════════════════════ */
+function gstr9Sheet(wb, ctx){
+  const ws = wb.addWorksheet("GSTR-9 Draft", {properties:{tabColor:{argb:"FF7B3F00"}}});
+
+  /* Annual sums */
+  function g1s(...keys){
+    const r=bucket();
+    for(const k of keys) for(const p of ctx.periods){const d=ctx.g1[p];if(d&&d.sections[k])addInto(r,d.sections[k].net,1);}
+    return r;
+  }
+  function b3s(fn){ const r=bucket(); for(const p of ctx.periods){const d=ctx.b3[p];if(d){const v=fn(d);if(v)addInto(r,v,1);}} return r; }
+  function b2itcFn(){
+    const r={igst:0,cgst:0,sgst:0,cess:0};
+    for(const p of ctx.periods){const d=ctx.b2[p];if(d&&d.netItc){r.igst+=d.netItc.igst||0;r.cgst+=d.netItc.cgst||0;r.sgst+=d.netItc.sgst||0;r.cess+=d.netItc.cess||0;}}
+    return r;
+  }
+
+  const C_G1=3, C_3B=8, C_BK=13, C_DF=18;
+
+  ws.columns = [
+    {width:9},{width:60},
+    {width:16},{width:13},{width:13},{width:13},{width:11},
+    {width:16},{width:13},{width:13},{width:13},{width:11},
+    {width:16},{width:13},{width:13},{width:13},{width:11},
+    {width:14},{width:13},
+  ];
+
+  /* Title row */
+  const t=ws.getCell(1,1);
+  t.value="GSTR-9 DRAFT — "+( ctx.fy||"FY")+"  |  "+(ctx.gstin||"")+"  |  "+(ctx.legal||ctx.trade||"");
+  t.font={bold:true,size:13,color:{argb:"FFFFFFFF"}};
+  t.fill={type:"pattern",pattern:"solid",fgColor:{argb:HDR_FILL}};
+  ws.mergeCells(1,1,1,19); ws.getRow(1).height=22;
+
+  /* Group label row */
+  [[C_G1,C_G1+4,"← As per GSTR-1"],[C_3B,C_3B+4,"← As per GSTR-3B"],
+   [C_BK,C_BK+4,"← Draft GSTR-9 Declaration  (edit yellow cells)"],
+   [C_DF,C_DF+1,"Diff (Draft − GSTR-1)"]
+  ].forEach(([f,t2,lbl]) => {
+    ws.getCell(2,f).value=lbl; ws.mergeCells(2,f,2,t2);
+    ws.getCell(2,f).fill={type:"pattern",pattern:"solid",fgColor:{argb:SUB_FILL}};
+    ws.getCell(2,f).font={bold:true,size:9,color:{argb:HDR_FILL}};
+    ws.getCell(2,f).alignment={horizontal:"center"};
+  });
+  ws.getRow(2).height=14;
+
+  /* Column header row */
+  const g3=ws.getRow(3);
+  g3.getCell(1).value="Ref"; g3.getCell(2).value="Description";
+  const TAX5=["Taxable Value","IGST","CGST","SGST/UTGST","Cess"];
+  TAX5.forEach((h2,i)=>{g3.getCell(C_G1+i).value=h2;g3.getCell(C_3B+i).value=h2;g3.getCell(C_BK+i).value=h2;});
+  g3.getCell(C_DF).value="Taxable"; g3.getCell(C_DF+1).value="Total Tax";
+  styleHeader(g3,"FF2E6BAF"); g3.height=28;
+  ws.views=[{state:"frozen",xSplit:2,ySplit:3}];
+
+  let cr=4; // current row
+  const keyRows={};
+
+  const fill=(row,c1,c2,argb)=>{for(let c=c1;c<=c2;c++) ws.getRow(row).getCell(c).fill={type:"pattern",pattern:"solid",fgColor:{argb}};};
+
+  function secHdr(lbl){
+    ws.mergeCells(cr,1,cr,19); const c=ws.getCell(cr,1);
+    c.value=lbl; c.font={bold:true,color:{argb:"FFFFFFFF"},size:10};
+    c.fill={type:"pattern",pattern:"solid",fgColor:{argb:HDR_FILL}};
+    ws.getRow(cr).height=18; cr++;
+  }
+  function subHdr(lbl){
+    ws.mergeCells(cr,1,cr,19); const c=ws.getCell(cr,1);
+    c.value=lbl; c.font={bold:true,size:9};
+    c.fill={type:"pattern",pattern:"solid",fgColor:{argb:SUB_FILL}};
+    ws.getRow(cr).height=14; cr++;
+  }
+
+  /* Outward data row */
+  function dRow(ref,desc,g1v,b3v,bold){
+    const row=ws.getRow(cr);
+    row.getCell(1).value=ref; row.getCell(2).value=desc;
+    if(bold){row.getCell(1).font={bold:true};row.getCell(2).font={bold:true};}
+    const put=(base,bkt)=>{if(!bkt)return;
+      [bkt.taxable,bkt.igst,bkt.cgst,bkt.sgst,bkt.cess].forEach((v,i)=>{row.getCell(base+i).value=n0(v)||null;});};
+    put(C_G1,g1v); put(C_3B,b3v);
+    const src=g1v?C_G1:(b3v?C_3B:null);
+    for(let i=0;i<5;i++){const cell=row.getCell(C_BK+i);if(src)cell.value={formula:colLetter(src+i)+cr};shadeBooks(ws,cr,C_BK+i,C_BK+i);}
+    row.getCell(C_DF).value={formula:colLetter(C_BK)+cr+"-"+colLetter(C_G1)+cr};
+    row.getCell(C_DF+1).value={formula:"("+[1,2,3,4].map(i=>colLetter(C_BK+i)+cr).join("+")+")-("+ [1,2,3,4].map(i=>colLetter(C_G1+i)+cr).join("+")+")"};
+    money(ws,cr,C_G1,C_DF+1);
+    if(bold)fill(cr,1,C_3B+4,TOT_FILL);
+    return cr++;
+  }
+
+  /* Sum-of-specific-rows row */
+  function sRow(ref,desc,rowArr,b3v){
+    const row=ws.getRow(cr);
+    row.getCell(1).value=ref; row.getCell(2).value=desc;
+    for(let i=0;i<5;i++){
+      row.getCell(C_G1+i).value={formula:rowArr.map(rr=>colLetter(C_G1+i)+rr).join("+")};
+      row.getCell(C_BK+i).value={formula:rowArr.map(rr=>colLetter(C_BK+i)+rr).join("+")};
+      shadeBooks(ws,cr,C_BK+i,C_BK+i);
+    }
+    if(b3v)[b3v.taxable,b3v.igst,b3v.cgst,b3v.sgst,b3v.cess].forEach((v,i)=>ws.getRow(cr).getCell(C_3B+i).value=n0(v)||null);
+    row.getCell(C_DF).value={formula:colLetter(C_BK)+cr+"-"+colLetter(C_G1)+cr};
+    row.getCell(C_DF+1).value={formula:"("+[1,2,3,4].map(i=>colLetter(C_BK+i)+cr).join("+")+")-("+ [1,2,3,4].map(i=>colLetter(C_G1+i)+cr).join("+")+")"};
+    money(ws,cr,C_G1,C_DF+1);
+    ws.getRow(cr).eachCell({includeEmpty:true},c=>{c.font={bold:true};});
+    fill(cr,1,C_3B+4,TOT_FILL);
+    return cr++;
+  }
+
+  /* ITC row (no taxable col) — G1 col = 2B data */
+  function iRow(ref,desc,twoBv,b3v,bold){
+    const row=ws.getRow(cr);
+    row.getCell(1).value=ref; row.getCell(2).value=desc;
+    const putItc=(base,bkt)=>{if(!bkt)return;[bkt.igst,bkt.cgst,bkt.sgst,bkt.cess].forEach((v,i)=>row.getCell(base+1+i).value=n0(v)||null);};
+    putItc(C_G1,twoBv); putItc(C_3B,b3v);
+    const src=twoBv?C_G1:(b3v?C_3B:null);
+    for(let i=1;i<5;i++){const cell=row.getCell(C_BK+i);if(src)cell.value={formula:colLetter(src+i)+cr};shadeBooks(ws,cr,C_BK+i,C_BK+i);}
+    shadeBooks(ws,cr,C_BK,C_BK);
+    row.getCell(C_DF+1).value={formula:"("+[1,2,3,4].map(i=>colLetter(C_BK+i)+cr).join("+")+")-("+ [1,2,3,4].map(i=>colLetter(C_G1+i)+cr).join("+")+")"};
+    money(ws,cr,C_G1+1,C_DF+1);
+    if(bold){ws.getRow(cr).eachCell({includeEmpty:true},c=>{c.font={bold:true};});fill(cr,1,C_3B+4,TOT_FILL);}
+    return cr++;
+  }
+
+  /* ITC sum-of-rows row */
+  function isRow(ref,desc,rowArr,b3v){
+    const row=ws.getRow(cr);
+    row.getCell(1).value=ref; row.getCell(2).value=desc;
+    for(let i=1;i<5;i++){
+      row.getCell(C_G1+i).value={formula:rowArr.map(rr=>colLetter(C_G1+i)+rr).join("+")};
+      row.getCell(C_BK+i).value={formula:rowArr.map(rr=>colLetter(C_BK+i)+rr).join("+")};
+      shadeBooks(ws,cr,C_BK+i,C_BK+i);
+    }
+    shadeBooks(ws,cr,C_BK,C_BK);
+    if(b3v)[b3v.igst,b3v.cgst,b3v.sgst,b3v.cess].forEach((v,i)=>ws.getRow(cr).getCell(C_3B+1+i).value=n0(v)||null);
+    row.getCell(C_DF+1).value={formula:"("+[1,2,3,4].map(i=>colLetter(C_BK+i)+cr).join("+")+")-("+ [1,2,3,4].map(i=>colLetter(C_G1+i)+cr).join("+")+")"};
+    money(ws,cr,C_G1+1,C_DF+1);
+    ws.getRow(cr).eachCell({includeEmpty:true},c=>{c.font={bold:true};});
+    fill(cr,1,C_3B+4,TOT_FILL);
+    return cr++;
+  }
+
+  /* ===== PART II ===== */
+  secHdr("PART II — OUTWARD AND INWARD SUPPLIES DECLARED");
+  subHdr("Table 4 — Taxable outward / inward supplies during the FY");
+  const r4B = dRow("4B","Supplies to registered persons — B2B (excl. RCM)", g1s("4A"), null);
+  const r4C = dRow("4C","B2C Small — intra-state or ≤ ₹1.5 cr turnover", g1s("7"), null);
+  const r4D = dRow("4D","B2C Large — inter-state > ₹2.5 lakh (unregistered)", g1s("5"), null);
+  const r4E = dRow("4E","Zero rated — Export on payment of tax (WPAY)", g1s("6A"), null);
+  const r4F = dRow("4F","Export WOPAY / SEZ supply", g1s("6B"), null);
+  const r4G = dRow("4G","Inward RCM — tax payable by recipient", g1s("4B"), null);
+  const r4H = sRow("4H","Sub-total (4B to 4G)",[r4B,r4C,r4D,r4E,r4F,r4G],null);
+  cr++; // blank
+  const r4I = dRow("4I","Credit notes issued on 4B–4G supplies  [reduces liability]", g1s("9B_CDNR","9B_CDNUR"), null);
+  const r4K = dRow("4J/K","Debit notes / amendments on 4B–4G supplies", g1s("9A_B2B_R","9A_B2CL","9C_CDNRA","9C_CDNURA"), null);
+  const r4Adv= dRow("10/11","Advances received / adjusted (net)", g1s("10","11A"), null);
+  const r4N = sRow("4N","Total taxable outward supplies (4H + 4I + 4J/K + advances)",
+    [r4H,r4I,r4K,r4Adv], b3s(d=>d.outwardTaxable));
+  keyRows.outwardTaxable={row:r4N,col:C_BK};
+  cr++;
+  subHdr("Table 5 — Outward supplies on which tax is not payable");
+  const r5DF = dRow("5D–5F","Nil rated / Exempt / Non-GST supplies", g1s("8"), null);
+  keyRows.nilExempt={row:r5DF,col:C_BK};
+  cr++;
+
+  /* ===== PART III ===== */
+  secHdr("PART III — ITC AVAILED  (GSTR-1 col = GSTR-2B data  |  GSTR-3B col = GSTR-3B data)");
+  const b2tot = b2itcFn();
+  subHdr("Table 6 — ITC availed during the FY");
+  const r6A = iRow("6A","Total ITC as per GSTR-2B (net of rejections)", b2tot, b3s(d=>d.itcAvailed));
+  cr++;
+  subHdr("Table 7 — ITC reversed during the FY");
+  const r7F = iRow("7F","Total ITC reversed (Rule 42, 43, 17(5), others)", null, b3s(d=>d.itcReversed));
+  cr++;
+  subHdr("Table 8 — ITC reconciliation between GSTR-2B and GSTR-3B");
+  const r8A = iRow("8A","ITC per GSTR-2B", b2tot, null);
+  const r8B = iRow("8B","ITC availed per GSTR-3B (Table 4A)", null, b3s(d=>d.itcAvailed));
+  /* 8D = difference row — override formulas */
+  const r8D = iRow("8D","Difference (8A − 8B) — ITC in 2B not taken in 3B", null, null);
+  for(let i=1;i<5;i++){
+    ws.getRow(r8D).getCell(C_G1+i).value={formula:colLetter(C_G1+i)+r8A+"-"+colLetter(C_G1+i)+r8B};
+    ws.getRow(r8D).getCell(C_BK+i).value={formula:colLetter(C_G1+i)+r8D};
+    shadeBooks(ws,r8D,C_BK+i,C_BK+i);
+  }
+  cr++;
+  const rNet = isRow("Net ITC","Net ITC available (6A − 7F)",[r6A,r7F], b3s(d=>d.itcNet));
+  /* Override: 6A minus 7F */
+  for(let i=1;i<5;i++){
+    ws.getRow(rNet).getCell(C_G1+i).value={formula:colLetter(C_G1+i)+r6A+"-"+colLetter(C_G1+i)+r7F};
+    ws.getRow(rNet).getCell(C_BK+i).value={formula:colLetter(C_BK+i)+r6A+"-"+colLetter(C_BK+i)+r7F};
+  }
+  keyRows.netItc={row:rNet,col:C_BK};
+
+  return {sheetName:"GSTR-9 Draft", keyRows, C_BK};
+}
+
+/* ═══════════════════════ GSTR-9C Draft ═══════════════════════ */
+function gstr9cSheet(wb, ctx, g9info){
+  const ws = wb.addWorksheet("GSTR-9C Draft", {properties:{tabColor:{argb:"FF5B1E75"}}});
+  const {sheetName, keyRows, C_BK:G9_BK} = g9info;
+  const g9ref = (row, colOffset) => "'"+sheetName+"'!"+colLetter(G9_BK+colOffset)+row;
+
+  ws.columns = [{width:9},{width:64},{width:18},{width:14},{width:14},{width:14},{width:13},{width:14},{width:13}];
+
+  /* Title */
+  ws.getCell(1,1).value="GSTR-9C DRAFT — RECONCILIATION STATEMENT  |  "+(ctx.fy||"FY")+"  |  "+(ctx.gstin||"");
+  ws.getCell(1,1).font={bold:true,size:13,color:{argb:"FFFFFFFF"}};
+  ws.getCell(1,1).fill={type:"pattern",pattern:"solid",fgColor:{argb:"FF5B1E75"}};
+  ws.mergeCells(1,1,1,9); ws.getRow(1).height=22;
+
+  ws.getCell(2,1).value="Yellow = enter from audited accounts.  Orange = auto-filled from GSTR-9 Draft.  Red diff = unreconciled.";
+  ws.getCell(2,1).font={italic:true,size:9,color:{argb:"FF614B00"}};
+  ws.getCell(2,1).fill={type:"pattern",pattern:"solid",fgColor:{argb:"FFFFF8DC"}};
+  ws.mergeCells(2,1,2,9); ws.getRow(2).height=20;
+
+  const g3=ws.getRow(3);
+  ["Ref","Description","Taxable Value","IGST","CGST","SGST/UTGST","Cess","Diff (Taxable)","Diff (Total Tax)"]
+    .forEach((v,i)=>{g3.getCell(i+1).value=v;});
+  styleHeader(g3,"FF7B3F00"); g3.height=24;
+  ws.views=[{state:"frozen",xSplit:2,ySplit:3}];
+
+  let r=4;
+  const CB=3, CD=8; // books start col, diff start col
+  const ORANGE="FFFFEBD6";
+
+  function secH(t){
+    ws.mergeCells(r,1,r,9); const c=ws.getCell(r,1);
+    c.value=t; c.font={bold:true,color:{argb:"FFFFFFFF"}};
+    c.fill={type:"pattern",pattern:"solid",fgColor:{argb:"FF5B1E75"}};
+    ws.getRow(r).height=18; r++;
+  }
+  function subH(t){
+    ws.mergeCells(r,1,r,9); const c=ws.getCell(r,1);
+    c.value=t; c.font={bold:true,size:9};
+    c.fill={type:"pattern",pattern:"solid",fgColor:{argb:SUB_FILL}};
+    ws.getRow(r).height=14; r++;
+  }
+  /* Yellow input row */
+  function inp(ref,desc,note){
+    const row=ws.getRow(r); row.getCell(1).value=ref; row.getCell(2).value=desc;
+    if(note) row.getCell(2).note=note;
+    shadeBooks(ws,r,CB,CB+4); money(ws,r,CB,CD+1);
+    return r++;
+  }
+  /* Orange ref row — links to GSTR-9 */
+  function ref9(ref,desc,g9row){
+    const row=ws.getRow(r); row.getCell(1).value=ref; row.getCell(2).value=desc;
+    if(g9row) for(let i=0;i<5;i++){
+      const c=row.getCell(CB+i);
+      c.value={formula:g9ref(g9row,i)};
+      c.fill={type:"pattern",pattern:"solid",fgColor:{argb:ORANGE}};
+    }
+    money(ws,r,CB,CD+1);
+    return r++;
+  }
+  /* Computed row with formula */
+  function calc(ref,desc,formula5,isErr){
+    const row=ws.getRow(r); row.getCell(1).value=ref; row.getCell(2).value=desc;
+    formula5.forEach((f,i)=>{
+      const c=row.getCell(CB+i); c.value=f?{formula:f}:null;
+      c.fill={type:"pattern",pattern:"solid",fgColor:{argb:TOT_FILL}};
+    });
+    row.getCell(CD).value={formula:colLetter(CB)+r};
+    row.getCell(CD+1).value={formula:"("+[1,2,3,4].map(i=>colLetter(CB+i)+r).join("+")+")"};
+    money(ws,r,CB,CD+1);
+    row.eachCell({includeEmpty:true},c=>{c.font={bold:true,color:{argb:isErr?"FF8A1520":"FF000000"}};});
+    return r++;
+  }
+
+  /* ===== PART II: Turnover ===== */
+  secH("PART II — RECONCILIATION OF TURNOVER  (Table 5)");
+  subH("Step 1 — Enter audited accounts figures (yellow cells)");
+  const r5A = inp("5A","Turnover as per audited financial statements (P&L)","Total income / revenue per audited accounts");
+  const r5B = inp("5B","Add: Unbilled revenue at close of year","Revenue accrued but not invoiced as at 31-Mar");
+  const r5C = inp("5C","Add: Unadjusted advances received at close of year","Advance receipts not yet adjusted against invoices");
+  const r5D = inp("5D","Add: Deemed supply / gift / personal use","");
+  const r5F = inp("5F","Add: Trade discounts not admissible as deduction","");
+  const r5H = inp("5H","Less: Unbilled revenue as at opening of year","Prior year closing unbilled revenue");
+  const r5I = inp("5I","Less: Unadjusted advances at opening of year","Prior year closing advances");
+  const r5J = inp("5J","Less: Credit notes accounted in previous year","");
+  const r5K = inp("5K","Less: Admissible trade discounts","");
+  r++;
+  subH("Step 2 — GSTR-9 figures (auto-filled)");
+  const r5L = ref9("5L","Taxable turnover as per GSTR-9 (Table 4N)", keyRows.outwardTaxable&&keyRows.outwardTaxable.row);
+  r++;
+  subH("Step 3 — Reconciliation");
+  const r5M = calc("5M","Adjusted books turnover (5A+5B+5C+5D+5F−5H−5I−5J−5K)",[
+    colLetter(CB)+r5A+"+"+colLetter(CB)+r5B+"+"+colLetter(CB)+r5C+"+"+colLetter(CB)+r5D+"+"+colLetter(CB)+r5F
+    +"-"+colLetter(CB)+r5H+"-"+colLetter(CB)+r5I+"-"+colLetter(CB)+r5J+"-"+colLetter(CB)+r5K,
+    ...[1,2,3,4].map(i=>colLetter(CB+i)+r5A+"+"+colLetter(CB+i)+r5B+"+"+colLetter(CB+i)+r5C+"+"+colLetter(CB+i)+r5D+"+"+colLetter(CB+i)+r5F
+      +"-"+colLetter(CB+i)+r5H+"-"+colLetter(CB+i)+r5I+"-"+colLetter(CB+i)+r5J+"-"+colLetter(CB+i)+r5K)
+  ]);
+  calc("5N","Unreconciled difference (5M − 5L)  ← should be zero",
+    [0,1,2,3,4].map(i=>colLetter(CB+i)+r5M+"-"+colLetter(CB+i)+r5L), true);
+  r++;
+
+  /* ===== PART III: ITC ===== */
+  secH("PART III — RECONCILIATION OF ITC  (Table 12)");
+  subH("Step 1 — Enter books ITC figures (yellow cells)");
+  const r12A = inp("12A","ITC as per books of accounts (before reversals)","Total ITC recorded in accounting records");
+  const r12B = inp("12B","Less: ITC pertaining to previous FY claimed in current FY","ITC booked in prior year but taken in GSTR-3B this year");
+  const r12C = inp("12C","Add: ITC pertaining to this FY to be claimed in next FY","ITC booked this year, will be taken in next year's GSTR-3B");
+  r++;
+  subH("Step 2 — GSTR-9 ITC (auto-filled)");
+  const r12D = ref9("12D","Net ITC as per GSTR-9 (6A − 7F)", keyRows.netItc&&keyRows.netItc.row);
+  r++;
+  subH("Step 3 — Reconciliation");
+  calc("12E","Unreconciled ITC difference (12A−12B+12C−12D)  ← should be zero",
+    [0,1,2,3,4].map(i=>
+      (i===0?"":colLetter(CB+i)+r12A+"-"+colLetter(CB+i)+r12B+"+"+colLetter(CB+i)+r12C+"-"+colLetter(CB+i)+r12D)
+    ).map((f,i)=>i===0?"":f), true);
+  /* fix: taxable col (i=0) is blank for ITC */
+  /* override 12E col 3 onwards */
+  const r12E = r-1;
+  for(let i=1;i<5;i++){
+    ws.getRow(r12E).getCell(CB+i).value={formula:colLetter(CB+i)+r12A+"-"+colLetter(CB+i)+r12B+"+"+colLetter(CB+i)+r12C+"-"+colLetter(CB+i)+r12D};
+    ws.getRow(r12E).getCell(CB+i).fill={type:"pattern",pattern:"solid",fgColor:{argb:TOT_FILL}};
+  }
+  ws.getRow(r12E).getCell(CB).value=null;
+  ws.getRow(r12E).getCell(CD).value=null; // taxable diff not meaningful for ITC
+  ws.getRow(r12E).getCell(CD+1).value={formula:"("+[1,2,3,4].map(i=>colLetter(CB+i)+r12E).join("+")+")"};
+  // re-apply red font on the fixed row
+  ws.getRow(r12E).eachCell({includeEmpty:true},c=>{if(c.value!==null&&c.value!==undefined)c.font={bold:true,color:{argb:"FF8A1520"}};});
+}
+
+/* ═══════════════════════ 3B · Challan / 6.1 ═══════════════════════ */
+function taxPaySheet(wb, ctx){
+  const ws = wb.addWorksheet("3B Challan 6.1", {properties:{tabColor:{argb:"FF1A5276"}}});
+  const NUM_FMT = '#,##0.00;[Red](#,##0.00);"-"';
+  const BLUE = "FF1A5276", WHITE = "FFFFFFFF";
+  // Group fill colours (light shades for data cells)
+  const G_NET  = "FFD6E4F0"; // Net Tax Payable group
+  const G_ITC  = "FFD5F5E3"; // ITC group
+  const G_CASH = "FFFEF9E7"; // Cash group
+  const G_INT  = "FFF5EEF8"; // Interest
+  const G_LF   = "FFFDE8E8"; // Late Fee
+  // Header fill colours (darker)
+  const H_NET  = "FF2471A3";
+  const H_ITC  = "FF1E8449";
+  const H_CASH = "FFB7950B";
+  const H_INT  = "FF7D3C98";
+  const H_LF   = "FFC0392B";
+  const TOT_FILL = "FF1A5276";
+
+  // Column layout: 1=Month, 2-5=Net(IGST/CGST/SGST/Cess),
+  //  6-9=ITC(IGST/CGST/SGST/Cess), 10-13=Cash(IGST/CGST/SGST/Cess),
+  //  14-17=Interest(IGST/CGST/SGST/Cess), 18-21=Late Fee(IGST/CGST/SGST/Cess)
+  const NCOL = 21;
+  ws.columns = [
+    {width:9},                                                      // A Month
+    {width:13},{width:13},{width:13},{width:10},                    // B-E Net Tax Payable
+    {width:13},{width:13},{width:13},{width:10},                    // F-I ITC
+    {width:13},{width:13},{width:13},{width:10},                    // J-M Cash
+    {width:11},{width:11},{width:11},{width:9},                     // N-Q Interest
+    {width:11},{width:11},{width:11},{width:9},                     // R-U Late Fee
+  ];
+
+  function hdr(r, c, val, fill, span, white){
+    const cell = ws.getCell(r, c);
+    cell.value = val;
+    cell.font = {bold:true, size:10, color:{argb: white===false ? "FF000000" : WHITE}};
+    cell.fill = {type:"pattern", pattern:"solid", fgColor:{argb:fill}};
+    cell.alignment = {horizontal:"center", vertical:"middle", wrapText:true};
+    if(span > 1) ws.mergeCells(r, c, r, c+span-1);
+    return cell;
+  }
+  function num(r, c, val, fill){
+    const cell = ws.getCell(r, c);
+    cell.value = n0(val);
+    cell.numFmt = NUM_FMT;
+    cell.font = {size:10};
+    if(fill) cell.fill = {type:"pattern", pattern:"solid", fgColor:{argb:fill}};
+    cell.alignment = {horizontal:"right"};
+    return cell;
+  }
+  function tot(r, c, val, fill){
+    const cell = ws.getCell(r, c);
+    cell.value = n0(val);
+    cell.numFmt = NUM_FMT;
+    cell.font = {bold:true, size:10, color:{argb:WHITE}};
+    cell.fill = {type:"pattern", pattern:"solid", fgColor:{argb:fill||TOT_FILL}};
+    cell.alignment = {horizontal:"right"};
+    return cell;
+  }
+
+  /* ── Row 1: title ── */
+  ws.mergeCells(1,1,1,NCOL);
+  const tc = ws.getCell(1,1);
+  tc.value = "GSTR-3B Table 6.1 — Payment of Tax  |  "+(ctx.fy||"FY")+"  |  "+(ctx.gstin||"")+"  |  "+(ctx.legal||ctx.trade||"");
+  tc.font={bold:true,size:12,color:{argb:WHITE}};
+  tc.fill={type:"pattern",pattern:"solid",fgColor:{argb:BLUE}};
+  tc.alignment={vertical:"middle"};
+  ws.getRow(1).height=20;
+
+  /* ── Row 2: sub-section label ── */
+  ws.mergeCells(2,1,2,NCOL);
+  const sl=ws.getCell(2,1);
+  sl.value="(A) Other than reverse charge";
+  sl.font={bold:true,size:10,italic:true};
+  sl.fill={type:"pattern",pattern:"solid",fgColor:{argb:"FFD0D8E8"}};
+  sl.alignment={horizontal:"left",vertical:"middle"};
+  ws.getRow(2).height=16;
+
+  /* ── Row 3: group headers ── */
+  hdr(3,1,"Month",BLUE,1);
+  hdr(3,2,"Net Tax Payable",H_NET,4);
+  hdr(3,6,"Tax paid through ITC",H_ITC,4);
+  hdr(3,10,"Tax paid through Cash",H_CASH,4);
+  hdr(3,14,"Interest paid in cash",H_INT,4);
+  hdr(3,18,"Late fee paid in cash",H_LF,4);
+  ws.getRow(3).height=26;
+
+  /* ── Row 4: sub-column labels ── */
+  hdr(4,1,"",BLUE);
+  ["IGST","CGST","SGST","Cess"].forEach((l,i)=>{ hdr(4,2+i,l,H_NET); });
+  ["IGST","CGST","SGST","Cess"].forEach((l,i)=>{ hdr(4,6+i,l,H_ITC); });
+  ["IGST","CGST","SGST","Cess"].forEach((l,i)=>{ hdr(4,10+i,l,H_CASH); });
+  ["IGST","CGST","SGST","Cess"].forEach((l,i)=>{ hdr(4,14+i,l,H_INT); });
+  ["IGST","CGST","SGST","Cess"].forEach((l,i)=>{ hdr(4,18+i,l,H_LF); });
+  ws.getRow(4).height=18;
+
+  /* ── Data rows (one per period) ── */
+  let r = 5;
+  const startData = r;
+
+  // Annual totals accumulator [21 values, cols 1-21]
+  const ann = new Array(NCOL+1).fill(0);
+
+  for(const p of ctx.periods){
+    const b3 = ctx.b3[p];
+    if(!b3) continue;
+    const t61 = b3.t61 || {};
+    const t51 = b3.t51 || {};
+
+    // ── Net Tax Payable ──────────────────────────────────────────────────────
+    // Use outwardTaxable (= t31.a from PDF, or t31 from portal JSON) — always accurate.
+    // t61 PDF parsing is unreliable (multi-column Y-split), so we ignore it for Net Tax Payable.
+    const ot = b3.outwardTaxable || {};
+    const netIgst = n0(ot.igst);
+    const netCgst = n0(ot.cgst);
+    const netSgst = n0(ot.sgst);
+    const netCess = n0(ot.cess);
+
+    // ── ITC and Cash from 6.1 (reads actual credit ledger, includes opening balance) ─
+    const t61v = b3.t61 || {};
+    const t6I = t61v.igst || {}, t6C = t61v.cgst || {}, t6S = t61v.sgst || {}, t6K = t61v.cess || {};
+
+    // Total IGST ledger used = sum of "Integrated" column across all liability rows
+    const itcIgst_61 = n0(t6I.itcIgst) + n0(t6C.itcIgst) + n0(t6S.itcIgst) + n0(t6K.itcIgst);
+    const itcCgst_61 = n0(t6C.itcCgst);
+    const itcSgst_61 = n0(t6S.itcSgst);
+    const itcCess_61 = n0(t6K.itcCess);
+    const cashIgst_61 = n0(t6I.cashPd);
+    const cashCgst_61 = n0(t6C.cashPd);
+    const cashSgst_61 = n0(t6S.cashPd);
+    const cashCess_61 = n0(t6K.cashPd);
+    const has61 = !!(t6I.cashPd !== undefined || t6C.cashPd !== undefined || t6S.cashPd !== undefined);
+
+    // ── Fallback: derive from 4(C) Net ITC if 6.1 parsing failed ────────────
+    const iNet = b3.itcNet || {};
+    const avI = n0(iNet.igst), avC = n0(iNet.cgst), avS = n0(iNet.sgst), avK = n0(iNet.cess);
+    const igstPaysIGST = Math.min(avI, netIgst);
+    const remI1 = avI - igstPaysIGST;
+    const igstPaysCGST = Math.min(remI1, Math.max(0, netCgst - avC));
+    const remI2 = remI1 - igstPaysCGST;
+    const igstPaysSGST = Math.min(remI2, Math.max(0, netSgst - avS));
+    const itcIgst_fb = igstPaysIGST + igstPaysCGST + igstPaysSGST;
+    const itcCgst_fb = Math.min(avC, netCgst);
+    const itcSgst_fb = Math.min(avS, netSgst);
+    const itcCess_fb = Math.min(avK, netCess);
+    const cashIgst_fb = Math.max(0, netIgst - igstPaysIGST);
+    const cashCgst_fb = Math.max(0, netCgst - itcCgst_fb - igstPaysCGST);
+    const cashSgst_fb = Math.max(0, netSgst - itcSgst_fb - igstPaysSGST);
+    const cashCess_fb = Math.max(0, netCess - itcCess_fb);
+
+    const itcIgst  = has61 ? itcIgst_61  : itcIgst_fb;
+    const itcCgst  = has61 ? itcCgst_61  : itcCgst_fb;
+    const itcSgst  = has61 ? itcSgst_61  : itcSgst_fb;
+    const itcCess  = has61 ? itcCess_61  : itcCess_fb;
+    const cashIgst = has61 ? cashIgst_61 : cashIgst_fb;
+    const cashCgst = has61 ? cashCgst_61 : cashCgst_fb;
+    const cashSgst = has61 ? cashSgst_61 : cashSgst_fb;
+    const cashCess = has61 ? cashCess_61 : cashCess_fb;
+
+    // ── Interest & Late fee ─────────────────────────────────────────────────
+    // Use t51 (section 5.1 — simple 4-column row, always parsed correctly from PDF)
+    const t51i = t51.interestPaid || {}; const t51lf = t51.lateFee || {};
+    const intIgst = n0(t51i.igst);
+    const intCgst = n0(t51i.cgst);
+    const intSgst = n0(t51i.sgst);
+    const intCess = n0(t51i.cess);
+    const lfIgst  = n0(t51lf.igst);
+    const lfCgst  = n0(t51lf.cgst);
+    const lfSgst  = n0(t51lf.sgst);
+    const lfCess  = n0(t51lf.cess);
+
+    const vals = [0, netIgst,netCgst,netSgst,netCess,
+                     itcIgst,itcCgst,itcSgst,itcCess,
+                     cashIgst,cashCgst,cashSgst,cashCess,
+                     intIgst,intCgst,intSgst,intCess,
+                     lfIgst,lfCgst,lfSgst,lfCess];
+
+    // Month cell
+    const mc = ws.getCell(r,1);
+    mc.value=p; mc.font={bold:true,size:10};
+    mc.fill={type:"pattern",pattern:"solid",fgColor:{argb:"FFD0E8F5"}};
+    mc.alignment={horizontal:"center",vertical:"middle"};
+
+    // Net Tax Payable (cols 2-5)
+    num(r,2,netIgst,G_NET); num(r,3,netCgst,G_NET); num(r,4,netSgst,G_NET); num(r,5,netCess,G_NET);
+    // ITC (cols 6-9)
+    num(r,6,itcIgst,G_ITC); num(r,7,itcCgst,G_ITC); num(r,8,itcSgst,G_ITC); num(r,9,itcCess,G_ITC);
+    // Cash (cols 10-13)
+    num(r,10,cashIgst,G_CASH); num(r,11,cashCgst,G_CASH); num(r,12,cashSgst,G_CASH); num(r,13,cashCess,G_CASH);
+    // Interest (cols 14-17)
+    num(r,14,intIgst,G_INT); num(r,15,intCgst,G_INT); num(r,16,intSgst,G_INT); num(r,17,intCess,G_INT);
+    // Late Fee (cols 18-21)
+    num(r,18,lfIgst,G_LF); num(r,19,lfCgst,G_LF); num(r,20,lfSgst,G_LF); num(r,21,lfCess,G_LF);
+
+    // Thin bottom border
+    for(let c=1;c<=NCOL;c++) ws.getCell(r,c).border={bottom:{style:"hair",color:{argb:"FFCCCCCC"}}};
+
+    // Accumulate annual
+    for(let c=1;c<=NCOL;c++) ann[c] += (vals[c]||0);
+    r++;
+  }
+
+  /* ── Annual total row ── */
+  if(r > startData){
+    const atc = ws.getCell(r,1);
+    atc.value="Annual Total"; atc.font={bold:true,size:10,color:{argb:WHITE}};
+    atc.fill={type:"pattern",pattern:"solid",fgColor:{argb:TOT_FILL}};
+    atc.alignment={horizontal:"center",vertical:"middle"};
+    for(let c=2;c<=NCOL;c++) tot(r,c,ann[c]);
+    for(let c=1;c<=NCOL;c++) ws.getCell(r,c).border={top:{style:"medium",color:{argb:WHITE}}};
+    ws.getRow(r).height=18;
+  }
+
+  ws.views=[{state:"frozen",ySplit:4,xSplit:1}];
+  return ws;
+}
+
+function buildWorkbook(ctx){
+  const wb = new ExcelJS.Workbook();
+  wb.creator = "GST Reconciliation Tool";
+  wb.created = new Date();
+
+  coverSheet(wb, ctx);
+  liabilitySheet(wb, ctx);
+  itcSheet(wb, ctx);
+  g1DetailSheet(wb, ctx);
+  b3DetailSheet(wb, ctx);
+  itcDetailSheet(wb, ctx);
+  ledgerSheet(wb, ctx);
+  supplierSheet(wb, ctx);
+  const hasJson = ctx.files.some(f => f.ok && f.src === "json");
+  if(hasJson){
+    b2bInvoiceSheet(wb, ctx);
+    b2csSummarySheet(wb, ctx);
+    hsnSummarySheet(wb, ctx);
+    cdnSheet(wb, ctx);
+  }
+  taxPaySheet(wb, ctx);
+  const g9info = gstr9Sheet(wb, ctx);
+  gstr9cSheet(wb, ctx, g9info);
+  return wb;
+}
+
+/* ---------- Cover ---------- */
+function coverSheet(wb, ctx){
+  const ws = wb.addWorksheet("Cover", {properties:{tabColor:{argb:HDR_FILL}}});
+  ws.columns = [{width:34},{width:46},{width:18},{width:12},{width:22},{width:16},{width:30}];
+
+  ws.getCell("A1").value = "GST RECONCILIATION — WORKING PAPER";
+  ws.getCell("A1").font = {bold:true, size:16, color:{argb:HDR_FILL}};
+  ws.mergeCells("A1:G1");
+  ws.getRow(1).height = 26;
+
+  let r = 3;
+  const kv = (k, v) => {
+    ws.getCell("A"+r).value = k;
+    ws.getCell("A"+r).font = {bold:true, size:10, color:{argb:"FF616B7A"}};
+    ws.getCell("B"+r).value = v;
+    ws.getCell("B"+r).font = {size:11};
+    r++;
+  };
+  kv("GSTIN",            ctx.gstin || "—");
+  kv("Legal name",       ctx.legal || "—");
+  kv("Trade name",       ctx.trade || "—");
+  kv("Financial year",   ctx.fy || "—");
+  kv("Periods covered",  ctx.periods.join(", ") || "—");
+  kv("Generated on",     new Date().toLocaleString("en-IN"));
+  kv("Returns read",     ctx.files.filter(f=>f.ok).length + " file(s)");
+
+  r++;
+  ws.getCell("A"+r).value = "FILES READ";
+  ws.getCell("A"+r).font = {bold:true, size:11, color:{argb:HDR_FILL}};
+  r++;
+  const fh = ws.getRow(r);
+  ["File","Form","GSTIN","Period","ARN","Date of filing","Status"].forEach((h,i)=> fh.getCell(i+1).value = h);
+  styleHeader(fh);
+  r++;
+  for(const f of ctx.files){
+    const d = f.data || {};
+    const row = ws.getRow(r);
+    row.getCell(1).value = f.name;
+    row.getCell(2).value = f.kind === "G1" ? "GSTR-1" : f.kind === "3B" ? "GSTR-3B" : f.kind === "2B" ? "GSTR-2B" : f.kind === "TL" ? d.form : "—";
+    row.getCell(3).value = d.gstin || "";
+    writePCell(ws, r, 4, d.period || "");
+    row.getCell(5).value = d.arn    || (f.kind === "2B" ? "—" : "");
+    row.getCell(6).value = d.arnDate || d.genDate || "";
+    row.getCell(7).value = f.ok ? "Read" : ("FAILED — " + (f.err||""));
+    if(!f.ok) row.getCell(7).font = {color:{argb:"FFA11D28"}, bold:true};
+    r++;
+  }
+
+  if(ctx.warnings.length){
+    r++;
+    ws.getCell("A"+r).value = "POINTS TO CHECK";
+    ws.getCell("A"+r).font = {bold:true, size:11, color:{argb:"FF8A5A00"}};
+    r++;
+    for(const w of ctx.warnings){
+      ws.getCell("A"+r).value = "•";
+      ws.getCell("B"+r).value = w;
+      ws.getCell("B"+r).alignment = {wrapText:true};
+      ws.mergeCells("B"+r+":G"+r);
+      r++;
+    }
+  }
+
+  r++;
+  ws.getCell("A"+r).value = "HOW THE COMPARISON IS BUILT";
+  ws.getCell("A"+r).font = {bold:true, size:11, color:{argb:HDR_FILL}};
+  r++;
+  const notes = [
+    ["GSTR-1 taxable supplies", "4A + 5 + 6C + 7 + 9B(CDNR) + 9B(CDNUR) + 9A/9C/10 net differentials + 11A − 11B. Compared against GSTR-3B table 3.1(a)."],
+    ["GSTR-1 zero rated",       "6A + 6B + related 9A amendments. Compared against GSTR-3B table 3.1(b)."],
+    ["GSTR-1 nil / exempt",     "Table 8. Compared against GSTR-3B tables 3.1(c) + 3.1(e)."],
+    ["GSTR-1 table 4B",         "Reverse-charge outward supplies. Shown for information only — the recipient discharges this, so it is not part of the 3.1(a) comparison."],
+    ["GSTR-2B ITC available",   "Part A (I + II + III + IV) less Part B credit notes, per the ITC Available summary sheet."],
+    ["GSTR-3B ITC availed",     "Table 4(A)(1) to 4(A)(5). Reversals in 4(B) and net credit in 4(C) are shown alongside."],
+    ["Difference columns",      "Live Excel formulas — edit any figure and the differences and cumulative totals recalculate."],
+    ["'As per books' columns",  "Filled month-wise from the Tally Sales Register (1 vs 3B, Table 1) and Purchase Register (2B vs 3B ITC) when uploaded; otherwise blank. Type or correct figures and the difference columns recalculate."],
+    ["Rounding",                "Figures are carried exactly as filed. GSTR-3B is filed in whole rupees while GSTR-1 carries paise, so small differences are normal."],
+  ];
+  for(const [k,v] of notes){
+    ws.getCell("A"+r).value = k;
+    ws.getCell("A"+r).font = {bold:true, size:10};
+    ws.getCell("A"+r).alignment = {vertical:"top"};
+    ws.getCell("B"+r).value = v;
+    ws.getCell("B"+r).alignment = {wrapText:true, vertical:"top"};
+    ws.mergeCells("B"+r+":G"+r);
+    ws.getRow(r).height = 28;
+    r++;
+  }
+
+  r++;
+  ws.getCell("A"+r).value =
+    "This workbook is a working paper generated from the returns supplied. It is not a filed document and does not replace professional judgement.";
+  ws.getCell("A"+r).font = {italic:true, size:9, color:{argb:"FF616B7A"}};
+  ws.mergeCells("A"+r+":G"+r);
+}
+
+/* ---------- GSTR-1 vs 3B liability ---------- */
+function liabilitySheet(wb, ctx){
+  const ws = wb.addWorksheet("1 vs 3B (Liability)", {properties:{tabColor:{argb:"FF1D3F91"}}});
+  const TAX = ["Taxable value","IGST","CGST","SGST/UTGST","Cess","Total tax"];
+
+  const last = buildHeader(ws, [
+    {name:"", cols:["Period"]},
+    {name:"As per GSTR-1",             cols:TAX},
+    {name:"As per GSTR-3B",            cols:TAX},
+    {name:"Difference (3B − GSTR-1)",  cols:TAX},
+    {name:"", cols:["Cumulative diff (total tax)"]},
+    {name:"As per books",              cols:TAX},
+    {name:"Difference (Books − GSTR-1)", cols:TAX},
+  ]);
+
+  const C_G1 = 2, C_3B = 8, C_DF = 14, C_CUM = 20, C_BK = 21, C_BD = 27;
+  ws.getColumn(1).width = 13;
+  for(let c = 2; c <= last; c++) ws.getColumn(c).width = 14;
+  ws.getColumn(C_CUM).width = 16;
+
+  let r = 3;
+
+  // Banner row for each sub-table
+  const banner = (label, fill) => {
+    const row = ws.getRow(r);
+    ws.mergeCells(r, 1, r, last);
+    const cell = row.getCell(1);
+    cell.value = label;
+    cell.font = {bold:true, color:{argb:"FFFFFFFF"}, size:11};
+    cell.fill = {type:"pattern", pattern:"solid", fgColor:{argb: fill || "FF1D3F91"}};
+    cell.alignment = {horizontal:"center", vertical:"middle"};
+    row.height = 18;
+    r++;
+  };
+
+  // Write one sub-table. showCum=true adds the running cumulative diff (total tax) column.
+  const writeTable = (g1Fn, b3Fn, showCum, bkFn) => {
+    const firstRow = r;
+    let cumRow = null;
+    for(const p of ctx.periods){
+      const g1 = ctx.g1[p], b3 = ctx.b3[p];
+      const row = ws.getRow(r);
+      writePCell(ws, r, 1, p);
+      row.getCell(1).font = {bold:true};
+
+      const put = (base, b) => {
+        if(!b) return;
+        row.getCell(base+0).value = b.taxable || null;
+        row.getCell(base+1).value = b.igst    || null;
+        row.getCell(base+2).value = b.cgst    || null;
+        row.getCell(base+3).value = b.sgst    || null;
+        row.getCell(base+4).value = b.cess    || null;
+        row.getCell(base+5).value = {formula:
+          colLetter(base+1)+r+"+"+colLetter(base+2)+r+"+"+colLetter(base+3)+r+"+"+colLetter(base+4)+r};
+      };
+
+      put(C_G1, g1 ? g1Fn(g1) : null);
+      put(C_3B, b3 ? b3Fn(b3) : null);
+      put(C_BK, bkFn ? bkFn(p) : null);
+
+      for(let i = 0; i < 6; i++){
+        row.getCell(C_DF+i).value = {formula: colLetter(C_3B+i)+r+"-"+colLetter(C_G1+i)+r};
+        row.getCell(C_DF+i).font = {color:{argb:"FF8A1520"}};
+        row.getCell(C_BD+i).value = {formula: colLetter(C_BK+i)+r+"-"+colLetter(C_G1+i)+r};
+      }
+      if(showCum){
+        row.getCell(C_CUM).value = cumRow === null
+          ? {formula: colLetter(C_DF+5)+r}
+          : {formula: colLetter(C_CUM)+cumRow+"+"+colLetter(C_DF+5)+r};
+        cumRow = r;
+      }
+
+      money(ws, r, 2, last);
+      shadeBooks(ws, r, C_BK, C_BK+5);
+      if(!g1) row.getCell(C_G1).note = "No GSTR-1 for this period";
+      if(!b3) row.getCell(C_3B).note = "No GSTR-3B for this period";
+      r++;
+    }
+    totalRow(ws, r, firstRow, last, [C_CUM]);
+    r++;
+    r++; // blank separator
+  };
+
+  // ── Table 1: Taxable outward supplies (3.1a) ──────────────────────────────
+  banner("TABLE 1 — Taxable outward supplies  [GSTR-1 net taxable  vs  GSTR-3B 3.1(a)]", "FF1D3F91");
+  writeTable(g => g.outwardTaxable, b => b.outwardTaxable, true, p => ctx.bkSales[p]);
+
+  // ── Table 2: Zero rated supplies (3.1b) ───────────────────────────────────
+  banner("TABLE 2 — Zero rated supplies (Exports / SEZ)  [GSTR-1 6A+6B  vs  GSTR-3B 3.1(b)]", "FF145A7C");
+  writeTable(g => g.outwardZero, b => b.outwardZero, true);
+
+  // ── Table 3: Nil rated / Exempt supplies (3.1c+e) ────────────────────────
+  banner("TABLE 3 — Nil rated / Exempt / Non-GST supplies  [GSTR-1 Table 8  vs  GSTR-3B 3.1(c)+(e)]", "FF1A6B3C");
+  writeTable(g => g.outwardNilExempt, b => b.outwardNilExempt, false);
+
+  // ── Table 4: RCM outward — info only ────────────────────────────────────
+  banner("TABLE 4 — Reverse charge outward supplies  [GSTR-1 Table 4B  vs  GSTR-3B 3.1(d)]  — info only", "FF6B3A1A");
+  writeTable(g => g.rcmOutward, b => b.inwardRcm, false);
+
+  ws.autoFilter = {from:{row:2,column:1}, to:{row:r, column:last}};
+}
+
+/* ---------- 2B vs 3B ITC ---------- */
+function itcSheet(wb, ctx){
+  const ws = wb.addWorksheet("2B vs 3B (ITC)", {properties:{tabColor:{argb:"FF8A5312"}}});
+  const H = ["IGST","CGST","SGST/UTGST","Cess","Total"];
+
+  const last = buildHeader(ws, [
+    {name:"", cols:["Period"]},
+    {name:"ITC available as per GSTR-2B", cols:H},
+    {name:"ITC availed in GSTR-3B 4(A)",  cols:H},
+    {name:"Difference (3B − 2B)",         cols:H},
+    {name:"", cols:["Cumulative diff (total)"]},
+    {name:"ITC reversed 3B 4(B)",         cols:H},
+    {name:"", cols:["Net ITC 3B 4(C)"]},
+    {name:"ITC as per books",             cols:H},
+    {name:"", cols:["Diff (Books − 3B)"]},
+  ]);
+
+  const C_2B = 2, C_3B = 7, C_DF = 12, C_CUM = 17, C_RV = 18, C_NET = 23, C_BK = 24, C_BD = 29;
+  ws.getColumn(1).width = 13;
+  for(let c = 2; c <= last; c++) ws.getColumn(c).width = 14;
+  ws.getColumn(C_CUM).width = 16;
+
+  let r = 3;
+  const firstRow = r;
+  for(const p of ctx.periods){
+    const b2 = ctx.b2[p], b3 = ctx.b3[p];
+    const row = ws.getRow(r);
+    writePCell(ws, r, 1, p);
+    row.getCell(1).font = {bold:true};
+
+    const put = (base, v) => {
+      if(!v) return;
+      row.getCell(base+0).value = n0(v.igst);
+      row.getCell(base+1).value = n0(v.cgst);
+      row.getCell(base+2).value = n0(v.sgst);
+      row.getCell(base+3).value = n0(v.cess);
+      row.getCell(base+4).value = {formula:
+        colLetter(base)+r+"+"+colLetter(base+1)+r+"+"+colLetter(base+2)+r+"+"+colLetter(base+3)+r};
+    };
+    put(C_2B, b2 ? b2.netItc : null);
+    put(C_3B, b3 ? b3.itcAvailed : null);
+    put(C_RV, b3 ? b3.itcReversed : null);
+    put(C_BK, ctx.bkPurch[p] || null);
+    row.getCell(C_BK+4).value = {formula:
+      colLetter(C_BK)+r+"+"+colLetter(C_BK+1)+r+"+"+colLetter(C_BK+2)+r+"+"+colLetter(C_BK+3)+r};
+
+    for(let i = 0; i < 5; i++){
+      row.getCell(C_DF+i).value = {formula: colLetter(C_3B+i)+r+"-"+colLetter(C_2B+i)+r};
+      row.getCell(C_DF+i).font = {color:{argb:"FF8A1520"}};
+    }
+    row.getCell(C_DF+4).font = {bold:true, color:{argb:"FF8A1520"}};
+
+    row.getCell(C_NET).value = {formula: colLetter(C_3B+4)+r+"-"+colLetter(C_RV+4)+r};
+    row.getCell(C_BD).value  = {formula: colLetter(C_BK+4)+r+"-"+colLetter(C_3B+4)+r};
+
+    row.getCell(C_CUM).value = (r === firstRow)
+      ? {formula: colLetter(C_DF+4)+r}
+      : {formula: colLetter(C_CUM)+(r-1)+"+"+colLetter(C_DF+4)+r};
+
+    money(ws, r, 2, last);
+    shadeBooks(ws, r, C_BK, C_BK+4);
+    if(!b2) row.getCell(C_2B).note = "No GSTR-2B supplied for this period";
+    if(!b3) row.getCell(C_3B).note = "No GSTR-3B supplied for this period";
+    r++;
+  }
+
+  totalRow(ws, r, firstRow, last, [C_CUM]);
+  ws.autoFilter = {from:{row:2,column:1}, to:{row:r, column:last}};
+}
+
+function totalRow(ws, r, firstRow, lastCol, skip){
+  const row = ws.getRow(r);
+  row.getCell(1).value = "Total";
+  for(let c = 2; c <= lastCol; c++){
+    if(skip && skip.indexOf(c) >= 0){
+      row.getCell(c).value = {formula: colLetter(c)+(r-1)};
+    } else {
+      row.getCell(c).value = {formula: "SUM("+colLetter(c)+firstRow+":"+colLetter(c)+(r-1)+")"};
+    }
+    row.getCell(c).numFmt = MONEY;
+  }
+  row.eachCell({includeEmpty:true}, c => {
+    c.font = {bold:true};
+    c.fill = {type:"pattern", pattern:"solid", fgColor:{argb:TOT_FILL}};
+    c.border = {top:{style:"double", color:{argb:"FF1A4F8A"}}};
+  });
+}
+
+/* ---------- GSTR-1 table-wise ---------- */
+function g1DetailSheet(wb, ctx){
+  const ws = wb.addWorksheet("GSTR-1 Table-wise", {properties:{tabColor:{argb:"FF4A6FC4"}}});
+  const order = G1_SECTIONS.map(s => s.key);
+
+  const last = buildHeader(ws, [
+    {name:"", cols:["Period"]},
+    {name:"", cols:["Table"]},
+    {name:"", cols:["Row taken"]},
+    {name:"", cols:["Records"]},
+    {name:"Figures as filed", cols:["Taxable value","IGST","CGST","SGST/UTGST","Cess"]},
+    {name:"As per books",     cols:["Taxable value","Total tax"]},
+    {name:"", cols:["Remarks"]},
+  ]);
+  ws.getColumn(1).width = 12; ws.getColumn(2).width = 34; ws.getColumn(3).width = 30;
+  ws.getColumn(4).width = 10;
+  for(let c = 5; c <= 9; c++) ws.getColumn(c).width = 15;
+  ws.getColumn(10).width = 14; ws.getColumn(11).width = 14; ws.getColumn(12).width = 26;
+
+  let r = 3;
+  for(const p of ctx.periods){
+    const g1 = ctx.g1[p];
+    if(!g1) continue;
+    for(const key of order){
+      const sec = g1.sections[key];
+      if(!sec) continue;
+      const row = ws.getRow(r);
+      writePCell(ws, r, 1, p);
+      row.getCell(2).value = sec.label;
+      row.getCell(3).value = sec.picked;
+      row.getCell(4).value = sec.count;
+      row.getCell(5).value = n0(sec.net.taxable);
+      row.getCell(6).value = n0(sec.net.igst);
+      row.getCell(7).value = n0(sec.net.cgst);
+      row.getCell(8).value = n0(sec.net.sgst);
+      row.getCell(9).value = n0(sec.net.cess);
+      money(ws, r, 5, 11);
+      shadeBooks(ws, r, 10, 11);
+      r++;
+    }
+    // per-period roll-up line
+    const row = ws.getRow(r);
+    row.getCell(2).value = "▸ Roll-up compared against GSTR-3B 3.1(a)";
+    row.getCell(5).value = n0(g1.outwardTaxable.taxable);
+    row.getCell(6).value = n0(g1.outwardTaxable.igst);
+    row.getCell(7).value = n0(g1.outwardTaxable.cgst);
+    row.getCell(8).value = n0(g1.outwardTaxable.sgst);
+    row.getCell(9).value = n0(g1.outwardTaxable.cess);
+    writePCell(ws, r, 1, p);
+    money(ws, r, 5, 9);
+    row.eachCell({includeEmpty:true}, c => {
+      c.font = {bold:true};
+      c.fill = {type:"pattern", pattern:"solid", fgColor:{argb:SUB_FILL}};
+    });
+    r++;
+  }
+  ws.autoFilter = {from:{row:2,column:1}, to:{row:Math.max(r-1,3), column:last}};
+}
+
+/* ---------- GSTR-3B table-wise ---------- */
+function b3DetailSheet(wb, ctx){
+  const ws = wb.addWorksheet("GSTR-3B Table-wise", {properties:{tabColor:{argb:"FF2F7D4F"}}});
+  const last = buildHeader(ws, [
+    {name:"", cols:["Period"]},
+    {name:"", cols:["Table"]},
+    {name:"", cols:["Description"]},
+    {name:"Figures as filed", cols:["Taxable value","IGST","CGST","SGST/UTGST","Cess"]},
+    {name:"As per books",     cols:["Taxable value","Total tax"]},
+  ]);
+  ws.getColumn(1).width = 12; ws.getColumn(2).width = 12; ws.getColumn(3).width = 52;
+  for(let c = 4; c <= 10; c++) ws.getColumn(c).width = 15;
+
+  const T31 = {
+    a:"Outward taxable supplies (other than zero rated, nil rated, exempted)",
+    b:"Outward taxable supplies (zero rated)",
+    c:"Other outward supplies (nil rated, exempted)",
+    d:"Inward supplies liable to reverse charge",
+    e:"Non-GST outward supplies",
+  };
+  const T4A = {
+    "1":"Import of goods", "2":"Import of services",
+    "3":"Inward supplies liable to reverse charge (other than 1 & 2)",
+    "4":"Inward supplies from ISD", "5":"All other ITC",
+  };
+  const T4B = {"1":"As per rules 38, 42 & 43 and section 17(5)", "2":"Others"};
+  const T4D = {"1":"ITC reclaimed (reversed earlier under 4B(2))", "2":"Ineligible ITC u/s 16(4) & PoS rules"};
+
+  let r = 3;
+  const line = (p, tbl, desc, b, isItc) => {
+    const row = ws.getRow(r);
+    writePCell(ws, r, 1, p);
+    row.getCell(2).value = tbl;
+    row.getCell(3).value = desc;
+    if(isItc){
+      row.getCell(4).value = null;
+      row.getCell(5).value = n0(b.igst); row.getCell(6).value = n0(b.cgst);
+      row.getCell(7).value = n0(b.sgst); row.getCell(8).value = n0(b.cess);
+    } else {
+      row.getCell(4).value = n0(b.taxable);
+      row.getCell(5).value = n0(b.igst); row.getCell(6).value = n0(b.cgst);
+      row.getCell(7).value = n0(b.sgst); row.getCell(8).value = n0(b.cess);
+    }
+    money(ws, r, 4, 10);
+    shadeBooks(ws, r, 9, 10);
+    r++;
+  };
+
+  for(const p of ctx.periods){
+    const b3 = ctx.b3[p];
+    if(!b3) continue;
+    for(const k of ["a","b","c","d","e"]) if(b3.t31[k]) line(p, "3.1("+k+")", T31[k], b3.t31[k], false);
+    for(const k of ["i","ii"]) if(b3.t311[k]) line(p, "3.1.1("+k+")", "Supplies u/s 9(5)", b3.t311[k], false);
+    if(b3.t32.unreg) line(p, "3.2", "Inter-state supplies to unregistered persons", {taxable:b3.t32.unreg.taxable, igst:b3.t32.unreg.igst}, false);
+    if(b3.t32.comp)  line(p, "3.2", "Inter-state supplies to composition taxable persons", {taxable:b3.t32.comp.taxable, igst:b3.t32.comp.igst}, false);
+    if(b3.t32.uin)   line(p, "3.2", "Inter-state supplies to UIN holders", {taxable:b3.t32.uin.taxable, igst:b3.t32.uin.igst}, false);
+    for(const k of ["1","2","3","4","5"]) if(b3.t4A[k]) line(p, "4(A)("+k+")", T4A[k], b3.t4A[k], true);
+    line(p, "4(A)", "Total ITC available", b3.itcAvailed, true);
+    for(const k of ["1","2"]) if(b3.t4B[k]) line(p, "4(B)("+k+")", T4B[k], b3.t4B[k], true);
+    if(b3.t4C) line(p, "4(C)", "Net ITC available (A − B)", b3.t4C, true);
+    for(const k of ["1","2"]) if(b3.t4D[k]) line(p, "4(D)("+k+")", T4D[k], b3.t4D[k], true);
+    if(b3.t51.interestPaid) line(p, "5.1", "Interest paid", b3.t51.interestPaid, true);
+    if(b3.t51.lateFee)      line(p, "5.1", "Late fee", b3.t51.lateFee, true);
+  }
+  ws.autoFilter = {from:{row:2,column:1}, to:{row:Math.max(r-1,3), column:last}};
+}
+
+/* ---------- 2B ITC component detail ---------- */
+function itcDetailSheet(wb, ctx){
+  const ws = wb.addWorksheet("2B ITC Detail", {properties:{tabColor:{argb:"FFB9762A"}}});
+  const last = buildHeader(ws, [
+    {name:"", cols:["Period"]},
+    {name:"", cols:["Summary"]},
+    {name:"", cols:["Part"]},
+    {name:"", cols:["Heading"]},
+    {name:"", cols:["GSTR-3B table"]},
+    {name:"Amount", cols:["IGST","CGST","SGST/UTGST","Cess","Total"]},
+  ]);
+  ws.getColumn(1).width = 12; ws.getColumn(2).width = 17; ws.getColumn(3).width = 8;
+  ws.getColumn(4).width = 54; ws.getColumn(5).width = 14;
+  for(let c = 6; c <= 10; c++) ws.getColumn(c).width = 14;
+
+  const NAMES = {available:"ITC Available", notAvailable:"ITC Not Available",
+                 reversal:"ITC Reversal", rejected:"ITC Rejected"};
+  let r = 3;
+  for(const p of ctx.periods){
+    const b2 = ctx.b2[p];
+    if(!b2) continue;
+    for(const key of ["available","notAvailable","reversal","rejected"]){
+      const grp = b2.summary[key];
+      if(!grp) continue;
+      for(const code of Object.keys(grp)){
+        const v = grp[code];
+        const row = ws.getRow(r);
+        writePCell(ws, r, 1, p);
+        row.getCell(2).value = NAMES[key];
+        row.getCell(3).value = code;
+        row.getCell(4).value = v.heading;
+        row.getCell(5).value = v.table3b;
+        row.getCell(6).value = v.igst; row.getCell(7).value = v.cgst;
+        row.getCell(8).value = v.sgst; row.getCell(9).value = v.cess;
+        row.getCell(10).value = {formula:"F"+r+"+G"+r+"+H"+r+"+I"+r};
+        money(ws, r, 6, 10);
+        r++;
+      }
+      if(key === "available"){
+        const row = ws.getRow(r);
+        writePCell(ws, r, 1, p);
+        row.getCell(4).value = "▸ Net ITC available (Part A I–IV less Part B credit notes)";
+        row.getCell(6).value = b2.netItc.igst; row.getCell(7).value = b2.netItc.cgst;
+        row.getCell(8).value = b2.netItc.sgst; row.getCell(9).value = b2.netItc.cess;
+        row.getCell(10).value = {formula:"F"+r+"+G"+r+"+H"+r+"+I"+r};
+        money(ws, r, 6, 10);
+        row.eachCell({includeEmpty:true}, c => {
+          c.font = {bold:true};
+          c.fill = {type:"pattern", pattern:"solid", fgColor:{argb:SUB_FILL}};
+        });
+        r++;
+      }
+    }
+  }
+  ws.autoFilter = {from:{row:2,column:1}, to:{row:Math.max(r-1,3), column:last}};
+}
+
+/* ---------- 2B invoice ledger ---------- */
+function ledgerSheet(wb, ctx){
+  const ws = wb.addWorksheet("2B Supplier Ledger", {properties:{tabColor:{argb:"FFD08A2E"}}});
+  const last = buildHeader(ws, [
+    {name:"", cols:["2B Period"]},
+    {name:"", cols:["Section"]},
+    {name:"", cols:["Category"]},
+    {name:"Supplier", cols:["GSTIN","Name"]},
+    {name:"Document",  cols:["Type","Number","Date","Value"]},
+    {name:"",          cols:["Place of supply"]},
+    {name:"",          cols:["RCM"]},
+    {name:"",          cols:["Rate"]},
+    {name:"Tax",       cols:["Taxable value","IGST","CGST","SGST/UTGST","Cess","Total tax"]},
+    {name:"ITC",       cols:["Available","Reason"]},
+    {name:"Supplier's GSTR-1", cols:["Period","Filing date"]},
+    {name:"",          cols:["Source"]},
+    {name:"As per books", cols:["Taxable value","Total tax"]},
+    {name:"",          cols:["Match status"]},
+    {name:"",          cols:["Remarks"]},
+  ]);
+
+  const W = [12,26,12,18,34,12,22,12,14,14,8,10,14,12,12,12,12,14,12,26,12,12,12,14,14,16,26];
+  W.forEach((w,i) => { if(i < last) ws.getColumn(i+1).width = w; });
+
+  const rows = [];
+  for(const p of ctx.periods){
+    const b2 = ctx.b2[p];
+    if(!b2) continue;
+    for(const d of b2.ledger) rows.push(d);
+  }
+
+  let r = 3;
+  for(const d of rows){
+    const row = ws.getRow(r);
+    let c = 1;
+    writePCell(ws, r, c++, d.period);
+    row.getCell(c++).value = d.section;
+    row.getCell(c++).value = d.category;
+    row.getCell(c++).value = d.gstin;
+    row.getCell(c++).value = d.name;
+    row.getCell(c++).value = d.docType;
+    row.getCell(c++).value = d.docNo;
+    row.getCell(c++).value = d.docDate;
+    row.getCell(c++).value = d.docValue;
+    row.getCell(c++).value = d.pos;
+    row.getCell(c++).value = d.rcm;
+    row.getCell(c++).value = d.rate;
+    const taxStart = c;
+    row.getCell(c++).value = d.taxable;
+    row.getCell(c++).value = d.igst;
+    row.getCell(c++).value = d.cgst;
+    row.getCell(c++).value = d.sgst;
+    row.getCell(c++).value = d.cess;
+    row.getCell(c).value = {formula:
+      colLetter(taxStart+1)+r+"+"+colLetter(taxStart+2)+r+"+"+colLetter(taxStart+3)+r+"+"+colLetter(taxStart+4)+r};
+    c++;
+    row.getCell(c++).value = d.itcAvail;
+    row.getCell(c++).value = d.reason;
+    row.getCell(c++).value = d.g1Period;
+    row.getCell(c++).value = d.g1Filed;
+    row.getCell(c++).value = d.source;
+    const bookStart = c;
+    c += 2;                              // books columns left blank
+    row.getCell(c++).value = null;       // match status
+    row.getCell(c++).value = null;       // remarks
+
+    ws.getRow(r).getCell(9).numFmt = MONEY;
+    money(ws, r, taxStart, taxStart+5);
+    money(ws, r, bookStart, bookStart+1);
+    shadeBooks(ws, r, bookStart, bookStart+3);
+
+    if(d.isCreditNote){
+      for(let k = 1; k <= last; k++)
+        ws.getRow(r).getCell(k).fill = {type:"pattern", pattern:"solid", fgColor:{argb:"FFFFF3CD"}};
+    } else if(d.category === "rejected" || /^no$/i.test(d.itcAvail)){
+      for(let k = 1; k <= last; k++)
+        ws.getRow(r).getCell(k).fill = {type:"pattern", pattern:"solid", fgColor:{argb:"FFFDECED"}};
+    }
+    r++;
+  }
+
+  if(rows.length){
+    const tr = ws.getRow(r);
+    tr.getCell(1).value = "Total";
+    for(const c of [13,14,15,16,17,18]){
+      tr.getCell(c).value = {formula:"SUM("+colLetter(c)+"3:"+colLetter(c)+(r-1)+")"};
+      tr.getCell(c).numFmt = MONEY;
+    }
+    tr.eachCell({includeEmpty:true}, c => {
+      c.font = {bold:true};
+      c.fill = {type:"pattern", pattern:"solid", fgColor:{argb:TOT_FILL}};
+      c.border = {top:{style:"double", color:{argb:"FF1A4F8A"}}};
+    });
+  }
+  ws.autoFilter = {from:{row:2,column:1}, to:{row:Math.max(r,3), column:last}};
+}
+
+/* ---------- supplier-wise summary ---------- */
+function supplierSheet(wb, ctx){
+  const ws = wb.addWorksheet("2B Supplier Summary", {properties:{tabColor:{argb:"FFE0A458"}}});
+  const last = buildHeader(ws, [
+    {name:"", cols:["Supplier GSTIN"]},
+    {name:"", cols:["Supplier name"]},
+    {name:"", cols:["Documents"]},
+    {name:"As per GSTR-2B", cols:["Taxable value","IGST","CGST","SGST/UTGST","Cess","Total tax"]},
+    {name:"As per books",   cols:["Taxable value","Total tax"]},
+    {name:"Difference (Books − 2B)", cols:["Taxable value","Total tax"]},
+    {name:"", cols:["Remarks"]},
+  ]);
+  ws.getColumn(1).width = 20; ws.getColumn(2).width = 40; ws.getColumn(3).width = 11;
+  for(let c = 4; c <= 15; c++) ws.getColumn(c).width = 15;
+  ws.getColumn(16).width = 28;
+
+  const map = new Map();
+  for(const p of ctx.periods){
+    const b2 = ctx.b2[p];
+    if(!b2) continue;
+    for(const d of b2.ledger){
+      if(d.category === "rejected") continue;
+      const k = d.gstin || "(no GSTIN)";
+      if(!map.has(k)) map.set(k, {gstin:k, name:d.name, n:0, taxable:0, igst:0, cgst:0, sgst:0, cess:0});
+      const a = map.get(k);
+      if(!a.name && d.name) a.name = d.name;
+      a.n++; a.taxable += n0(d.taxable);
+      a.igst += n0(d.igst); a.cgst += n0(d.cgst); a.sgst += n0(d.sgst); a.cess += n0(d.cess);
+    }
+  }
+  const list = [...map.values()].sort((a,b) =>
+    (b.taxable - a.taxable) || String(a.name).localeCompare(String(b.name)));
+
+  let r = 3;
+  for(const s of list){
+    const row = ws.getRow(r);
+    row.getCell(1).value = s.gstin;
+    row.getCell(2).value = s.name;
+    row.getCell(3).value = s.n;
+    row.getCell(4).value = s.taxable;
+    row.getCell(5).value = s.igst;
+    row.getCell(6).value = s.cgst;
+    row.getCell(7).value = s.sgst;
+    row.getCell(8).value = s.cess;
+    row.getCell(9).value = {formula:"E"+r+"+F"+r+"+G"+r+"+H"+r};
+    row.getCell(12).value = {formula:"J"+r+"-D"+r};
+    row.getCell(13).value = {formula:"K"+r+"-I"+r};
+    money(ws, r, 4, 13);
+    shadeBooks(ws, r, 10, 11);
+    r++;
+  }
+  if(list.length){
+    const tr = ws.getRow(r);
+    tr.getCell(1).value = "Total";
+    tr.getCell(3).value = {formula:"SUM(C3:C"+(r-1)+")"};
+    for(let c = 4; c <= 13; c++){
+      tr.getCell(c).value = {formula:"SUM("+colLetter(c)+"3:"+colLetter(c)+(r-1)+")"};
+      tr.getCell(c).numFmt = MONEY;
+    }
+    tr.eachCell({includeEmpty:true}, c => {
+      c.font = {bold:true};
+      c.fill = {type:"pattern", pattern:"solid", fgColor:{argb:TOT_FILL}};
+      c.border = {top:{style:"double", color:{argb:"FF1A4F8A"}}};
+    });
+  }
+  ws.autoFilter = {from:{row:2,column:1}, to:{row:Math.max(r,3), column:last}};
+}
+
+/* ═══════════════════════ JSON-only sheets ═══════════════════════ */
+
+function b2bInvoiceSheet(wb, ctx){
+  const ws = wb.addWorksheet("B2B Invoices", {properties:{tabColor:{argb:"FF1A6B3C"}}});
+  ws.columns = [
+    {key:"period",  header:"Period",       width:10},
+    {key:"ctin",    header:"Supplier GSTIN",width:18},
+    {key:"inum",    header:"Invoice No",    width:18},
+    {key:"idt",     header:"Invoice Date",  width:14},
+    {key:"rchrg",   header:"RCM",           width:6},
+    {key:"pos",     header:"POS",           width:6},
+    {key:"inv_typ", header:"Type",          width:8},
+    {key:"rt",      header:"Rate %",        width:8},
+    {key:"txval",   header:"Taxable",       width:14},
+    {key:"iamt",    header:"IGST",          width:14},
+    {key:"camt",    header:"CGST",          width:14},
+    {key:"samt",    header:"SGST",          width:14},
+    {key:"csamt",   header:"Cess",          width:12},
+  ];
+  const hdr = ws.getRow(1);
+  hdr.font = {bold:true, color:{argb:"FFFFFFFF"}, size:10};
+  hdr.fill = {type:"pattern", pattern:"solid", fgColor:{argb:"FF1A6B3C"}};
+  hdr.alignment = {horizontal:"center"};
+
+  let r = 2;
+  for(const p of ctx.periods){
+    const g1 = ctx.g1[p];
+    if(!g1 || !g1.raw) continue;
+    for(const sup of (g1.raw.b2b||[])){
+      for(const inv of (sup.inv||[])){
+        for(const itm of (inv.itms||[])){
+          const d = itm.itm_det||{};
+          if(d.txval == null) continue;
+          const row = ws.getRow(r++);
+          row.getCell(1).value  = p;
+          row.getCell(2).value  = sup.ctin||"";
+          row.getCell(3).value  = inv.inum||"";
+          row.getCell(4).value  = inv.idt||"";
+          row.getCell(5).value  = inv.rchrg||"";
+          row.getCell(6).value  = inv.pos||"";
+          row.getCell(7).value  = inv.inv_typ||"";
+          row.getCell(8).value  = d.rt||0;
+          row.getCell(9).value  = d.txval||0;
+          row.getCell(10).value = d.iamt||0;
+          row.getCell(11).value = d.camt||0;
+          row.getCell(12).value = d.samt||0;
+          row.getCell(13).value = d.csamt||0;
+          for(let c=9;c<=13;c++) row.getCell(c).numFmt = MONEY;
+          row.commit();
+        }
+      }
+    }
+  }
+  ws.autoFilter = {from:"A1", to:{row:1, column:13}};
+  ws.views = [{state:"frozen", ySplit:1}];
+}
+
+function b2csSummarySheet(wb, ctx){
+  const ws = wb.addWorksheet("B2CS Summary", {properties:{tabColor:{argb:"FF2E7D32"}}});
+  ws.columns = [
+    {key:"period", header:"Period",   width:10},
+    {key:"pos",    header:"POS",      width:6},
+    {key:"sply_ty",header:"Supply",   width:10},
+    {key:"typ",    header:"Type",     width:8},
+    {key:"rt",     header:"Rate %",   width:8},
+    {key:"txval",  header:"Taxable",  width:14},
+    {key:"iamt",   header:"IGST",     width:14},
+    {key:"camt",   header:"CGST",     width:14},
+    {key:"samt",   header:"SGST",     width:14},
+    {key:"csamt",  header:"Cess",     width:12},
+  ];
+  const hdr = ws.getRow(1);
+  hdr.font = {bold:true, color:{argb:"FFFFFFFF"}, size:10};
+  hdr.fill = {type:"pattern", pattern:"solid", fgColor:{argb:"FF2E7D32"}};
+  hdr.alignment = {horizontal:"center"};
+
+  let r = 2;
+  for(const p of ctx.periods){
+    const g1 = ctx.g1[p];
+    if(!g1 || !g1.raw) continue;
+    for(const row of (g1.raw.b2cs||[])){
+      const wr = ws.getRow(r++);
+      wr.getCell(1).value  = p;
+      wr.getCell(2).value  = row.pos||"";
+      wr.getCell(3).value  = row.sply_ty||"";
+      wr.getCell(4).value  = row.typ||"";
+      wr.getCell(5).value  = row.rt||0;
+      wr.getCell(6).value  = row.txval||0;
+      wr.getCell(7).value  = row.iamt||0;
+      wr.getCell(8).value  = row.camt||0;
+      wr.getCell(9).value  = row.samt||0;
+      wr.getCell(10).value = row.csamt||0;
+      for(let c=6;c<=10;c++) wr.getCell(c).numFmt = MONEY;
+      wr.commit();
+    }
+  }
+  ws.autoFilter = {from:"A1", to:{row:1, column:10}};
+  ws.views = [{state:"frozen", ySplit:1}];
+}
+
+function hsnSummarySheet(wb, ctx){
+  const ws = wb.addWorksheet("HSN Summary", {properties:{tabColor:{argb:"FF6A1B9A"}}});
+  ws.columns = [
+    {key:"period", header:"Period",   width:10},
+    {key:"hsn_sc", header:"HSN/SAC",  width:12},
+    {key:"desc",   header:"Description",width:40},
+    {key:"uqc",    header:"UQC",      width:8},
+    {key:"qty",    header:"Quantity", width:12},
+    {key:"rt",     header:"Rate %",   width:8},
+    {key:"txval",  header:"Taxable",  width:14},
+    {key:"iamt",   header:"IGST",     width:14},
+    {key:"camt",   header:"CGST",     width:14},
+    {key:"samt",   header:"SGST",     width:14},
+    {key:"csamt",  header:"Cess",     width:12},
+  ];
+  const hdr = ws.getRow(1);
+  hdr.font = {bold:true, color:{argb:"FFFFFFFF"}, size:10};
+  hdr.fill = {type:"pattern", pattern:"solid", fgColor:{argb:"FF6A1B9A"}};
+  hdr.alignment = {horizontal:"center"};
+
+  let r = 2;
+  for(const p of ctx.periods){
+    const g1 = ctx.g1[p];
+    if(!g1 || !g1.raw) continue;
+    for(const itm of (g1.raw.hsn||[])){
+        const wr = ws.getRow(r++);
+        wr.getCell(1).value  = p;
+        wr.getCell(2).value  = itm.hsn_sc||"";
+        wr.getCell(3).value  = itm.desc||"";
+        wr.getCell(4).value  = itm.uqc||"";
+        wr.getCell(5).value  = itm.qty||0;
+        wr.getCell(6).value  = itm.rt||0;
+        wr.getCell(7).value  = itm.txval||0;
+        wr.getCell(8).value  = itm.iamt||0;
+        wr.getCell(9).value  = itm.camt||0;
+        wr.getCell(10).value = itm.samt||0;
+        wr.getCell(11).value = itm.csamt||0;
+        for(let c=7;c<=11;c++) wr.getCell(c).numFmt = MONEY;
+        wr.commit();
+    }
+  }
+  ws.autoFilter = {from:"A1", to:{row:1, column:11}};
+  ws.views = [{state:"frozen", ySplit:1}];
+}
+
+/* ═══════════════════════ orchestration ═══════════════════════ */
+
+function buildContext(){
+  const good = store.filter(f => f.ok);
+  const ctx = {files:store, g1:{}, b3:{}, b2:{}, bkSales:{}, bkPurch:{}, periods:[], warnings:[],
+               gstin:"", legal:"", trade:"", fy:""};
+
+  for(const f of good){
+    if(f.kind === "TL"){                        // Tally register: month-wise books, not a return period
+      const dst = f.data.side === "sales" ? ctx.bkSales : ctx.bkPurch;
+      for(const [p, b] of Object.entries(f.data.books)) addInto(dst[p] || (dst[p] = bucket()), b, 1);
+      continue;
+    }
+    const p = periodKey(f.data.period) || "(no period)";
+    f.data.period = p;                          // normalise in place
+    if(f.kind === "G1") ctx.g1[p] = f.data;
+    else if(f.kind === "3B") ctx.b3[p] = f.data;
+    else if(f.kind === "2B") ctx.b2[p] = f.data;
+    if(!ctx.gstin && f.data.gstin) ctx.gstin = f.data.gstin;
+    if(!ctx.legal && f.data.legal) ctx.legal = f.data.legal;
+    if(!ctx.trade && f.data.trade) ctx.trade = f.data.trade;
+    if(!ctx.fy && f.data.fy)       ctx.fy    = f.data.fy;
+  }
+
+  const all = new Set([...Object.keys(ctx.g1), ...Object.keys(ctx.b3), ...Object.keys(ctx.b2)]);
+  ctx.periods = [...all].sort((a, b) => {
+    // Extract trailing 2-digit year from "May-25" → 25; fall back to 0
+    const ya = parseInt((String(a).match(/-(\d{2})$/) || [])[1] || "0");
+    const yb = parseInt((String(b).match(/-(\d{2})$/) || [])[1] || "0");
+    if(ya !== yb) return ya - yb;            // earlier year first
+    return fyOrder(a) - fyOrder(b) || a.localeCompare(b);
+  });
+
+  const gstins = [...new Set(good.map(f => f.data.gstin).filter(Boolean))];
+  if(gstins.length > 1)
+    ctx.warnings.push("More than one GSTIN appears in this batch (" + gstins.join(", ") +
+                      "). Check that returns of two different registrations have not been mixed.");
+  const fys = [...new Set(good.map(f => f.data.fy).filter(Boolean))];
+  if(fys.length > 1)
+    ctx.warnings.push("Returns from more than one financial year are included (" + fys.join(", ") + ").");
+
+  for(const p of ctx.periods){
+    const missing = [];
+    if(!ctx.g1[p]) missing.push("GSTR-1");
+    if(!ctx.b3[p]) missing.push("GSTR-3B");
+    if(!ctx.b2[p]) missing.push("GSTR-2B");
+    if(missing.length)
+      ctx.warnings.push(p + ": no " + missing.join(", ") + " supplied — those columns are blank, not nil.");
+  }
+  for(const f of store) if(!f.ok)
+    ctx.warnings.push("Could not read " + f.name + " — " + (f.err||"unknown error") + ".");
+
+  return ctx;
+}
+
+document.getElementById("gen").addEventListener("click", async () => {
+  const btn = document.getElementById("gen");
+  btn.disabled = true;
+  btn.textContent = "Building…";
+  document.getElementById("dlHolder").innerHTML = "";
+  try{
+    const ctx = buildContext();
+    log("Building workbook for " + (ctx.gstin||"?") + " — " + ctx.periods.length + " period(s)…");
+    for(const w of ctx.warnings) logWarn(w);
+
+    const wb  = buildWorkbook(ctx);
+    const buf = await wb.xlsx.writeBuffer();
+    const blob = new Blob([buf], {type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"});
+
+    const clientName = (ctx.trade || ctx.legal || ctx.gstin || "GST").replace(/[\\/:*?"<>|]/g, " ").trim();
+    const fname = "GST Reco_" + clientName + "_" + (ctx.fy || "FY") + ".xlsx";
+
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = fname;
+    a.className = "dl";
+    a.textContent = "↓ Download " + fname;
+    document.getElementById("dlHolder").appendChild(a);
+    a.click();
+    logOk("Workbook ready — " + fname);
+  }catch(err){
+    logErr("Could not build the workbook: " + err.message);
+    console.error(err);
+  }
+  btn.disabled = false;
+  btn.textContent = "Generate comparison workbook";
+});
+
+document.getElementById("clear").addEventListener("click", () => {
+  store.length = 0;
+  renderFiles();
+  renderPreview();
+  document.getElementById("dlHolder").innerHTML = "";
+  logEl.textContent = "Cleared. Waiting for files…";
+  logStarted = false;
+});
+
+const drop   = document.getElementById("drop");
+const picker = document.getElementById("picker");
+
+// click-to-browse: handled natively by <label for="picker"> — no JS needed
+
+picker.addEventListener("change", e => { handleFiles([...e.target.files]); picker.value = ""; });
+
+const tallyPicker = document.getElementById("tallyPicker");
+tallyPicker.addEventListener("change", e => { handleFiles([...e.target.files]); tallyPicker.value = ""; });
+
+["dragenter","dragover"].forEach(ev => drop.addEventListener(ev, e => {
+  e.preventDefault(); drop.classList.add("over");
+}));
+
+drop.addEventListener("dragleave", e => {
+  // only remove class when leaving the drop zone itself, not a child element
+  if(!drop.contains(e.relatedTarget)) drop.classList.remove("over");
+});
+
+drop.addEventListener("drop", e => {
+  e.preventDefault();                    // prevent browser default (and label activation)
+  drop.classList.remove("over");
+  const files = e.dataTransfer ? [...e.dataTransfer.files] : [];
+  if(files.length) handleFiles(files);
+});
+
+/* ═══════════════════════ serve.ps1 download ═══════════════════════ */
+
+const SERVE_PS1 = String.raw`param([int]$Port = 8971, [string]$Root = $PSScriptRoot)
+$listener = New-Object System.Net.HttpListener
+$listener.Prefixes.Add("http://localhost:$Port/")
+$listener.Start()
+Write-Output "serving $Root"
+Write-Output "open http://localhost:$Port/ in Chrome or Edge (Ctrl+C or close this window to stop)"
+$types = @{ ".html"="text/html; charset=utf-8"; ".js"="application/javascript"; ".css"="text/css"; ".json"="application/json"; ".pdf"="application/pdf"; ".xlsx"="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"; ".txt"="text/plain; charset=utf-8" }
+while ($listener.IsListening) {
+  try {
+    $ctx = $listener.GetContext()
+    $rel = [Uri]::UnescapeDataString($ctx.Request.Url.AbsolutePath).TrimStart('/')
+    if ($rel -eq "") { $rel = "GST Tool.html" }
+    if ($rel -eq "__quit") { $ctx.Response.StatusCode = 200; $ctx.Response.Close(); break }
+    $file = Join-Path $Root $rel
+    if (Test-Path $file -PathType Leaf) {
+      $ext = [IO.Path]::GetExtension($file).ToLower()
+      $ct = $types[$ext]; if (-not $ct) { $ct = "application/octet-stream" }
+      $bytes = [IO.File]::ReadAllBytes($file)
+      $ctx.Response.ContentType = $ct
+      $ctx.Response.Headers.Add("Access-Control-Allow-Origin","*")
+      $ctx.Response.ContentLength64 = $bytes.Length
+      $ctx.Response.OutputStream.Write($bytes, 0, $bytes.Length)
+    } else {
+      $ctx.Response.StatusCode = 404
+      $msg = [Text.Encoding]::UTF8.GetBytes("not found: $rel")
+      $ctx.Response.OutputStream.Write($msg, 0, $msg.Length)
+    }
+    $ctx.Response.Close()
+  } catch { }
+}
+$listener.Stop()
+`;
+
+document.getElementById("dlServe").addEventListener("click", e => {
+  e.preventDefault();
+  const blob = new Blob([SERVE_PS1], {type:"text/plain"});
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "serve.ps1";
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(a.href), 30000);
+});
+
+/* expose for the automated smoke test */
+window.__gst = {store, handleFiles, buildContext, buildWorkbook, parse3B, parseG1, parse2B, pdfLines};
+</script>
+</body>
+</html>
