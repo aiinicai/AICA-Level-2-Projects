@@ -1,0 +1,968 @@
+;; ===========================================================================
+;; BOQ-Export.tdl   (version 6.1)
+;; BOQ analysis data for an interior decoration firm
+;;
+;; Gateway of Tally > BOQ Export has TWO reports:
+;;
+;;   1. BOQ Summary (for analysis)
+;;      One line per ledger, grouped under its ledger group, for the selected
+;;      cost centre and period, with Debit, Credit and Net Cost (Dr - Cr).
+;;      Section A : postings made directly to cost centres - Payment, Receipt,
+;;                  Journal, Contra, Purchase (ledger mode), Sales etc.
+;;      Section B : purchase / inventory item allocations (item mode vouchers)
+;;      Use this to build the Material / Labour / Profit table of the BOQ.
+;;
+;;   2. BOQ Detail (for checking)
+;;      Same data voucher by voucher (date, voucher type and number, ledger,
+;;      item, quantity, rate, amount, narration) so any summary figure can be
+;;      traced to its voucher.
+;;
+;; Both reports use the SAME two selections:
+;;   F2          = Period (From / To date)
+;;   Ctrl + F6   = Cost Centre (pick one, or "All Cost Centres")
+;;   Alt  + F5   = Export BOQ (choose Excel on the export screen)
+;;
+;; Built from constructs documented in "TDL Reference Manual" (Tally
+;; Solutions, April 2017, Tally.ERP 9) and run by the user on TallyPrime 7.x.
+;; v4.0 fixes the display bug found in v3.x: one Repeat per Part.
+;; Keep this file plain ASCII text.
+;; ===========================================================================
+
+
+;; ---------------------------------------------------------------------------
+;; 1. MENU
+;; ---------------------------------------------------------------------------
+
+[#Menu : Gateway of Tally]
+    Item : BOQ Export : Menu : BOQ Export Menu
+
+[Menu : BOQ Export Menu]
+    Add : Key Item : BOQ Summary - by Ledger (for analysis)    : S : Display : BOQ Sum Rpt
+    Add : Key Item : BOQ Detail - Voucher wise (for checking)  : D : Display : BOQ Det Rpt
+
+
+;; ---------------------------------------------------------------------------
+;; 2. VARIABLE (cost centre selected by the user) AND FORMULAS
+;; ---------------------------------------------------------------------------
+
+[Variable : BOQCCName]
+    Type       : String
+    Default    : "<< Select a cost centre: Ctrl+F6 >>"   ;; v5.3 - matches nothing, so the report opens instantly; pick a cost centre (or All) with Ctrl+F6
+    Persistent : No
+
+[System : Formula]
+    ;; CHANGED v3.3 - selected cost centre PLUS its sub-cost centres (up to 3 levels), as Tally's Break-up does
+    BOQCCFilter : ##BOQCCName = "All Cost Centres" OR $Name = ##BOQCCName OR $Parent:CostCentre:$Name = ##BOQCCName OR $Parent:CostCentre:$Parent:CostCentre:$Name = ##BOQCCName
+    BOQIsAllCC  : ##BOQCCName = "All Cost Centres"
+    BOQVchLive  : NOT $IsCancelled AND NOT $IsOptional   ;; NEW v3.2 - Tally's cost centre reports ignore these
+    BOQNoCCYet  : ##BOQCCName = "<< Select a cost centre: Ctrl+F6 >>"
+    ;; v5.4 - until a cost centre is chosen the voucher list itself is empty, so nothing is walked
+    BOQVchSel    : NOT @@BOQNoCCYet AND @@BOQVchLive
+    BOQVchSelOne : @@BOQVchSel AND NOT @@BOQIsAllCC        ;; v5.7 one cost centre chosen
+    BOQVchSelAll : @@BOQVchSel AND @@BOQIsAllCC            ;; v5.7 All Cost Centres chosen
+
+    ;; v4.6 - ledger classification, applied to the SUMMARISED rows (ledger name is
+    ;; a plain value there). $$IsLedOfGrp covers sub-groups too.
+    BOQIsIncome   : $$IsLedOfGrp:$BOQSumLedger:"Sales Accounts" OR $$IsLedOfGrp:$BOQSumLedger:"Indirect Incomes"
+    BOQIsCost     : $$IsLedOfGrp:$BOQSumLedger:"Purchase Accounts" OR $$IsLedOfGrp:$BOQSumLedger:"Direct Expenses" OR $$IsLedOfGrp:$BOQSumLedger:"Indirect Expenses"
+    BOQIsPLLed    : @@BOQIsIncome OR @@BOQIsCost
+    BOQIsDebtor   : $$IsLedOfGrp:$BOQSumLedger:$$GroupSundryDebtors
+    BOQIsTax      : $$IsLedOfGrp:$BOQSumLedger:"Duties & Taxes"
+    ;; v4.7: Section A = cost ledgers only (income excluded); Section C = other
+    ;; ledgers excluding debtors, tax accounts and nil net balances
+    BOQIsOtherLed : NOT @@BOQIsPLLed AND NOT @@BOQIsDebtor AND NOT @@BOQIsTax AND $BOQSumDr <> $BOQSumCr
+
+    ;; v5.0 - the same classification at VOUCHER-ROW level (Detail report), on the
+    ;; computed ledger name $BOQLedger of each cost centre allocation row
+    BOQRowIsIncome : $$IsLedOfGrp:$BOQLedger:"Sales Accounts" OR $$IsLedOfGrp:$BOQLedger:"Indirect Incomes"
+    BOQRowIsCost   : $$IsLedOfGrp:$BOQLedger:"Purchase Accounts" OR $$IsLedOfGrp:$BOQLedger:"Direct Expenses" OR $$IsLedOfGrp:$BOQLedger:"Indirect Expenses"
+    BOQRowIsDebtor : $$IsLedOfGrp:$BOQLedger:$$GroupSundryDebtors
+    BOQRowIsTax    : $$IsLedOfGrp:$BOQLedger:"Duties & Taxes"
+    BOQDetFiltA    : @@BOQCCFilter AND @@BOQRowIsCost
+    BOQDetFiltB    : @@BOQCCFilter AND (@@BOQRowIsCost OR @@BOQRowIsIncome)
+    BOQDetFiltC    : @@BOQCCFilter AND NOT @@BOQRowIsCost AND NOT @@BOQRowIsIncome AND NOT @@BOQRowIsDebtor AND NOT @@BOQRowIsTax
+
+
+;; ---------------------------------------------------------------------------
+;; 3. COST CENTRE SELECTION (opens over the report, changes its variable)
+;; ---------------------------------------------------------------------------
+
+[Collection : BOQ CC List]
+    Type : Cost Centre
+
+[Report : BOQ CC Select Rpt]
+    Form  : BOQ CC Select Frm
+    Title : "Select Cost Centre"
+    Auto  : Yes
+
+[Form : BOQ CC Select Frm]
+    Parts : BOQ CC Select Prt
+
+[Part : BOQ CC Select Prt]
+    Lines : BOQ CC Select Line
+
+[Line : BOQ CC Select Line]
+    Fields : BOQ CC Select Fld
+
+[Field : BOQ CC Select Fld]
+    Use        : Name Field
+    Table      : BOQ CC List, All Cost Centres
+    Show Table : Always
+    Width      : 40
+    Set as     : ##BOQCCName
+    Modifies   : BOQCCName
+    Variable   : BOQCCName
+
+
+;; ---------------------------------------------------------------------------
+;; 4. BUTTONS
+;; ---------------------------------------------------------------------------
+
+[Button : BOQ Period Btn]
+    Title  : "Period"
+    Key    : F2
+    Action : Modify Variables : Change Period
+
+[Button : BOQ CC Btn]
+    Title  : "Cost Centre"
+    Key    : Ctrl + F6
+    Action : Modify Variables : BOQ CC Select Rpt
+
+[Button : BOQ Export Btn]
+    Title  : "Export BOQ"
+    Key    : Alt + F5
+    Action : Export Report
+
+
+;; ---------------------------------------------------------------------------
+;; 5. COLLECTIONS
+;; ---------------------------------------------------------------------------
+
+;; ---- Source vouchers (v5.7)
+;; With ONE cost centre selected, Tally's own cost centre index is used
+;; (Type : Vouchers : Cost Centre - the mechanism behind Tally's Cost Centre
+;; Break-up; NOT in the April 2017 manual, which documents only the Ledger and
+;; Voucher Type variants). Only vouchers that touch that cost centre (or its
+;; sub-cost centres) are read. With "All Cost Centres" the full voucher list is
+;; read as before.
+[Collection : BOQ CC Vouchers]
+    Type       : Vouchers : Cost Centre
+    Child Of   : ##BOQCCName
+    Belongs To : Yes
+    Filter     : BOQVchSelOne
+    Fetch      : Date, VoucherNumber, VoucherTypeName, PartyLedgerName, Narration
+    ;; v5.8 - indexed voucher collections carry only what is fetched (manual, Vouchers : Ledger
+    ;; example), so the entry sub-collections are fetched explicitly
+    Fetch      : AllLedgerEntries.*, AllInventoryEntries.*, InventoryEntries.*, LedgerEntries.*
+
+[Collection : BOQ Full Vouchers]
+    Type   : Voucher
+    Filter : BOQVchSelAll
+    Fetch  : Date, VoucherNumber, VoucherTypeName, PartyLedgerName, Narration
+
+[Collection : BOQ All Vouchers]           ;; union: exactly one of the two above is non-empty
+    Collection : BOQ CC Vouchers, BOQ Full Vouchers
+
+;; ---- Base A: cost centre allocations on ledger entries, all voucher types
+;; Walk path: Voucher > Ledger Entries > Category Allocations
+;;            > Cost Centre Allocations
+;; $$Owner: 1 = Category Allocation, 2 = Ledger Entry.
+;; The filter acts on the cost centre allocation ($Name = cost centre).
+[Collection : BOQ Led CC Coll]
+    Source Collection : BOQ All Vouchers
+    Walk              : AllLedgerEntries, CategoryAllocations, CostCentreAllocations   ;; CHANGED v3.4 (was LedgerEntries)
+    Filter            : BOQCCFilter
+    Fetch             : Name, Amount
+    Compute           : BOQVchDate : $$CollSrcObj:$Date
+    Compute           : BOQVchNo   : $$CollSrcObj:$VoucherNumber
+    Compute           : BOQVchType : $$CollSrcObj:$VoucherTypeName
+    Compute           : BOQNarr    : $$CollSrcObj:$Narration
+    Compute           : BOQLedger  : $$Owner:$$Owner:$LedgerName
+    Compute           : BOQItem    : ""
+    Compute           : BOQQtyNum  : 0
+    Compute           : BOQRateNum : 0
+    Compute           : BOQDebit   : if $$IsDr:$Amount then $Amount * -1 else 0
+    Compute           : BOQCredit  : if $$IsDr:$Amount then 0 else $Amount
+
+;; ---- Base B: cost centre allocations on inventory (item) lines
+;; Walk path: Voucher > Inventory Entries > Accounting Allocations
+;;            > Category Allocations > Cost Centre Allocations
+;; $$Owner: 1 = Category Allocation, 2 = Accounting Allocation (ledger),
+;;          3 = Inventory Entry (stock item line).
+[Collection : BOQ Inv CC Coll]
+    Source Collection : BOQ All Vouchers
+    Walk              : AllInventoryEntries, AccountingAllocations, CategoryAllocations, CostCentreAllocations   ;; v5.8 (was InventoryEntries)
+    Filter            : BOQCCFilter
+    Fetch             : Name, Amount
+    Compute           : BOQVchDate : $$CollSrcObj:$Date
+    Compute           : BOQVchNo   : $$CollSrcObj:$VoucherNumber
+    Compute           : BOQVchType : $$CollSrcObj:$VoucherTypeName
+    Compute           : BOQNarr    : $$CollSrcObj:$Narration
+    Compute           : BOQLedger  : $$Owner:$$Owner:$LedgerName
+    Compute           : BOQItem    : $$Owner:$$Owner:$$Owner:$StockItemName
+    Compute           : BOQQtyNum  : $$Number:($$Owner:$$Owner:$$Owner:$BilledQty)
+    Compute           : BOQRateNum : $$Number:($$Owner:$$Owner:$$Owner:$Rate)
+    Compute           : BOQDebit   : if $$IsDr:$Amount then $Amount * -1 else 0
+    Compute           : BOQCredit  : if $$IsDr:$Amount then 0 else $Amount
+
+;; ---- Summary A: Base A added up per ledger group and ledger
+[Collection : BOQ Sum Led Coll]
+    Source Collection : BOQ Led CC Coll
+    Filter            : BOQIsCost                           ;; v4.7 - cost ledgers only (income excluded)
+    By                : BOQSumLedger : $BOQLedger
+    Compute           : BOQSumGroup  : $Parent:Ledger:$BOQSumLedger   ;; CHANGED v4.2 - group read from ledger master after summarising
+    Aggr Compute      : BOQSumDr : Sum : $BOQDebit
+    Aggr Compute      : BOQSumCr : Sum : $BOQCredit
+    Sort              : Default : -$BOQSumDr, $BOQSumLedger   ;; v5.2 - largest first
+
+;; ---- Summary B: Base B added up per ledger group and ledger
+[Collection : BOQ Sum Inv Coll]
+    Source Collection : BOQ Inv CC Coll
+    Filter            : BOQIsPLLed                          ;; v4.6 - P&L ledgers only
+    By                : BOQSumLedger : $BOQLedger
+    Compute           : BOQSumGroup  : $Parent:Ledger:$BOQSumLedger   ;; CHANGED v4.2 - group read from ledger master after summarising
+    Aggr Compute      : BOQSumDr : Sum : $BOQDebit
+    Aggr Compute      : BOQSumCr : Sum : $BOQCredit
+    Sort              : Default : -$BOQSumDr, $BOQSumLedger   ;; v5.2 - largest first
+
+
+;; ---- Summary C (NEW v4.5): other ledgers added up per ledger
+[Collection : BOQ Sum Oth Coll]
+    Source Collection : BOQ Led CC Coll
+    Filter            : BOQIsOtherLed                       ;; v4.6 - everything except P&L and debtors
+    By                : BOQSumLedger : $BOQLedger
+    Compute           : BOQSumGroup  : $Parent:Ledger:$BOQSumLedger
+    Aggr Compute      : BOQSumDr : Sum : $BOQDebit
+    Aggr Compute      : BOQSumCr : Sum : $BOQCredit
+    Sort              : Default : -$BOQSumDr, $BOQSumLedger   ;; v5.2 - largest first
+
+;; ---- v4.8: totals. Each total reads an UNDISPLAYED copy of its section's
+;; summary (re-summarising a displayed collection crashed TallyPrime in v4.x).
+[Collection : BOQ Sum Led Copy]
+    Source Collection : BOQ Led CC Coll
+    Filter            : BOQIsCost
+    By                : BOQSumLedger : $BOQLedger
+    Aggr Compute      : BOQSumDr : Sum : $BOQDebit
+    Aggr Compute      : BOQSumCr : Sum : $BOQCredit
+
+[Collection : BOQ Sum Inv Copy]
+    Source Collection : BOQ Inv CC Coll
+    Filter            : BOQIsPLLed
+    By                : BOQSumLedger : $BOQLedger
+    Aggr Compute      : BOQSumDr : Sum : $BOQDebit
+    Aggr Compute      : BOQSumCr : Sum : $BOQCredit
+
+[Collection : BOQ Sum Oth Copy]
+    Source Collection : BOQ Led CC Coll
+    Filter            : BOQIsOtherLed
+    By                : BOQSumLedger : $BOQLedger
+    Aggr Compute      : BOQSumDr : Sum : $BOQDebit
+    Aggr Compute      : BOQSumCr : Sum : $BOQCredit
+
+[Collection : BOQ Tot A Coll]
+    Source Collection : BOQ Sum Led Copy
+    By                : BOQTotKey : "A"
+    Aggr Compute      : BOQTotDr : Sum : $BOQSumDr
+    Aggr Compute      : BOQTotCr : Sum : $BOQSumCr
+
+[Collection : BOQ Tot B Coll]
+    Source Collection : BOQ Sum Inv Copy
+    By                : BOQTotKey : "B"
+    Aggr Compute      : BOQTotDr : Sum : $BOQSumDr
+    Aggr Compute      : BOQTotCr : Sum : $BOQSumCr
+
+[Collection : BOQ Tot C Coll]
+    Source Collection : BOQ Sum Oth Copy
+    By                : BOQTotKey : "C"
+    Aggr Compute      : BOQTotDr : Sum : $BOQSumDr
+    Aggr Compute      : BOQTotCr : Sum : $BOQSumCr
+
+[Collection : BOQ Grand Src]              ;; union of the two cost summaries (manual: union pattern)
+    Collection : BOQ Sum Led Copy, BOQ Sum Inv Copy
+
+[Collection : BOQ Tot G Coll]
+    Source Collection : BOQ Grand Src
+    By                : BOQTotKey : "G"
+    Aggr Compute      : BOQTotDr : Sum : $BOQSumDr
+    Aggr Compute      : BOQTotCr : Sum : $BOQSumCr
+
+;; ---------------------------------------------------------------------------
+;; 6. REPORT 1 - BOQ SUMMARY
+;; ---------------------------------------------------------------------------
+
+[Report : BOQ Sum Rpt]
+    Form     : BOQ Sum Frm
+    Title    : "BOQ Summary - by Ledger"
+    Variable : BOQCCName
+
+[Form : BOQ Sum Frm]
+    Height      : 100% Page                                ;; v5.6 - manual example: full screen form
+    Width       : 100% Page
+    Full Height : Yes
+    Full Width  : Yes
+    Orientation : Landscape                                ;; v5.1 print / PDF
+    ;; v4.7 - the sections sit inside ONE scrolling body part, so the whole
+    ;; report scrolls as a unit and each section's total stays under its rows.
+    Parts   : BOQ Sum Head Prt, BOQ Sum Body Prt
+    Buttons : BOQ Period Btn, BOQ CC Btn, BOQ Export Btn
+
+[Part : BOQ Sum Head Prt]
+    Lines : BOQ Crit CC Line, BOQ Crit Period Line, BOQ Blank Line, BOQ Sum Title Line
+
+[Part : BOQ Sum Body Prt]
+    Parts  : BOQ Sum SecA Hdr Prt, BOQ Sum A Prt, BOQ Sum A Tot Prt, BOQ Sum SecB Hdr Prt, BOQ Sum B Prt, BOQ Sum B Tot Prt, BOQ Sum Grand Sp Prt, BOQ Sum Grand Prt, BOQ Sum SecC Hdr Prt, BOQ Sum C Prt, BOQ Sum C Tot Prt
+    Scroll : Vertical
+
+[Part : BOQ Sum SecA Hdr Prt]
+    Lines : BOQ Sec A Line, BOQ Sec A Sub Line
+
+[Part : BOQ Sum A Prt]
+    Lines  : BOQ Sum A Det
+    Repeat : BOQ Sum A Det : BOQ Sum Led Coll
+
+[Part : BOQ Sum A Tot Prt]
+    Lines  : BOQ Sum A Tot
+    Repeat : BOQ Sum A Tot : BOQ Tot A Coll
+
+[Part : BOQ Sum SecB Hdr Prt]
+    Lines : BOQ Blank Line, BOQ Sec B Line, BOQ Sec B Sub Line
+
+[Part : BOQ Sum B Prt]
+    Lines  : BOQ Sum B Det
+    Repeat : BOQ Sum B Det : BOQ Sum Inv Coll
+
+[Part : BOQ Sum B Tot Prt]
+    Lines  : BOQ Sum B Tot
+    Repeat : BOQ Sum B Tot : BOQ Tot B Coll
+
+[Part : BOQ Sum Grand Sp Prt]
+    Lines : BOQ Blank Line
+
+[Part : BOQ Sum Grand Prt]
+    Lines  : BOQ Sum Grand Line
+    Repeat : BOQ Sum Grand Line : BOQ Tot G Coll
+
+[Part : BOQ Sum SecC Hdr Prt]
+    Lines : BOQ Blank Line, BOQ Sec C Line, BOQ Sec C Sub Line
+
+[Part : BOQ Sum C Prt]
+    Lines  : BOQ Sum C Det
+    Repeat : BOQ Sum C Det : BOQ Sum Oth Coll
+
+[Part : BOQ Sum C Tot Prt]
+    Lines  : BOQ Sum C Tot
+    Repeat : BOQ Sum C Tot : BOQ Tot C Coll
+
+[Line : BOQ Sum Title Line]
+    Border : Thin Bottom
+    Fields : BOQ H Group, BOQ H Ledger, BOQ H Debit, BOQ H Credit, BOQ H Net
+
+[Line : BOQ Sum A Det]
+    Fields : BOQ F SGroup, BOQ F SLedger, BOQSADr, BOQSACr, BOQSANet
+
+[Line : BOQ Sum B Det]
+    Fields : BOQ F SGroup, BOQ F SLedger, BOQSBDr, BOQSBCr, BOQSBNet
+
+[Line : BOQ Sec A Line]
+    Fields : BOQ Sec A Fld
+
+[Line : BOQ Sec A Sub Line]
+    Fields : BOQ Sec A Sub Fld
+
+[Field : BOQ Sec A Sub Fld]
+    Set as : "Purchase / Direct / Indirect Expense ledgers from Payment, Journal, Contra and ledger-mode Purchase vouchers"
+    Width  : 120
+
+[Line : BOQ Sum C Det]
+    Fields : BOQ F SGroup, BOQ F SLedger, BOQSCDr, BOQSCCr, BOQSCNet
+
+[Line : BOQ Sec C Line]
+    Fields : BOQ Sec C Fld
+
+[Line : BOQ Sec C Sub Line]
+    Fields : BOQ Sec C Sub Fld
+
+[Field : BOQ Sec C Sub Fld]
+    Set as : "Excludes debtors, tax accounts and nil balances. A DEBIT net is an unsettled advance on this job."
+    Width  : 120
+
+[Line : BOQ Sum C Tot]
+    Border : Thin Top
+    Fields : BOQ Tot C Lbl, BOQ Tot Blank, BOQTCDr, BOQTCCr, BOQTCNet
+
+[Field : BOQ Sec C Fld]
+    Set as : "C.  PARTY AND OTHER BALANCES  (memo - not part of cost)"
+    Style  : Normal Bold
+    Width  : 120
+
+[Field : BOQ Tot C Lbl]
+    Set as : "Total - Section C"
+    Style  : Normal Bold
+    Width  : 30
+
+[Field : BOQTCDr]
+    Use    : BOQ Tot Num Base
+    Set as : $BOQTotDr
+
+[Field : BOQTCCr]
+    Use    : BOQ Tot Num Base
+    Set as : $BOQTotCr
+
+[Field : BOQTCNet]
+    Use    : BOQ Tot Num Base
+    Set as : $BOQTotDr - $BOQTotCr
+
+[Line : BOQ Sec B Line]
+    Fields : BOQ Sec B Fld
+
+[Line : BOQ Sec B Sub Line]
+    Fields : BOQ Sec B Sub Fld
+
+[Field : BOQ Sec B Sub Fld]
+    Set as : "Stock item lines allocated to the cost centre, with the P&L ledger of each line"
+    Width  : 120
+
+[Line : BOQ Sum A Tot]
+    Border : Thin Top
+    Fields : BOQ Tot A Lbl, BOQ Tot Blank, BOQTADr, BOQTACr, BOQTANet
+
+[Line : BOQ Sum B Tot]
+    Border : Thin Top
+    Fields : BOQ Tot B Lbl, BOQ Tot Blank, BOQTBDr, BOQTBCr, BOQTBNet
+
+[Line : BOQ Sum Grand Line]
+    Border : Thin Top Bottom
+    Fields : BOQ Tot G Lbl, BOQ Tot Blank, BOQTGDr, BOQTGCr, BOQTGNet
+
+[Field : BOQ Sec A Fld]
+    Set as : "A.  DIRECT COST POSTINGS"
+    Style  : Normal Bold
+    Width  : 120
+
+[Field : BOQ Sec B Fld]
+    Set as : "B.  ITEM-WISE PURCHASES"
+    Style  : Normal Bold
+    Width  : 120
+
+[Field : BOQ Tot A Lbl]
+    Set as : "Total - Section A"
+    Style  : Normal Bold
+    Width  : 30
+
+[Field : BOQ Tot B Lbl]
+    Set as : "Total - Section B"
+    Style  : Normal Bold
+    Width  : 30
+
+[Field : BOQ Tot G Lbl]
+    Set as : "TOTAL COST (A + B)"
+    Style  : Normal Bold
+    Width  : 30
+
+[Field : BOQ Tot Blank]
+    Set as : ""
+    Width  : 38
+
+[Field : BOQ Tot Num Base]
+    Type   : Number
+    Align  : Right
+    Style  : Normal Bold
+    Width  : 16
+
+[Field : BOQTADr]
+    Use    : BOQ Tot Num Base
+    Set as : $BOQTotDr
+
+[Field : BOQTACr]
+    Use    : BOQ Tot Num Base
+    Set as : $BOQTotCr
+
+[Field : BOQTANet]
+    Use    : BOQ Tot Num Base
+    Set as : $BOQTotDr - $BOQTotCr
+
+[Field : BOQTBDr]
+    Use    : BOQ Tot Num Base
+    Set as : $BOQTotDr
+
+[Field : BOQTBCr]
+    Use    : BOQ Tot Num Base
+    Set as : $BOQTotCr
+
+[Field : BOQTBNet]
+    Use    : BOQ Tot Num Base
+    Set as : $BOQTotDr - $BOQTotCr
+
+;; Grand total - from the union collection BOQ Tot G Coll.
+[Field : BOQTGDr]
+    Use    : BOQ Tot Num Base
+    Set as : $BOQTotDr
+
+[Field : BOQTGCr]
+    Use    : BOQ Tot Num Base
+    Set as : $BOQTotCr
+
+[Field : BOQTGNet]
+    Use    : BOQ Tot Num Base
+    Set as : $BOQTotDr - $BOQTotCr
+
+
+;; ---- v5.0: DETAIL report sections = the Summary's sections, voucher by voucher.
+;; Each section has a displayed walk and an undisplayed copy for its total.
+[Collection : BOQ Det A Coll]
+    Source Collection : BOQ All Vouchers
+    Walk              : AllLedgerEntries, CategoryAllocations, CostCentreAllocations
+    Filter            : BOQDetFiltA
+    Fetch             : Name, Amount
+    Compute           : BOQVchDate : $$CollSrcObj:$Date
+    Compute           : BOQVchNo   : $$CollSrcObj:$VoucherNumber
+    Compute           : BOQVchType : $$CollSrcObj:$VoucherTypeName
+    Compute           : BOQNarr    : $$CollSrcObj:$Narration
+    Compute           : BOQLedger  : $$Owner:$$Owner:$LedgerName
+    Compute           : BOQItem    : ""
+    Compute           : BOQQtyNum  : 0
+    Compute           : BOQRateNum : 0
+    Compute           : BOQDebit   : if $$IsDr:$Amount then $Amount * -1 else 0
+    Compute           : BOQCredit  : if $$IsDr:$Amount then 0 else $Amount
+
+[Collection : BOQ Det A Copy]                 ;; v5.9 - undisplayed copy for the total (re-reading a displayed walk crashed)
+    Source Collection : BOQ All Vouchers
+    Walk              : AllLedgerEntries, CategoryAllocations, CostCentreAllocations
+    Filter            : BOQDetFiltA
+    Fetch             : Name, Amount
+    Compute           : BOQLedger  : $$Owner:$$Owner:$LedgerName
+    Compute           : BOQDebit   : if $$IsDr:$Amount then $Amount * -1 else 0
+    Compute           : BOQCredit  : if $$IsDr:$Amount then 0 else $Amount
+
+[Collection : BOQ Det A Tot Coll]
+    Source Collection : BOQ Det A Copy
+    By                : BOQTotKey : "A"
+    Aggr Compute      : BOQTotDr : Sum : $BOQDebit
+    Aggr Compute      : BOQTotCr : Sum : $BOQCredit
+
+[Collection : BOQ Det B Coll]
+    Source Collection : BOQ All Vouchers
+    Walk              : AllInventoryEntries, AccountingAllocations, CategoryAllocations, CostCentreAllocations   ;; v5.8 (was InventoryEntries)
+    Filter            : BOQDetFiltB
+    Fetch             : Name, Amount
+    Compute           : BOQVchDate : $$CollSrcObj:$Date
+    Compute           : BOQVchNo   : $$CollSrcObj:$VoucherNumber
+    Compute           : BOQVchType : $$CollSrcObj:$VoucherTypeName
+    Compute           : BOQNarr    : $$CollSrcObj:$Narration
+    Compute           : BOQLedger  : $$Owner:$$Owner:$LedgerName
+    Compute           : BOQItem    : $$Owner:$$Owner:$$Owner:$StockItemName
+    Compute           : BOQQtyNum  : $$Number:($$Owner:$$Owner:$$Owner:$BilledQty)
+    Compute           : BOQRateNum : $$Number:($$Owner:$$Owner:$$Owner:$Rate)
+    Compute           : BOQDebit   : if $$IsDr:$Amount then $Amount * -1 else 0
+    Compute           : BOQCredit  : if $$IsDr:$Amount then 0 else $Amount
+
+[Collection : BOQ Det B Copy]                 ;; v5.9 - undisplayed copy for the total
+    Source Collection : BOQ All Vouchers
+    Walk              : AllInventoryEntries, AccountingAllocations, CategoryAllocations, CostCentreAllocations
+    Filter            : BOQDetFiltB
+    Fetch             : Name, Amount
+    Compute           : BOQLedger  : $$Owner:$$Owner:$LedgerName
+    Compute           : BOQDebit   : if $$IsDr:$Amount then $Amount * -1 else 0
+    Compute           : BOQCredit  : if $$IsDr:$Amount then 0 else $Amount
+
+[Collection : BOQ Det B Tot Coll]
+    Source Collection : BOQ Det B Copy
+    By                : BOQTotKey : "B"
+    Aggr Compute      : BOQTotDr : Sum : $BOQDebit
+    Aggr Compute      : BOQTotCr : Sum : $BOQCredit
+
+[Collection : BOQ Det C Coll]
+    Source Collection : BOQ All Vouchers
+    Walk              : AllLedgerEntries, CategoryAllocations, CostCentreAllocations
+    Filter            : BOQDetFiltC
+    Fetch             : Name, Amount
+    Compute           : BOQVchDate : $$CollSrcObj:$Date
+    Compute           : BOQVchNo   : $$CollSrcObj:$VoucherNumber
+    Compute           : BOQVchType : $$CollSrcObj:$VoucherTypeName
+    Compute           : BOQNarr    : $$CollSrcObj:$Narration
+    Compute           : BOQLedger  : $$Owner:$$Owner:$LedgerName
+    Compute           : BOQItem    : ""
+    Compute           : BOQQtyNum  : 0
+    Compute           : BOQRateNum : 0
+    Compute           : BOQDebit   : if $$IsDr:$Amount then $Amount * -1 else 0
+    Compute           : BOQCredit  : if $$IsDr:$Amount then 0 else $Amount
+
+[Collection : BOQ Det C Copy]                 ;; v5.9 - undisplayed copy for the total (re-reading a displayed walk crashed)
+    Source Collection : BOQ All Vouchers
+    Walk              : AllLedgerEntries, CategoryAllocations, CostCentreAllocations
+    Filter            : BOQDetFiltC
+    Fetch             : Name, Amount
+    Compute           : BOQLedger  : $$Owner:$$Owner:$LedgerName
+    Compute           : BOQDebit   : if $$IsDr:$Amount then $Amount * -1 else 0
+    Compute           : BOQCredit  : if $$IsDr:$Amount then 0 else $Amount
+
+[Collection : BOQ Det C Tot Coll]
+    Source Collection : BOQ Det C Copy
+    By                : BOQTotKey : "C"
+    Aggr Compute      : BOQTotDr : Sum : $BOQDebit
+    Aggr Compute      : BOQTotCr : Sum : $BOQCredit
+
+;; ---------------------------------------------------------------------------
+;; 7. REPORT 2 - BOQ DETAIL (voucher wise)
+;; ---------------------------------------------------------------------------
+
+[Report : BOQ Det Rpt]
+    Form     : BOQ Det Frm
+    Title    : "BOQ Detail - Voucher wise"
+    Variable : BOQCCName
+
+[Form : BOQ Det Frm]
+    Height      : 100% Page                                ;; v5.6 - manual example: full screen form
+    Width       : 100% Page
+    Full Height : Yes
+    Full Width  : Yes
+    Orientation : Landscape                                ;; v5.1 print / PDF
+    ;; v5.0 - same three sections as the Summary, one scrolling body
+    Parts   : BOQ Det Head Prt, BOQ Det Body Prt
+    Buttons : BOQ Period Btn, BOQ CC Btn, BOQ Export Btn
+
+[Part : BOQ Det Head Prt]
+    Lines : BOQ Crit CC Line, BOQ Crit Period Line, BOQ Blank Line, BOQ Det Title Line
+
+[Part : BOQ Det Body Prt]
+    Parts  : BOQ Det SecA Hdr Prt, BOQ Det A Prt, BOQ Det A Tot Prt, BOQ Det SecB Hdr Prt, BOQ Det B Prt, BOQ Det B Tot Prt, BOQ Det SecC Hdr Prt, BOQ Det C Prt, BOQ Det C Tot Prt
+    Scroll : Vertical
+
+[Part : BOQ Det SecA Hdr Prt]
+    Lines : BOQ Sec A Line, BOQ Sec A Sub Line
+
+[Part : BOQ Det A Prt]
+    Lines  : BOQ Det A Det
+    Repeat : BOQ Det A Det : BOQ Det A Coll
+
+[Part : BOQ Det A Tot Prt]
+    Lines  : BOQ Det A Tot
+    Repeat : BOQ Det A Tot : BOQ Det A Tot Coll
+
+[Part : BOQ Det SecB Hdr Prt]
+    Lines : BOQ Blank Line, BOQ Sec B Line, BOQ Sec B Sub Line
+
+[Part : BOQ Det B Prt]
+    Lines  : BOQ Det B Det
+    Repeat : BOQ Det B Det : BOQ Det B Coll
+
+[Part : BOQ Det B Tot Prt]
+    Lines  : BOQ Det B Tot
+    Repeat : BOQ Det B Tot : BOQ Det B Tot Coll
+
+[Part : BOQ Det SecC Hdr Prt]
+    Lines : BOQ Blank Line, BOQ Sec C Line, BOQ Sec C Sub Line
+
+[Part : BOQ Det C Prt]
+    Lines  : BOQ Det C Det
+    Repeat : BOQ Det C Det : BOQ Det C Coll
+
+[Part : BOQ Det C Tot Prt]
+    Lines  : BOQ Det C Tot
+    Repeat : BOQ Det C Tot : BOQ Det C Tot Coll
+
+[Line : BOQ Det Title Line]
+    Border : Thin Bottom
+    Fields : BOQ H Date, BOQ H VchType, BOQ H VchNo, BOQ H Ledger, BOQ H Item, BOQ H QtyNum, BOQ H RateNum, BOQ H CCName, BOQ H Debit, BOQ H Credit, BOQ H Narr
+
+[Line : BOQ Det A Det]
+    Space Top : 0.1
+    Fields : BOQ F Date, BOQ F VchType, BOQ F VchNo, BOQ F Ledger, BOQ F Item, BOQ F QtyNum, BOQ F RateNum, BOQ F CCName, BOQ F Debit, BOQ F Credit, BOQ F Narr
+
+[Line : BOQ Det B Det]
+    Use : BOQ Det A Det
+
+[Line : BOQ Det C Det]
+    Use : BOQ Det A Det
+
+;; Detail total lines: label + spacer sized to the detail columns, then Dr / Cr
+[Line : BOQ Det A Tot]
+    Border : Thin Top
+    Fields : BOQ DTot A Lbl, BOQ DTot Sp, BOQTADr, BOQTACr
+
+[Line : BOQ Det B Tot]
+    Border : Thin Top
+    Fields : BOQ DTot B Lbl, BOQ DTot Sp, BOQTBDr, BOQTBCr
+
+[Line : BOQ Det C Tot]
+    Border : Thin Top
+    Fields : BOQ DTot C Lbl, BOQ DTot Sp, BOQTCDr, BOQTCCr
+
+[Field : BOQ DTot A Lbl]
+    Set as : "Total - Section A"
+    Style  : Normal Bold
+    Width  : 30
+
+[Field : BOQ DTot B Lbl]
+    Set as : "Total - Section B"
+    Style  : Normal Bold
+    Width  : 30
+
+[Field : BOQ DTot C Lbl]
+    Set as : "Total - Section C"
+    Style  : Normal Bold
+    Width  : 30
+
+[Field : BOQ DTot Sp]
+    Set as : ""
+    Width  : 114
+
+
+;; ---------------------------------------------------------------------------
+;; 8. CRITERIA LINES (selected cost centre and period, shown in the export)
+;; ---------------------------------------------------------------------------
+
+[Line : BOQ Blank Line]
+    Fields : BOQ Tot Blank
+
+[Line : BOQ Crit CC Line]
+    Fields : BOQ Crit CC Lbl, BOQ Crit CC Val
+
+[Line : BOQ Crit Period Line]
+    Fields : BOQ Crit Per Lbl, BOQ Crit From, BOQ Crit To Lbl, BOQ Crit To
+
+[Field : BOQ Crit CC Lbl]
+    Set as : "Cost Centre :"
+    Style  : Normal Bold
+    Width  : 14
+
+[Field : BOQ Crit CC Val]
+    Set as : ##BOQCCName
+    Style  : Normal Bold
+    Width  : 40
+
+[Field : BOQ Crit Per Lbl]
+    Set as : "Period :"
+    Style  : Normal Bold
+    Width  : 14
+
+[Field : BOQ Crit From]
+    Type   : Date
+    Set as : ##SVFromDate
+    Format : "Short Date"
+    Width  : 12
+
+[Field : BOQ Crit To Lbl]
+    Set as : "to"
+    Width  : 4
+
+[Field : BOQ Crit To]
+    Type   : Date
+    Set as : ##SVToDate
+    Format : "Short Date"
+    Width  : 12
+
+
+;; ---------------------------------------------------------------------------
+;; 9. COLUMN HEADINGS (H) - bold
+;; ---------------------------------------------------------------------------
+
+[Field : BOQ Hdr Base]
+    Style : Normal Bold
+
+[Field : BOQ H Date]
+    Use    : BOQ Hdr Base
+    Set as : "Date"
+    Width  : 10
+
+[Field : BOQ H VchType]
+    Use    : BOQ Hdr Base
+    Set as : "Voucher Type"
+    Width  : 14
+
+[Field : BOQ H VchNo]
+    Use    : BOQ Hdr Base
+    Set as : "Vch No"
+    Width  : 8
+
+[Field : BOQ H Group]
+    Use    : BOQ Hdr Base
+    Set as : "Ledger Group"
+    Width  : 30
+
+[Field : BOQ H Ledger]
+    Use    : BOQ Hdr Base
+    Set as : "Ledger"
+    Width  : 34
+
+[Field : BOQ H Item]
+    Use    : BOQ Hdr Base
+    Set as : "Stock Item"
+    Width  : 32
+
+[Field : BOQ H QtyNum]
+    Use    : BOQ Hdr Base
+    Set as : "Qty"
+    Width  : 9
+
+[Field : BOQ H RateNum]
+    Use    : BOQ Hdr Base
+    Set as : "Rate"
+    Width  : 11
+
+[Field : BOQ H CCName]
+    Use    : BOQ Hdr Base
+    Set as : "Cost Centre"
+    Width  : 26
+
+[Field : BOQ H Debit]
+    Use    : BOQ Hdr Base
+    Set as : "Debit"
+    Width  : 15
+
+[Field : BOQ H Credit]
+    Use    : BOQ Hdr Base
+    Set as : "Credit"
+    Width  : 15
+
+[Field : BOQ H Net]
+    Use    : BOQ Hdr Base
+    Set as : "Net Cost (Dr - Cr)"
+    Width  : 18
+
+[Field : BOQ H Narr]
+    Use    : BOQ Hdr Base
+    Set as : "Narration"
+    Width  : 34
+
+
+;; ---------------------------------------------------------------------------
+;; 10. DATA FIELDS (F) - detail report
+;; ---------------------------------------------------------------------------
+
+[Field : BOQ F Date]
+    Type   : Date
+    Set as : $BOQVchDate
+    Format : "Short Date"
+    Width  : 10
+
+[Field : BOQ F VchType]
+    Set as : $BOQVchType
+    Width  : 14
+
+[Field : BOQ F VchNo]
+    Set as : $BOQVchNo
+    Width  : 8
+
+[Field : BOQ F Ledger]
+    Set as : $BOQLedger
+    Width  : 34
+
+[Field : BOQ F Item]
+    Set as : $BOQItem
+    Width  : 32
+
+[Field : BOQ F QtyNum]
+    Type   : Number
+    Set as : $BOQQtyNum
+    Format : "No Zero"
+    Align  : Right
+    Width  : 9
+
+[Field : BOQ F RateNum]
+    Type   : Number
+    Set as : $BOQRateNum
+    Format : "No Zero"
+    Align  : Right
+    Width  : 11
+
+[Field : BOQ F CCName]
+    Set as    : $Name
+    Width     : 28
+
+[Field : BOQ F Debit]
+    Type   : Number
+    Set as : $BOQDebit
+    Format : "No Zero"
+    Align  : Right
+    Width  : 15
+
+[Field : BOQ F Credit]
+    Type   : Number
+    Set as : $BOQCredit
+    Format : "No Zero"
+    Align  : Right
+    Width  : 15
+
+[Field : BOQ F Narr]
+    Set as : $BOQNarr
+    Width  : 34
+
+
+;; ---------------------------------------------------------------------------
+;; 11. DATA FIELDS (S) - summary report
+;; ---------------------------------------------------------------------------
+
+[Field : BOQ F SGroup]
+    Set as : $BOQSumGroup
+    Width  : 30
+
+[Field : BOQ F SLedger]
+    Set as : $BOQSumLedger
+    Width  : 38
+
+[Field : BOQSADr]
+    Type   : Number
+    Set as : $BOQSumDr
+    Format : "No Zero"
+    Align  : Right
+    Width  : 16
+
+[Field : BOQSACr]
+    Type   : Number
+    Set as : $BOQSumCr
+    Format : "No Zero"
+    Align  : Right
+    Width  : 16
+
+[Field : BOQSANet]
+    Type   : Number
+    Set as : $BOQSumDr - $BOQSumCr
+    Align  : Right
+    Width  : 18
+
+[Field : BOQSBDr]
+    Type   : Number
+    Set as : $BOQSumDr
+    Format : "No Zero"
+    Align  : Right
+    Width  : 16
+
+[Field : BOQSBCr]
+    Type   : Number
+    Set as : $BOQSumCr
+    Format : "No Zero"
+    Align  : Right
+    Width  : 16
+
+[Field : BOQSBNet]
+    Type   : Number
+    Set as : $BOQSumDr - $BOQSumCr
+    Align  : Right
+    Width  : 18
+
+
+;; Section C data fields (restored v5.3)
+[Field : BOQSCDr]
+    Type   : Number
+    Set as : $BOQSumDr
+    Format : "No Zero"
+    Align  : Right
+    Width  : 16
+
+[Field : BOQSCCr]
+    Type   : Number
+    Set as : $BOQSumCr
+    Format : "No Zero"
+    Align  : Right
+    Width  : 16
+
+[Field : BOQSCNet]
+    Type   : Number
+    Set as : $BOQSumDr - $BOQSumCr
+    Align  : Right
+    Width  : 18
+
+;; ===========================================================================
+;; End of file
+;; ===========================================================================
