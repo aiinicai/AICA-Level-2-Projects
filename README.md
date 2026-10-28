@@ -1,81 +1,65 @@
-# GST Inward HSN/SAC Fetcher — V1
+# DPDP Compliance Manager
 
-Desktop app that reads a downloaded NIC e-invoice "Received" JSON export and
-produces an HSN-wise Excel report. Runs fully offline — no data leaves the
-machine.
+A multi-institution web application that helps a school or college adopt the Digital Personal Data Protection Act, 2023 for the first time. It is run by a Chartered Accountant's firm for its institution clients.
 
-## What's built in this version (V1)
+Author: CA Jayson Jacob Mathew (Saju and Co.) | ICAI AICA Level 2 | Batch L2B98 EKM
+Status: working prototype with synthetic data only. Not a certified compliance product.
 
-- **Home** — Manual upload of a downloaded e-invoice JSON. Decodes every
-  record's embedded signed invoice, extracts HSN-level line items, stores
-  them locally (SQLite), and is ready to export.
-  "Fetch from portal" tile is present but disabled — that's the V2
-  auto-download feature, not built yet.
-- **Reports** — Pick a From/To month range (and optionally a GSTIN) and
-  generate a consolidated 3-sheet Excel (Invoice Summary / HSN Item Detail /
-  HSN Summary). Keeps a running list of past exports.
-- **Settings** — Register the GSTINs you work with, and choose the folder
-  where generated Excel reports are saved.
+## Problem
+Institutions hold large volumes of student, parent and staff data, often in scattered systems, and have no structured way to find what they hold, judge which duties apply, assess controls, keep evidence and show who approved what.
 
-Data accumulates month-on-month in a local database
-(`%APPDATA%\GSTInwardHSNFetcher\data.db`), so re-running the app next month
-adds to what's already there rather than starting over. Re-uploading the same
-JSON is safe — invoices are keyed by IRN, so nothing gets duplicated.
+## What it does
+- Institution profile, departments, systems, vendors.
+- Personal-data inventory (processing activities) with sensitive-data flags that prompt human review.
+- Applicability questions with a written rationale and a "Needs legal review" outcome.
+- Control library and item-by-item assessment (Implemented and verified, Implemented, Partial, Gap, Not applicable, Not assessed).
+- Evidence kept in private storage; the uploader cannot verify their own evidence.
+- Maker-checker approval: the preparer cannot approve their own assessment; approved assessments are frozen and reopening needs a reason.
+- Corrective actions with owner, due date, overdue flag, closure evidence and risk acceptance.
+- Dashboard and reports with numerator and denominator for every percentage. "Not assessed" is never counted as implemented.
+- Audit trail that is append-only.
 
-## Before you build — one-time setup on your Windows machine
+## Design decisions
+- Tenant isolation is enforced in the database (row-level security), not only in the interface.
+- State changes go through database functions, not direct updates.
+- No Aadhaar storage. Money and legal dates are settings, not hard-coded. Legal content is marked "Requires verification" until a qualified person signs off.
+- The words "compliant", "certified" and "guaranteed" are not used.
 
-You need Python 3.10+ installed. If DGFT AutoComply's build environment is
-still on this machine, you likely already have everything needed.
+## Repository layout
+| Folder | Contents |
+|---|---|
+| `database/` | `database_schema.sql`, `row_level_security.sql`, `seed_demo_data.sql` (run in this order) |
+| `docs/` | screen map, data dictionary, test plan, build log |
+| `tests/`, `tools/` | database test harness (225 tests) |
+| `test_output/` | `rls_results.json` (225 passed, 0 failed) |
+| `samples/` | synthetic CSV for inventory import testing and its checklist |
+| `app/` | Lovable (TanStack Start, React, Supabase) front-end source |
+| `user_manual/` | draft user manual |
 
+## How it was built
+Requirements and professional logic by the author (a practising CA). Database design, tests and prompts drafted with Claude (Anthropic); the interface was generated and revised with Lovable. All design decisions, legal logic and acceptance checks were reviewed by the author.
+
+## Running the database
+1. Create a Supabase (or Lovable Cloud) test project. Never use real data.
+2. Run `database/database_schema.sql`, then `database/row_level_security.sql`, then `database/seed_demo_data.sql`.
+3. Create a user in Authentication and add a row in `tenant_memberships` linking it to a demo institution.
+
+## Running the database tests
 ```
-cd GSTInwardFetcher
-python -m venv venv
-venv\Scripts\activate
-pip install -r requirements.txt
+cd tools && npm install
+node tools/apply.mjs tests/supabase_stubs.sql database/database_schema.sql database/row_level_security.sql database/seed_demo_data.sql
+node tools/run_rls_tests.mjs
 ```
+Result recorded: 225 passed, 0 failed (see `test_output/rls_results.json`). One isolation condition was removed on purpose to prove the tests can fail; 28 tests then failed.
 
-## Test it first (without building the exe)
+## What the tests do not prove
+They run on an in-process PostgreSQL stand-in, not on Supabase. They do not prove JWT handling, storage behaviour, signed links or the invitation flow. Manual tests M1 to M13 in `docs/TEST_PLAN.md` are still to be run on the real project.
 
-```
-python main.py
-```
+## Limitations and next steps
+- Sign-in and database-backed screens are being connected (Phase 1); remaining workflow phases follow.
+- Legal controls and statutory dates are demonstration content and must be verified against the Act, the Rules and Gazette notifications by a qualified person.
+- Independent security review, backup and restore test, and accessibility audit are pending.
+- The app records an assessment. It does not certify compliance or give legal advice.
 
-A window should open with the app. Try uploading a real e-invoice JSON and
-confirm a report generates into your chosen folder before you build the exe —
-much faster to catch issues here than after packaging.
-
-## Build the .exe
-
-```
-pyinstaller build.spec
-```
-
-The finished file appears at:
-
-```
-dist\GST Inward HSN-SAC Fetcher.exe
-```
-
-This is a single portable file — the whole app, nothing else to carry
-alongside it.
-
-## Getting the .exe onto your office laptop via GitHub
-
-1. Create a repository on GitHub (private, since this is your own tool) —
-   e.g. `gst-inward-hsn-fetcher`.
-2. Push the source code (main.py, backend.py, ui.html, etc.) — do **not**
-   commit the built .exe into the repo itself (GitHub's normal file-size
-   limits are much stricter than Release assets).
-3. On GitHub, go to the repo → **Releases** → **Draft a new release** →
-   attach `GST Inward HSN-SAC Fetcher.exe` as a release asset → publish.
-4. On your office laptop, open the Release page in the browser and click
-   the .exe link to download — this is a plain HTTPS download from
-   github.com, which should go through even if other file-transfer routes
-   are blocked.
-
-## Known limitation to mention in the demo
-
-The uploaded JSON file needs to be the **"Received" download** from
-`einvoice.gst.gov.in` (Services → e-Invoice → Download e-Invoice →
-Received tab). It reads the array of records with the `SignedInvoice`
-field per record — the format we tested this against.
+## Security
+No keys, passwords or `.env` files are stored in this repository. The browser uses only the public anon key. The service-role key must never be committed.
