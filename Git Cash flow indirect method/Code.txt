@@ -1,0 +1,1241 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+CASH FLOW STATEMENT GENERATOR (INDIRECT METHOD)  -  AS 3 / Ind AS 7 format
+Offline desktop application (Python + Tkinter).  Capstone project: AI course, ICAI.
+
+Inputs : Balance Sheets and Statements of Profit & Loss (CY and PY) in
+         Excel (.xlsx/.xlsm/.xls), Word (.docx), PDF (text based), Text/CSV.
+Outputs: Cash Flow Statement (indirect method) in Excel, Word, PDF and Text.
+
+Method : all arithmetic uses decimal.Decimal (no floating point errors).
+         Every line is classified (rule based, editable by the user) and the
+         statement is verified with built-in checks:
+            1. Balance sheet balances for both years
+            2. Computed PBT / PAT agree with the figures reported in the P&L
+            3. Closing cash per cash-flow = Cash & cash equivalents per Balance Sheet
+"""
+import os, re, sys, csv
+from decimal import Decimal as D, ROUND_HALF_UP
+
+try:
+    import tkinter as tk
+    from tkinter import ttk, filedialog, messagebox
+except Exception:          # allows the calculation engine to be imported/tested headless
+    tk = None
+
+# =====================================================================
+# 1. TAG (CLASSIFICATION) DEFINITIONS
+# =====================================================================
+BS_TAGS = [
+    ('SHARE_CAPITAL', 'Share capital / Owner capital'),
+    ('RESERVES', 'Reserves & surplus (incl. P&L balance)'),
+    ('LT_BORROW', 'Long-term borrowings'),
+    ('ST_BORROW', 'Short-term borrowings / overdraft'),
+    ('TRADE_PAY', 'Trade payables'),
+    ('OTHER_L', 'Other liabilities & provisions'),
+    ('TAX_PROV', 'Provision for tax / current tax liability'),
+    ('DTL', 'Deferred tax liability'),
+    ('FIXED_ASSET', 'Fixed assets (net block, CWIP, intangibles)'),
+    ('NC_INVEST', 'Non-current investments'),
+    ('CUR_INVEST', 'Current investments / fixed deposits'),
+    ('LOANS_NC', 'Long-term loans & advances'),
+    ('INVENTORY', 'Inventories'),
+    ('TRADE_REC', 'Trade receivables'),
+    ('CASH', 'Cash & cash equivalents'),
+    ('OTHER_A', 'Other assets (current & non-current)'),
+    ('TAX_ASSET', 'Advance tax / tax assets'),
+    ('DTA', 'Deferred tax asset'),
+    ('IGNORE', 'Ignore (total / subtotal)'),
+    ('UNCLASSIFIED', '** Unclassified - please choose **'),
+]
+PL_TAGS = [
+    ('REVENUE', 'Revenue from operations'),
+    ('OTHER_INCOME', 'Other income (operating nature)'),
+    ('INTEREST_INCOME', 'Interest income'),
+    ('DIVIDEND_INCOME', 'Dividend income'),
+    ('GAIN_SALE', 'Profit / gain on sale of assets'),
+    ('EXPENSE', 'Operating expense'),
+    ('DEPRECIATION', 'Depreciation & amortisation'),
+    ('FINANCE_COST', 'Finance cost / interest expense'),
+    ('LOSS_SALE', 'Loss on sale of assets'),
+    ('TAX', 'Tax expense (current + deferred)'),
+    ('DIVIDEND', 'Dividend paid / proposed (appropriation)'),
+    ('PBT', 'Reported Profit before tax (for verification only)'),
+    ('PAT', 'Reported Profit after tax (for verification only)'),
+    ('IGNORE', 'Ignore (total / subtotal)'),
+    ('UNCLASSIFIED', '** Unclassified - please choose **'),
+]
+LIAB_TAGS = {'SHARE_CAPITAL', 'RESERVES', 'LT_BORROW', 'ST_BORROW', 'TRADE_PAY', 'OTHER_L', 'TAX_PROV', 'DTL'}
+ASSET_TAGS = {'FIXED_ASSET', 'NC_INVEST', 'CUR_INVEST', 'LOANS_NC', 'INVENTORY', 'TRADE_REC', 'CASH',
+              'OTHER_A', 'TAX_ASSET', 'DTA'}
+INCOME_TAGS = ('REVENUE', 'OTHER_INCOME', 'INTEREST_INCOME', 'DIVIDEND_INCOME', 'GAIN_SALE')
+EXPENSE_TAGS = ('EXPENSE', 'DEPRECIATION', 'FINANCE_COST', 'LOSS_SALE')
+
+# =====================================================================
+# 2. NUMBER / TEXT HELPERS
+# =====================================================================
+NUM_PLAIN = re.compile(r'^[-+]?\d[\d,]*(\.\d+)?$|^[-+]?\.\d+$')
+NUM_PAREN = re.compile(r'^\(\s*\d[\d,]*(\.\d+)?\s*\)$')
+NUM_NEG = re.compile(r'^\(-\)\s*\d[\d,]*(\.\d+)?$')
+DASHES = {'-', '\u2013', '\u2014', 'nil', 'Nil', 'NIL'}
+HDR = re.compile(r'\b(january|february|march|april|june|july|august|september|october|november|december|sept)\b'
+                 r'|\bas at\b|\bas on\b|year ended|period ended|particulars|note no|figures|schedule'
+                 r'|amount.*amount|\brs\.? in\b|in lakhs|in crores|in thousands|in millions', re.I)
+
+
+def to_num(tok):
+    """Convert a token to Decimal; (1,234) -> negative; '-'/'nil' -> 0; otherwise None."""
+    t = str(tok).strip().replace('\u20b9', '').replace('Rs.', '').strip()
+    if t in DASHES:
+        return D(0)
+    if NUM_NEG.match(t):
+        return -D(t[3:].strip().replace(',', ''))
+    if NUM_PAREN.match(t):
+        return -D(t.strip('() ').replace(',', ''))
+    if NUM_PLAIN.match(t):
+        return D(t.replace(',', '').replace('+', ''))
+    return None
+
+
+def norm(s):
+    s = s.lower().replace('&', ' and ').replace('\u2019', "'").replace("'", '')
+    s = re.sub(r'[^a-z0-9 ]', ' ', s)
+    s = re.sub(r'\s+', ' ', s).strip()
+    s = re.sub(r'^((i|ii|iii|iv|v|vi|vii|viii|ix|x|[a-z]|\d+) )+', '', s)
+    return s
+
+
+def despace(text):
+    """'T o t a l' -> 'Total', 'G S T' -> 'GST' (some accounting software prints letter-spaced words)."""
+    return re.sub(r'\b(?:[A-Za-z] ){2,}[A-Za-z]\b', lambda m: m.group(0).replace(' ', ''), text)
+
+
+def clean_label(label):
+    label = re.sub(r'\(?\bnotes?\s*(no\.?)?\s*[\d, &and]+\)?', '', label, flags=re.I)
+    return re.sub(r'\s+', ' ', label).strip(' .:-')
+
+
+def fmt(d, dp=0):
+    """Indian digit grouping, negatives in brackets, zero as '-'."""
+    if d is None:
+        return ''
+    q = d.quantize(D('0.01') if dp else D(1), rounding=ROUND_HALF_UP)
+    if q == 0:
+        return '-'
+    neg = q < 0
+    s = f'{abs(q):.{dp}f}'
+    ip, _, fp = s.partition('.')
+    if len(ip) > 3:
+        head, tail, groups = ip[:-3], ip[-3:], []
+        while len(head) > 2:
+            groups.insert(0, head[-2:])
+            head = head[:-2]
+        if head:
+            groups.insert(0, head)
+        ip = ','.join(groups + [tail])
+    s = ip + ('.' + fp if fp else '')
+    return f'({s})' if neg else s
+
+
+def period_text(cy_label):
+    m = re.match(r'\s*(\d{4})\s*[-/]\s*(\d{2,4})', cy_label or '')
+    if m:
+        return f'31st March {int(m.group(1)) + 1}'
+    return cy_label or ''
+
+
+# =====================================================================
+# 3. FILE READERS  (Excel / Word / PDF / Text)  ->  list of rows (list of cells)
+# =====================================================================
+def split_line(line):
+    return [c.strip() for c in re.split(r'\t+|\s{2,}|\|', line) if c.strip()]
+
+
+def read_rows(path, kind='BS'):
+    ext = os.path.splitext(path)[1].lower()
+    if ext in ('.xlsx', '.xlsm'):
+        return _read_xlsx(path, kind)
+    if ext == '.xls':
+        return _read_xls(path)
+    if ext == '.docx':
+        return _read_docx(path)
+    if ext == '.pdf':
+        return _read_pdf(path)
+    if ext in ('.txt', '.csv', '.text'):
+        return _read_text(path, ext)
+    if ext == '.doc':
+        raise ValueError('Old .doc format is not supported offline. Please save the file as .docx and retry.')
+    raise ValueError(f'Unsupported file type: {ext}')
+
+
+def _cellstr(v):
+    if v is None or isinstance(v, bool):
+        return ''
+    if isinstance(v, (int, float)):
+        return format(D(str(round(v, 4))), 'f').rstrip('0').rstrip('.') if isinstance(v, float) else str(v)
+    if hasattr(v, 'year'):     # dates are headings, ignore
+        return ''
+    return str(v).strip()
+
+
+def _pick_sheet(names, kind):
+    keys = ('balance', 'bs', 'position') if kind == 'BS' else ('profit', 'loss', 'p&l', 'pl', 'income', 'operations')
+    for n in names:
+        if any(k in n.lower() for k in keys):
+            return n
+    return names[0]
+
+
+def _read_xlsx(path, kind):
+    import openpyxl
+    wb = openpyxl.load_workbook(path, data_only=True)
+    ws = wb[_pick_sheet(wb.sheetnames, kind)]
+    rows = [[_cellstr(c) for c in r] for r in ws.iter_rows(values_only=True)]
+    return [r for r in rows if any(r)]
+
+
+def _read_xls(path):
+    try:
+        import xlrd
+    except ImportError:
+        raise ValueError('Reading .xls needs the "xlrd" package, or save the file as .xlsx.')
+    sh = xlrd.open_workbook(path).sheet_by_index(0)
+    return [[_cellstr(v) for v in sh.row_values(i)] for i in range(sh.nrows)]
+
+
+def _read_docx(path):
+    import docx
+    from docx.table import Table
+    from docx.text.paragraph import Paragraph
+    doc = docx.Document(path)
+    rows = []
+    for child in doc.element.body.iterchildren():
+        if child.tag.endswith('}tbl'):
+            for r in Table(child, doc).rows:
+                seen, cells = set(), []
+                for c in r.cells:
+                    if id(c._tc) in seen:
+                        continue
+                    seen.add(id(c._tc))
+                    cells.append(c.text.replace('\n', ' ').strip())
+                rows.append(cells)
+        elif child.tag.endswith('}p'):
+            t = Paragraph(child, doc).text
+            if t.strip():
+                rows.append(split_line(t) or [t])
+    return rows
+
+
+def _cluster_lines(words):
+    words = sorted(words, key=lambda w: (round(w['top']), w['x0']))
+    lines, cur, top = [], [], None
+    for w in words:
+        if top is None or abs(w['top'] - top) > 3:
+            if cur:
+                lines.append(cur)
+            cur, top = [], w['top']
+        cur.append(w)
+    if cur:
+        lines.append(cur)
+    out = []
+    for ln in lines:
+        ln.sort(key=lambda w: w['x0'])
+        txt = ln[0]['text']
+        for p, w in zip(ln, ln[1:]):
+            txt += ('' if w['x0'] - p['x1'] < 0.8 else ' ') + w['text']
+        if txt.strip():
+            out.append(txt)
+    return out
+
+
+def _pdf_lines(page):
+    """Rebuild text lines from word positions. Touching fragments (e.g. '6' + '4,602') are glued back together.
+    Two-column (T-form) pages are returned left column first, then right column, each introduced by a marker."""
+    words = page.extract_words(x_tolerance=1.5, y_tolerance=2, keep_blank_chars=False)
+    mid = page.width / 2
+    amt = re.compile(r'^[\(\)\-+]*\d[\d,]*(\.\d+)?$')
+    is_amt = lambda t: bool(amt.match(t)) and (',' in t or '.' in t)
+    rows = {}
+    for w in words:
+        rows.setdefault(round(w['top'] / 3), []).append(w)
+    both = 0
+    for ws in rows.values():
+        left_amt = any(is_amt(w['text']) and w['x0'] < mid for w in ws)
+        right_txt = any(re.search('[A-Za-z]', w['text']) and w['x0'] >= mid + 5 for w in ws)
+        both += left_amt and right_txt
+    if both >= 3:
+        left = [w for w in words if w['x0'] < mid]
+        right = [w for w in words if w['x0'] >= mid]
+        return ['\u00a7LEFT\u00a7'] + _cluster_lines(left) + ['\u00a7RIGHT\u00a7'] + _cluster_lines(right)
+    return _cluster_lines(words)
+
+
+def _read_pdf(path):
+    try:
+        import pdfplumber
+    except ImportError:
+        raise ValueError('Reading PDF needs the "pdfplumber" package (pip install pdfplumber).')
+    table_rows, text_rows = [], []
+    with pdfplumber.open(path) as pdf:
+        for page in pdf.pages:
+            for tb in page.extract_tables() or []:
+                for r in tb:
+                    table_rows.append([(c or '').replace('\n', ' ').strip() for c in r])
+            for line in _pdf_lines(page):
+                text_rows.append(split_line(line) or [line])
+    if not table_rows and not text_rows:
+        raise ValueError('No text found in the PDF (scanned image?). OCR is not available offline - '
+                         'please use a text-based PDF, Excel or Word file.')
+    def score(rows):      # number of lines that look like  "label ... amount"
+        n = 0
+        for r in rows:
+            n += sum(1 for g in row_groups(r) if re.search('[A-Za-z]', g[0]) and g[1])
+        return n
+    return table_rows if score(table_rows) > score(text_rows) else text_rows
+
+
+def _read_text(path, ext):
+    raw = open(path, 'rb').read()
+    for enc in ('utf-8-sig', 'cp1252', 'latin-1'):
+        try:
+            txt = raw.decode(enc)
+            break
+        except UnicodeDecodeError:
+            continue
+    if ext == '.csv':
+        return [r for r in csv.reader(txt.splitlines()) if any(c.strip() for c in r)]
+    return [split_line(l) or [l] for l in txt.splitlines() if l.strip()]
+
+
+# =====================================================================
+# 4. PARSING ROWS -> ITEMS
+# =====================================================================
+def row_groups(cells):
+    cells = [str(c).strip() for c in cells if c is not None and str(c).strip() != '']
+    if not cells:
+        return []
+    if len(cells) == 1:                         # plain text line: trailing run of numbers = amounts
+        toks = cells[0].split()
+        j = len(toks)
+        while j > 0 and to_num(toks[j - 1]) is not None:
+            j -= 1
+        return [(' '.join(toks[:j]), [to_num(t) for t in toks[j:]])]
+    groups, label, nums = [], [], []            # cell mode (also handles T-form: two groups per row)
+    for c in cells:
+        v = to_num(c)
+        if v is not None and label:
+            nums.append(v)
+        else:
+            if nums:
+                groups.append((' '.join(label), nums))
+                label, nums = [], []
+            label.append(c)
+    groups.append((' '.join(label), nums))
+    return groups
+
+
+def heading_side(h, kind):
+    if kind == 'BS':
+        if re.search(r'asset|application', h):
+            return 'A'
+        if re.search(r'liabilit|equity|sources|funds|capital', h):
+            return 'L'
+    else:
+        if re.search(r'expens|cost', h):
+            return 'E'
+        if re.search(r'income|revenue', h):
+            return 'I'
+    return None
+
+
+def parse_rows(rows, kind):
+    side, items, pending, paired = None, [], '', None
+    pos = ('L', 'A') if kind == 'BS' else ('E', 'I')
+    for cells in rows:
+        cells = [despace(str(c)) for c in cells if c is not None]
+        text = ' '.join(cells)
+        if text.strip() in ('\u00a7LEFT\u00a7', '\u00a7RIGHT\u00a7'):      # two-column page: left = Cr/liab side
+            side = pos[0] if 'LEFT' in text else pos[1]
+            pending, paired = '', None
+            continue
+        m = re.match(r'^\s*(liabilities|assets)\b', text, re.I)
+        if m and kind == 'BS' and not any(to_num(t) is not None and re.search(r'[,.]', t) for t in text.split()):
+            side = 'L' if m.group(1).lower() == 'liabilities' else 'A'
+            pending, paired = '', None
+            continue
+        if not text.strip() or HDR.search(text):
+            continue
+        groups = row_groups(cells)
+        valid = [g for g in groups if re.search('[A-Za-z]', g[0]) and g[1]]
+        numonly = [g for g in groups if not re.search('[A-Za-z]', g[0]) and g[1]]
+        if not valid and numonly and len(groups) == 1 and pending:
+            # amounts printed on their own line, vertically centred against a wrapped label above
+            paired = dict(label=clean_label(pending), nums=numonly[0][1], side=side)
+            items.append(paired)
+            pending = ''
+            continue
+        if not valid:
+            if paired and text.strip()[:1].islower():      # continuation of that wrapped label (e.g. 'and tax')
+                paired['label'] = clean_label(paired['label'] + ' ' + text.strip())
+                continue
+            paired = None
+            side = heading_side(norm(text), kind) or side
+            pending = text.strip() if (re.search('[A-Za-z]', text) and not text.strip().endswith(':')) else ''
+            continue
+        paired = None
+        for k, (label, nums) in enumerate(valid):
+            # a label wrapped over two lines: previous line has no amount, this one starts in lower case
+            if (k == 0 and len(valid) == 1 and pending and label[:1].islower()
+                    and not re.match(r'^\(?([a-z]|[ivx]+|\d+)[\).]', label, re.I)):
+                label = pending + ' ' + label
+            items.append(dict(label=clean_label(label), nums=nums,
+                              side=pos[k] if len(valid) == 2 else side))
+        pending = ''
+    return items
+
+
+# =====================================================================
+# 5. AUTOMATIC CLASSIFICATION (rule based; user can override)
+# =====================================================================
+HEAD_IGNORE = {'shareholders funds', 'shareholders fund', 'non current liabilities', 'current liabilities',
+               'non current assets', 'current assets', 'net current assets', 'equity and liabilities', 'assets',
+               'liabilities', 'capital and liabilities', 'net worth', 'networth', 'equity'}
+
+
+def classify_bs(label, side):
+    s = norm(label)
+    has = lambda p: re.search(p, s) is not None
+    if has(r'outstanding dues|dues of (micro|creditors)'):
+        return 'TRADE_PAY'
+    if has(r'\btotal\b') or s in HEAD_IGNORE:
+        return 'IGNORE'
+    if has(r'^(current period|opening balance|less transferred|transferred)'):
+        return 'RESERVES'                    # profit of the year in the P&L account and its transfer to capital
+    if has(r'capital work|cwip'):
+        return 'FIXED_ASSET'
+    if has(r'def+er+ed tax'):
+        if has(r'liab') or side == 'L':
+            return 'DTL'
+        if has(r'asset') or side == 'A':
+            return 'DTA'
+        return 'UNCLASSIFIED'
+    if has(r'\btds\b'):
+        return 'TAX_ASSET' if side == 'A' else 'OTHER_L'
+    if has(r'\btax') and not has(r'gst|vat|excise|duty|statutory|sales tax'):
+        if side == 'A' or has(r'advance|deducted|refund|asset|credit|paid'):
+            return 'TAX_ASSET'
+        if side == 'L' or has(r'provision|payable|liab'):
+            return 'TAX_PROV'
+    if side != 'A' and has(r'borrowing|debenture|term loan|secured loan|unsecured loan|bank loan|loans? from|'
+                            r'loans? repayable|overdraft|cash credit|bank od|working capital loan|\bbonds?\b|'
+                            r'loan payable|loan funds|mortgage|public deposits|inter corporate deposit|'
+                            r'vehicle loan|hire purchase|finance lease|^loans?$|^loans? (secured|unsecured)'):
+        if has(r'long|non current|term loan|debenture|secured loan|unsecured loan|mortgage|\bbonds?\b') \
+                and not has(r'short|current maturities|overdraft|cash credit'):
+            return 'LT_BORROW'
+        return 'ST_BORROW'
+    if side != 'A' and has(r'trade payable|creditor|bills payable|acceptances|micro and small'):
+        return 'TRADE_PAY'
+    if has(r'reserve|surplus|retained|profit and loss|profit loss|p and l|premium|other equity|'
+           r'accumulated profit|accumulated loss|share warrant|general fund|revaluation') :
+        return 'RESERVES'
+    if has(r'share capital|equity share|preference share|paid up|capital account|partners? capital|proprietor|'
+           r'owners? capital|^capital$|^capital |members capital|capital fund|corpus|drawings'):
+        return 'SHARE_CAPITAL'
+    if side != 'L' and has(r'property plant|plant and|equipment|fixed asset|tangible|intangible|goodwill|\bland\b|'
+                            r'building|machiner|furniture|vehicle|computer|right of use|net block|investment property|'
+                            r'patent|trademark|software|leasehold|freehold|motor|tools|fittings|accumulated depreciation|'
+                            r'^depreciation'):
+        return 'FIXED_ASSET'
+    if side != 'L' and has(r'investment|mutual fund'):
+        if has(r'non current|long term'):
+            return 'NC_INVEST'
+        return 'CUR_INVEST' if has(r'current|short term|marketable|mutual fund') else 'NC_INVEST'
+    if side != 'L' and has(r'fixed deposit|bank deposit|other bank balance|margin money'):
+        return 'CUR_INVEST'
+    if side != 'L' and has(r'loan|advance|deposit'):
+        return 'LOANS_NC' if has(r'long term|non current') else 'OTHER_A'
+    if side != 'L' and has(r'inventor|stock in trade|stores and spares|raw material|finished goods|work in progress|'
+                            r'closing stock|^stock|stock$|^stores'):
+        return 'INVENTORY'
+    if side != 'L' and has(r'receivable|debtors|book debts'):
+        return 'TRADE_REC'
+    if side != 'L' and has(r'\bcash\b|bank balance|balances? with bank|cash equivalents|^bank|at bank'):
+        return 'CASH'
+    if side != 'A' and has(r'provision|liabilit|payable|outstanding|advance from|accrued|deferred income|unearned|'
+                           r'statutory|employee benefit|gratuity|unclaimed'):
+        return 'OTHER_L'
+    if side != 'L' and has(r'prepaid|accrued income|other current asset|other non current asset|miscellaneous expenditure|'
+                           r'preliminary|deferred revenue|interest accrued|\bgst\b|input credit|government|\bvat\b'):
+        return 'OTHER_A'
+    return {'L': 'OTHER_L', 'A': 'OTHER_A'}.get(side, 'UNCLASSIFIED')
+
+
+def classify_pl(label, side):
+    s = norm(label)
+    has = lambda p: re.search(p, s) is not None
+    if has(r'\btotal\b') or s in ('income', 'expenses', 'expense', 'revenue', 'tax expense', 'tax expenses'):
+        return 'IGNORE'
+    if (has(r'before tax|before taxation') and not has(r'before exceptional')) or \
+            has(r'before (exceptional|extraordinary).*tax'):
+        return 'PBT'
+    if has(r'earnings per|before extraordinary|after extraordinary'):
+        return 'PAT' if has(r'extraordinary') else 'IGNORE'
+    if has(r'before exceptional|gross profit|gross loss|operating profit|ebitda|\bebit\b|surplus|balance carried|'
+           r'balance brought|per share|\beps\b|appropriation|transfer(red)? to'):
+        return 'IGNORE'
+    if has(r'profit for the|net profit|nett profit|profit after tax|profit after taxation|net income|net loss|loss for the|'
+           r'profit loss for|profit and loss for'):
+        return 'PAT'
+    if has(r'closing (stock|inventor)'):
+        return 'EXPENSE'                      # credit-side closing stock: deducted from cost of sales
+    if has(r'dividend'):
+        if has(r'income|received|from|investment') or side == 'I':
+            return 'DIVIDEND_INCOME'
+        return 'DIVIDEND'
+    if has(r'profit on sale|gain on sale|profit on disposal|gain on disposal|profit on sale of'):
+        return 'GAIN_SALE'
+    if has(r'loss on sale|loss on disposal|loss on discard|assets written off|loss on sale of'):
+        return 'LOSS_SALE'
+    if has(r'interest') and (has(r'income|received|earned|on deposit|on fixed deposit|on investment|on bank|'
+                               r'on loans given|on tax refund') or side == 'I'):
+        return 'INTEREST_INCOME'
+    if has(r'income tax|current tax|deferred tax|tax expense|provision for tax|provision for taxation|taxation|'
+           r'tax for earlier|tax adjust|mat credit|fringe') or s in ('tax', 'taxes'):
+        return 'TAX'
+    if has(r'finance cost|finance charge|financial charge|interest|borrowing cost'):
+        return 'FINANCE_COST'
+    if has(r'depreciation|amortisation|amortization|depletion'):
+        return 'DEPRECIATION'
+    if side != 'E' and has(r'revenue|sales|turnover|operating income|sale of|income from operations|service income|fees'):
+        return 'REVENUE'
+    if side != 'E' and has(r'income|received|written back|gain|royalty|subsidy|grant'):
+        return 'OTHER_INCOME'
+    if side != 'I' and has(r'expense|cost of|purchase|consumption|employee|salar|wages|rent|repair|power|fuel|freight|'
+                           r'carriage|audit|legal|professional|insurance|travel|advertis|selling|distribution|'
+                           r'administrative|manufacturing|direct|bad debt|doubtful|provision|commission|discount allowed|'
+                           r'printing|stationery|telephone|postage|conveyance|bonus|gratuity|staff|rates and taxes|loss|'
+                           r'changes in inventor|stock|royalty|csr|donation|miscellaneous|office|general|factory|packing|'
+                           r'bank charges|water|electric'):
+        return 'EXPENSE'
+    return {'E': 'EXPENSE', 'I': 'OTHER_INCOME'}.get(side, 'UNCLASSIFIED')
+
+
+KEEP_BS = re.compile(r'^(capital accounts?|fixed assets|investments?)$')
+KEEP_PL = re.compile(r'^(opening stock|closing stock|purchase accounts?|sales accounts?|direct expenses|direct incomes?)$')
+SINGLE = re.compile(r'^(opening stock|closing stock|investments?|indirect incomes?|indirect expenses|direct incomes?|'
+                    r'direct expenses|fixed assets|capital accounts?|sales accounts?|purchase accounts?)$')
+
+
+def mark_groups(kind, items):
+    """Find group headings whose amount equals the sum of the lines below them (both years).
+    - Capital Account / Fixed Assets / Investments (and Tally trading-account groups such as Purchase Accounts,
+      Sales Accounts, Direct Expenses, Stocks): the GROUP TOTAL is used and the detail lines are ignored.
+      (e.g. total partners' capital instead of every partner's capital and drawings.)
+    - Any other group (Current Assets, Loans, Indirect Expenses ...): the heading is ignored, the details are used."""
+    n, role = len(items), [None] * len(items)
+    keep = KEEP_BS if kind == 'BS' else KEEP_PL
+    for i, it in enumerate(items):
+        if role[i] or (it['cy'] == 0 and it['py'] == 0):
+            continue
+        pn = norm(it['label'])
+        if re.search(r'\btotal\b', pn):          # grand totals are handled by classification
+            continue
+        sc = sp = D(0)
+        found = None
+        for j in range(i + 1, min(n, i + 61)):
+            if role[j]:
+                break
+            sc += items[j]['cy']
+            sp += items[j]['py']
+            cnt = j - i
+            if sc == it['cy'] and sp == it['py'] and (cnt >= 2 or (SINGLE.match(pn) and norm(items[j]['label']) != pn)):
+                found = j
+                break
+        if found is None:
+            continue
+        if keep.match(pn):
+            for k in range(i + 1, found + 1):
+                role[k] = 'child'
+        else:
+            role[i] = 'parent'
+            side = None
+            if kind == 'PL':
+                side = 'E' if re.search(r'expens|purchase', pn) else 'I' if re.search(r'income|sales', pn) else side
+            for k in range(i + 1, found + 1):
+                if side:
+                    items[k]['side'] = side
+    return role
+
+
+def finish_items(kind, out):
+    role = mark_groups(kind, out)
+    cls = classify_bs if kind == 'BS' else classify_pl
+    for it, r in zip(out, role):
+        it['tag'] = 'IGNORE' if r else cls(it['label'], it['side'])
+        if r == 'parent':
+            it['note'] = (it['note'] + '; ' if it['note'] else '') + 'auto: subtotal of the lines below'
+        elif r == 'child':
+            it['note'] = (it['note'] + '; ' if it['note'] else '') + 'auto: included in group total above'
+    for it in out:
+        nl = norm(it['label'])
+        if kind == 'BS' and it['tag'] == 'RESERVES':
+            if it['side'] == 'A':                         # debit balance of P&L on asset side
+                it['cy'], it['py'], it['note'] = -it['cy'], -it['py'], 'asset-side balance shown as negative reserve'
+            elif nl.startswith('less') and it['cy'] >= 0 and it['py'] >= 0:     # 'Less: Transferred'
+                it['cy'], it['py'], it['note'] = -it['cy'], -it['py'], 'deduction shown as negative'
+        if kind == 'PL' and it['tag'] == 'REVENUE' and 'return' in nl and it['cy'] > 0:
+            it['cy'], it['py'], it['note'] = -it['cy'], -it['py'], 'sales return deducted'
+        if kind == 'PL' and it['tag'] == 'EXPENSE' and re.search(r'closing (stock|inventor)', nl) \
+                and it['cy'] >= 0 and it['py'] >= 0:
+            it['cy'], it['py'], it['note'] = -it['cy'], -it['py'], 'closing stock deducted from cost of sales'
+    return out
+
+
+def build_items(kind, mode, parsed_cy, parsed_py=None, order='cy_first'):
+    if mode == 'combined':
+        out = []
+        for it in parsed_cy:
+            n = it['nums']
+            if len(n) >= 4:          # last line of a group printed as: item CY | group total CY | item PY | group total PY
+                a, b, note = n[-4], n[-2], 'inline group-total columns detected - item amounts taken'
+            elif len(n) >= 2:
+                a, b, note = n[-2], n[-1], ''
+            else:
+                a, b, note = n[-1], D(0), 'only one amount found'
+            if order == 'py_first':
+                a, b = b, a
+            out.append(dict(label=it['label'], cy=a, py=b, side=it['side'], note=note))
+        return finish_items(kind, out)
+    # separate files: every year is analysed on its own (labels may differ between years), then merged
+    cy_items = finish_items(kind, [dict(label=i['label'], cy=i['nums'][-1], py=D(0), side=i['side'], note='')
+                                   for i in parsed_cy])
+    py_items = finish_items(kind, [dict(label=i['label'], cy=D(0), py=i['nums'][-1], side=i['side'], note='')
+                                   for i in parsed_py])
+    out = cy_items
+    for p in py_items:
+        for q in out:
+            if q['py'] == 0 and q['tag'] == p['tag'] and norm(q['label']) == norm(p['label']):
+                q['py'] = p['py']
+                break
+        else:
+            p['note'] = (p['note'] + '; ' if p['note'] else '') + 'not found in current-year file'
+            out.append(p)
+    for q in out:
+        if q['py'] == 0 and not q['note']:
+            q['note'] = 'no matching line in previous-year file'
+    return out
+
+
+# =====================================================================
+# 6. CASH FLOW ENGINE (INDIRECT METHOD)
+# =====================================================================
+def _S(items, tags, yr):
+    tags = (tags,) if isinstance(tags, str) else tags
+    return sum((i[yr] for i in items if i['tag'] in tags), D(0))
+
+
+def needs_decimals(*lists):
+    return 2 if any(i[y] != i[y].to_integral_value() for l in lists for i in l
+                    for y in ('cy', 'py') if i['tag'] != 'IGNORE') else 0
+
+
+def compute_cash_flow(bs, pl, meta):
+    TOL = D('0.005')
+    S = lambda it, t, y: _S(it, t, y)
+    dl = lambda t: S(bs, t, 'cy') - S(bs, t, 'py')
+    dp = needs_decimals(bs, pl)
+
+    pbt = S(pl, INCOME_TAGS, 'cy') - S(pl, EXPENSE_TAGS, 'cy')
+    pbt_py = S(pl, INCOME_TAGS, 'py') - S(pl, EXPENSE_TAGS, 'py')
+    tax, divd = S(pl, 'TAX', 'cy'), S(pl, 'DIVIDEND', 'cy')
+    pat = pbt - tax
+    dep, fin = S(pl, 'DEPRECIATION', 'cy'), S(pl, 'FINANCE_COST', 'cy')
+    loss, gain = S(pl, 'LOSS_SALE', 'cy'), S(pl, 'GAIN_SALE', 'cy')
+    intr, dvi = S(pl, 'INTEREST_INCOME', 'cy'), S(pl, 'DIVIDEND_INCOME', 'cy')
+
+    # ---- A. Operating
+    opbwc = pbt + dep + fin + loss - gain - intr - dvi
+    wc_inv, wc_rec, wc_oa = -dl('INVENTORY'), -dl('TRADE_REC'), -dl('OTHER_A')
+    wc_pay, wc_ol = dl('TRADE_PAY'), dl('OTHER_L')
+    cash_ops = opbwc + wc_inv + wc_rec + wc_oa + wc_pay + wc_ol
+    tax_paid = tax - dl('DTL') + dl('DTA') - dl('TAX_PROV') + dl('TAX_ASSET')
+    ncfo = cash_ops - tax_paid
+    # ---- B. Investing
+    fa = gain - loss - dl('FIXED_ASSET') - dep          # = sale proceeds - purchases
+    ncinv, cinv, loans = -dl('NC_INVEST'), -dl('CUR_INVEST'), -dl('LOANS_NC')
+    ncfi = fa + ncinv + cinv + loans + intr + dvi
+    # ---- C. Financing
+    sc, ltb, stb = dl('SHARE_CAPITAL'), dl('LT_BORROW'), dl('ST_BORROW')
+    no_reserves = S(bs, 'RESERVES', 'cy') == 0 and S(bs, 'RESERVES', 'py') == 0 and pat != 0
+    if no_reserves:      # proprietorship / partnership: profit is credited to the capital account itself
+        sc_label = "Capital introduced / (drawings) by owner(s) / partners, net of profit credited to capital"
+        sc, other_res = sc - pat + divd, D(0)
+    else:
+        sc_label = "Proceeds from issue of / (reduction in) share capital & owners' capital"
+        other_res = dl('RESERVES') - pat + divd         # movement in reserves other than profit & dividend
+        if 0 < abs(other_res) <= (D(1) if dp == 0 else D('0.01')):
+            other_res = D(0)                            # pure rounding in the source; absorbed in the rounding line
+    ncff = sc + ltb + stb - fin - divd + other_res
+    net = ncfo + ncfi + ncff
+    opening, closing_bs = S(bs, 'CASH', 'py'), S(bs, 'CASH', 'cy')
+    rt = D(1) if dp == 0 else D('0.01')                  # rounding tolerance (whole-rupee statements)
+    raw_diff = opening + net - closing_bs
+    rnd = -raw_diff if 0 < abs(raw_diff) <= 2 * rt else D(0)
+    net += rnd
+    closing = opening + net
+    diff = closing - closing_bs
+
+    # ---- Rows
+    rows = []
+    def add(kind, label, amt=None, indent=0, always=False):
+        if kind == 'line' and not always and (amt is None or amt.quantize(D('0.01')) == 0):
+            return
+        rows.append((kind, label, amt, indent))
+    add('head', 'A. CASH FLOW FROM OPERATING ACTIVITIES')
+    add('line', 'Net profit before tax as per Statement of Profit and Loss', pbt, 1, True)
+    add('label', 'Adjustments for:', None, 1)
+    add('line', 'Depreciation and amortisation expense', dep, 2)
+    add('line', 'Finance costs', fin, 2)
+    add('line', 'Loss on sale of fixed assets / investments', loss, 2)
+    add('line', 'Profit on sale of fixed assets / investments', -gain, 2)
+    add('line', 'Interest income', -intr, 2)
+    add('line', 'Dividend income', -dvi, 2)
+    add('sub', 'Operating profit before working capital changes', opbwc, 1)
+    add('label', 'Adjustments for changes in working capital:', None, 1)
+    add('line', '(Increase) / decrease in inventories', wc_inv, 2)
+    add('line', '(Increase) / decrease in trade receivables', wc_rec, 2)
+    add('line', '(Increase) / decrease in other assets', wc_oa, 2)
+    add('line', 'Increase / (decrease) in trade payables', wc_pay, 2)
+    add('line', 'Increase / (decrease) in other liabilities and provisions', wc_ol, 2)
+    add('sub', 'Cash generated from operations', cash_ops, 1)
+    add('line', 'Less: Direct taxes paid (net of refunds)', -tax_paid, 2, True)
+    add('total', 'Net cash flow from operating activities (A)', ncfo)
+    add('blank', '')
+    add('head', 'B. CASH FLOW FROM INVESTING ACTIVITIES')
+    add('line', 'Purchase of fixed assets incl. CWIP & intangibles (net of sale proceeds)', fa, 1)
+    add('line', '(Purchase) / sale of non-current investments (net)', ncinv, 1)
+    add('line', '(Purchase) / sale of current investments / fixed deposits (net)', cinv, 1)
+    add('line', 'Long-term loans and advances (given) / recovered', loans, 1)
+    add('line', 'Interest received', intr, 1)
+    add('line', 'Dividend received', dvi, 1)
+    add('total', 'Net cash flow from / (used in) investing activities (B)', ncfi)
+    add('blank', '')
+    add('head', 'C. CASH FLOW FROM FINANCING ACTIVITIES')
+    add('line', sc_label, sc, 1)
+    add('line', 'Proceeds from / (repayment of) long-term borrowings (net)', ltb, 1)
+    add('line', 'Proceeds from / (repayment of) short-term borrowings (net)', stb, 1)
+    add('line', 'Finance costs paid', -fin, 1)
+    add('line', 'Dividend paid', -divd, 1)
+    add('line', 'Other movements in reserves (net)', other_res, 1)
+    add('total', 'Net cash flow from / (used in) financing activities (C)', ncff)
+    add('blank', '')
+    add('total', 'NET INCREASE / (DECREASE) IN CASH AND CASH EQUIVALENTS (A+B+C)', net - rnd)
+    add('line', 'Add: Rounding difference in source balance sheets', rnd, 1)
+    add('line', 'Cash and cash equivalents at the beginning of the year', opening, 1, True)
+    add('total', 'Cash and cash equivalents at the end of the year', closing)
+
+    # ---- Verification checks
+    checks = []
+    for yr, lab in (('cy', meta['cy']), ('py', meta['py'])):
+        a, l = S(bs, ASSET_TAGS, yr), S(bs, LIAB_TAGS, yr)
+        ok = abs(a - l) <= rt
+        tail = '  - balanced' if abs(a - l) <= TOL else (f'  - rounding difference of {fmt(a - l, dp)} in the source (shown as a separate line)'
+                                                         if ok else f'  - DIFFERENCE {fmt(a - l, dp)} (check classification / totals)')
+        checks.append((ok, f'Balance Sheet {lab}: Assets {fmt(a, dp)} vs Equity & Liabilities {fmt(l, dp)}' + tail))
+    for t, lab, calc, calc_py in (('PBT', 'Profit before tax', pbt, pbt_py), ('PAT', 'Profit after tax', pat, None)):
+        rep = [i for i in pl if i['tag'] == t]
+        if rep:
+            r = rep[0]['cy']
+            ok = abs(r - calc) <= TOL
+            checks.append((ok, f'{lab}: computed {fmt(calc, dp)} vs reported {fmt(r, dp)}'
+                               + ('  - agrees' if ok else '  - MISMATCH (check P&L classification)')))
+    checks.append((True, f'Profit after tax {meta["cy"]}: {fmt(pat, dp)}; Tax expense: {fmt(tax, dp)}; Direct taxes paid: {fmt(tax_paid, dp)}'))
+    unc = [i['label'] for i in bs + pl if i['tag'] == 'UNCLASSIFIED' and (i['cy'] != 0 or i['py'] != 0)]
+    if unc:
+        checks.append((False, 'Unclassified items excluded from computation: ' + '; '.join(unc)))
+    checks.append((abs(diff) <= TOL,
+                   f'Closing cash per cash flow {fmt(closing, dp)} vs Balance Sheet {fmt(closing_bs, dp)}'
+                   + ('  - RECONCILED' if abs(diff) <= TOL else f'  - NOT RECONCILED, difference {fmt(diff, dp)}')))
+    if not no_reserves and sc != 0 and other_res != 0:
+        checks.append((True, 'Note: both share capital and other reserves moved - confirm whether any bonus issue / '
+                             'non-cash transfer is involved (non-cash items should not appear in a cash flow).'))
+    header = [meta['company'] or 'Company Name',
+              f'CASH FLOW STATEMENT FOR THE YEAR ENDED {period_text(meta["cy"]).upper()}',
+              '(Indirect Method - AS 3 / Ind AS 7)', f'({meta["units"]})']
+    return dict(rows=rows, checks=checks, header=header, dp=dp, ok=all(c[0] for c in checks), diff=diff)
+
+
+# =====================================================================
+# 7. EXPORTS
+# =====================================================================
+def render_text(res, width=100):
+    dp, amtw = res['dp'], 18
+    out = []
+    for h in res['header']:
+        out.append(h.center(width))
+    out += ['=' * width, f'{"Particulars":<{width - amtw}}{"Amount":>{amtw}}', '-' * width]
+    for kind, label, amt, ind in res['rows']:
+        if kind == 'blank':
+            out.append('')
+            continue
+        left = ('   ' * ind + label)
+        a = fmt(amt, dp) if amt is not None else ''
+        if kind in ('sub', 'total'):
+            out.append('-' * width if kind == 'total' else '')
+        out.append(f'{left[:width - amtw - 1]:<{width - amtw}}{a:>{amtw}}')
+    out += ['=' * width, '', 'VERIFICATION NOTES:']
+    for ok, msg in res['checks']:
+        out.append(('[OK]  ' if ok else '[!!]  ') + msg)
+    if not res['ok']:
+        out.append('\n*** WARNING: statement is NOT fully verified. Review the items marked [!!] before use. ***')
+    return '\n'.join(out)
+
+
+def export_txt(path, res):
+    with open(path, 'w', encoding='utf-8') as f:
+        f.write(render_text(res))
+
+
+def export_xlsx(path, res):
+    import openpyxl
+    from openpyxl.styles import Font, Alignment, Border, Side
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = 'Cash Flow Statement'
+    nf = '#,##0.00;(#,##0.00);"-"' if res['dp'] else '#,##0;(#,##0);"-"'
+    r = 1
+    for i, h in enumerate(res['header']):
+        ws.merge_cells(start_row=r, start_column=1, end_row=r, end_column=2)
+        c = ws.cell(r, 1, h)
+        c.font = Font(bold=(i < 2), size=13 if i < 2 else 10)
+        c.alignment = Alignment(horizontal='center')
+        r += 1
+    r += 1
+    ws.cell(r, 1, 'Particulars').font = Font(bold=True)
+    ws.cell(r, 2, 'Amount').font = Font(bold=True)
+    ws.cell(r, 2).alignment = Alignment(horizontal='right')
+    r += 1
+    for kind, label, amt, ind in res['rows']:
+        if kind == 'blank':
+            r += 1
+            continue
+        c1, c2 = ws.cell(r, 1, label), ws.cell(r, 2)
+        c1.alignment = Alignment(indent=ind * 2)
+        if amt is not None:
+            c2.value = float(amt.quantize(D('0.01') if res['dp'] else D(1), rounding=ROUND_HALF_UP))
+            c2.number_format = nf
+        if kind in ('head', 'sub', 'total'):
+            c1.font = c2.font = Font(bold=True)
+        if kind == 'total':
+            c2.border = Border(top=Side(style='thin'), bottom=Side(style='double'))
+        r += 1
+    r += 1
+    ws.cell(r, 1, 'Verification notes').font = Font(bold=True)
+    for ok, msg in res['checks']:
+        r += 1
+        ws.cell(r, 1, ('OK: ' if ok else 'CHECK: ') + msg)
+    ws.column_dimensions['A'].width = 85
+    ws.column_dimensions['B'].width = 20
+    wb.save(path)
+
+
+def export_docx(path, res):
+    import docx
+    from docx.shared import Pt, Inches
+    from docx.enum.text import WD_ALIGN_PARAGRAPH
+    d = docx.Document()
+    for i, h in enumerate(res['header']):
+        p = d.add_paragraph()
+        p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        run = p.add_run(h)
+        run.bold, run.font.size = i < 2, Pt(13 if i < 2 else 10)
+    t = d.add_table(rows=1, cols=2)
+    t.style = 'Table Grid'
+    t.rows[0].cells[0].text, t.rows[0].cells[1].text = 'Particulars', 'Amount'
+    for c in t.rows[0].cells:
+        c.paragraphs[0].runs[0].bold = True
+    t.rows[0].cells[1].paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.RIGHT
+    for kind, label, amt, ind in res['rows']:
+        cells = t.add_row().cells
+        if kind == 'blank':
+            continue
+        p0, p1 = cells[0].paragraphs[0], cells[1].paragraphs[0]
+        p0.paragraph_format.left_indent = Inches(0.2 * ind)
+        r0 = p0.add_run(label)
+        r1 = p1.add_run(fmt(amt, res['dp']) if amt is not None else '')
+        p1.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+        if kind in ('head', 'sub', 'total'):
+            r0.bold = r1.bold = True
+    for row in t.rows:
+        row.cells[0].width, row.cells[1].width = Inches(5.2), Inches(1.4)
+    d.add_paragraph()
+    d.add_paragraph().add_run('Verification notes').bold = True
+    for ok, msg in res['checks']:
+        d.add_paragraph(('OK: ' if ok else 'CHECK: ') + msg, style='List Bullet')
+    d.save(path)
+
+
+def export_pdf(path, res):
+    from reportlab.lib.pagesizes import A4
+    from reportlab.lib import colors
+    from reportlab.lib.styles import getSampleStyleSheet
+    from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+    from reportlab.lib.units import mm
+    st = getSampleStyleSheet()
+    story = []
+    for i, h in enumerate(res['header']):
+        s = st['Title'] if i == 1 else st['Normal']
+        p = Paragraph(f'<para alignment="center"><b>{h}</b></para>' if i < 2 else f'<para alignment="center">{h}</para>', s)
+        story.append(p)
+    story.append(Spacer(1, 6 * mm))
+    data, styles = [['Particulars', 'Amount']], [('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                                                 ('LINEBELOW', (0, 0), (-1, 0), 0.8, colors.black),
+                                                 ('ALIGN', (1, 0), (1, -1), 'RIGHT'), ('FONTSIZE', (0, 0), (-1, -1), 8.5)]
+    for kind, label, amt, ind in res['rows']:
+        data.append([('    ' * ind) + label, fmt(amt, res['dp']) if amt is not None else ''])
+        n = len(data) - 1
+        if kind in ('head', 'sub', 'total'):
+            styles.append(('FONTNAME', (0, n), (-1, n), 'Helvetica-Bold'))
+        if kind == 'total':
+            styles += [('LINEABOVE', (1, n), (1, n), 0.6, colors.black), ('LINEBELOW', (1, n), (1, n), 1.2, colors.black)]
+    tb = Table(data, colWidths=[140 * mm, 35 * mm])
+    tb.setStyle(TableStyle(styles))
+    story += [tb, Spacer(1, 6 * mm), Paragraph('<b>Verification notes</b>', st['Normal'])]
+    for ok, msg in res['checks']:
+        safe = msg.replace('&', '&amp;').replace('<', '&lt;')
+        story.append(Paragraph(('OK: ' if ok else '<b>CHECK:</b> ') + safe, st['BodyText']))
+    SimpleDocTemplate(path, pagesize=A4, leftMargin=15 * mm, rightMargin=15 * mm,
+                      topMargin=15 * mm, bottomMargin=15 * mm).build(story)
+
+
+# =====================================================================
+# 8. GUI
+# =====================================================================
+if tk:
+    FILETYPES = [('Supported files', '*.xlsx *.xlsm *.xls *.docx *.pdf *.txt *.csv'), ('All files', '*.*')]
+
+    class StatementTab(ttk.Frame):
+        COLS = ('label', 'cy', 'py', 'tag', 'note')
+
+        def __init__(self, master, app, kind):
+            super().__init__(master, padding=8)
+            self.app, self.kind, self.items = app, kind, []
+            self.tags = BS_TAGS if kind == 'BS' else PL_TAGS
+            self.c2n, self.n2c = dict(self.tags), {v: k for k, v in self.tags}
+            self.mode, self.order = tk.StringVar(value='separate'), tk.StringVar(value='cy_first')
+            self.f_cy, self.f_py, self.f_one = tk.StringVar(), tk.StringVar(), tk.StringVar()
+            nm = 'Balance Sheet' if kind == 'BS' else 'Statement of Profit & Loss'
+            ttk.Label(self, text=f'Step: upload {nm}', font=('Segoe UI', 11, 'bold')).pack(anchor='w')
+            mf = ttk.Frame(self)
+            mf.pack(fill='x', pady=4)
+            ttk.Radiobutton(mf, text='Two separate files (current year + previous year)', variable=self.mode,
+                            value='separate', command=self.toggle).pack(side='left')
+            ttk.Radiobutton(mf, text='ONE file having both years (columns)', variable=self.mode,
+                            value='combined', command=self.toggle).pack(side='left', padx=15)
+            self.sep = ttk.Frame(self)
+            self.one = ttk.Frame(self)
+            self._row(self.sep, 'Current year file :', self.f_cy, 0)
+            self._row(self.sep, 'Previous year file :', self.f_py, 1)
+            self._row(self.one, 'File with both years :', self.f_one, 0)
+            ttk.Radiobutton(self.one, text='First amount column = current year', variable=self.order,
+                            value='cy_first').grid(row=1, column=1, sticky='w')
+            ttk.Radiobutton(self.one, text='First amount column = previous year', variable=self.order,
+                            value='py_first').grid(row=1, column=2, sticky='w')
+            self.toggle()
+            bf = ttk.Frame(self)
+            bf.pack(fill='x', pady=4)
+            ttk.Button(bf, text='Load & Analyse', command=self.load).pack(side='left')
+            ttk.Button(bf, text='Add row', command=self.add_row).pack(side='left', padx=6)
+            ttk.Button(bf, text='Delete selected row', command=self.del_row).pack(side='left')
+            ttk.Button(bf, text='Reset this tab', command=self.reset).pack(side='left', padx=6)
+            ttk.Label(bf, text='Tip: double-click any row to edit its name, amounts or classification.',
+                      foreground='#555').pack(side='left', padx=12)
+            self.tree = ttk.Treeview(self, columns=self.COLS, show='headings', height=16)
+            for c, w in zip(self.COLS, (330, 110, 110, 290, 220)):
+                self.tree.column(c, width=w, anchor='e' if c in ('cy', 'py') else 'w')
+            self.tree.pack(fill='both', expand=True)
+            sb = ttk.Scrollbar(self.tree, orient='vertical', command=self.tree.yview)
+            self.tree.configure(yscrollcommand=sb.set)
+            sb.pack(side='right', fill='y')
+            self.tree.bind('<Double-1>', self.edit_cell)
+            self.tree.bind('<Delete>', self.del_row)
+            self.status = ttk.Label(self, text='No data loaded.', wraplength=1000, justify='left')
+            self.status.pack(anchor='w', pady=4)
+            self.heads()
+            for v in (app.cy, app.py):
+                v.trace_add('write', lambda *a: self.heads())
+
+        def _row(self, parent, text, var, r):
+            ttk.Label(parent, text=text, width=20).grid(row=r, column=0, sticky='w', pady=2)
+            ttk.Entry(parent, textvariable=var, width=80).grid(row=r, column=1, columnspan=2, sticky='w')
+            ttk.Button(parent, text='Browse...', command=lambda: self.browse(var)).grid(row=r, column=3, padx=5)
+
+        def heads(self):
+            t = {'label': 'Particulars', 'cy': f'FY {self.app.cy.get()}', 'py': f'FY {self.app.py.get()}',
+                 'tag': 'Classification (double-click row to edit)', 'note': 'Remarks'}
+            for c in self.COLS:
+                self.tree.heading(c, text=t[c])
+
+        def toggle(self):
+            self.sep.pack_forget()
+            self.one.pack_forget()
+            (self.sep if self.mode.get() == 'separate' else self.one).pack(fill='x', after=self.winfo_children()[1])
+
+        def browse(self, var):
+            p = filedialog.askopenfilename(filetypes=FILETYPES)
+            if p:
+                var.set(p)
+
+        def load(self):
+            try:
+                if self.mode.get() == 'separate':
+                    if not (self.f_cy.get() and self.f_py.get()):
+                        return messagebox.showwarning('Files missing', 'Please select both current-year and previous-year files.')
+                    pc = parse_rows(read_rows(self.f_cy.get(), self.kind), self.kind)
+                    pp = parse_rows(read_rows(self.f_py.get(), self.kind), self.kind)
+                    if not pc or not pp:
+                        raise ValueError('No amounts could be read from one of the files.')
+                    self.items = build_items(self.kind, 'separate', pc, pp)
+                else:
+                    if not self.f_one.get():
+                        return messagebox.showwarning('File missing', 'Please select the file.')
+                    pc = parse_rows(read_rows(self.f_one.get(), self.kind), self.kind)
+                    if not pc:
+                        raise ValueError('No amounts could be read from the file.')
+                    self.items = build_items(self.kind, 'combined', pc, None, self.order.get())
+            except Exception as e:
+                return messagebox.showerror('Could not read file', str(e))
+            self.refresh()
+
+        def dp(self):
+            return needs_decimals(self.items)
+
+        def refresh(self):
+            self.tree.delete(*self.tree.get_children())
+            dp = self.dp()
+            for i, it in enumerate(self.items):
+                self.tree.insert('', 'end', iid=str(i), values=(it['label'], fmt(it['cy'], dp), fmt(it['py'], dp),
+                                                                 self.c2n[it['tag']], it['note']))
+            self.summary()
+
+        def summary(self):
+            dp, T = self.dp(), self.items
+            if not T:
+                return self.status.config(text='No data loaded.')
+            unc = sum(1 for i in T if i['tag'] == 'UNCLASSIFIED')
+            msg = f'{len(T)} lines read. Unclassified: {unc}. '
+            if self.kind == 'BS':
+                for y, lab in (('cy', self.app.cy.get()), ('py', self.app.py.get())):
+                    a, l = _S(T, ASSET_TAGS, y), _S(T, LIAB_TAGS, y)
+                    msg += f'| {lab}: Assets {fmt(a, dp)} / Liabilities {fmt(l, dp)} -> ' + \
+                           ('BALANCED  ' if a == l else f'DIFFERENCE {fmt(a - l, dp)}  ')
+            else:
+                pbt = _S(T, INCOME_TAGS, 'cy') - _S(T, EXPENSE_TAGS, 'cy')
+                msg += f'| Computed PBT ({self.app.cy.get()}): {fmt(pbt, dp)}; PAT: {fmt(pbt - _S(T, "TAX", "cy"), dp)}'
+            self.status.config(text=msg)
+
+        def add_row(self):
+            self.items.append(dict(label='New item', cy=D(0), py=D(0), tag='UNCLASSIFIED', side=None, note='added manually'))
+            self.refresh()
+
+        def del_row(self, _=None):
+            if not self.tree.selection():
+                return messagebox.showinfo('Delete', 'Select one or more rows first (click / Ctrl+click).')
+            for iid in sorted((int(i) for i in self.tree.selection()), reverse=True):
+                del self.items[iid]
+            self.refresh()
+
+        def edit_cell(self, ev):
+            if self.tree.identify('region', ev.x, ev.y) != 'cell':
+                return
+            iid = self.tree.identify_row(ev.y)
+            if iid:
+                self.edit_dialog(int(iid))
+
+        def edit_dialog(self, idx):
+            """Edit one line in a small dialog (works for duplicate-looking rows too: rows are addressed by position)."""
+            it = self.items[idx]
+            top = self.winfo_toplevel()
+            dlg = tk.Toplevel(top)
+            dlg.title('Edit line')
+            dlg.transient(top)
+            dlg.resizable(False, False)
+            dlg.geometry(f'+{top.winfo_rootx() + 220}+{top.winfo_rooty() + 180}')
+            f = ttk.Frame(dlg, padding=12)
+            f.pack()
+            v_label, v_cy, v_py = tk.StringVar(value=it['label']), tk.StringVar(value=str(it['cy'])), tk.StringVar(value=str(it['py']))
+            v_tag = tk.StringVar(value=self.c2n[it['tag']])
+            rows = (('Particulars', ttk.Entry(f, textvariable=v_label, width=70)),
+                    (f'Amount FY {self.app.cy.get()}', ttk.Entry(f, textvariable=v_cy, width=24)),
+                    (f'Amount FY {self.app.py.get()}', ttk.Entry(f, textvariable=v_py, width=24)),
+                    ('Classification', ttk.Combobox(f, textvariable=v_tag, values=[n for _, n in self.tags],
+                                                    state='readonly', width=60)))
+            for r, (t, w) in enumerate(rows):
+                ttk.Label(f, text=t).grid(row=r, column=0, sticky='w', pady=4, padx=(0, 10))
+                w.grid(row=r, column=1, sticky='w')
+            ttk.Label(f, text='Negative amounts: -100 or (100)', foreground='#555').grid(row=4, column=1, sticky='w')
+
+            def save(_=None):
+                cy, py = to_num(v_cy.get()), to_num(v_py.get())
+                if cy is None or py is None or not v_label.get().strip():
+                    return messagebox.showerror('Invalid entry', 'Enter a name and valid numbers, e.g. 1250.50 or (300).', parent=dlg)
+                it['label'], it['cy'], it['py'] = v_label.get().strip(), cy, py
+                it['tag'] = self.n2c.get(v_tag.get(), it['tag'])
+                if 'edited' not in it['note']:
+                    it['note'] = (it['note'] + '; ' if it['note'] else '') + 'edited'
+                dlg.destroy()
+                self.refresh()
+                if idx < len(self.items):
+                    self.tree.selection_set(str(idx))
+                    self.tree.see(str(idx))
+            bf = ttk.Frame(f)
+            bf.grid(row=5, column=0, columnspan=2, pady=(10, 0), sticky='e')
+            ttk.Button(bf, text='Save', command=save).pack(side='left', padx=4)
+            ttk.Button(bf, text='Cancel', command=dlg.destroy).pack(side='left')
+            dlg.bind('<Return>', save)
+            dlg.bind('<Escape>', lambda e: dlg.destroy())
+            dlg.grab_set()
+            rows[0][1].focus_set()
+
+        def reset(self, confirm=True):
+            if confirm and self.items and not messagebox.askyesno('Reset', 'Remove the loaded data of this tab?'):
+                return
+            self.items = []
+            for v in (self.f_cy, self.f_py, self.f_one):
+                v.set('')
+            self.refresh()
+            self.status.config(text='No data loaded.')
+
+    class App(tk.Tk):
+        def __init__(self):
+            super().__init__()
+            self.title('Cash Flow Statement Generator - Indirect Method (Offline)')
+            self.geometry('1180x760')
+            ttk.Style(self).theme_use('clam')
+            self.company, self.cy = tk.StringVar(), tk.StringVar(value='2025-26')
+            self.py, self.units = tk.StringVar(value='2024-25'), tk.StringVar(value='Amount in Rs.')
+            hf = ttk.Frame(self, padding=8)
+            hf.pack(fill='x')
+            for i, (t, v, w) in enumerate((('Entity name:', self.company, 34), ('Current FY:', self.cy, 10),
+                                           ('Previous FY:', self.py, 10), ('Units:', self.units, 16))):
+                ttk.Label(hf, text=t).grid(row=0, column=2 * i, padx=(8, 2))
+                ttk.Entry(hf, textvariable=v, width=w).grid(row=0, column=2 * i + 1)
+            nb = ttk.Notebook(self)
+            self.nb = nb
+            nb.pack(fill='both', expand=True, padx=8, pady=4)
+            self.bs, self.pl = StatementTab(nb, self, 'BS'), StatementTab(nb, self, 'PL')
+            nb.add(self.bs, text='1. Balance Sheets')
+            nb.add(self.pl, text='2. Profit & Loss Accounts')
+            cf = ttk.Frame(nb, padding=8)
+            nb.add(cf, text='3. Cash Flow Statement')
+            nb.add(self._reset_tab(), text='Reset')
+            nb.add(self._help(), text='Help')
+            bar = ttk.Frame(cf)
+            bar.pack(fill='x')
+            ttk.Button(bar, text='Generate Cash Flow Statement', command=self.generate).pack(side='left')
+            for lab, fn, ext in (('Export Excel', export_xlsx, '.xlsx'), ('Export Word', export_docx, '.docx'),
+                                 ('Export PDF', export_pdf, '.pdf'), ('Export Text', export_txt, '.txt')):
+                ttk.Button(bar, text=lab, command=lambda f=fn, e=ext: self.export(f, e)).pack(side='left', padx=4)
+            self.out = tk.Text(cf, font=('Consolas', 10), wrap='none')
+            self.out.pack(fill='both', expand=True, pady=6)
+            self.res = None
+
+        def _reset_tab(self):
+            f = ttk.Frame(self.nb, padding=20)
+            ttk.Label(f, text='Reset / clear previously uploaded data', font=('Segoe UI', 12, 'bold')).pack(anchor='w', pady=(0, 12))
+            for text, fn in (('Reset Balance Sheet data (tab 1)', lambda: self.reset_some(bs=True)),
+                             ('Reset Profit & Loss data (tab 2)', lambda: self.reset_some(pl=True)),
+                             ('Clear generated Cash Flow Statement (tab 3)', lambda: self.reset_some(out=True)),
+                             ('RESET EVERYTHING - start a new entity / year', lambda: self.reset_some(bs=True, pl=True, out=True, meta=True))):
+                ttk.Button(f, text=text, width=52, command=fn).pack(anchor='w', pady=5)
+            ttk.Label(f, text='Resetting removes the loaded lines, the selected file paths and the generated statement. '
+                              'Your original files are never changed.', foreground='#555').pack(anchor='w', pady=12)
+            return f
+
+        def reset_some(self, bs=False, pl=False, out=False, meta=False):
+            if not messagebox.askyesno('Confirm reset', 'This will clear the selected data. Continue?'):
+                return
+            if bs:
+                self.bs.reset(confirm=False)
+            if pl:
+                self.pl.reset(confirm=False)
+            if out:
+                self.out.delete('1.0', 'end')
+                self.res = None
+            if meta:
+                self.company.set('')
+                self.cy.set('2025-26')
+                self.py.set('2024-25')
+                self.units.set('Amount in Rs.')
+            messagebox.showinfo('Reset', 'Done.')
+
+        def _help(self):
+            f = ttk.Frame(self.nb, padding=12)
+            txt = ("HOW TO USE\n"
+                   "1. Enter entity name, financial-year labels (e.g. 2025-26 / 2024-25) and units.\n"
+                   "2. Tab 1: load the Balance Sheet - either two files (CY and PY) or one file with both year columns.\n"
+                   "3. Tab 2: load the Profit & Loss account the same way.\n"
+                   "4. Review the classification of every line (double-click to change). Subtotals/totals must be 'Ignore'.\n"
+                   "5. Tab 3: Generate. Read the VERIFICATION NOTES - the statement is reliable only when all checks show [OK].\n"
+                   "6. Export to Excel / Word / PDF / Text.\n\n"
+                   "FILE FORMAT TIPS\n"
+                   "- Best results: one line per item with the amount columns to the right (vertical Schedule III format).\n"
+                   "  T-form (two-sided) layouts in Excel / Word tables are also supported.\n"
+                   "- A 'Note No.' column is fine; the LAST amount (or last two amounts) on a line are used.\n"
+                   "- Negative amounts: use -100 or (100). Scanned PDFs (images) cannot be read offline.\n"
+                   "- Excel workbooks: the sheet whose name contains 'balance' / 'profit' is read, else the first sheet.\n\n"
+                   "METHOD\n"
+                   "- Operating: PBT + depreciation + finance cost + loss on sale - profit on sale - interest/dividend income,\n"
+                   "  then changes in working capital, less direct taxes paid\n"
+                   "  (tax paid = tax expense - change in deferred tax liability + change in deferred tax asset\n"
+                   "   - change in provision for tax + change in advance tax).\n"
+                   "- Investing: net purchase of fixed assets = -(change in net block + depreciation + loss - profit);\n"
+                   "  investments, long-term loans & advances, interest and dividend received.\n"
+                   "- Financing: share capital, borrowings, finance cost paid, dividend paid, other reserve movements.\n"
+                   "- Fixed deposits are treated as investing (current investments); re-classify to Cash if maturity < 3 months.\n"
+                   "- All arithmetic uses exact decimals; reconciliation with closing cash is shown in the verification notes.\n")
+            t = tk.Text(f, wrap='word', font=('Segoe UI', 10))
+            t.insert('1.0', txt)
+            t.config(state='disabled')
+            t.pack(fill='both', expand=True)
+            return f
+
+        def meta(self):
+            return dict(company=self.company.get().strip(), cy=self.cy.get().strip(), py=self.py.get().strip(),
+                        units=self.units.get().strip())
+
+        def generate(self):
+            if not self.bs.items or not self.pl.items:
+                return messagebox.showwarning('Data missing', 'Please load both the Balance Sheet (tab 1) and the Profit & Loss (tab 2) first.')
+            self.res = compute_cash_flow(self.bs.items, self.pl.items, self.meta())
+            self.out.delete('1.0', 'end')
+            self.out.insert('1.0', render_text(self.res))
+            if not self.res['ok']:
+                messagebox.showwarning('Verification warning', 'Some checks failed. Please read the verification notes at the end of the statement.')
+
+        def export(self, fn, ext):
+            if not self.res:
+                return messagebox.showinfo('Nothing to export', 'Generate the cash flow statement first.')
+            p = filedialog.asksaveasfilename(defaultextension=ext, initialfile='Cash_Flow_Statement' + ext,
+                                             filetypes=[(ext.upper(), '*' + ext)])
+            if not p:
+                return
+            try:
+                fn(p, self.res)
+                messagebox.showinfo('Saved', f'Saved: {p}')
+            except ImportError as e:
+                messagebox.showerror('Library missing', f'{e}\nInstall with: pip install -r requirements.txt')
+            except Exception as e:
+                messagebox.showerror('Export failed', str(e))
+
+
+def main():
+    if tk is None:
+        sys.exit('Tkinter is not available in this Python installation.')
+    App().mainloop()
+
+
+if __name__ == '__main__':
+    main()
