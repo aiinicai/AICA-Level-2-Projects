@@ -1,0 +1,361 @@
+{
+ "_comment": "Risk indicators are NOT tax conclusions. They tell the reviewer where to look. Thresholds and categories are editable. 'adj_key' links a category to a row of the tax computation; an adjustment is only ever PROPOSED until a person approves it.",
+ "thresholds": {
+  "materiality_aed": 25000,
+  "high_aed": 250000,
+  "round_min_aed": 10000,
+  "round_multiple": 1000,
+  "year_end_days": 7,
+  "movement_pct": 0.5,
+  "max_gl_refs_per_flag": 25,
+  "max_txn_flags": 3000
+ },
+ "vague_narrations": [
+  "^$",
+  "^(adj|adjustment|adjustments|misc|miscellaneous|various|sundry|payment|being|reclass|reclassification|journal|jv|n/?a|-+)$",
+  "^.{1,5}$"
+ ],
+ "categories": [
+  {
+   "id": "ENT",
+   "label": "Entertainment / hospitality",
+   "pattern": "entertain|hospitality|amusement|recreation|ramadan|(staff|office|annual|christmas)\\s*part(y|ies)|\\bevents?\\b",
+   "lines": [
+    "P_ENT"
+   ],
+   "applies_to": "PL",
+   "narration": true,
+   "base_risk": "High",
+   "status": "Potential adjustment",
+   "implication": "Entertainment, amusement and recreation provided to customers, shareholders, suppliers or business partners is generally restricted to 50% deductibility; staff-only entertainment may be treated differently.",
+   "documents": [
+    "Invoices and proof of payment",
+    "Attendee list and business purpose",
+    "Split between staff and external guests"
+   ],
+   "adj_key": "a_entertainment",
+   "pct_param": "entertainment_disallow_pct"
+  },
+  {
+   "id": "GIFT",
+   "label": "Gifts",
+   "pattern": "\\bgifts?\\b",
+   "lines": [],
+   "applies_to": "PL",
+   "narration": true,
+   "base_risk": "Medium",
+   "status": "Information required",
+   "implication": "Gifts may be entertainment (50% restriction), donations (non-qualifying recipients are non-deductible) or deductible business promotion depending on recipient and nature.",
+   "documents": [
+    "Recipient and purpose of each gift",
+    "Invoices"
+   ],
+   "adj_key": null
+  },
+  {
+   "id": "DON",
+   "label": "Donations / charitable",
+   "pattern": "donat|charit|zakat|sadaq|\\bcsr\\b",
+   "lines": [
+    "P_DON"
+   ],
+   "applies_to": "PL",
+   "narration": true,
+   "base_risk": "High",
+   "status": "Information required",
+   "implication": "Donations are deductible only where made to a Qualifying Public Benefit Entity; otherwise non-deductible.",
+   "documents": [
+    "Recipient name and proof of Qualifying Public Benefit Entity status",
+    "Receipts"
+   ],
+   "adj_key": "a_donations",
+   "pct": 1.0
+  },
+  {
+   "id": "FINE",
+   "label": "Fines and penalties",
+   "pattern": "\\bfines?\\b|penalt|surcharge|late (fee|payment)",
+   "lines": [
+    "P_FINES"
+   ],
+   "applies_to": "PL",
+   "narration": true,
+   "base_risk": "High",
+   "status": "Potential adjustment",
+   "implication": "Fines and penalties are generally non-deductible, other than amounts awarded as compensation for damages or breach of contract.",
+   "documents": [
+    "Notice or order giving rise to each fine/penalty",
+    "Nature (regulatory vs contractual compensation)"
+   ],
+   "adj_key": "a_fines",
+   "pct": 1.0
+  },
+  {
+   "id": "PERS",
+   "label": "Personal / owner expenses",
+   "pattern": "personal|private|owner'?s? (expense|travel)|director'?s? (expense|travel|personal)|shareholder'?s? expense|drawings",
+   "lines": [],
+   "applies_to": "any",
+   "narration": true,
+   "base_risk": "High",
+   "status": "Information required",
+   "implication": "Expenditure not incurred wholly and exclusively for the business, and amounts withdrawn by owners, are generally non-deductible.",
+   "documents": [
+    "Business purpose for each item",
+    "Supporting invoices",
+    "Owner/shareholder confirmation"
+   ],
+   "adj_key": "a_non_business",
+   "pct": 1.0
+  },
+  {
+   "id": "MISC",
+   "label": "Miscellaneous / general expenses",
+   "pattern": "miscellaneous|sundry|other expenses?|general expenses?|unclassified|suspense|petty cash",
+   "lines": [],
+   "applies_to": "PL",
+   "narration": false,
+   "base_risk": "High",
+   "status": "Information required",
+   "implication": "Catch-all accounts frequently hide non-deductible or undocumented items.",
+   "documents": [
+    "Breakdown of the account by nature",
+    "Invoices for the largest items"
+   ],
+   "adj_key": null
+  },
+  {
+   "id": "PROF",
+   "label": "Legal, professional and consultancy fees",
+   "pattern": "legal|professional|consult|advis|retainer",
+   "lines": [
+    "P_PROF"
+   ],
+   "applies_to": "PL",
+   "narration": false,
+   "base_risk": "Medium",
+   "status": "Information required",
+   "implication": "Check business purpose, capital nature (e.g. acquisition/structuring costs), related-party payees and arm's-length pricing.",
+   "documents": [
+    "Engagement letters / contracts",
+    "Invoices",
+    "Identity and relationship of payee"
+   ],
+   "adj_key": null
+  },
+  {
+   "id": "COMM",
+   "label": "Commissions, incentives, promotion and marketing",
+   "pattern": "commission|incentive|bonus|promotion|marketing|advertis|sponsor",
+   "lines": [
+    "P_MKT"
+   ],
+   "applies_to": "PL",
+   "narration": false,
+   "base_risk": "Medium",
+   "status": "Information required",
+   "implication": "Deductibility requires a business purpose and documents; payments to related parties, owners or for entertainment may be restricted.",
+   "documents": [
+    "Agreements and commission calculations",
+    "Beneficiary list",
+    "Invoices"
+   ],
+   "adj_key": null
+  },
+  {
+   "id": "REPAIR",
+   "label": "Repairs and maintenance",
+   "pattern": "repairs?|maintenance",
+   "lines": [],
+   "applies_to": "PL",
+   "narration": false,
+   "base_risk": "Low",
+   "status": "Information required",
+   "implication": "Check for expenditure of a capital nature that has been expensed.",
+   "documents": [
+    "Invoices for the largest items"
+   ],
+   "adj_key": null
+  },
+  {
+   "id": "RP",
+   "label": "Related-party balances / transactions",
+   "pattern": "related part|inter-?company|intercompany|group compan|due (to|from)|management fee",
+   "lines": [
+    "A_RP",
+    "L_RP"
+   ],
+   "applies_to": "any",
+   "narration": true,
+   "base_risk": "High",
+   "status": "Technical review required",
+   "implication": "Transactions with Related Parties and Connected Persons must be at arm's length; non-arm's-length amounts are adjusted. Disclosure and transfer-pricing documentation obligations may apply.",
+   "documents": [
+    "List of related parties",
+    "Agreements and pricing support",
+    "Transfer-pricing documentation if required"
+   ],
+   "adj_key": null
+  },
+  {
+   "id": "SHCA",
+   "label": "Shareholder / director current account",
+   "pattern": "(share\\s*holders?|owners?|directors?)'?s?'?\\s*(current|loan|account)",
+   "lines": [
+    "E_SHCA"
+   ],
+   "applies_to": "BS",
+   "narration": false,
+   "base_risk": "Medium",
+   "status": "Information required",
+   "implication": "Check for owner withdrawals, personal expenses, interest charged or benefits, and whether the balance is really a liability.",
+   "documents": [
+    "Movement summary with nature of each item",
+    "Any agreement and interest terms"
+   ],
+   "adj_key": null
+  },
+  {
+   "id": "INT",
+   "label": "Interest and finance costs",
+   "pattern": "interest (expense|on|paid)|finance (cost|charge)|loan interest",
+   "lines": [
+    "P_FIN"
+   ],
+   "applies_to": "PL",
+   "narration": false,
+   "base_risk": "Medium",
+   "status": "Technical review required",
+   "implication": "Net interest is subject to the general interest deduction limitation; related-party and shareholder loans carry additional restrictions; check interest on loans used for exempt income.",
+   "documents": [
+    "Loan agreements",
+    "Lender identity and relationship",
+    "Interest computation"
+   ],
+   "adj_key": null
+  },
+  {
+   "id": "PROV",
+   "label": "Provisions, impairments and bad debts",
+   "pattern": "provision|impairment|bad debt|doubtful|write[- ]?off",
+   "lines": [
+    "P_PROV",
+    "L_PROV"
+   ],
+   "applies_to": "any",
+   "narration": false,
+   "base_risk": "Medium",
+   "status": "Information required",
+   "implication": "Treatment depends on the realisation-basis election and the nature of the provision; unsupported provisions may be restricted.",
+   "documents": [
+    "Provision movement schedule",
+    "Basis of estimate",
+    "Evidence for write-offs"
+   ],
+   "adj_key": null
+  },
+  {
+   "id": "TAXN",
+   "label": "Taxes and statutory charges",
+   "pattern": "corporate tax|income tax|vat\\b|excise",
+   "lines": [
+    "P_TAX"
+   ],
+   "applies_to": "PL",
+   "narration": false,
+   "base_risk": "Medium",
+   "status": "Potential adjustment",
+   "implication": "Corporate Tax, recoverable input VAT and foreign taxes on income are non-deductible (a foreign tax credit may be available instead).",
+   "documents": [
+    "Nature of each tax charge",
+    "Proof of payment / assessment"
+   ],
+   "adj_key": "a_ct",
+   "pct": 1.0,
+   "only_lines": [
+    "P_TAX"
+   ],
+   "exclude": "withholding|foreign tax|tax suffered|tax deducted"
+  },
+  {
+   "id": "TAXF",
+   "label": "Foreign / withholding taxes expensed",
+   "pattern": "withholding|foreign tax|tax suffered|tax deducted",
+   "lines": [
+    "P_TAX"
+   ],
+   "applies_to": "PL",
+   "narration": false,
+   "base_risk": "Medium",
+   "status": "Potential adjustment",
+   "implication": "Tax on income imposed outside the UAE is non-deductible; a foreign tax credit may be claimed instead, limited to the UAE tax on that income and supported by proof of payment.",
+   "documents": [
+    "Foreign tax certificates / withholding vouchers",
+    "Income to which the tax relates"
+   ],
+   "adj_key": "a_foreign_tax",
+   "pct": 1.0,
+   "only_lines": [
+    "P_TAX"
+   ]
+  },
+  {
+   "id": "EXEMPT",
+   "label": "Dividends and gains on shares (possible exempt income)",
+   "pattern": "dividend|(gain|profit|loss).*(sale|disposal).*(share|invest|subsidiar)",
+   "lines": [
+    "P_DIV",
+    "P_GAIN_REAL"
+   ],
+   "applies_to": "PL",
+   "narration": false,
+   "base_risk": "Medium",
+   "status": "Information required",
+   "implication": "May qualify as exempt income (dividends from resident persons; participation exemption) or as Qualifying Income of a QFZP - only if all conditions are met. Related expenses are not deductible.",
+   "documents": [
+    "Investee name, jurisdiction and % held",
+    "Date and cost of acquisition",
+    "Subject-to-tax confirmation",
+    "Dividend vouchers / disposal agreements"
+   ],
+   "adj_key": null
+  },
+  {
+   "id": "UNREAL",
+   "label": "Fair value / unrealised movements",
+   "pattern": "fair value|revaluation|unrealis|mark[- ]to[- ]market",
+   "lines": [
+    "P_FV"
+   ],
+   "applies_to": "PL",
+   "narration": false,
+   "base_risk": "High",
+   "status": "Technical review required",
+   "implication": "Unrealised gains/losses are taxable by default; with a valid realisation-basis election only realised amounts are taxed (scope depends on the election). Items must be classified as capital or revenue.",
+   "documents": [
+    "Copy of the realisation-basis election and first-period return",
+    "Opening and closing fair values by investment",
+    "Capital vs revenue classification"
+   ],
+   "adj_key": null
+  },
+  {
+   "id": "FX",
+   "label": "Foreign exchange differences",
+   "pattern": "exchange (gain|loss|difference)|forex|fx (gain|loss)",
+   "lines": [
+    "P_FX"
+   ],
+   "applies_to": "PL",
+   "narration": false,
+   "base_risk": "Medium",
+   "status": "Information required",
+   "implication": "Realised vs unrealised split matters under the realisation basis; FX on interest is treated as interest for the limitation rule.",
+   "documents": [
+    "Split of realised and unrealised FX",
+    "FX on loans / interest"
+   ],
+   "adj_key": null
+  }
+ ]
+}
