@@ -1,0 +1,57 @@
+# Builds "Audit Document Generator.exe" on a Windows machine at GitHub.
+# Runs automatically on every upload (push) to main, or by hand from the
+# Actions tab ("Run workflow"). The exe appears under the run's "Artifacts".
+
+name: Build Windows exe
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - name: Get the code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install packages
+        run: python -m pip install --upgrade pip pyinstaller python-docx pdfplumber
+
+      - name: Build the exe
+        run: >
+          python -m PyInstaller --noconfirm --onefile --windowed
+          --name "Audit Document Generator" --icon app.ico
+          --add-data "ca_logo.jpeg;."
+          --collect-data docx --collect-data pdfminer
+          --exclude-module pandas --exclude-module numpy --exclude-module pyarrow
+          --exclude-module streamlit --exclude-module matplotlib --exclude-module scipy
+          --exclude-module jinja2
+          desktop_app.py
+
+      - name: Build a test copy (same settings, with a console)
+        run: >
+          python -m PyInstaller --noconfirm --onefile --name SmokeTest --paths .
+          --distpath test-dist --workpath test-build
+          --add-data "ca_logo.jpeg;."
+          --collect-data docx --collect-data pdfminer
+          --exclude-module pandas --exclude-module numpy --exclude-module pyarrow
+          --exclude-module streamlit --exclude-module matplotlib --exclude-module scipy
+          --exclude-module jinja2
+          tests/exe_smoke_check.py
+
+      - name: Test - read sample MCA PDF and generate all 4 documents
+        run: test-dist\SmokeTest.exe tests\fixtures\mca_v3_two_line_address.pdf
+
+      - name: Make the exe available for download
+        uses: actions/upload-artifact@v4
+        with:
+          name: Audit-Document-Generator-exe
+          path: dist/Audit Document Generator.exe
+          retention-days: 90
