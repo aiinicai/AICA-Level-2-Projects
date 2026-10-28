@@ -1,0 +1,3229 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Fixed Asset Register &amp; Depreciation Calculator (Companies Act 2013 &amp; Income Tax Act 1961)</title>
+  <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    body { font-family: 'Inter', system-ui, -apple-system, sans-serif; }
+    .custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
+    .custom-scrollbar::-webkit-scrollbar-track { background: #f1f5f9; }
+    .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+    .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-800 min-h-screen flex flex-col">
+
+  <!-- Top Navigation Header -->
+  <header class="bg-slate-900 text-white shadow-md border-b border-slate-800">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 py-3.5 flex flex-wrap items-center justify-between gap-3">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-lg bg-indigo-600 flex items-center justify-center font-bold text-lg shadow-inner">
+          FA
+        </div>
+        <div>
+          <h1 class="text-base sm:text-lg font-bold tracking-tight text-white">
+            Fixed Asset Register &amp; Depreciation Manager
+          </h1>
+          <p class="text-xs text-slate-400">
+            Companies Act, 2013 (Schedule II SLM &amp; WDV) &bull; Income Tax Act, 1961 (Sec 32 WDV &amp; 180-Day Rule)
+          </p>
+        </div>
+      </div>
+
+      <div class="flex flex-wrap items-center gap-2">
+        <button id="btnOpenAddModal" type="button" class="inline-flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-500 text-white text-xs sm:text-sm font-semibold px-3.5 py-2 rounded-lg shadow-sm transition">
+          <span>+ Add New Asset</span>
+        </button>
+        <button id="btnLoadSamples" type="button" class="inline-flex items-center gap-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs sm:text-sm font-medium px-3 py-2 rounded-lg transition">
+          <span>Load Demo Assets</span>
+        </button>
+        <button id="btnDownloadPyApp" type="button" class="inline-flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs sm:text-sm font-semibold px-3.5 py-2 rounded-lg shadow-sm transition">
+          <span>&#11015; Download Python App (.py)</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- KPI Summary Strip -->
+  <section class="max-w-7xl w-full mx-auto px-4 sm:px-6 pt-4">
+    <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
+      <div class="bg-white rounded-xl p-3.5 border border-slate-200 shadow-sm">
+        <div class="text-xs font-medium text-slate-500 uppercase tracking-wider">Total Active Assets</div>
+        <div id="kpiAssetCount" class="text-xl sm:text-2xl font-bold text-slate-900 mt-1">0</div>
+        <div class="text-xs text-slate-400 mt-0.5">In master register</div>
+      </div>
+      <div class="bg-white rounded-xl p-3.5 border border-slate-200 shadow-sm">
+        <div class="text-xs font-medium text-slate-500 uppercase tracking-wider">Total Historical Cost</div>
+        <div id="kpiTotalCost" class="text-xl sm:text-2xl font-bold text-indigo-700 mt-1">&#8377;0.00</div>
+        <div class="text-xs text-slate-400 mt-0.5">Gross block acquisition value</div>
+      </div>
+      <div class="bg-white rounded-xl p-3.5 border border-slate-200 shadow-sm">
+        <div class="text-xs font-medium text-slate-500 uppercase tracking-wider">Depreciable Base (Co. Act)</div>
+        <div id="kpiDepreciableBase" class="text-xl sm:text-2xl font-bold text-emerald-700 mt-1">&#8377;0.00</div>
+        <div class="text-xs text-slate-400 mt-0.5">Cost less residual value</div>
+      </div>
+      <div class="bg-white rounded-xl p-3.5 border border-slate-200 shadow-sm">
+        <div class="text-xs font-medium text-slate-500 uppercase tracking-wider">Total Residual Value</div>
+        <div id="kpiResidualTotal" class="text-xl sm:text-2xl font-bold text-amber-700 mt-1">&#8377;0.00</div>
+        <div class="text-xs text-slate-400 mt-0.5">Schedule II salvage floor</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Main View Switcher Tabs -->
+  <div class="max-w-7xl w-full mx-auto px-4 sm:px-6 pt-4">
+    <div class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 pb-2">
+      <div class="flex flex-wrap gap-2">
+        <button id="tabBtnLifecycle" type="button" class="px-4 py-2 rounded-lg text-xs sm:text-sm font-semibold bg-indigo-600 text-white shadow-sm transition">
+          1. Asset Register &amp; Lifecycle Schedule (Acquisition to Useful Life)
+        </button>
+        <button id="tabBtnFySummary" type="button" class="px-4 py-2 rounded-lg text-xs sm:text-sm font-semibold bg-white text-slate-700 hover:bg-slate-100 border border-slate-200 transition">
+          2. Financial Year-Wise Register Summary (All Assets)
+        </button>
+      </div>
+
+      <div class="flex items-center gap-2">
+        <button id="btnExportMasterCsv" type="button" class="text-xs font-medium px-3 py-1.5 rounded-lg bg-white border border-slate-300 text-slate-700 hover:bg-slate-50 transition">
+          Export Master CSV
+        </button>
+        <button id="btnExportScheduleCsv" type="button" class="text-xs font-medium px-3 py-1.5 rounded-lg bg-white border border-slate-300 text-slate-700 hover:bg-slate-50 transition">
+          Export Selected Schedule CSV
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Main Content Area -->
+  <main class="max-w-7xl w-full mx-auto px-4 sm:px-6 py-4 flex-1 flex flex-col gap-4">
+
+    <!-- VIEW 1: Asset Register + Lifecycle Schedule -->
+    <div id="viewLifecycle" class="flex flex-col gap-4">
+
+      <!-- Asset Master Table Card -->
+      <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+        <div class="px-4 py-3 bg-slate-50 border-b border-slate-200 flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h2 class="text-sm font-bold text-slate-800">Fixed Asset Master Register</h2>
+            <p class="text-xs text-slate-500">Click any asset row below to inspect its complete year-by-year depreciation schedule from acquisition till useful life.</p>
+          </div>
+          <div class="flex items-center gap-2">
+            <input id="searchInput" type="text" placeholder="Search code, name, category, location..." class="text-xs sm:text-sm px-3 py-1.5 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-500 w-64" />
+          </div>
+        </div>
+
+        <div class="overflow-x-auto custom-scrollbar max-h-64">
+          <table class="w-full text-left border-collapse text-xs sm:text-sm">
+            <thead>
+              <tr class="bg-slate-100 text-slate-700 border-b border-slate-200 font-semibold">
+                <th class="py-2.5 px-3">Code</th>
+                <th class="py-2.5 px-3">Asset Name</th>
+                <th class="py-2.5 px-3">Category</th>
+                <th class="py-2.5 px-3">Location</th>
+                <th class="py-2.5 px-3 text-center">Acq. Date</th>
+                <th class="py-2.5 px-3 text-center">Put to Use</th>
+                <th class="py-2.5 px-3 text-right">Original Cost (&#8377;)</th>
+                <th class="py-2.5 px-3 text-center">Life (Yrs)</th>
+                <th class="py-2.5 px-3 text-right">Residual (&#8377;)</th>
+                <th class="py-2.5 px-3 text-center">Co. Act</th>
+                <th class="py-2.5 px-3 text-right">IT Rate</th>
+                <th class="py-2.5 px-3 text-center">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="masterTableBody" class="divide-y divide-slate-200"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Selected Asset Lifecycle Depreciation Schedule Card -->
+      <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+        <div class="px-4 py-3 bg-slate-900 text-white flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <h2 id="schedHeaderTitle" class="text-sm font-bold text-white">
+              Year-by-Year Depreciation Schedule (Year of Acquisition till Useful Life)
+            </h2>
+            <p id="schedHeaderMeta" class="text-xs text-slate-300 mt-0.5">
+              Select an asset above to view its Companies Act, 2013 and Income Tax Act, 1961 lifecycle calculation.
+            </p>
+          </div>
+          <div id="schedBadgeContainer" class="flex flex-wrap items-center gap-2"></div>
+        </div>
+
+        <div class="overflow-x-auto custom-scrollbar max-h-96">
+          <table class="w-full text-left border-collapse text-xs">
+            <thead>
+              <tr class="bg-slate-100 text-slate-700 border-b border-slate-200 font-semibold">
+                <th class="py-2.5 px-2.5 text-center">Yr #</th>
+                <th class="py-2.5 px-2.5 text-center">Financial Year</th>
+                <th class="py-2.5 px-2.5 text-center bg-indigo-50/60 text-indigo-950">CA Days</th>
+                <th class="py-2.5 px-2.5 text-right bg-indigo-50/60 text-indigo-950">CA Open WDV (&#8377;)</th>
+                <th class="py-2.5 px-2.5 text-right bg-indigo-50/60 text-indigo-950">CA Dep. (&#8377;)</th>
+                <th class="py-2.5 px-2.5 text-right bg-indigo-50/60 text-indigo-950">CA Accum. Dep (&#8377;)</th>
+                <th class="py-2.5 px-2.5 text-right bg-indigo-50/60 text-indigo-950">CA Close WDV (&#8377;)</th>
+                <th class="py-2.5 px-2.5 text-center bg-emerald-50/60 text-emerald-950">IT Act Rule / Days</th>
+                <th class="py-2.5 px-2.5 text-right bg-emerald-50/60 text-emerald-950">IT Open WDV (&#8377;)</th>
+                <th class="py-2.5 px-2.5 text-right bg-emerald-50/60 text-emerald-950">IT Normal Dep (&#8377;)</th>
+                <th class="py-2.5 px-2.5 text-right bg-emerald-50/60 text-emerald-950">IT Add. Dep (&#8377;)</th>
+                <th class="py-2.5 px-2.5 text-right bg-emerald-50/60 text-emerald-950">IT Total Dep (&#8377;)</th>
+                <th class="py-2.5 px-2.5 text-right bg-emerald-50/60 text-emerald-950">IT Close WDV (&#8377;)</th>
+                <th class="py-2.5 px-2.5 text-right">Timing Diff (CA - IT)</th>
+              </tr>
+            </thead>
+            <tbody id="scheduleTableBody" class="divide-y divide-slate-200"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- VIEW 2: Financial Year-Wise Summary Across All Assets -->
+    <div id="viewFySummary" class="hidden flex-col gap-4">
+      <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+        <div class="px-4 py-3 bg-slate-50 border-b border-slate-200 flex flex-wrap items-center justify-between gap-3">
+          <div class="flex flex-wrap items-center gap-3">
+            <label for="selectFyDropdown" class="text-sm font-bold text-slate-800">Select Financial Year:</label>
+            <select id="selectFyDropdown" class="text-sm px-3 py-1.5 rounded-lg border border-slate-300 bg-white font-semibold text-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500"></select>
+            <span id="fySummaryBannerText" class="text-xs text-slate-600 font-medium"></span>
+          </div>
+          <button id="btnExportFyCsv" type="button" class="text-xs font-semibold px-3.5 py-2 rounded-lg bg-indigo-600 text-white hover:bg-indigo-500 transition">
+            Export FY Summary CSV
+          </button>
+        </div>
+
+        <div class="overflow-x-auto custom-scrollbar">
+          <table class="w-full text-left border-collapse text-xs">
+            <thead>
+              <tr class="bg-slate-100 text-slate-700 border-b border-slate-200 font-semibold">
+                <th class="py-2.5 px-3">Code</th>
+                <th class="py-2.5 px-3">Asset Name</th>
+                <th class="py-2.5 px-3">Category</th>
+                <th class="py-2.5 px-3 text-center">Put to Use</th>
+                <th class="py-2.5 px-3 text-right">Original Cost (&#8377;)</th>
+                <th class="py-2.5 px-3 text-center bg-indigo-50/60">CA Method</th>
+                <th class="py-2.5 px-3 text-right bg-indigo-50/60">CA Open WDV</th>
+                <th class="py-2.5 px-3 text-right bg-indigo-50/60">CA Dep. (Year)</th>
+                <th class="py-2.5 px-3 text-right bg-indigo-50/60">CA Close WDV</th>
+                <th class="py-2.5 px-3 text-right bg-emerald-50/60">IT Rate %</th>
+                <th class="py-2.5 px-3 text-center bg-emerald-50/60">IT Rule Applied</th>
+                <th class="py-2.5 px-3 text-right bg-emerald-50/60">IT Open WDV</th>
+                <th class="py-2.5 px-3 text-right bg-emerald-50/60">IT Dep. (Year)</th>
+                <th class="py-2.5 px-3 text-right bg-emerald-50/60">IT Close WDV</th>
+              </tr>
+            </thead>
+            <tbody id="fyTableBody" class="divide-y divide-slate-200"></tbody>
+            <tfoot id="fyTableFoot" class="bg-slate-100 font-bold text-slate-900 border-t-2 border-slate-300"></tfoot>
+          </table>
+        </div>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- ADD / EDIT ASSET MODAL -->
+  <div id="assetModal" class="fixed inset-0 z-50 hidden items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4 overflow-y-auto">
+    <div class="bg-white rounded-2xl shadow-2xl border border-slate-200 max-w-2xl w-full overflow-hidden my-8">
+      <div class="px-6 py-4 bg-slate-900 text-white flex items-center justify-between">
+        <h3 id="modalTitle" class="text-base font-bold">Add New Fixed Asset</h3>
+        <button id="btnCloseAssetModal" type="button" class="text-slate-400 hover:text-white text-lg font-bold px-2">&times;</button>
+      </div>
+
+      <form id="assetForm" class="p-6 space-y-4 max-h-[80vh] overflow-y-auto custom-scrollbar">
+        <input type="hidden" id="formAssetId" value="" />
+
+        <div id="formErrorBox" class="hidden p-3 rounded-lg bg-rose-50 border border-rose-200 text-rose-700 text-xs font-medium"></div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label for="inputCode" class="block text-xs font-semibold text-slate-700 mb-1">Asset Code *</label>
+            <input id="inputCode" type="text" required class="w-full text-sm px-3 py-2 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+          </div>
+          <div>
+            <label for="inputName" class="block text-xs font-semibold text-slate-700 mb-1">Asset Name / Description *</label>
+            <input id="inputName" type="text" required placeholder="e.g. CNC Milling Machine" class="w-full text-sm px-3 py-2 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+          </div>
+
+          <div>
+            <label for="inputCategory" class="block text-xs font-semibold text-slate-700 mb-1">Schedule II Asset Category *</label>
+            <select id="inputCategory" class="w-full text-sm px-3 py-2 rounded-lg border border-slate-300 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500"></select>
+          </div>
+          <div>
+            <label for="inputLocation" class="block text-xs font-semibold text-slate-700 mb-1">Location / Department</label>
+            <input id="inputLocation" type="text" placeholder="e.g. Plant Shopfloor A" class="w-full text-sm px-3 py-2 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+          </div>
+
+          <div>
+            <label for="inputVendor" class="block text-xs font-semibold text-slate-700 mb-1">Supplier / Vendor Name</label>
+            <input id="inputVendor" type="text" placeholder="e.g. Bharat Machine Tools" class="w-full text-sm px-3 py-2 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+          </div>
+          <div>
+            <label for="inputInvoice" class="block text-xs font-semibold text-slate-700 mb-1">Invoice / Bill No.</label>
+            <input id="inputInvoice" type="text" placeholder="e.g. INV/24-25/108" class="w-full text-sm px-3 py-2 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+          </div>
+
+          <div>
+            <label for="inputAcqDate" class="block text-xs font-semibold text-slate-700 mb-1">Acquisition Date *</label>
+            <input id="inputAcqDate" type="date" required class="w-full text-sm px-3 py-2 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+          </div>
+          <div>
+            <label for="inputPutDate" class="block text-xs font-semibold text-slate-700 mb-1">Put-to-Use Date *</label>
+            <input id="inputPutDate" type="date" required class="w-full text-sm px-3 py-2 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+          </div>
+
+          <div class="sm:col-span-2">
+            <label for="inputCost" class="block text-xs font-semibold text-slate-700 mb-1">Total Acquisition Cost including Installation &amp; Freight (&#8377;) *</label>
+            <input id="inputCost" type="number" step="0.01" min="1" required class="w-full text-sm px-3 py-2 rounded-lg border border-slate-300 font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+          </div>
+        </div>
+
+        <!-- Companies Act Section -->
+        <div class="pt-2 border-t border-slate-200">
+          <h4 class="text-xs font-bold uppercase tracking-wider text-indigo-700 mb-3">Companies Act, 2013 (Schedule II) Settings</h4>
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div>
+              <label for="inputCaMethod" class="block text-xs font-semibold text-slate-700 mb-1">Method *</label>
+              <select id="inputCaMethod" class="w-full text-sm px-3 py-2 rounded-lg border border-slate-300 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                <option value="SLM">SLM (Straight Line)</option>
+                <option value="WDV">WDV (Written Down Value)</option>
+              </select>
+            </div>
+            <div>
+              <label for="inputUsefulLife" class="block text-xs font-semibold text-slate-700 mb-1">Useful Life (Years) *</label>
+              <input id="inputUsefulLife" type="number" step="0.5" min="0.5" max="100" required class="w-full text-sm px-3 py-2 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+            </div>
+            <div>
+              <label for="inputResidualPct" class="block text-xs font-semibold text-slate-700 mb-1">Residual Value (%) *</label>
+              <input id="inputResidualPct" type="number" step="0.1" min="0" max="95" required class="w-full text-sm px-3 py-2 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+            </div>
+          </div>
+          <div class="mt-2 flex items-center justify-between text-xs text-slate-600 bg-indigo-50/60 px-3 py-2 rounded-lg">
+            <span>Computed Residual Value (&#8377;):</span>
+            <input id="inputResidualVal" type="number" step="0.01" min="0" required class="w-36 text-right font-bold bg-white px-2 py-1 rounded border border-indigo-200" />
+          </div>
+        </div>
+
+        <!-- Income Tax Act Section -->
+        <div class="pt-2 border-t border-slate-200">
+          <h4 class="text-xs font-bold uppercase tracking-wider text-emerald-700 mb-3">Income Tax Act, 1961 (Section 32 Block WDV) Settings</h4>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 items-center">
+            <div>
+              <label for="inputItRate" class="block text-xs font-semibold text-slate-700 mb-1">IT Act Block WDV Rate (%) *</label>
+              <input id="inputItRate" type="number" step="0.5" min="0" max="100" required class="w-full text-sm px-3 py-2 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+            </div>
+            <div class="pt-4">
+              <label class="inline-flex items-center gap-2 cursor-pointer select-none">
+                <input id="inputItAddDep" type="checkbox" class="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500" />
+                <span class="text-xs font-semibold text-slate-700">Eligible for 20% Additional Dep. u/s 32(1)(iia)</span>
+              </label>
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <label for="inputRemarks" class="block text-xs font-semibold text-slate-700 mb-1">Remarks / Audit Notes</label>
+          <input id="inputRemarks" type="text" placeholder="Optional notes..." class="w-full text-sm px-3 py-2 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+        </div>
+
+        <div class="pt-3 border-t border-slate-200 flex items-center justify-end gap-2">
+          <button id="btnCancelModal" type="button" class="px-4 py-2 rounded-lg text-xs sm:text-sm font-medium border border-slate-300 text-slate-700 hover:bg-slate-100">
+            Cancel
+          </button>
+          <button type="submit" class="px-5 py-2 rounded-lg text-xs sm:text-sm font-semibold bg-indigo-600 text-white hover:bg-indigo-500 shadow-sm">
+            Save Asset
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- DELETE CONFIRMATION MODAL -->
+  <div id="deleteModal" class="fixed inset-0 z-50 hidden items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4">
+    <div class="bg-white rounded-2xl shadow-xl border border-slate-200 max-w-md w-full overflow-hidden">
+      <div class="px-5 py-4 bg-rose-600 text-white flex items-center justify-between">
+        <h3 class="text-sm font-bold">Confirm Asset Deletion</h3>
+        <button id="btnCloseDeleteModal" type="button" class="text-rose-200 hover:text-white text-lg font-bold px-2">&times;</button>
+      </div>
+      <div class="p-5">
+        <p id="deleteModalText" class="text-sm text-slate-700"></p>
+        <div class="mt-5 flex items-center justify-end gap-2">
+          <button id="btnCancelDelete" type="button" class="px-4 py-2 rounded-lg text-xs font-medium border border-slate-300 text-slate-700 hover:bg-slate-100">
+            Cancel
+          </button>
+          <button id="btnConfirmDelete" type="button" class="px-4 py-2 rounded-lg text-xs font-semibold bg-rose-600 text-white hover:bg-rose-500 shadow-sm">
+            Delete Permanently
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Notification -->
+  <div id="toastBanner" class="fixed bottom-4 right-4 z-50 hidden bg-slate-900 text-white text-xs sm:text-sm font-medium px-4 py-2.5 rounded-xl shadow-lg border border-slate-700"></div>
+
+  <script>
+    // -----------------------------------------------------------------------
+    // Schedule II & Income Tax Act Presets
+    // -----------------------------------------------------------------------
+    const ASSET_CATEGORIES = {
+      "Buildings (Factory)": { useful_life: 30.0, residual_pct: 5.0, it_rate: 10.0 },
+      "Buildings (Office / Non-Factory)": { useful_life: 60.0, residual_pct: 5.0, it_rate: 10.0 },
+      "Plant & Machinery (General)": { useful_life: 15.0, residual_pct: 5.0, it_rate: 15.0 },
+      "Furniture & Fittings (General)": { useful_life: 10.0, residual_pct: 5.0, it_rate: 10.0 },
+      "Office Equipment": { useful_life: 5.0, residual_pct: 5.0, it_rate: 15.0 },
+      "Computers & Laptops (End-User)": { useful_life: 3.0, residual_pct: 5.0, it_rate: 40.0 },
+      "Servers & Networks": { useful_life: 6.0, residual_pct: 5.0, it_rate: 40.0 },
+      "Motor Cars (Non-Hire)": { useful_life: 8.0, residual_pct: 5.0, it_rate: 15.0 },
+      "Motor Buses / Lorries / Commercial": { useful_life: 8.0, residual_pct: 5.0, it_rate: 30.0 },
+      "Intangible Assets / Software": { useful_life: 5.0, residual_pct: 0.0, it_rate: 25.0 },
+      "Custom Category": { useful_life: 10.0, residual_pct: 5.0, it_rate: 15.0 }
+    };
+
+    const DEFAULT_SAMPLES = [
+      {
+            "id": 1,
+            "asset_code": "FA-0001",
+            "asset_name": "Industrial Factory Shed & Civil Works",
+            "category": "Buildings (Factory)",
+            "location": "Peenya Industrial Area - Block A",
+            "vendor": "Shapoorji Industrial Constructions",
+            "invoice_no": "SIC/22-23/014",
+            "acq_date": "2022-05-15",
+            "put_to_use_date": "2022-06-01",
+            "cost": 4500000.0,
+            "useful_life": 30.0,
+            "residual_pct": 5.0,
+            "residual_value": 225000.0,
+            "ca_method": "SLM",
+            "it_rate": 10.0,
+            "it_additional_dep": 0,
+            "remarks": "Factory building put to use >= 180 days in FY 2022-23"
+      },
+      {
+            "id": 2,
+            "asset_code": "FA-0002",
+            "asset_name": "Corporate Office Floor Unit",
+            "category": "Buildings (Office / Non-Factory)",
+            "location": "Kochi InfoPark - Tower 2",
+            "vendor": "Prestige Commercial Estates",
+            "invoice_no": "PCE/22-23/089",
+            "acq_date": "2022-09-01",
+            "put_to_use_date": "2022-09-15",
+            "cost": 8000000.0,
+            "useful_life": 60.0,
+            "residual_pct": 5.0,
+            "residual_value": 400000.0,
+            "ca_method": "SLM",
+            "it_rate": 10.0,
+            "it_additional_dep": 0,
+            "remarks": "Admin office RCC structure (60 yrs Schedule II useful life)"
+      },
+      {
+            "id": 3,
+            "asset_code": "FA-0003",
+            "asset_name": "5-Axis CNC Vertical Machining Center",
+            "category": "Plant & Machinery (General)",
+            "location": "Plant Shopfloor A",
+            "vendor": "Bharat Machine Tools Ltd",
+            "invoice_no": "BMT/23-24/108",
+            "acq_date": "2023-05-10",
+            "put_to_use_date": "2023-05-20",
+            "cost": 1850000.0,
+            "useful_life": 15.0,
+            "residual_pct": 5.0,
+            "residual_value": 92500.0,
+            "ca_method": "SLM",
+            "it_rate": 15.0,
+            "it_additional_dep": 1,
+            "remarks": "Put to use >= 180 days in FY 2023-24; 20% Add. Dep u/s 32(1)(iia)"
+      },
+      {
+            "id": 4,
+            "asset_code": "FA-0004",
+            "asset_name": "Automated Laser Cutting & Bending Line",
+            "category": "Plant & Machinery (General)",
+            "location": "Plant Shopfloor B",
+            "vendor": "Trumpf India Pvt Ltd",
+            "invoice_no": "TIPL/23-24/412",
+            "acq_date": "2023-11-10",
+            "put_to_use_date": "2023-11-18",
+            "cost": 1200000.0,
+            "useful_life": 15.0,
+            "residual_pct": 5.0,
+            "residual_value": 60000.0,
+            "ca_method": "WDV",
+            "it_rate": 15.0,
+            "it_additional_dep": 1,
+            "remarks": "< 180 days in FY 2023-24 (Half rate + 10% Add. Dep in Yr 1, bal 10% in Yr 2)"
+      },
+      {
+            "id": 5,
+            "asset_code": "FA-0005",
+            "asset_name": "Dell PowerEdge R750 Rack Server Cluster",
+            "category": "Servers & Networks",
+            "location": "Head Office Data Center",
+            "vendor": "TechNova Enterprise Solutions",
+            "invoice_no": "TN/24-25/119",
+            "acq_date": "2024-04-08",
+            "put_to_use_date": "2024-04-12",
+            "cost": 640000.0,
+            "useful_life": 6.0,
+            "residual_pct": 5.0,
+            "residual_value": 32000.0,
+            "ca_method": "WDV",
+            "it_rate": 40.0,
+            "it_additional_dep": 0,
+            "remarks": "Core production servers (6 yrs Schedule II; 40% IT Act Block)"
+      },
+      {
+            "id": 6,
+            "asset_code": "FA-0006",
+            "asset_name": "Modular Workstations & Conference Tables",
+            "category": "Furniture & Fittings (General)",
+            "location": "Corporate Floor 3",
+            "vendor": "Featherlite Office Systems",
+            "invoice_no": "FL/24-25/204",
+            "acq_date": "2024-08-01",
+            "put_to_use_date": "2024-08-05",
+            "cost": 420000.0,
+            "useful_life": 10.0,
+            "residual_pct": 5.0,
+            "residual_value": 21000.0,
+            "ca_method": "SLM",
+            "it_rate": 10.0,
+            "it_additional_dep": 0,
+            "remarks": "50-seater modular office furniture & boardroom setup"
+      },
+      {
+            "id": 7,
+            "asset_code": "FA-0007",
+            "asset_name": "Daikin VRV Central Air Conditioning System",
+            "category": "Office Equipment",
+            "location": "Corporate Floor 3",
+            "vendor": "CoolAir HVAC Engineers",
+            "invoice_no": "CA/24-25/551",
+            "acq_date": "2024-12-02",
+            "put_to_use_date": "2024-12-10",
+            "cost": 360000.0,
+            "useful_life": 5.0,
+            "residual_pct": 5.0,
+            "residual_value": 18000.0,
+            "ca_method": "SLM",
+            "it_rate": 15.0,
+            "it_additional_dep": 0,
+            "remarks": "Put to use < 180 days in FY 2024-25 (7.5% IT WDV in Year 1)"
+      },
+      {
+            "id": 8,
+            "asset_code": "FA-0008",
+            "asset_name": "Executive Passenger SUV (Staff Transport)",
+            "category": "Motor Cars (Non-Hire)",
+            "location": "Head Office Fleet",
+            "vendor": "TVS Sundaram Motors",
+            "invoice_no": "TSM/25-26/077",
+            "acq_date": "2025-06-12",
+            "put_to_use_date": "2025-06-15",
+            "cost": 1600000.0,
+            "useful_life": 8.0,
+            "residual_pct": 5.0,
+            "residual_value": 80000.0,
+            "ca_method": "WDV",
+            "it_rate": 15.0,
+            "it_additional_dep": 0,
+            "remarks": "Company vehicle put to use >= 180 days in FY 2025-26"
+      },
+      {
+            "id": 9,
+            "asset_code": "FA-0009",
+            "asset_name": "MacBook Pro & ThinkPad Developer Fleet (15 Units)",
+            "category": "Computers & Laptops (End-User)",
+            "location": "Engineering Wing",
+            "vendor": "Croma Corporate Direct",
+            "invoice_no": "CCD/25-26/903",
+            "acq_date": "2025-10-20",
+            "put_to_use_date": "2025-10-25",
+            "cost": 1125000.0,
+            "useful_life": 3.0,
+            "residual_pct": 5.0,
+            "residual_value": 56250.0,
+            "ca_method": "SLM",
+            "it_rate": 40.0,
+            "it_additional_dep": 0,
+            "remarks": "Put to use < 180 days in FY 2025-26 (20% effective IT WDV in Yr 1)"
+      },
+      {
+            "id": 10,
+            "asset_code": "FA-0010",
+            "asset_name": "SAP Business One ERP License & Implementation",
+            "category": "Intangible Assets / Software",
+            "location": "Enterprise IT",
+            "vendor": "SAP India Systems",
+            "invoice_no": "SAP/26-27/019",
+            "acq_date": "2026-04-10",
+            "put_to_use_date": "2026-04-15",
+            "cost": 750000.0,
+            "useful_life": 5.0,
+            "residual_pct": 0.0,
+            "residual_value": 0.0,
+            "ca_method": "SLM",
+            "it_rate": 25.0,
+            "it_additional_dep": 0,
+            "remarks": "Perpetual ERP license amortized over 5 years; 25% IT Act intangible rate"
+      }
+];
+
+    // -----------------------------------------------------------------------
+    // State Management
+    // -----------------------------------------------------------------------
+    const STORAGE_KEY = "fixed_asset_register_v2";
+    let assets = [];
+    let selectedAssetId = null;
+    let pendingDeleteId = null;
+
+    function loadState() {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            assets = parsed;
+            selectedAssetId = assets[0].id;
+            return;
+          }
+        }
+      } catch (e) {
+        // Ignore storage errors in sandboxed iframes
+      }
+      assets = JSON.parse(JSON.stringify(DEFAULT_SAMPLES));
+      selectedAssetId = assets[0].id;
+    }
+
+    function saveState() {
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(assets));
+      } catch (e) {
+        // Ignore storage errors
+      }
+    }
+
+    function showToast(msg) {
+      const el = document.getElementById("toastBanner");
+      el.textContent = msg;
+      el.classList.remove("hidden");
+      if (window._toastTimer) clearTimeout(window._toastTimer);
+      window._toastTimer = setTimeout(() => {
+        el.classList.add("hidden");
+      }, 3200);
+    }
+
+    // -----------------------------------------------------------------------
+    // Date & Financial Year Helpers
+    // -----------------------------------------------------------------------
+    function parseDateUTC(dateStr) {
+      const parts = dateStr.split("-").map(Number);
+      return new Date(Date.UTC(parts[0], parts[1] - 1, parts[2]));
+    }
+
+    function diffDaysInclusive(dStart, dEnd) {
+      const msPerDay = 86400000;
+      return Math.round((dEnd.getTime() - dStart.getTime()) / msPerDay) + 1;
+    }
+
+    function getFyStartYear(d) {
+      const m = d.getUTCMonth() + 1;
+      const y = d.getUTCFullYear();
+      return m >= 4 ? y : y - 1;
+    }
+
+    function formatFy(startYr) {
+      const nextTwo = String(startYr + 1).slice(-2);
+      return `FY ${startYr}-${nextTwo}`;
+    }
+
+    function formatINR(val) {
+      return Number(val || 0).toLocaleString("en-IN", {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2
+      });
+    }
+
+    function round2(val) {
+      return Math.round((val + Number.EPSILON) * 100) / 100;
+    }
+
+    // -----------------------------------------------------------------------
+    // Core Depreciation Engine (Companies Act 2013 & Income Tax Act 1961)
+    // -----------------------------------------------------------------------
+    function calculateDepreciationSchedule(asset) {
+      const cost = Number(asset.cost);
+      const putDate = parseDateUTC(asset.put_to_use_date || asset.acq_date);
+      const usefulLifeYears = Number(asset.useful_life);
+      const residualVal = Number(asset.residual_value);
+      const caMethod = (asset.ca_method || "SLM").toUpperCase();
+      const itRate = Number(asset.it_rate);
+      const addDepFlag = Boolean(Number(asset.it_additional_dep));
+
+      if (cost <= 0 || usefulLifeYears <= 0) return [];
+
+      const depreciableAmount = Math.max(0, cost - residualVal);
+      const annualSlmDep = depreciableAmount / usefulLifeYears;
+
+      let caWdvRate = 0;
+      if (caMethod === "WDV") {
+        const effRes = residualVal > 0 ? residualVal : cost * 0.05;
+        caWdvRate = effRes >= cost ? 0 : (1 - Math.pow(effRes / cost, 1 / usefulLifeYears)) * 100;
+      } else {
+        caWdvRate = cost > 0 ? (annualSlmDep / cost) * 100 : 0;
+      }
+
+      // Compute exact end of useful life date
+      const wholeYears = Math.floor(usefulLifeYears);
+      const remDays = Math.round((usefulLifeYears - wholeYears) * 365.25);
+      const endLifeDate = new Date(Date.UTC(
+        putDate.getUTCFullYear() + wholeYears,
+        putDate.getUTCMonth(),
+        putDate.getUTCDate()
+      ));
+      endLifeDate.setUTCDate(endLifeDate.getUTCDate() + remDays - 1);
+
+      const totalLifeDays = diffDaysInclusive(putDate, endLifeDate);
+      const startFyYr = getFyStartYear(putDate);
+      const maxFys = Math.ceil(usefulLifeYears) + 2;
+
+      let caOpeningWdv = cost;
+      let caAccumDep = 0;
+      let remainingLifeDays = totalLifeDays;
+
+      let itOpeningWdv = cost;
+      let itAccumDep = 0;
+      let balanceHalfAddDepPending = false;
+
+      const schedule = [];
+
+      for (let idx = 0; idx < maxFys; idx++) {
+        const fyYr = startFyYr + idx;
+        const fyStart = new Date(Date.UTC(fyYr, 3, 1)); // April 1
+        const fyEnd = new Date(Date.UTC(fyYr + 1, 2, 31)); // March 31
+        const daysInFy = diffDaysInclusive(fyStart, fyEnd);
+
+        if (remainingLifeDays <= 0 && idx >= Math.ceil(usefulLifeYears)) {
+          break;
+        }
+
+        // 1. Companies Act 2013
+        let caDaysUsed = 0;
+        let caDep = 0;
+        if (remainingLifeDays > 0 && caOpeningWdv > residualVal + 0.005) {
+          const effStart = putDate > fyStart ? putDate : fyStart;
+          const effEnd = endLifeDate < fyEnd ? endLifeDate : fyEnd;
+          if (effStart <= effEnd) {
+            caDaysUsed = diffDaysInclusive(effStart, effEnd);
+          }
+          if (caDaysUsed > 0) {
+            if (caMethod === "SLM") {
+              caDep = annualSlmDep * (caDaysUsed / daysInFy);
+            } else {
+              caDep = caOpeningWdv * (caWdvRate / 100) * (caDaysUsed / daysInFy);
+            }
+            const maxAllowable = Math.max(0, caOpeningWdv - residualVal);
+            if (remainingLifeDays - caDaysUsed <= 0) {
+              caDep = maxAllowable;
+            } else {
+              caDep = Math.min(caDep, maxAllowable);
+            }
+            caDep = round2(caDep);
+            remainingLifeDays -= caDaysUsed;
+          }
+        }
+
+        if (caDaysUsed === 0 && idx > 0 && remainingLifeDays <= 0) {
+          break;
+        }
+
+        caAccumDep = round2(caAccumDep + caDep);
+        const caClosingWdv = round2(Math.max(cost > residualVal ? residualVal : 0, cost - caAccumDep));
+
+        // 2. Income Tax Act 1961
+        let itDaysUsed = 0;
+        let itRuleNote = "Full Rate (100%)";
+        let itNormalDep = 0;
+        let itAddDep = 0;
+
+        if (idx === 0) {
+          itDaysUsed = putDate <= fyEnd ? diffDaysInclusive(putDate, fyEnd) : 0;
+          let effItRate = 0;
+          let effAddRate = 0;
+          if (itDaysUsed <= 0) {
+            itRuleNote = "Not Put to Use";
+          } else if (itDaysUsed < 180) {
+            effItRate = itRate * 0.5;
+            effAddRate = addDepFlag ? 10.0 : 0.0;
+            balanceHalfAddDepPending = addDepFlag;
+            itRuleNote = `<180 Days (${itDaysUsed}d) - Half Rate`;
+          } else {
+            effItRate = itRate;
+            effAddRate = addDepFlag ? 20.0 : 0.0;
+            itRuleNote = `>=180 Days (${itDaysUsed}d) - Full Rate`;
+          }
+          itNormalDep = round2(itOpeningWdv * (effItRate / 100));
+          itAddDep = round2(cost * (effAddRate / 100));
+        } else {
+          itDaysUsed = daysInFy;
+          itNormalDep = round2(itOpeningWdv * (itRate / 100));
+          if (idx === 1 && balanceHalfAddDepPending) {
+            itAddDep = round2(cost * 0.10);
+            itRuleNote = "Full Rate + Bal 10% Add. Dep";
+            balanceHalfAddDepPending = false;
+          }
+        }
+
+        const itTotalDep = Math.min(itOpeningWdv, round2(itNormalDep + itAddDep));
+        itAccumDep = round2(itAccumDep + itTotalDep);
+        const itClosingWdv = round2(Math.max(0, itOpeningWdv - itTotalDep));
+
+        schedule.push({
+          year_no: idx + 1,
+          fy_start_yr: fyYr,
+          fy_label: formatFy(fyYr),
+          ca_days: caDaysUsed,
+          ca_rate_pct: round2(caWdvRate),
+          ca_opening_wdv: round2(caOpeningWdv),
+          ca_depreciation: caDep,
+          ca_accum_dep: caAccumDep,
+          ca_closing_wdv: caClosingWdv,
+          it_days: itDaysUsed,
+          it_rule_note: itRuleNote,
+          it_opening_wdv: round2(itOpeningWdv),
+          it_normal_dep: itNormalDep,
+          it_add_dep: itAddDep,
+          it_total_dep: itTotalDep,
+          it_accum_dep: itAccumDep,
+          it_closing_wdv: itClosingWdv,
+          dep_diff: round2(caDep - itTotalDep)
+        });
+
+        caOpeningWdv = caClosingWdv;
+        itOpeningWdv = itClosingWdv;
+      }
+
+      return schedule;
+    }
+
+    // -----------------------------------------------------------------------
+    // UI Rendering
+    // -----------------------------------------------------------------------
+    function renderAll() {
+      renderKpis();
+      renderMasterTable();
+      renderScheduleTable();
+      populateFyDropdown();
+      renderFySummaryTable();
+    }
+
+    function renderKpis() {
+      const totalCost = assets.reduce((acc, a) => acc + Number(a.cost || 0), 0);
+      const totalRes = assets.reduce((acc, a) => acc + Number(a.residual_value || 0), 0);
+      const depBase = Math.max(0, totalCost - totalRes);
+
+      document.getElementById("kpiAssetCount").textContent = String(assets.length);
+      document.getElementById("kpiTotalCost").textContent = "\u20B9" + formatINR(totalCost);
+      document.getElementById("kpiDepreciableBase").textContent = "\u20B9" + formatINR(depBase);
+      document.getElementById("kpiResidualTotal").textContent = "\u20B9" + formatINR(totalRes);
+    }
+
+    function getFilteredAssets() {
+      const q = (document.getElementById("searchInput").value || "").trim().toLowerCase();
+      const sorted = [...assets].sort((a, b) => (a.acq_date || "").localeCompare(b.acq_date || "") || a.id - b.id);
+      if (!q) return sorted;
+      return sorted.filter(a =>
+        (a.asset_code || "").toLowerCase().includes(q) ||
+        (a.asset_name || "").toLowerCase().includes(q) ||
+        (a.category || "").toLowerCase().includes(q) ||
+        (a.location || "").toLowerCase().includes(q)
+      );
+    }
+
+    function renderMasterTable() {
+      const tbody = document.getElementById("masterTableBody");
+      tbody.innerHTML = "";
+      const filtered = getFilteredAssets();
+
+      if (filtered.length === 0) {
+        const tr = document.createElement("tr");
+        tr.innerHTML = `<td colspan="12" class="py-8 text-center text-slate-400">No assets found in register. Click "+ Add New Asset" or "Load Demo Assets" to begin.</td>`;
+        tbody.appendChild(tr);
+        return;
+      }
+
+      filtered.forEach(asset => {
+        const isSelected = asset.id === selectedAssetId;
+        const tr = document.createElement("tr");
+        tr.className = isSelected
+          ? "bg-indigo-50/90 hover:bg-indigo-100/70 cursor-pointer transition font-medium"
+          : "hover:bg-slate-50 cursor-pointer transition";
+
+        tr.addEventListener("click", (e) => {
+          if (e.target.closest("button")) return;
+          selectedAssetId = asset.id;
+          renderMasterTable();
+          renderScheduleTable();
+        });
+
+        tr.innerHTML = `
+          <td class="py-2.5 px-3 font-semibold text-indigo-700 whitespace-nowrap">${asset.asset_code}</td>
+          <td class="py-2.5 px-3 text-slate-900">${asset.asset_name}</td>
+          <td class="py-2.5 px-3 text-slate-600">${asset.category}</td>
+          <td class="py-2.5 px-3 text-slate-500">${asset.location || "-"}</td>
+          <td class="py-2.5 px-3 text-center whitespace-nowrap">${asset.acq_date}</td>
+          <td class="py-2.5 px-3 text-center whitespace-nowrap">${asset.put_to_use_date}</td>
+          <td class="py-2.5 px-3 text-right font-semibold whitespace-nowrap">${formatINR(asset.cost)}</td>
+          <td class="py-2.5 px-3 text-center">${asset.useful_life}</td>
+          <td class="py-2.5 px-3 text-right text-slate-600 whitespace-nowrap">${formatINR(asset.residual_value)}</td>
+          <td class="py-2.5 px-3 text-center"><span class="px-2 py-0.5 rounded text-xs font-semibold ${asset.ca_method === 'WDV' ? 'bg-amber-100 text-amber-800' : 'bg-indigo-100 text-indigo-800'}">${asset.ca_method}</span></td>
+          <td class="py-2.5 px-3 text-right font-medium text-emerald-700">${asset.it_rate}%</td>
+          <td class="py-2.5 px-3 text-center whitespace-nowrap">
+            <button type="button" data-edit-id="${asset.id}" class="text-xs font-semibold text-indigo-600 hover:text-indigo-800 px-2 py-1 rounded hover:bg-indigo-100 mr-1">Edit</button>
+            <button type="button" data-del-id="${asset.id}" class="text-xs font-semibold text-rose-600 hover:text-rose-800 px-2 py-1 rounded hover:bg-rose-100">Delete</button>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+
+      tbody.querySelectorAll("[data-edit-id]").forEach(btn => {
+        btn.addEventListener("click", () => openEditModal(Number(btn.getAttribute("data-edit-id"))));
+      });
+      tbody.querySelectorAll("[data-del-id]").forEach(btn => {
+        btn.addEventListener("click", () => openDeleteModal(Number(btn.getAttribute("data-del-id"))));
+      });
+    }
+
+    function renderScheduleTable() {
+      const tbody = document.getElementById("scheduleTableBody");
+      const titleEl = document.getElementById("schedHeaderTitle");
+      const metaEl = document.getElementById("schedHeaderMeta");
+      const badgesEl = document.getElementById("schedBadgeContainer");
+      tbody.innerHTML = "";
+      badgesEl.innerHTML = "";
+
+      const asset = assets.find(a => a.id === selectedAssetId);
+      if (!asset) {
+        titleEl.textContent = "Year-by-Year Depreciation Schedule";
+        metaEl.textContent = "Select an asset above to view its lifecycle depreciation schedule.";
+        tbody.innerHTML = `<tr><td colspan="14" class="py-8 text-center text-slate-400">No asset selected.</td></tr>`;
+        return;
+      }
+
+      const sched = calculateDepreciationSchedule(asset);
+      const effRate = sched.length > 0 ? sched[0].ca_rate_pct : 0;
+
+      titleEl.textContent = `${asset.asset_code} — ${asset.asset_name} (${asset.category})`;
+      metaEl.textContent = `Put to Use: ${asset.put_to_use_date} | Original Cost: \u20B9${formatINR(asset.cost)} | Residual Floor: \u20B9${formatINR(asset.residual_value)} (${asset.residual_pct}%)`;
+
+      badgesEl.innerHTML = `
+        <span class="px-2.5 py-1 rounded-md text-xs font-semibold bg-indigo-500/20 text-indigo-200 border border-indigo-400/30">
+          Co. Act: ${asset.ca_method} (${asset.useful_life} Yrs @ ${effRate}% p.a.)
+        </span>
+        <span class="px-2.5 py-1 rounded-md text-xs font-semibold bg-emerald-500/20 text-emerald-200 border border-emerald-400/30">
+          IT Act: ${asset.it_rate}% WDV ${Number(asset.it_additional_dep) ? '+ 20% Add. Dep' : ''}
+        </span>
+      `;
+
+      sched.forEach(r => {
+        const tr = document.createElement("tr");
+        tr.className = "hover:bg-slate-50 transition";
+        const diffColor = r.dep_diff >= 0 ? "text-slate-700" : "text-amber-700 font-medium";
+        tr.innerHTML = `
+          <td class="py-2 px-2.5 text-center font-semibold text-slate-600">${r.year_no}</td>
+          <td class="py-2 px-2.5 text-center font-semibold text-slate-900 whitespace-nowrap">${r.fy_label}</td>
+          <td class="py-2 px-2.5 text-center bg-indigo-50/30">${r.ca_days}</td>
+          <td class="py-2 px-2.5 text-right bg-indigo-50/30 whitespace-nowrap">${formatINR(r.ca_opening_wdv)}</td>
+          <td class="py-2 px-2.5 text-right font-semibold text-indigo-700 bg-indigo-50/30 whitespace-nowrap">${formatINR(r.ca_depreciation)}</td>
+          <td class="py-2 px-2.5 text-right text-slate-600 bg-indigo-50/30 whitespace-nowrap">${formatINR(r.ca_accum_dep)}</td>
+          <td class="py-2 px-2.5 text-right font-semibold text-slate-900 bg-indigo-50/30 whitespace-nowrap">${formatINR(r.ca_closing_wdv)}</td>
+          <td class="py-2 px-2.5 text-center bg-emerald-50/30 whitespace-nowrap"><span class="px-1.5 py-0.5 rounded text-[11px] bg-emerald-100/80 text-emerald-900">${r.it_rule_note}</span></td>
+          <td class="py-2 px-2.5 text-right bg-emerald-50/30 whitespace-nowrap">${formatINR(r.it_opening_wdv)}</td>
+          <td class="py-2 px-2.5 text-right bg-emerald-50/30 whitespace-nowrap">${formatINR(r.it_normal_dep)}</td>
+          <td class="py-2 px-2.5 text-right bg-emerald-50/30 whitespace-nowrap">${formatINR(r.it_add_dep)}</td>
+          <td class="py-2 px-2.5 text-right font-semibold text-emerald-700 bg-emerald-50/30 whitespace-nowrap">${formatINR(r.it_total_dep)}</td>
+          <td class="py-2 px-2.5 text-right font-semibold text-slate-900 bg-emerald-50/30 whitespace-nowrap">${formatINR(r.it_closing_wdv)}</td>
+          <td class="py-2 px-2.5 text-right ${diffColor} whitespace-nowrap">${r.dep_diff >= 0 ? '+' : ''}${formatINR(r.dep_diff)}</td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    function populateFyDropdown() {
+      const sel = document.getElementById("selectFyDropdown");
+      const currentVal = sel.value;
+      const fySet = new Set();
+
+      assets.forEach(a => {
+        const sched = calculateDepreciationSchedule(a);
+        sched.forEach(r => fySet.add(r.fy_start_yr));
+      });
+
+      if (fySet.size === 0) {
+        fySet.add(getFyStartYear(new Date()));
+      }
+
+      const sortedYrs = Array.from(fySet).sort((a, b) => a - b);
+      sel.innerHTML = "";
+      sortedYrs.forEach(yr => {
+        const opt = document.createElement("option");
+        opt.value = formatFy(yr);
+        opt.textContent = formatFy(yr);
+        sel.appendChild(opt);
+      });
+
+      if (currentVal && Array.from(sel.options).some(o => o.value === currentVal)) {
+        sel.value = currentVal;
+      } else if (sel.options.length > 0) {
+        sel.value = sel.options[0].value;
+      }
+    }
+
+    function renderFySummaryTable() {
+      const targetFy = document.getElementById("selectFyDropdown").value;
+      const tbody = document.getElementById("fyTableBody");
+      const tfoot = document.getElementById("fyTableFoot");
+      const banner = document.getElementById("fySummaryBannerText");
+      tbody.innerHTML = "";
+      tfoot.innerHTML = "";
+
+      let totCost = 0, totCaOpen = 0, totCaDep = 0, totCaClose = 0;
+      let totItOpen = 0, totItDep = 0, totItClose = 0;
+      let count = 0;
+
+      assets.forEach(a => {
+        const sched = calculateDepreciationSchedule(a);
+        const row = sched.find(r => r.fy_label === targetFy);
+        if (!row) return;
+        count++;
+        totCost += Number(a.cost);
+        totCaOpen += row.ca_opening_wdv;
+        totCaDep += row.ca_depreciation;
+        totCaClose += row.ca_closing_wdv;
+        totItOpen += row.it_opening_wdv;
+        totItDep += row.it_total_dep;
+        totItClose += row.it_closing_wdv;
+
+        const tr = document.createElement("tr");
+        tr.className = "hover:bg-slate-50";
+        tr.innerHTML = `
+          <td class="py-2 px-3 font-semibold text-indigo-700">${a.asset_code}</td>
+          <td class="py-2 px-3 text-slate-900 font-medium">${a.asset_name}</td>
+          <td class="py-2 px-3 text-slate-600">${a.category}</td>
+          <td class="py-2 px-3 text-center">${a.put_to_use_date}</td>
+          <td class="py-2 px-3 text-right">${formatINR(a.cost)}</td>
+          <td class="py-2 px-3 text-center bg-indigo-50/30">${a.ca_method}</td>
+          <td class="py-2 px-3 text-right bg-indigo-50/30">${formatINR(row.ca_opening_wdv)}</td>
+          <td class="py-2 px-3 text-right font-semibold text-indigo-700 bg-indigo-50/30">${formatINR(row.ca_depreciation)}</td>
+          <td class="py-2 px-3 text-right bg-indigo-50/30">${formatINR(row.ca_closing_wdv)}</td>
+          <td class="py-2 px-3 text-right bg-emerald-50/30">${a.it_rate}%</td>
+          <td class="py-2 px-3 text-center bg-emerald-50/30">${row.it_rule_note}</td>
+          <td class="py-2 px-3 text-right bg-emerald-50/30">${formatINR(row.it_opening_wdv)}</td>
+          <td class="py-2 px-3 text-right font-semibold text-emerald-700 bg-emerald-50/30">${formatINR(row.it_total_dep)}</td>
+          <td class="py-2 px-3 text-right bg-emerald-50/30">${formatINR(row.it_closing_wdv)}</td>
+        `;
+        tbody.appendChild(tr);
+      });
+
+      banner.textContent = `${count} active asset(s) in ${targetFy}`;
+
+      if (count === 0) {
+        tbody.innerHTML = `<tr><td colspan="14" class="py-8 text-center text-slate-400">No active assets for ${targetFy}.</td></tr>`;
+      } else {
+        tfoot.innerHTML = `
+          <tr>
+            <td colspan="4" class="py-2.5 px-3 text-right">Total (${targetFy}):</td>
+            <td class="py-2.5 px-3 text-right">\u20B9${formatINR(totCost)}</td>
+            <td class="py-2.5 px-3"></td>
+            <td class="py-2.5 px-3 text-right">\u20B9${formatINR(totCaOpen)}</td>
+            <td class="py-2.5 px-3 text-right text-indigo-700">\u20B9${formatINR(totCaDep)}</td>
+            <td class="py-2.5 px-3 text-right">\u20B9${formatINR(totCaClose)}</td>
+            <td colspan="2" class="py-2.5 px-3"></td>
+            <td class="py-2.5 px-3 text-right">\u20B9${formatINR(totItOpen)}</td>
+            <td class="py-2.5 px-3 text-right text-emerald-700">\u20B9${formatINR(totItDep)}</td>
+            <td class="py-2.5 px-3 text-right">\u20B9${formatINR(totItClose)}</td>
+          </tr>
+        `;
+      }
+    }
+
+    // -----------------------------------------------------------------------
+    // Add / Edit / Delete Modal Logic
+    // -----------------------------------------------------------------------
+    function getNextAssetCode() {
+      const existing = new Set(assets.map(a => (a.asset_code || "").toUpperCase()));
+      let cnt = assets.length + 1;
+      while (true) {
+        const code = `FA-${String(cnt).padStart(4, "0")}`;
+        if (!existing.has(code)) return code;
+        cnt++;
+      }
+    }
+
+    function recalcResidualFromPct() {
+      const cost = parseFloat(document.getElementById("inputCost").value) || 0;
+      const pct = parseFloat(document.getElementById("inputResidualPct").value) || 0;
+      document.getElementById("inputResidualVal").value = round2(cost * (pct / 100)).toFixed(2);
+    }
+
+    function openAddModal() {
+      document.getElementById("modalTitle").textContent = "Add New Fixed Asset";
+      document.getElementById("formAssetId").value = "";
+      document.getElementById("formErrorBox").classList.add("hidden");
+      document.getElementById("inputCode").value = getNextAssetCode();
+      document.getElementById("inputName").value = "";
+      document.getElementById("inputCategory").value = "Plant & Machinery (General)";
+      document.getElementById("inputLocation").value = "";
+      document.getElementById("inputVendor").value = "";
+      document.getElementById("inputInvoice").value = "";
+      const todayIso = new Date().toISOString().slice(0, 10);
+      document.getElementById("inputAcqDate").value = todayIso;
+      document.getElementById("inputPutDate").value = todayIso;
+      document.getElementById("inputCost").value = "100000.00";
+      document.getElementById("inputCaMethod").value = "SLM";
+      const preset = ASSET_CATEGORIES["Plant & Machinery (General)"];
+      document.getElementById("inputUsefulLife").value = preset.useful_life;
+      document.getElementById("inputResidualPct").value = preset.residual_pct;
+      document.getElementById("inputItRate").value = preset.it_rate;
+      document.getElementById("inputItAddDep").checked = false;
+      document.getElementById("inputRemarks").value = "";
+      recalcResidualFromPct();
+
+      const modal = document.getElementById("assetModal");
+      modal.classList.remove("hidden");
+      modal.classList.add("flex");
+    }
+
+    function openEditModal(id) {
+      const asset = assets.find(a => a.id === id);
+      if (!asset) return;
+      document.getElementById("modalTitle").textContent = `Edit Asset: ${asset.asset_code}`;
+      document.getElementById("formAssetId").value = String(asset.id);
+      document.getElementById("formErrorBox").classList.add("hidden");
+      document.getElementById("inputCode").value = asset.asset_code;
+      document.getElementById("inputName").value = asset.asset_name;
+      document.getElementById("inputCategory").value = ASSET_CATEGORIES[asset.category] ? asset.category : "Custom Category";
+      document.getElementById("inputLocation").value = asset.location || "";
+      document.getElementById("inputVendor").value = asset.vendor || "";
+      document.getElementById("inputInvoice").value = asset.invoice_no || "";
+      document.getElementById("inputAcqDate").value = asset.acq_date;
+      document.getElementById("inputPutDate").value = asset.put_to_use_date;
+      document.getElementById("inputCost").value = Number(asset.cost).toFixed(2);
+      document.getElementById("inputCaMethod").value = asset.ca_method || "SLM";
+      document.getElementById("inputUsefulLife").value = asset.useful_life;
+      document.getElementById("inputResidualPct").value = asset.residual_pct;
+      document.getElementById("inputResidualVal").value = Number(asset.residual_value).toFixed(2);
+      document.getElementById("inputItRate").value = asset.it_rate;
+      document.getElementById("inputItAddDep").checked = Boolean(Number(asset.it_additional_dep));
+      document.getElementById("inputRemarks").value = asset.remarks || "";
+
+      const modal = document.getElementById("assetModal");
+      modal.classList.remove("hidden");
+      modal.classList.add("flex");
+    }
+
+    function closeAssetModal() {
+      const modal = document.getElementById("assetModal");
+      modal.classList.add("hidden");
+      modal.classList.remove("flex");
+    }
+
+    function openDeleteModal(id) {
+      const asset = assets.find(a => a.id === id);
+      if (!asset) return;
+      pendingDeleteId = id;
+      document.getElementById("deleteModalText").textContent =
+        `Are you sure you want to permanently remove "${asset.asset_code} - ${asset.asset_name}" from the Fixed Asset Register?`;
+      const modal = document.getElementById("deleteModal");
+      modal.classList.remove("hidden");
+      modal.classList.add("flex");
+    }
+
+    function closeDeleteModal() {
+      pendingDeleteId = null;
+      const modal = document.getElementById("deleteModal");
+      modal.classList.add("hidden");
+      modal.classList.remove("flex");
+    }
+
+    // -----------------------------------------------------------------------
+    // CSV & Python File Downloads
+    // -----------------------------------------------------------------------
+    function triggerFileDownload(filename, content, mimeType) {
+      const blob = new Blob([content], { type: mimeType });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }
+
+    function exportMasterCsv() {
+      if (assets.length === 0) {
+        showToast("No assets in register to export.");
+        return;
+      }
+      const headers = [
+        "Asset Code", "Asset Name", "Category", "Location", "Vendor", "Invoice No",
+        "Acquisition Date", "Put to Use Date", "Original Cost", "Useful Life (Yrs)",
+        "Residual %", "Residual Value", "Companies Act Method", "IT Act Rate %",
+        "Additional Dep Eligible", "Remarks"
+      ];
+      const rows = assets.map(a => [
+        a.asset_code, a.asset_name, a.category, a.location || "", a.vendor || "", a.invoice_no || "",
+        a.acq_date, a.put_to_use_date, a.cost, a.useful_life,
+        a.residual_pct, a.residual_value, a.ca_method, a.it_rate,
+        a.it_additional_dep ? "Yes" : "No", a.remarks || ""
+      ]);
+      const csvContent = "\uFEFF" + [headers, ...rows]
+        .map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(","))
+        .join("\r\n");
+      triggerFileDownload("Fixed_Asset_Master_Register.csv", csvContent, "text/csv;charset=utf-8");
+      showToast("Exported Fixed_Asset_Master_Register.csv");
+    }
+
+    function exportSelectedScheduleCsv() {
+      const asset = assets.find(a => a.id === selectedAssetId);
+      if (!asset) {
+        showToast("Select an asset first to export its schedule.");
+        return;
+      }
+      const sched = calculateDepreciationSchedule(asset);
+      const metaRows = [
+        ["Asset Code", asset.asset_code, "Asset Name", asset.asset_name],
+        ["Category", asset.category, "Acquisition Date", asset.acq_date, "Put to Use Date", asset.put_to_use_date],
+        ["Original Cost", asset.cost, "Useful Life (Yrs)", asset.useful_life, "Residual Value", asset.residual_value, "Co. Act Method", asset.ca_method, "IT Rate %", asset.it_rate],
+        []
+      ];
+      const headers = [
+        "Year #", "Financial Year", "CA Days", "CA Opening WDV", "CA Depreciation",
+        "CA Accumulated Dep", "CA Closing WDV", "IT Rule Applied", "IT Opening WDV",
+        "IT Normal Dep", "IT Additional Dep", "IT Total Dep", "IT Closing WDV", "Timing Diff (CA - IT)"
+      ];
+      const dataRows = sched.map(r => [
+        r.year_no, r.fy_label, r.ca_days, r.ca_opening_wdv, r.ca_depreciation,
+        r.ca_accum_dep, r.ca_closing_wdv, r.it_rule_note, r.it_opening_wdv,
+        r.it_normal_dep, r.it_add_dep, r.it_total_dep, r.it_closing_wdv, r.dep_diff
+      ]);
+      const csvContent = "\uFEFF" + [...metaRows, headers, ...dataRows]
+        .map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(","))
+        .join("\r\n");
+      triggerFileDownload(`Depreciation_Schedule_${asset.asset_code}.csv`, csvContent, "text/csv;charset=utf-8");
+      showToast(`Exported Depreciation_Schedule_${asset.asset_code}.csv`);
+    }
+
+    function exportFyCsv() {
+      const targetFy = document.getElementById("selectFyDropdown").value;
+      if (!targetFy) return;
+      const headers = [
+        "Asset Code", "Asset Name", "Category", "Put to Use Date", "Original Cost",
+        "CA Method", "CA Opening WDV", "CA Depreciation", "CA Closing WDV",
+        "IT Rate %", "IT Rule Applied", "IT Opening WDV", "IT Depreciation", "IT Closing WDV"
+      ];
+      const rows = [];
+      assets.forEach(a => {
+        const sched = calculateDepreciationSchedule(a);
+        const r = sched.find(x => x.fy_label === targetFy);
+        if (r) {
+          rows.push([
+            a.asset_code, a.asset_name, a.category, a.put_to_use_date, a.cost,
+            a.ca_method, r.ca_opening_wdv, r.ca_depreciation, r.ca_closing_wdv,
+            a.it_rate, r.it_rule_note, r.it_opening_wdv, r.it_total_dep, r.it_closing_wdv
+          ]);
+        }
+      });
+      const csvContent = "\uFEFF" + [[`Fixed Asset Register Summary - ${targetFy}`], headers, ...rows]
+        .map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(","))
+        .join("\r\n");
+      triggerFileDownload(`Fixed_Asset_Register_${targetFy.replace(/\s+/g, "_")}.csv`, csvContent, "text/csv;charset=utf-8");
+      showToast(`Exported ${targetFy} Summary CSV`);
+    }
+
+    // -----------------------------------------------------------------------
+    // Initialization & Event Listeners
+    // -----------------------------------------------------------------------
+    window.addEventListener("DOMContentLoaded", () => {
+      // Populate Category Select
+      const catSelect = document.getElementById("inputCategory");
+      Object.keys(ASSET_CATEGORIES).forEach(cat => {
+        const opt = document.createElement("option");
+        opt.value = cat;
+        opt.textContent = cat;
+        catSelect.appendChild(opt);
+      });
+
+      catSelect.addEventListener("change", () => {
+        const preset = ASSET_CATEGORIES[catSelect.value];
+        if (preset) {
+          document.getElementById("inputUsefulLife").value = preset.useful_life;
+          document.getElementById("inputResidualPct").value = preset.residual_pct;
+          document.getElementById("inputItRate").value = preset.it_rate;
+          recalcResidualFromPct();
+        }
+      });
+
+      document.getElementById("inputCost").addEventListener("input", recalcResidualFromPct);
+      document.getElementById("inputResidualPct").addEventListener("input", recalcResidualFromPct);
+
+      // View Tabs
+      const tabLifecycle = document.getElementById("tabBtnLifecycle");
+      const tabFySummary = document.getElementById("tabBtnFySummary");
+      const viewLifecycle = document.getElementById("viewLifecycle");
+      const viewFySummary = document.getElementById("viewFySummary");
+
+      tabLifecycle.addEventListener("click", () => {
+        viewLifecycle.classList.remove("hidden");
+        viewLifecycle.classList.add("flex");
+        viewFySummary.classList.add("hidden");
+        viewFySummary.classList.remove("flex");
+        tabLifecycle.className = "px-4 py-2 rounded-lg text-xs sm:text-sm font-semibold bg-indigo-600 text-white shadow-sm transition";
+        tabFySummary.className = "px-4 py-2 rounded-lg text-xs sm:text-sm font-semibold bg-white text-slate-700 hover:bg-slate-100 border border-slate-200 transition";
+      });
+
+      tabFySummary.addEventListener("click", () => {
+        viewFySummary.classList.remove("hidden");
+        viewFySummary.classList.add("flex");
+        viewLifecycle.classList.add("hidden");
+        viewLifecycle.classList.remove("flex");
+        tabFySummary.className = "px-4 py-2 rounded-lg text-xs sm:text-sm font-semibold bg-indigo-600 text-white shadow-sm transition";
+        tabLifecycle.className = "px-4 py-2 rounded-lg text-xs sm:text-sm font-semibold bg-white text-slate-700 hover:bg-slate-100 border border-slate-200 transition";
+        renderFySummaryTable();
+      });
+
+      // Buttons
+      document.getElementById("btnOpenAddModal").addEventListener("click", openAddModal);
+      document.getElementById("btnCloseAssetModal").addEventListener("click", closeAssetModal);
+      document.getElementById("btnCancelModal").addEventListener("click", closeAssetModal);
+
+      document.getElementById("btnCloseDeleteModal").addEventListener("click", closeDeleteModal);
+      document.getElementById("btnCancelDelete").addEventListener("click", closeDeleteModal);
+      document.getElementById("btnConfirmDelete").addEventListener("click", () => {
+        if (pendingDeleteId !== null) {
+          assets = assets.filter(a => a.id !== pendingDeleteId);
+          if (selectedAssetId === pendingDeleteId) {
+            selectedAssetId = assets.length > 0 ? assets[0].id : null;
+          }
+          saveState();
+          renderAll();
+          showToast("Asset deleted from register.");
+        }
+        closeDeleteModal();
+      });
+
+      document.getElementById("btnLoadSamples").addEventListener("click", () => {
+        const existingCodes = new Set(assets.map(a => a.asset_code.toUpperCase()));
+        let maxId = assets.reduce((m, a) => Math.max(m, a.id || 0), 0);
+        let added = 0;
+        DEFAULT_SAMPLES.forEach(s => {
+          if (!existingCodes.has(s.asset_code.toUpperCase())) {
+            maxId++;
+            assets.push({ ...s, id: maxId });
+            added++;
+          }
+        });
+        if (selectedAssetId === null && assets.length > 0) {
+          selectedAssetId = assets[0].id;
+        }
+        saveState();
+        renderAll();
+        showToast(added > 0 ? `Loaded ${added} sample fixed assets.` : "Sample assets are already in the register.");
+      });
+
+      document.getElementById("searchInput").addEventListener("input", renderMasterTable);
+      document.getElementById("selectFyDropdown").addEventListener("change", renderFySummaryTable);
+      document.getElementById("btnExportMasterCsv").addEventListener("click", exportMasterCsv);
+      document.getElementById("btnExportScheduleCsv").addEventListener("click", exportSelectedScheduleCsv);
+      document.getElementById("btnExportFyCsv").addEventListener("click", exportFyCsv);
+
+      // Form Submit
+      document.getElementById("assetForm").addEventListener("submit", (e) => {
+        e.preventDefault();
+        const errBox = document.getElementById("formErrorBox");
+        errBox.classList.add("hidden");
+
+        const editIdStr = document.getElementById("formAssetId").value;
+        const editId = editIdStr ? Number(editIdStr) : null;
+        const code = document.getElementById("inputCode").value.trim();
+        const name = document.getElementById("inputName").value.trim();
+        const acqDate = document.getElementById("inputAcqDate").value;
+        const putDate = document.getElementById("inputPutDate").value;
+        const cost = parseFloat(document.getElementById("inputCost").value);
+        const usefulLife = parseFloat(document.getElementById("inputUsefulLife").value);
+        const residualPct = parseFloat(document.getElementById("inputResidualPct").value);
+        const residualVal = parseFloat(document.getElementById("inputResidualVal").value);
+        const itRate = parseFloat(document.getElementById("inputItRate").value);
+
+        if (putDate < acqDate) {
+          errBox.textContent = "Put-to-Use Date cannot be earlier than Acquisition Date.";
+          errBox.classList.remove("hidden");
+          return;
+        }
+        if (residualVal < 0 || residualVal >= cost) {
+          errBox.textContent = "Residual Value must be non-negative and less than Original Cost.";
+          errBox.classList.remove("hidden");
+          return;
+        }
+
+        const duplicate = assets.find(a => a.asset_code.toUpperCase() === code.toUpperCase() && a.id !== editId);
+        if (duplicate) {
+          errBox.textContent = `Asset Code "${code}" is already used by another asset.`;
+          errBox.classList.remove("hidden");
+          return;
+        }
+
+        const payload = {
+          asset_code: code,
+          asset_name: name,
+          category: document.getElementById("inputCategory").value,
+          location: document.getElementById("inputLocation").value.trim(),
+          vendor: document.getElementById("inputVendor").value.trim(),
+          invoice_no: document.getElementById("inputInvoice").value.trim(),
+          acq_date: acqDate,
+          put_to_use_date: putDate,
+          cost: round2(cost),
+          useful_life: round2(usefulLife),
+          residual_pct: round2(residualPct),
+          residual_value: round2(residualVal),
+          ca_method: document.getElementById("inputCaMethod").value,
+          it_rate: round2(itRate),
+          it_additional_dep: document.getElementById("inputItAddDep").checked ? 1 : 0,
+          remarks: document.getElementById("inputRemarks").value.trim()
+        };
+
+        if (editId !== null) {
+          const idx = assets.findIndex(a => a.id === editId);
+          if (idx !== -1) {
+            assets[idx] = { ...assets[idx], ...payload, id: editId };
+            selectedAssetId = editId;
+            showToast(`Updated asset ${code}`);
+          }
+        } else {
+          const newId = assets.reduce((m, a) => Math.max(m, a.id || 0), 0) + 1;
+          assets.push({ ...payload, id: newId });
+          selectedAssetId = newId;
+          showToast(`Added asset ${code} to register`);
+        }
+
+        saveState();
+        closeAssetModal();
+        renderAll();
+      });
+
+      // Download Standalone Python App (.py)
+      document.getElementById("btnDownloadPyApp").addEventListener("click", () => {
+        const pyScript = document.getElementById("embeddedPythonSource").textContent;
+        triggerFileDownload("fixed_asset_register.py", pyScript.trim() + "\n", "text/x-python;charset=utf-8");
+        showToast("Downloaded standalone fixed_asset_register.py");
+      });
+
+      loadState();
+      renderAll();
+    });
+  </script>
+
+  <!-- Embedded Standalone Python Desktop Script for Instant Download -->
+  <script id="embeddedPythonSource" type="text/plain">
+"""
+Fixed Asset Register & Depreciation Calculator
+Compliant with:
+  1. Companies Act, 2013 (Schedule II) - Supports both SLM and WDV methods,
+     pro-rata day-wise calculation, and 5% default residual value cap.
+  2. Income Tax Act, 1961 (Section 32) - Supports WDV Block of Assets rates,
+     automatic 180-day rule (>=180 days full rate, <180 days half rate in year
+     of acquisition), and optional Additional Depreciation (20% / 10%).
+
+Runs independently on any Windows system using only Python Standard Library
+modules (tkinter, json, csv, datetime, math, os). Requires zero external pip
+packages and works reliably across local drives, OneDrive, and network folders.
+"""
+
+import csv
+from datetime import date, datetime, timedelta
+import json
+import math
+import os
+import sys
+from typing import Dict, List, Optional, Tuple
+
+try:
+    import tkinter as tk
+    from tkinter import filedialog, messagebox, ttk
+    HAS_TKINTER = True
+except ImportError:
+    tk = None  # type: ignore
+    filedialog = None  # type: ignore
+    messagebox = None  # type: ignore
+    ttk = None  # type: ignore
+    HAS_TKINTER = False
+
+
+# ---------------------------------------------------------------------------
+# Standard Presets as per Schedule II (Companies Act, 2013) & Income Tax Act
+# ---------------------------------------------------------------------------
+ASSET_CATEGORIES: Dict[str, Dict[str, float]] = {
+    "Buildings (Factory)": {
+        "useful_life": 30.0,
+        "residual_pct": 5.0,
+        "it_rate": 10.0,
+    },
+    "Buildings (Office / Non-Factory)": {
+        "useful_life": 60.0,
+        "residual_pct": 5.0,
+        "it_rate": 10.0,
+    },
+    "Plant & Machinery (General)": {
+        "useful_life": 15.0,
+        "residual_pct": 5.0,
+        "it_rate": 15.0,
+    },
+    "Furniture & Fittings (General)": {
+        "useful_life": 10.0,
+        "residual_pct": 5.0,
+        "it_rate": 10.0,
+    },
+    "Office Equipment": {
+        "useful_life": 5.0,
+        "residual_pct": 5.0,
+        "it_rate": 15.0,
+    },
+    "Computers & Laptops (End-User)": {
+        "useful_life": 3.0,
+        "residual_pct": 5.0,
+        "it_rate": 40.0,
+    },
+    "Servers & Networks": {
+        "useful_life": 6.0,
+        "residual_pct": 5.0,
+        "it_rate": 40.0,
+    },
+    "Motor Cars (Non-Hire)": {
+        "useful_life": 8.0,
+        "residual_pct": 5.0,
+        "it_rate": 15.0,
+    },
+    "Motor Buses / Lorries / Commercial": {
+        "useful_life": 8.0,
+        "residual_pct": 5.0,
+        "it_rate": 30.0,
+    },
+    "Intangible Assets / Software": {
+        "useful_life": 5.0,
+        "residual_pct": 0.0,
+        "it_rate": 25.0,
+    },
+    "Custom Category": {
+        "useful_life": 10.0,
+        "residual_pct": 5.0,
+        "it_rate": 15.0,
+    },
+}
+
+
+# ---------------------------------------------------------------------------
+# Financial Year & Date Utilities
+# ---------------------------------------------------------------------------
+def get_fy_bounds(d: date) -> Tuple[int, date, date]:
+    """
+    Returns (fy_start_year, fy_start_date, fy_end_date) for an Indian Financial Year
+    (April 1 to March 31).
+    """
+    if d.month >= 4:
+        start_yr = d.year
+    else:
+        start_yr = d.year - 1
+    return start_yr, date(start_yr, 4, 1), date(start_yr + 1, 3, 31)
+
+
+def format_fy(start_yr: int) -> str:
+    """Formats e.g. 2026 as 'FY 2026-27'."""
+    return f"FY {start_yr}-{str(start_yr + 1)[-2:]}"
+
+
+def parse_iso_date(date_str: str) -> date:
+    """Parses YYYY-MM-DD or DD-MM-YYYY string into a date object."""
+    date_str = date_str.strip()
+    for fmt in ("%Y-%m-%d", "%d-%m-%Y", "%d/%m/%Y", "%Y/%m/%d"):
+        try:
+            return datetime.strptime(date_str, fmt).date()
+        except ValueError:
+            continue
+    raise ValueError(f"Invalid date format '{date_str}'. Use YYYY-MM-DD or DD-MM-YYYY.")
+
+
+# ---------------------------------------------------------------------------
+# Depreciation Calculation Engine (Companies Act 2013 & Income Tax Act 1961)
+# ---------------------------------------------------------------------------
+def calculate_depreciation_schedule(asset: Dict) -> List[Dict]:
+    """
+    Generates a year-by-year depreciation schedule from the Financial Year of
+    acquisition up to the completion of useful life (and corresponding IT Act WDV).
+    """
+    cost = float(asset["cost"])
+    put_to_use_date = parse_iso_date(asset.get("put_to_use_date") or asset["acq_date"])
+    useful_life_years = float(asset["useful_life"])
+    residual_val = float(asset["residual_value"])
+    ca_method = asset.get("ca_method", "SLM").upper()
+    it_rate = float(asset["it_rate"])
+    add_dep_flag = bool(int(asset.get("it_additional_dep", 0)))
+
+    if cost <= 0 or useful_life_years <= 0:
+        return []
+
+    depreciable_amount = max(0.0, cost - residual_val)
+    annual_slm_dep = depreciable_amount / useful_life_years
+
+    # Companies Act WDV annual rate: r = 1 - (Residual / Cost) ^ (1 / Useful_Life)
+    if ca_method == "WDV":
+        eff_residual = residual_val if residual_val > 0 else cost * 0.05
+        if eff_residual >= cost:
+            ca_wdv_rate = 0.0
+        else:
+            ca_wdv_rate = (1.0 - math.pow(eff_residual / cost, 1.0 / useful_life_years)) * 100.0
+    else:
+        ca_wdv_rate = (annual_slm_dep / cost) * 100.0 if cost > 0 else 0.0
+
+    # Useful life end date from put_to_use_date
+    try:
+        whole_years = int(useful_life_years)
+        rem_days = int(round((useful_life_years - whole_years) * 365.25))
+        end_life_date = date(
+            put_to_use_date.year + whole_years, put_to_use_date.month, put_to_use_date.day
+        ) + timedelta(days=rem_days - 1)
+    except ValueError:
+        # Handle Feb 29 leap year edge case
+        end_life_date = put_to_use_date + timedelta(days=int(round(useful_life_years * 365.25)) - 1)
+
+    total_life_days = (end_life_date - put_to_use_date).days + 1
+    start_fy_yr, _, _ = get_fy_bounds(put_to_use_date)
+    max_fys = int(math.ceil(useful_life_years)) + 2
+
+    ca_opening_wdv = cost
+    ca_accum_dep = 0.0
+    remaining_life_days = total_life_days
+
+    it_opening_wdv = cost
+    it_accum_dep = 0.0
+    balance_half_add_dep_pending = False
+
+    schedule: List[Dict] = []
+
+    for idx in range(max_fys):
+        fy_yr = start_fy_yr + idx
+        fy_start = date(fy_yr, 4, 1)
+        fy_end = date(fy_yr + 1, 3, 31)
+        days_in_fy = (fy_end - fy_start).days + 1
+
+        if remaining_life_days <= 0 and idx >= int(math.ceil(useful_life_years)):
+            break
+
+        # --- 1. COMPANIES ACT, 2013 CALCULATION ---
+        if remaining_life_days > 0 and ca_opening_wdv > residual_val + 0.005:
+            eff_start = max(put_to_use_date, fy_start)
+            eff_end = min(end_life_date, fy_end)
+            if eff_start <= eff_end:
+                ca_days_used = (eff_end - eff_start).days + 1
+            else:
+                ca_days_used = 0
+
+            if ca_days_used > 0:
+                if ca_method == "SLM":
+                    ca_dep = annual_slm_dep * (ca_days_used / days_in_fy)
+                else:
+                    ca_dep = ca_opening_wdv * (ca_wdv_rate / 100.0) * (ca_days_used / days_in_fy)
+
+                max_allowable_ca_dep = max(0.0, ca_opening_wdv - residual_val)
+                if (remaining_life_days - ca_days_used) <= 0:
+                    ca_dep = max_allowable_ca_dep
+                else:
+                    ca_dep = min(ca_dep, max_allowable_ca_dep)
+
+                ca_dep = round(ca_dep, 2)
+                remaining_life_days -= ca_days_used
+            else:
+                ca_dep = 0.0
+        else:
+            ca_days_used = 0
+            ca_dep = 0.0
+
+        if ca_days_used == 0 and idx > 0 and remaining_life_days <= 0:
+            break
+
+        ca_accum_dep = round(ca_accum_dep + ca_dep, 2)
+        ca_closing_wdv = round(max(residual_val if cost > residual_val else 0.0, cost - ca_accum_dep), 2)
+
+        # --- 2. INCOME TAX ACT, 1961 CALCULATION ---
+        it_days_used = 0
+        it_rule_note = "Full Rate (100%)"
+        if idx == 0:
+            it_days_used = (fy_end - put_to_use_date).days + 1 if put_to_use_date <= fy_end else 0
+            if it_days_used <= 0:
+                eff_it_rate = 0.0
+                eff_add_rate = 0.0
+                it_rule_note = "Not Put to Use"
+            elif it_days_used < 180:
+                eff_it_rate = it_rate * 0.5
+                eff_add_rate = 10.0 if add_dep_flag else 0.0
+                balance_half_add_dep_pending = add_dep_flag
+                it_rule_note = f"<180 Days ({it_days_used}d) - Half Rate"
+            else:
+                eff_it_rate = it_rate
+                eff_add_rate = 20.0 if add_dep_flag else 0.0
+                it_rule_note = f">=180 Days ({it_days_used}d) - Full Rate"
+
+            it_normal_dep = round(it_opening_wdv * (eff_it_rate / 100.0), 2)
+            it_add_dep = round(cost * (eff_add_rate / 100.0), 2)
+        else:
+            it_days_used = days_in_fy
+            it_normal_dep = round(it_opening_wdv * (it_rate / 100.0), 2)
+            if idx == 1 and balance_half_add_dep_pending:
+                it_add_dep = round(cost * 0.10, 2)
+                it_rule_note = "Full Rate + Bal 10% Add. Dep"
+                balance_half_add_dep_pending = False
+            else:
+                it_add_dep = 0.0
+
+        it_total_dep = min(it_opening_wdv, round(it_normal_dep + it_add_dep, 2))
+        it_accum_dep = round(it_accum_dep + it_total_dep, 2)
+        it_closing_wdv = round(max(0.0, it_opening_wdv - it_total_dep), 2)
+
+        schedule.append({
+            "year_no": idx + 1,
+            "fy_start_yr": fy_yr,
+            "fy_label": format_fy(fy_yr),
+            "ca_days": ca_days_used,
+            "ca_rate_pct": round(ca_wdv_rate, 2),
+            "ca_opening_wdv": round(ca_opening_wdv, 2),
+            "ca_depreciation": ca_dep,
+            "ca_accum_dep": ca_accum_dep,
+            "ca_closing_wdv": ca_closing_wdv,
+            "it_days": it_days_used,
+            "it_rule_note": it_rule_note,
+            "it_opening_wdv": round(it_opening_wdv, 2),
+            "it_normal_dep": it_normal_dep,
+            "it_add_dep": it_add_dep,
+            "it_total_dep": it_total_dep,
+            "it_accum_dep": it_accum_dep,
+            "it_closing_wdv": it_closing_wdv,
+            "dep_diff": round(ca_dep - it_total_dep, 2),
+        })
+
+        ca_opening_wdv = ca_closing_wdv
+        it_opening_wdv = it_closing_wdv
+
+    return schedule
+
+
+# ---------------------------------------------------------------------------
+# Persistent Storage Layer (JSON-backed, works on local, OneDrive & network drives)
+# ---------------------------------------------------------------------------
+class DuplicateAssetCodeError(ValueError):
+    """Raised when attempting to insert or update an asset with an existing asset_code."""
+
+
+class AssetDatabase:
+    def __init__(self, db_path: Optional[str] = None):
+        if db_path is None:
+            base_dir = os.path.dirname(os.path.abspath(sys.argv[0]))
+            db_path = os.path.join(base_dir, "fixed_assets_register.json")
+        self.db_path = db_path
+        self._data: Dict = {"next_id": 1, "assets": []}
+        self._load()
+
+    def _load(self) -> None:
+        if os.path.exists(self.db_path):
+            try:
+                with open(self.db_path, "r", encoding="utf-8") as f:
+                    loaded = json.load(f)
+                    if isinstance(loaded, dict) and "assets" in loaded:
+                        self._data = loaded
+            except Exception:
+                self._data = {"next_id": 1, "assets": []}
+        else:
+            self._data = {
+                "next_id": 11,
+                "assets": [
+    {
+        "id": 1,
+        "asset_code": "FA-0001",
+        "asset_name": "Industrial Factory Shed & Civil Works",
+        "category": "Buildings (Factory)",
+        "location": "Peenya Industrial Area - Block A",
+        "vendor": "Shapoorji Industrial Constructions",
+        "invoice_no": "SIC/22-23/014",
+        "acq_date": "2022-05-15",
+        "put_to_use_date": "2022-06-01",
+        "cost": 4500000.0,
+        "useful_life": 30.0,
+        "residual_pct": 5.0,
+        "residual_value": 225000.0,
+        "ca_method": "SLM",
+        "it_rate": 10.0,
+        "it_additional_dep": 0,
+        "remarks": "Factory building put to use >= 180 days in FY 2022-23"
+    },
+    {
+        "id": 2,
+        "asset_code": "FA-0002",
+        "asset_name": "Corporate Office Floor Unit",
+        "category": "Buildings (Office / Non-Factory)",
+        "location": "Kochi InfoPark - Tower 2",
+        "vendor": "Prestige Commercial Estates",
+        "invoice_no": "PCE/22-23/089",
+        "acq_date": "2022-09-01",
+        "put_to_use_date": "2022-09-15",
+        "cost": 8000000.0,
+        "useful_life": 60.0,
+        "residual_pct": 5.0,
+        "residual_value": 400000.0,
+        "ca_method": "SLM",
+        "it_rate": 10.0,
+        "it_additional_dep": 0,
+        "remarks": "Admin office RCC structure (60 yrs Schedule II useful life)"
+    },
+    {
+        "id": 3,
+        "asset_code": "FA-0003",
+        "asset_name": "5-Axis CNC Vertical Machining Center",
+        "category": "Plant & Machinery (General)",
+        "location": "Plant Shopfloor A",
+        "vendor": "Bharat Machine Tools Ltd",
+        "invoice_no": "BMT/23-24/108",
+        "acq_date": "2023-05-10",
+        "put_to_use_date": "2023-05-20",
+        "cost": 1850000.0,
+        "useful_life": 15.0,
+        "residual_pct": 5.0,
+        "residual_value": 92500.0,
+        "ca_method": "SLM",
+        "it_rate": 15.0,
+        "it_additional_dep": 1,
+        "remarks": "Put to use >= 180 days in FY 2023-24; 20% Add. Dep u/s 32(1)(iia)"
+    },
+    {
+        "id": 4,
+        "asset_code": "FA-0004",
+        "asset_name": "Automated Laser Cutting & Bending Line",
+        "category": "Plant & Machinery (General)",
+        "location": "Plant Shopfloor B",
+        "vendor": "Trumpf India Pvt Ltd",
+        "invoice_no": "TIPL/23-24/412",
+        "acq_date": "2023-11-10",
+        "put_to_use_date": "2023-11-18",
+        "cost": 1200000.0,
+        "useful_life": 15.0,
+        "residual_pct": 5.0,
+        "residual_value": 60000.0,
+        "ca_method": "WDV",
+        "it_rate": 15.0,
+        "it_additional_dep": 1,
+        "remarks": "< 180 days in FY 2023-24 (Half rate + 10% Add. Dep in Yr 1, bal 10% in Yr 2)"
+    },
+    {
+        "id": 5,
+        "asset_code": "FA-0005",
+        "asset_name": "Dell PowerEdge R750 Rack Server Cluster",
+        "category": "Servers & Networks",
+        "location": "Head Office Data Center",
+        "vendor": "TechNova Enterprise Solutions",
+        "invoice_no": "TN/24-25/119",
+        "acq_date": "2024-04-08",
+        "put_to_use_date": "2024-04-12",
+        "cost": 640000.0,
+        "useful_life": 6.0,
+        "residual_pct": 5.0,
+        "residual_value": 32000.0,
+        "ca_method": "WDV",
+        "it_rate": 40.0,
+        "it_additional_dep": 0,
+        "remarks": "Core production servers (6 yrs Schedule II; 40% IT Act Block)"
+    },
+    {
+        "id": 6,
+        "asset_code": "FA-0006",
+        "asset_name": "Modular Workstations & Conference Tables",
+        "category": "Furniture & Fittings (General)",
+        "location": "Corporate Floor 3",
+        "vendor": "Featherlite Office Systems",
+        "invoice_no": "FL/24-25/204",
+        "acq_date": "2024-08-01",
+        "put_to_use_date": "2024-08-05",
+        "cost": 420000.0,
+        "useful_life": 10.0,
+        "residual_pct": 5.0,
+        "residual_value": 21000.0,
+        "ca_method": "SLM",
+        "it_rate": 10.0,
+        "it_additional_dep": 0,
+        "remarks": "50-seater modular office furniture & boardroom setup"
+    },
+    {
+        "id": 7,
+        "asset_code": "FA-0007",
+        "asset_name": "Daikin VRV Central Air Conditioning System",
+        "category": "Office Equipment",
+        "location": "Corporate Floor 3",
+        "vendor": "CoolAir HVAC Engineers",
+        "invoice_no": "CA/24-25/551",
+        "acq_date": "2024-12-02",
+        "put_to_use_date": "2024-12-10",
+        "cost": 360000.0,
+        "useful_life": 5.0,
+        "residual_pct": 5.0,
+        "residual_value": 18000.0,
+        "ca_method": "SLM",
+        "it_rate": 15.0,
+        "it_additional_dep": 0,
+        "remarks": "Put to use < 180 days in FY 2024-25 (7.5% IT WDV in Year 1)"
+    },
+    {
+        "id": 8,
+        "asset_code": "FA-0008",
+        "asset_name": "Executive Passenger SUV (Staff Transport)",
+        "category": "Motor Cars (Non-Hire)",
+        "location": "Head Office Fleet",
+        "vendor": "TVS Sundaram Motors",
+        "invoice_no": "TSM/25-26/077",
+        "acq_date": "2025-06-12",
+        "put_to_use_date": "2025-06-15",
+        "cost": 1600000.0,
+        "useful_life": 8.0,
+        "residual_pct": 5.0,
+        "residual_value": 80000.0,
+        "ca_method": "WDV",
+        "it_rate": 15.0,
+        "it_additional_dep": 0,
+        "remarks": "Company vehicle put to use >= 180 days in FY 2025-26"
+    },
+    {
+        "id": 9,
+        "asset_code": "FA-0009",
+        "asset_name": "MacBook Pro & ThinkPad Developer Fleet (15 Units)",
+        "category": "Computers & Laptops (End-User)",
+        "location": "Engineering Wing",
+        "vendor": "Croma Corporate Direct",
+        "invoice_no": "CCD/25-26/903",
+        "acq_date": "2025-10-20",
+        "put_to_use_date": "2025-10-25",
+        "cost": 1125000.0,
+        "useful_life": 3.0,
+        "residual_pct": 5.0,
+        "residual_value": 56250.0,
+        "ca_method": "SLM",
+        "it_rate": 40.0,
+        "it_additional_dep": 0,
+        "remarks": "Put to use < 180 days in FY 2025-26 (20% effective IT WDV in Yr 1)"
+    },
+    {
+        "id": 10,
+        "asset_code": "FA-0010",
+        "asset_name": "SAP Business One ERP License & Implementation",
+        "category": "Intangible Assets / Software",
+        "location": "Enterprise IT",
+        "vendor": "SAP India Systems",
+        "invoice_no": "SAP/26-27/019",
+        "acq_date": "2026-04-10",
+        "put_to_use_date": "2026-04-15",
+        "cost": 750000.0,
+        "useful_life": 5.0,
+        "residual_pct": 0.0,
+        "residual_value": 0.0,
+        "ca_method": "SLM",
+        "it_rate": 25.0,
+        "it_additional_dep": 0,
+        "remarks": "Perpetual ERP license amortized over 5 years; 25% IT Act intangible rate"
+    }
+]
+            }
+            self._save()
+
+    def _save(self) -> None:
+        tmp_path = f"{self.db_path}.tmp"
+        with open(tmp_path, "w", encoding="utf-8") as f:
+            json.dump(self._data, f, indent=2)
+        os.replace(tmp_path, self.db_path)
+
+    def add_asset(self, data: Dict) -> int:
+        code_upper = data["asset_code"].strip().upper()
+        for existing in self._data["assets"]:
+            if existing["asset_code"].strip().upper() == code_upper:
+                raise DuplicateAssetCodeError(f"Asset code '{data['asset_code']}' already exists.")
+
+        new_id = int(self._data.get("next_id", 1))
+        record = dict(data)
+        record["id"] = new_id
+        record["created_at"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        self._data["assets"].append(record)
+        self._data["next_id"] = new_id + 1
+        self._save()
+        return new_id
+
+    def update_asset(self, asset_id: int, data: Dict) -> None:
+        code_upper = data["asset_code"].strip().upper()
+        for existing in self._data["assets"]:
+            if existing["id"] != asset_id and existing["asset_code"].strip().upper() == code_upper:
+                raise DuplicateAssetCodeError(f"Asset code '{data['asset_code']}' already exists.")
+
+        for idx, existing in enumerate(self._data["assets"]):
+            if existing["id"] == asset_id:
+                updated = dict(existing)
+                updated.update(data)
+                updated["id"] = asset_id
+                self._data["assets"][idx] = updated
+                self._save()
+                return
+
+    def delete_asset(self, asset_id: int) -> None:
+        self._data["assets"] = [a for a in self._data["assets"] if a["id"] != asset_id]
+        self._save()
+
+    def get_all_assets(self, search_query: str = "") -> List[Dict]:
+        assets = list(self._data["assets"])
+        assets.sort(key=lambda x: (x.get("acq_date", ""), x.get("id", 0)))
+        q = search_query.strip().lower()
+        if not q:
+            return [dict(a) for a in assets]
+        return [
+            dict(a)
+            for a in assets
+            if q in a.get("asset_code", "").lower()
+            or q in a.get("asset_name", "").lower()
+            or q in a.get("category", "").lower()
+            or q in a.get("location", "").lower()
+        ]
+
+    def get_asset_by_id(self, asset_id: int) -> Optional[Dict]:
+        for a in self._data["assets"]:
+            if a["id"] == asset_id:
+                return dict(a)
+        return None
+
+    def next_asset_code(self) -> str:
+        existing_codes = {a["asset_code"].strip().upper() for a in self._data["assets"]}
+        cnt = len(existing_codes) + 1
+        while True:
+            candidate = f"FA-{cnt:04d}"
+            if candidate not in existing_codes:
+                return candidate
+            cnt += 1
+
+
+# ---------------------------------------------------------------------------
+# Desktop GUI Application (Tkinter / ttk)
+# ---------------------------------------------------------------------------
+if HAS_TKINTER:
+    class FixedAssetRegisterApp(tk.Tk):
+        def __init__(self, db: AssetDatabase):
+            super().__init__()
+            self.db = db
+            self.selected_asset_id: Optional[int] = None
+
+            self.title(
+                "Fixed Asset Register & Depreciation Calculator (Companies Act 2013 & Income Tax Act 1961)"
+            )
+            self.geometry("1360x820")
+            self.minsize(1120, 700)
+
+            # Configure High-DPI awareness on Windows if available
+            if sys.platform.startswith("win"):
+                try:
+                    from ctypes import windll
+                    windll.shcore.SetProcessDpiAwareness(1)
+                except Exception:
+                    pass
+
+            self._configure_styles()
+            self._build_ui()
+            self.refresh_asset_table()
+
+        def _configure_styles(self) -> None:
+            style = ttk.Style(self)
+            if "clam" in style.theme_names():
+                style.theme_use("clam")
+
+            style.configure("TFrame", background="#F8FAFC")
+            style.configure("Card.TFrame", background="#FFFFFF", relief="solid", borderwidth=1)
+            style.configure(
+                "Header.TLabel",
+                background="#0F172A",
+                foreground="#FFFFFF",
+                font=("Segoe UI", 14, "bold"),
+                padding=(12, 8),
+            )
+            style.configure(
+                "SubHeader.TLabel",
+                background="#0F172A",
+                foreground="#94A3B8",
+                font=("Segoe UI", 9),
+            )
+            style.configure(
+                "Section.TLabelframe",
+                background="#F8FAFC",
+                font=("Segoe UI", 10, "bold"),
+            )
+            style.configure(
+                "Section.TLabelframe.Label",
+                background="#F8FAFC",
+                foreground="#1E293B",
+                font=("Segoe UI", 10, "bold"),
+            )
+            style.configure("TLabel", background="#F8FAFC", foreground="#1E293B", font=("Segoe UI", 9))
+            style.configure("Bold.TLabel", background="#F8FAFC", foreground="#0F172A", font=("Segoe UI", 9, "bold"))
+            style.configure("Primary.TButton", font=("Segoe UI", 9, "bold"), padding=(10, 5))
+            style.configure("Danger.TButton", font=("Segoe UI", 9, "bold"), foreground="#991B1B", padding=(10, 5))
+            style.configure("Treeview", font=("Segoe UI", 9), rowheight=25)
+            style.configure("Treeview.Heading", font=("Segoe UI", 9, "bold"), background="#E2E8F0", foreground="#0F172A")
+
+        def _build_ui(self) -> None:
+            self.configure(bg="#F8FAFC")
+
+            # Top Banner
+            banner = tk.Frame(self, bg="#0F172A", height=56)
+            banner.pack(fill=tk.X, side=tk.TOP)
+            lbl_title = tk.Label(
+                banner,
+                text="FIXED ASSET REGISTER & DEPRECIATION MANAGER",
+                bg="#0F172A",
+                fg="#FFFFFF",
+                font=("Segoe UI", 13, "bold"),
+                padx=16,
+                pady=8,
+            )
+            lbl_title.pack(side=tk.LEFT)
+            lbl_sub = tk.Label(
+                banner,
+                text="Companies Act, 2013 (Schedule II - SLM / WDV)  |  Income Tax Act, 1961 (Sec 32 WDV & 180-Day Rule)",
+                bg="#0F172A",
+                fg="#CBD5E1",
+                font=("Segoe UI", 9),
+                padx=16,
+            )
+            lbl_sub.pack(side=tk.RIGHT)
+
+            # Main Notebook Tabs
+            self.notebook = ttk.Notebook(self)
+            self.notebook.pack(fill=tk.BOTH, expand=True, padx=10, pady=8)
+
+            # Tab 1: Asset Master & Lifecycle Schedule
+            self.tab_register = ttk.Frame(self.notebook)
+            self.notebook.add(
+                self.tab_register,
+                text="  1. Asset Register & Lifecycle Depreciation (Acquisition to Useful Life)  ",
+            )
+
+            # Tab 2: Annual FY Summary Report
+            self.tab_fy_summary = ttk.Frame(self.notebook)
+            self.notebook.add(
+                self.tab_fy_summary,
+                text="  2. Financial Year-Wise Register Summary (All Assets)  ",
+            )
+
+            self._build_tab_register()
+            self._build_tab_fy_summary()
+
+        def _build_tab_register(self) -> None:
+            left_frame = ttk.LabelFrame(
+                self.tab_register, text="Asset Details (Add / Update / Delete)", style="Section.TLabelframe"
+            )
+            left_frame.pack(side=tk.LEFT, fill=tk.Y, padx=(6, 6), pady=6)
+
+            form_grid = ttk.Frame(left_frame)
+            form_grid.pack(fill=tk.BOTH, expand=True, padx=10, pady=6)
+
+            self.var_code = tk.StringVar(value=self.db.next_asset_code())
+            self.var_name = tk.StringVar()
+            self.var_category = tk.StringVar(value="Plant & Machinery (General)")
+            self.var_location = tk.StringVar()
+            self.var_vendor = tk.StringVar()
+            self.var_invoice = tk.StringVar()
+            self.var_acq_date = tk.StringVar(value=date.today().strftime("%Y-%m-%d"))
+            self.var_put_date = tk.StringVar(value=date.today().strftime("%Y-%m-%d"))
+            self.var_cost = tk.StringVar(value="100000.00")
+            self.var_useful_life = tk.StringVar(value="15.0")
+            self.var_residual_pct = tk.StringVar(value="5.0")
+            self.var_residual_val = tk.StringVar(value="5000.00")
+            self.var_ca_method = tk.StringVar(value="SLM")
+            self.var_it_rate = tk.StringVar(value="15.0")
+            self.var_it_add_dep = tk.IntVar(value=0)
+            self.var_remarks = tk.StringVar()
+
+            row_idx = 0
+
+            def add_field(label_text: str, widget: tk.Widget, r: int) -> None:
+                lbl = ttk.Label(form_grid, text=label_text)
+                lbl.grid(row=r, column=0, sticky=tk.W, pady=3, padx=(0, 8))
+                widget.grid(row=r, column=1, sticky=tk.EW, pady=3)
+
+            form_grid.columnconfigure(1, weight=1)
+
+            add_field("Asset Code *:", ttk.Entry(form_grid, textvariable=self.var_code, width=26), row_idx)
+            row_idx += 1
+
+            add_field("Asset Name *:", ttk.Entry(form_grid, textvariable=self.var_name, width=26), row_idx)
+            row_idx += 1
+
+            cb_cat = ttk.Combobox(
+                form_grid,
+                textvariable=self.var_category,
+                values=list(ASSET_CATEGORIES.keys()),
+                state="readonly",
+                width=24,
+            )
+            cb_cat.bind("<<ComboboxSelected>>", self._on_category_selected)
+            add_field("Asset Category *:", cb_cat, row_idx)
+            row_idx += 1
+
+            add_field("Location / Dept:", ttk.Entry(form_grid, textvariable=self.var_location, width=26), row_idx)
+            row_idx += 1
+
+            add_field("Supplier / Vendor:", ttk.Entry(form_grid, textvariable=self.var_vendor, width=26), row_idx)
+            row_idx += 1
+
+            add_field("Invoice / Bill No.:", ttk.Entry(form_grid, textvariable=self.var_invoice, width=26), row_idx)
+            row_idx += 1
+
+            add_field(
+                "Acquisition Date * (YYYY-MM-DD):",
+                ttk.Entry(form_grid, textvariable=self.var_acq_date, width=26),
+                row_idx,
+            )
+            row_idx += 1
+
+            add_field(
+                "Put-to-Use Date * (YYYY-MM-DD):",
+                ttk.Entry(form_grid, textvariable=self.var_put_date, width=26),
+                row_idx,
+            )
+            row_idx += 1
+
+            ent_cost = ttk.Entry(form_grid, textvariable=self.var_cost, width=26)
+            ent_cost.bind("<KeyRelease>", self._recalc_residual_from_pct)
+            add_field("Total Acquisition Cost (Rs.) *:", ent_cost, row_idx)
+            row_idx += 1
+
+            ttk.Separator(form_grid, orient=tk.HORIZONTAL).grid(
+                row=row_idx, column=0, columnspan=2, sticky=tk.EW, pady=6
+            )
+            row_idx += 1
+            ttk.Label(form_grid, text="Companies Act, 2013 Parameters", style="Bold.TLabel").grid(
+                row=row_idx, column=0, columnspan=2, sticky=tk.W, pady=(0, 3)
+            )
+            row_idx += 1
+
+            cb_method = ttk.Combobox(
+                form_grid,
+                textvariable=self.var_ca_method,
+                values=["SLM", "WDV"],
+                state="readonly",
+                width=24,
+            )
+            add_field("Depreciation Method *:", cb_method, row_idx)
+            row_idx += 1
+
+            add_field(
+                "Useful Life (Years) *:",
+                ttk.Entry(form_grid, textvariable=self.var_useful_life, width=26),
+                row_idx,
+            )
+            row_idx += 1
+
+            ent_res_pct = ttk.Entry(form_grid, textvariable=self.var_residual_pct, width=26)
+            ent_res_pct.bind("<KeyRelease>", self._recalc_residual_from_pct)
+            add_field("Residual Value (%) *:", ent_res_pct, row_idx)
+            row_idx += 1
+
+            add_field(
+                "Residual Value (Rs.) *:",
+                ttk.Entry(form_grid, textvariable=self.var_residual_val, width=26),
+                row_idx,
+            )
+            row_idx += 1
+
+            ttk.Separator(form_grid, orient=tk.HORIZONTAL).grid(
+                row=row_idx, column=0, columnspan=2, sticky=tk.EW, pady=6
+            )
+            row_idx += 1
+            ttk.Label(form_grid, text="Income Tax Act, 1961 Parameters", style="Bold.TLabel").grid(
+                row=row_idx, column=0, columnspan=2, sticky=tk.W, pady=(0, 3)
+            )
+            row_idx += 1
+
+            add_field(
+                "IT Block WDV Rate (%) *:",
+                ttk.Entry(form_grid, textvariable=self.var_it_rate, width=26),
+                row_idx,
+            )
+            row_idx += 1
+
+            chk_add_dep = ttk.Checkbutton(
+                form_grid,
+                text="Eligible for 20% Additional Dep. u/s 32(1)(iia)",
+                variable=self.var_it_add_dep,
+            )
+            chk_add_dep.grid(row=row_idx, column=0, columnspan=2, sticky=tk.W, pady=3)
+            row_idx += 1
+
+            add_field("Remarks / Notes:", ttk.Entry(form_grid, textvariable=self.var_remarks, width=26), row_idx)
+            row_idx += 1
+
+            btn_frame = ttk.Frame(left_frame)
+            btn_frame.pack(fill=tk.X, padx=10, pady=(4, 8))
+
+            btn_add = ttk.Button(
+                btn_frame, text="Add New Asset", style="Primary.TButton", command=self.on_add_asset
+            )
+            btn_add.grid(row=0, column=0, sticky=tk.EW, padx=2, pady=3)
+
+            btn_update = ttk.Button(
+                btn_frame, text="Update Selected", style="Primary.TButton", command=self.on_update_asset
+            )
+            btn_update.grid(row=0, column=1, sticky=tk.EW, padx=2, pady=3)
+
+            btn_delete = ttk.Button(
+                btn_frame, text="Delete Selected Asset", style="Danger.TButton", command=self.on_delete_asset
+            )
+            btn_delete.grid(row=1, column=0, sticky=tk.EW, padx=2, pady=3)
+
+            btn_clear = ttk.Button(
+                btn_frame, text="Clear / Reset Form", command=self.clear_form
+            )
+            btn_clear.grid(row=1, column=1, sticky=tk.EW, padx=2, pady=3)
+
+            btn_sample = ttk.Button(
+                btn_frame, text="Load Sample Assets (Demo)", command=self.load_sample_assets
+            )
+            btn_sample.grid(row=2, column=0, columnspan=2, sticky=tk.EW, padx=2, pady=3)
+
+            btn_frame.columnconfigure(0, weight=1)
+            btn_frame.columnconfigure(1, weight=1)
+
+            right_paned = ttk.PanedWindow(self.tab_register, orient=tk.VERTICAL)
+            right_paned.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(0, 6), pady=6)
+
+            master_frame = ttk.LabelFrame(
+                right_paned,
+                text="Fixed Asset Master Register (Select any asset below to view its full lifecycle schedule)",
+                style="Section.TLabelframe",
+            )
+            right_paned.add(master_frame, weight=1)
+
+            search_bar = ttk.Frame(master_frame)
+            search_bar.pack(fill=tk.X, padx=8, pady=4)
+            ttk.Label(search_bar, text="Search Assets:").pack(side=tk.LEFT, padx=(0, 6))
+            self.var_search = tk.StringVar()
+            ent_search = ttk.Entry(search_bar, textvariable=self.var_search, width=32)
+            ent_search.pack(side=tk.LEFT, padx=(0, 6))
+            ent_search.bind("<KeyRelease>", lambda _e: self.refresh_asset_table())
+            ttk.Button(
+                search_bar, text="Export Asset Master (CSV)", command=self.export_master_csv
+            ).pack(side=tk.RIGHT, padx=4)
+            ttk.Button(
+                search_bar,
+                text="Export Selected Asset Schedule (CSV)",
+                command=self.export_selected_schedule_csv,
+            ).pack(side=tk.RIGHT, padx=4)
+
+            cols_master = (
+                "id",
+                "asset_code",
+                "asset_name",
+                "category",
+                "location",
+                "acq_date",
+                "put_to_use_date",
+                "cost",
+                "useful_life",
+                "residual_value",
+                "ca_method",
+                "it_rate",
+            )
+            self.tree_master = ttk.Treeview(
+                master_frame, columns=cols_master, show="headings", height=8, selectmode="browse"
+            )
+            headings_master = {
+                "id": ("ID", 40, tk.CENTER),
+                "asset_code": ("Code", 75, tk.CENTER),
+                "asset_name": ("Asset Name", 170, tk.W),
+                "category": ("Category", 150, tk.W),
+                "location": ("Location", 90, tk.W),
+                "acq_date": ("Acq. Date", 85, tk.CENTER),
+                "put_to_use_date": ("Put to Use", 85, tk.CENTER),
+                "cost": ("Original Cost", 95, tk.E),
+                "useful_life": ("Life (Yrs)", 65, tk.CENTER),
+                "residual_value": ("Residual Val", 85, tk.E),
+                "ca_method": ("Co. Act Method", 95, tk.CENTER),
+                "it_rate": ("IT Rate %", 70, tk.E),
+            }
+            for col, (text, width, anchor) in headings_master.items():
+                self.tree_master.heading(col, text=text)
+                self.tree_master.column(col, width=width, anchor=anchor)
+
+            scroll_master_y = ttk.Scrollbar(master_frame, orient=tk.VERTICAL, command=self.tree_master.yview)
+            self.tree_master.configure(yscrollcommand=scroll_master_y.set)
+            self.tree_master.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(8, 0), pady=(0, 6))
+            scroll_master_y.pack(side=tk.RIGHT, fill=tk.Y, padx=(0, 8), pady=(0, 6))
+
+            self.tree_master.bind("<<TreeviewSelect>>", self.on_asset_selected)
+
+            sched_frame = ttk.LabelFrame(
+                right_paned,
+                text="Year-by-Year Depreciation Schedule (From Year of Acquisition till Useful Life)",
+                style="Section.TLabelframe",
+            )
+            right_paned.add(sched_frame, weight=2)
+
+            self.lbl_sched_banner = ttk.Label(
+                sched_frame,
+                text="Select an asset from the register above to inspect its full Companies Act & Income Tax Act depreciation schedule.",
+                style="Bold.TLabel",
+            )
+            self.lbl_sched_banner.pack(fill=tk.X, padx=8, pady=4)
+
+            cols_sched = (
+                "year_no",
+                "fy_label",
+                "ca_days",
+                "ca_opening_wdv",
+                "ca_depreciation",
+                "ca_accum_dep",
+                "ca_closing_wdv",
+                "it_rule_note",
+                "it_opening_wdv",
+                "it_normal_dep",
+                "it_add_dep",
+                "it_total_dep",
+                "it_closing_wdv",
+                "dep_diff",
+            )
+            self.tree_sched = ttk.Treeview(
+                sched_frame, columns=cols_sched, show="headings", height=12
+            )
+            headings_sched = {
+                "year_no": ("Yr #", 42, tk.CENTER),
+                "fy_label": ("Financial Year", 85, tk.CENTER),
+                "ca_days": ("CA Days", 60, tk.CENTER),
+                "ca_opening_wdv": ("CA Opening WDV", 105, tk.E),
+                "ca_depreciation": ("CA Depreciation", 105, tk.E),
+                "ca_accum_dep": ("CA Accum. Dep.", 105, tk.E),
+                "ca_closing_wdv": ("CA Closing WDV", 105, tk.E),
+                "it_rule_note": ("IT Act Rule / Days", 145, tk.CENTER),
+                "it_opening_wdv": ("IT Opening WDV", 105, tk.E),
+                "it_normal_dep": ("IT Normal Dep.", 95, tk.E),
+                "it_add_dep": ("IT Add. Dep.", 85, tk.E),
+                "it_total_dep": ("IT Total Dep.", 95, tk.E),
+                "it_closing_wdv": ("IT Closing WDV", 105, tk.E),
+                "dep_diff": ("Diff (CA - IT)", 90, tk.E),
+            }
+            for col, (text, width, anchor) in headings_sched.items():
+                self.tree_sched.heading(col, text=text)
+                self.tree_sched.column(col, width=width, anchor=anchor)
+
+            scroll_sched_y = ttk.Scrollbar(sched_frame, orient=tk.VERTICAL, command=self.tree_sched.yview)
+            scroll_sched_x = ttk.Scrollbar(sched_frame, orient=tk.HORIZONTAL, command=self.tree_sched.xview)
+            self.tree_sched.configure(yscrollcommand=scroll_sched_y.set, xscrollcommand=scroll_sched_x.set)
+
+            self.tree_sched.pack(side=tk.TOP, fill=tk.BOTH, expand=True, padx=(8, 0), pady=(0, 0))
+            scroll_sched_y.pack(side=tk.RIGHT, fill=tk.Y, padx=(0, 8))
+            scroll_sched_x.pack(side=tk.BOTTOM, fill=tk.X, padx=8, pady=(0, 6))
+
+        def _build_tab_fy_summary(self) -> None:
+            top_bar = ttk.Frame(self.tab_fy_summary)
+            top_bar.pack(fill=tk.X, padx=10, pady=8)
+
+            ttk.Label(top_bar, text="Select Financial Year:", style="Bold.TLabel").pack(
+                side=tk.LEFT, padx=(0, 8)
+            )
+            self.var_selected_fy = tk.StringVar()
+            self.cb_fy = ttk.Combobox(
+                top_bar, textvariable=self.var_selected_fy, state="readonly", width=18
+            )
+            self.cb_fy.pack(side=tk.LEFT, padx=(0, 12))
+            self.cb_fy.bind("<<ComboboxSelected>>", lambda _e: self.refresh_fy_summary())
+
+            ttk.Button(
+                top_bar,
+                text="Refresh FY Register",
+                style="Primary.TButton",
+                command=self.refresh_fy_summary,
+            ).pack(side=tk.LEFT, padx=4)
+
+            ttk.Button(
+                top_bar,
+                text="Export FY Register to CSV",
+                command=self.export_fy_summary_csv,
+            ).pack(side=tk.RIGHT, padx=4)
+
+            self.lbl_fy_totals = ttk.Label(
+                self.tab_fy_summary,
+                text="Totals for Selected Financial Year will appear here.",
+                style="Bold.TLabel",
+            )
+            self.lbl_fy_totals.pack(fill=tk.X, padx=12, pady=(0, 6))
+
+            cols_fy = (
+                "asset_code",
+                "asset_name",
+                "category",
+                "put_to_use_date",
+                "cost",
+                "ca_method",
+                "ca_opening_wdv",
+                "ca_depreciation",
+                "ca_closing_wdv",
+                "it_rate",
+                "it_rule_note",
+                "it_opening_wdv",
+                "it_total_dep",
+                "it_closing_wdv",
+            )
+            self.tree_fy = ttk.Treeview(self.tab_fy_summary, columns=cols_fy, show="headings")
+            headings_fy = {
+                "asset_code": ("Code", 75, tk.CENTER),
+                "asset_name": ("Asset Name", 160, tk.W),
+                "category": ("Category", 145, tk.W),
+                "put_to_use_date": ("Put to Use", 85, tk.CENTER),
+                "cost": ("Original Cost", 95, tk.E),
+                "ca_method": ("CA Method", 75, tk.CENTER),
+                "ca_opening_wdv": ("CA Open WDV", 100, tk.E),
+                "ca_depreciation": ("CA Dep. (Year)", 100, tk.E),
+                "ca_closing_wdv": ("CA Close WDV", 100, tk.E),
+                "it_rate": ("IT Rate %", 70, tk.E),
+                "it_rule_note": ("IT Rule Applied", 140, tk.CENTER),
+                "it_opening_wdv": ("IT Open WDV", 100, tk.E),
+                "it_total_dep": ("IT Dep. (Year)", 100, tk.E),
+                "it_closing_wdv": ("IT Close WDV", 100, tk.E),
+            }
+            for col, (text, width, anchor) in headings_fy.items():
+                self.tree_fy.heading(col, text=text)
+                self.tree_fy.column(col, width=width, anchor=anchor)
+
+            scroll_fy_y = ttk.Scrollbar(self.tab_fy_summary, orient=tk.VERTICAL, command=self.tree_fy.yview)
+            scroll_fy_x = ttk.Scrollbar(self.tab_fy_summary, orient=tk.HORIZONTAL, command=self.tree_fy.xview)
+            self.tree_fy.configure(yscrollcommand=scroll_fy_y.set, xscrollcommand=scroll_fy_x.set)
+
+            self.tree_fy.pack(side=tk.TOP, fill=tk.BOTH, expand=True, padx=(10, 0), pady=(0, 0))
+            scroll_fy_y.pack(side=tk.RIGHT, fill=tk.Y, padx=(0, 10))
+            scroll_fy_x.pack(side=tk.BOTTOM, fill=tk.X, padx=10, pady=(0, 8))
+
+        def _on_category_selected(self, _event: Optional[object] = None) -> None:
+            cat = self.var_category.get()
+            if cat in ASSET_CATEGORIES:
+                preset = ASSET_CATEGORIES[cat]
+                self.var_useful_life.set(str(preset["useful_life"]))
+                self.var_residual_pct.set(str(preset["residual_pct"]))
+                self.var_it_rate.set(str(preset["it_rate"]))
+                self._recalc_residual_from_pct()
+
+        def _recalc_residual_from_pct(self, _event: Optional[object] = None) -> None:
+            try:
+                cost = float(self.var_cost.get())
+                pct = float(self.var_residual_pct.get())
+                res_val = round(cost * (pct / 100.0), 2)
+                self.var_residual_val.set(f"{res_val:.2f}")
+            except ValueError:
+                pass
+
+        def _validate_and_collect_form(self) -> Optional[Dict]:
+            code = self.var_code.get().strip()
+            name = self.var_name.get().strip()
+            if not code or not name:
+                messagebox.showerror("Validation Error", "Asset Code and Asset Name are required.")
+                return None
+
+            try:
+                acq_d = parse_iso_date(self.var_acq_date.get())
+                put_d = parse_iso_date(self.var_put_date.get())
+            except ValueError as err:
+                messagebox.showerror("Date Error", str(err))
+                return None
+
+            if put_d < acq_d:
+                messagebox.showerror(
+                    "Date Error", "Put-to-Use Date cannot be earlier than Acquisition Date."
+                )
+                return None
+
+            try:
+                cost = float(self.var_cost.get())
+                useful_life = float(self.var_useful_life.get())
+                residual_pct = float(self.var_residual_pct.get())
+                residual_val = float(self.var_residual_val.get())
+                it_rate = float(self.var_it_rate.get())
+            except ValueError:
+                messagebox.showerror(
+                    "Numeric Error",
+                    "Cost, Useful Life, Residual Value, and IT Rate must be valid numbers.",
+                )
+                return None
+
+            if cost <= 0:
+                messagebox.showerror("Validation Error", "Acquisition Cost must be greater than zero.")
+                return None
+            if useful_life <= 0 or useful_life > 100:
+                messagebox.showerror(
+                    "Validation Error", "Useful Life must be between 0.5 and 100 years."
+                )
+                return None
+            if residual_val < 0 or residual_val >= cost:
+                messagebox.showerror(
+                    "Validation Error",
+                    "Residual Value must be non-negative and less than Original Cost.",
+                )
+                return None
+            if it_rate < 0 or it_rate > 100:
+                messagebox.showerror("Validation Error", "Income Tax WDV Rate must be between 0% and 100%.")
+                return None
+
+            return {
+                "asset_code": code,
+                "asset_name": name,
+                "category": self.var_category.get().strip(),
+                "location": self.var_location.get().strip(),
+                "vendor": self.var_vendor.get().strip(),
+                "invoice_no": self.var_invoice.get().strip(),
+                "acq_date": acq_d.strftime("%Y-%m-%d"),
+                "put_to_use_date": put_d.strftime("%Y-%m-%d"),
+                "cost": round(cost, 2),
+                "useful_life": round(useful_life, 2),
+                "residual_pct": round(residual_pct, 2),
+                "residual_value": round(residual_val, 2),
+                "ca_method": self.var_ca_method.get().strip().upper(),
+                "it_rate": round(it_rate, 2),
+                "it_additional_dep": int(self.var_it_add_dep.get()),
+                "remarks": self.var_remarks.get().strip(),
+            }
+
+        def on_add_asset(self) -> None:
+            data = self._validate_and_collect_form()
+            if not data:
+                return
+            try:
+                new_id = self.db.add_asset(data)
+            except DuplicateAssetCodeError:
+                messagebox.showerror(
+                    "Duplicate Asset Code",
+                    f"Asset Code '{data['asset_code']}' already exists. Please use a unique code.",
+                )
+                return
+
+            self.refresh_asset_table(select_id=new_id)
+            self.clear_form()
+            messagebox.showinfo("Asset Added", f"Asset '{data['asset_name']}' added to register.")
+
+        def on_update_asset(self) -> None:
+            if self.selected_asset_id is None:
+                messagebox.showwarning("No Selection", "Please select an asset from the register to update.")
+                return
+            data = self._validate_and_collect_form()
+            if not data:
+                return
+            try:
+                self.db.update_asset(self.selected_asset_id, data)
+            except DuplicateAssetCodeError:
+                messagebox.showerror(
+                    "Duplicate Asset Code",
+                    f"Asset Code '{data['asset_code']}' is already used by another asset.",
+                )
+                return
+
+            current_id = self.selected_asset_id
+            self.refresh_asset_table(select_id=current_id)
+            messagebox.showinfo("Asset Updated", f"Asset '{data['asset_name']}' updated.")
+
+        def on_delete_asset(self) -> None:
+            if self.selected_asset_id is None:
+                messagebox.showwarning("No Selection", "Please select an asset from the register to delete.")
+                return
+            asset = self.db.get_asset_by_id(self.selected_asset_id)
+            if not asset:
+                return
+            confirm = messagebox.askyesno(
+                "Confirm Deletion",
+                f"Are you sure you want to permanently delete asset '{asset['asset_code']} - {asset['asset_name']}'?",
+            )
+            if not confirm:
+                return
+            self.db.delete_asset(self.selected_asset_id)
+            self.selected_asset_id = None
+            self.clear_form()
+            self.refresh_asset_table()
+            for item in self.tree_sched.get_children():
+                self.tree_sched.delete(item)
+            self.lbl_sched_banner.config(
+                text="Asset deleted. Select another asset to view its depreciation schedule."
+            )
+
+        def clear_form(self) -> None:
+            self.selected_asset_id = None
+            self.var_code.set(self.db.next_asset_code())
+            self.var_name.set("")
+            self.var_category.set("Plant & Machinery (General)")
+            self.var_location.set("")
+            self.var_vendor.set("")
+            self.var_invoice.set("")
+            today_str = date.today().strftime("%Y-%m-%d")
+            self.var_acq_date.set(today_str)
+            self.var_put_date.set(today_str)
+            self.var_cost.set("100000.00")
+            self._on_category_selected()
+            self.var_ca_method.set("SLM")
+            self.var_it_add_dep.set(0)
+            self.var_remarks.set("")
+
+        def load_sample_assets(self) -> None:
+            samples = [
+                {
+                                "asset_code": "FA-0001",
+                                "asset_name": "Industrial Factory Shed & Civil Works",
+                                "category": "Buildings (Factory)",
+                                "location": "Peenya Industrial Area - Block A",
+                                "vendor": "Shapoorji Industrial Constructions",
+                                "invoice_no": "SIC/22-23/014",
+                                "acq_date": "2022-05-15",
+                                "put_to_use_date": "2022-06-01",
+                                "cost": 4500000.0,
+                                "useful_life": 30.0,
+                                "residual_pct": 5.0,
+                                "residual_value": 225000.0,
+                                "ca_method": "SLM",
+                                "it_rate": 10.0,
+                                "it_additional_dep": 0,
+                                "remarks": "Factory building put to use >= 180 days in FY 2022-23"
+                },
+                {
+                                "asset_code": "FA-0002",
+                                "asset_name": "Corporate Office Floor Unit",
+                                "category": "Buildings (Office / Non-Factory)",
+                                "location": "Kochi InfoPark - Tower 2",
+                                "vendor": "Prestige Commercial Estates",
+                                "invoice_no": "PCE/22-23/089",
+                                "acq_date": "2022-09-01",
+                                "put_to_use_date": "2022-09-15",
+                                "cost": 8000000.0,
+                                "useful_life": 60.0,
+                                "residual_pct": 5.0,
+                                "residual_value": 400000.0,
+                                "ca_method": "SLM",
+                                "it_rate": 10.0,
+                                "it_additional_dep": 0,
+                                "remarks": "Admin office RCC structure (60 yrs Schedule II useful life)"
+                },
+                {
+                                "asset_code": "FA-0003",
+                                "asset_name": "5-Axis CNC Vertical Machining Center",
+                                "category": "Plant & Machinery (General)",
+                                "location": "Plant Shopfloor A",
+                                "vendor": "Bharat Machine Tools Ltd",
+                                "invoice_no": "BMT/23-24/108",
+                                "acq_date": "2023-05-10",
+                                "put_to_use_date": "2023-05-20",
+                                "cost": 1850000.0,
+                                "useful_life": 15.0,
+                                "residual_pct": 5.0,
+                                "residual_value": 92500.0,
+                                "ca_method": "SLM",
+                                "it_rate": 15.0,
+                                "it_additional_dep": 1,
+                                "remarks": "Put to use >= 180 days in FY 2023-24; 20% Add. Dep u/s 32(1)(iia)"
+                },
+                {
+                                "asset_code": "FA-0004",
+                                "asset_name": "Automated Laser Cutting & Bending Line",
+                                "category": "Plant & Machinery (General)",
+                                "location": "Plant Shopfloor B",
+                                "vendor": "Trumpf India Pvt Ltd",
+                                "invoice_no": "TIPL/23-24/412",
+                                "acq_date": "2023-11-10",
+                                "put_to_use_date": "2023-11-18",
+                                "cost": 1200000.0,
+                                "useful_life": 15.0,
+                                "residual_pct": 5.0,
+                                "residual_value": 60000.0,
+                                "ca_method": "WDV",
+                                "it_rate": 15.0,
+                                "it_additional_dep": 1,
+                                "remarks": "< 180 days in FY 2023-24 (Half rate + 10% Add. Dep in Yr 1, bal 10% in Yr 2)"
+                },
+                {
+                                "asset_code": "FA-0005",
+                                "asset_name": "Dell PowerEdge R750 Rack Server Cluster",
+                                "category": "Servers & Networks",
+                                "location": "Head Office Data Center",
+                                "vendor": "TechNova Enterprise Solutions",
+                                "invoice_no": "TN/24-25/119",
+                                "acq_date": "2024-04-08",
+                                "put_to_use_date": "2024-04-12",
+                                "cost": 640000.0,
+                                "useful_life": 6.0,
+                                "residual_pct": 5.0,
+                                "residual_value": 32000.0,
+                                "ca_method": "WDV",
+                                "it_rate": 40.0,
+                                "it_additional_dep": 0,
+                                "remarks": "Core production servers (6 yrs Schedule II; 40% IT Act Block)"
+                },
+                {
+                                "asset_code": "FA-0006",
+                                "asset_name": "Modular Workstations & Conference Tables",
+                                "category": "Furniture & Fittings (General)",
+                                "location": "Corporate Floor 3",
+                                "vendor": "Featherlite Office Systems",
+                                "invoice_no": "FL/24-25/204",
+                                "acq_date": "2024-08-01",
+                                "put_to_use_date": "2024-08-05",
+                                "cost": 420000.0,
+                                "useful_life": 10.0,
+                                "residual_pct": 5.0,
+                                "residual_value": 21000.0,
+                                "ca_method": "SLM",
+                                "it_rate": 10.0,
+                                "it_additional_dep": 0,
+                                "remarks": "50-seater modular office furniture & boardroom setup"
+                },
+                {
+                                "asset_code": "FA-0007",
+                                "asset_name": "Daikin VRV Central Air Conditioning System",
+                                "category": "Office Equipment",
+                                "location": "Corporate Floor 3",
+                                "vendor": "CoolAir HVAC Engineers",
+                                "invoice_no": "CA/24-25/551",
+                                "acq_date": "2024-12-02",
+                                "put_to_use_date": "2024-12-10",
+                                "cost": 360000.0,
+                                "useful_life": 5.0,
+                                "residual_pct": 5.0,
+                                "residual_value": 18000.0,
+                                "ca_method": "SLM",
+                                "it_rate": 15.0,
+                                "it_additional_dep": 0,
+                                "remarks": "Put to use < 180 days in FY 2024-25 (7.5% IT WDV in Year 1)"
+                },
+                {
+                                "asset_code": "FA-0008",
+                                "asset_name": "Executive Passenger SUV (Staff Transport)",
+                                "category": "Motor Cars (Non-Hire)",
+                                "location": "Head Office Fleet",
+                                "vendor": "TVS Sundaram Motors",
+                                "invoice_no": "TSM/25-26/077",
+                                "acq_date": "2025-06-12",
+                                "put_to_use_date": "2025-06-15",
+                                "cost": 1600000.0,
+                                "useful_life": 8.0,
+                                "residual_pct": 5.0,
+                                "residual_value": 80000.0,
+                                "ca_method": "WDV",
+                                "it_rate": 15.0,
+                                "it_additional_dep": 0,
+                                "remarks": "Company vehicle put to use >= 180 days in FY 2025-26"
+                },
+                {
+                                "asset_code": "FA-0009",
+                                "asset_name": "MacBook Pro & ThinkPad Developer Fleet (15 Units)",
+                                "category": "Computers & Laptops (End-User)",
+                                "location": "Engineering Wing",
+                                "vendor": "Croma Corporate Direct",
+                                "invoice_no": "CCD/25-26/903",
+                                "acq_date": "2025-10-20",
+                                "put_to_use_date": "2025-10-25",
+                                "cost": 1125000.0,
+                                "useful_life": 3.0,
+                                "residual_pct": 5.0,
+                                "residual_value": 56250.0,
+                                "ca_method": "SLM",
+                                "it_rate": 40.0,
+                                "it_additional_dep": 0,
+                                "remarks": "Put to use < 180 days in FY 2025-26 (20% effective IT WDV in Yr 1)"
+                },
+                {
+                                "asset_code": "FA-0010",
+                                "asset_name": "SAP Business One ERP License & Implementation",
+                                "category": "Intangible Assets / Software",
+                                "location": "Enterprise IT",
+                                "vendor": "SAP India Systems",
+                                "invoice_no": "SAP/26-27/019",
+                                "acq_date": "2026-04-10",
+                                "put_to_use_date": "2026-04-15",
+                                "cost": 750000.0,
+                                "useful_life": 5.0,
+                                "residual_pct": 0.0,
+                                "residual_value": 0.0,
+                                "ca_method": "SLM",
+                                "it_rate": 25.0,
+                                "it_additional_dep": 0,
+                                "remarks": "Perpetual ERP license amortized over 5 years; 25% IT Act intangible rate"
+                }
+]
+            added = 0
+            for s in samples:
+                try:
+                    self.db.add_asset(s)
+                    added += 1
+                except DuplicateAssetCodeError:
+                    pass
+            self.refresh_asset_table()
+            self.clear_form()
+            if added > 0:
+                messagebox.showinfo("Sample Data Loaded", f"Loaded {added} sample fixed assets.")
+            else:
+                messagebox.showinfo("Sample Data", "Sample assets are already present in the register.")
+
+        def refresh_asset_table(self, select_id: Optional[int] = None) -> None:
+            for item in self.tree_master.get_children():
+                self.tree_master.delete(item)
+
+            assets = self.db.get_all_assets(self.var_search.get())
+            selected_iid = None
+
+            for a in assets:
+                iid = str(a["id"])
+                self.tree_master.insert(
+                    "",
+                    tk.END,
+                    iid=iid,
+                    values=(
+                        a["id"],
+                        a["asset_code"],
+                        a["asset_name"],
+                        a["category"],
+                        a["location"],
+                        a["acq_date"],
+                        a["put_to_use_date"],
+                        f"{a['cost']:,.2f}",
+                        f"{a['useful_life']:.1f}",
+                        f"{a['residual_value']:,.2f}",
+                        a["ca_method"],
+                        f"{a['it_rate']:.1f}%",
+                    ),
+                )
+                if select_id is not None and a["id"] == select_id:
+                    selected_iid = iid
+
+            if selected_iid:
+                self.tree_master.selection_set(selected_iid)
+                self.tree_master.see(selected_iid)
+                self.on_asset_selected()
+            elif assets and self.selected_asset_id is None:
+                first_iid = str(assets[0]["id"])
+                self.tree_master.selection_set(first_iid)
+                self.on_asset_selected()
+
+            self._populate_fy_dropdown()
+            self.refresh_fy_summary()
+
+        def on_asset_selected(self, _event: Optional[object] = None) -> None:
+            sel = self.tree_master.selection()
+            if not sel:
+                return
+            asset_id = int(sel[0])
+            asset = self.db.get_asset_by_id(asset_id)
+            if not asset:
+                return
+
+            self.selected_asset_id = asset_id
+
+            self.var_code.set(asset["asset_code"])
+            self.var_name.set(asset["asset_name"])
+            self.var_category.set(asset["category"])
+            self.var_location.set(asset["location"])
+            self.var_vendor.set(asset["vendor"])
+            self.var_invoice.set(asset["invoice_no"])
+            self.var_acq_date.set(asset["acq_date"])
+            self.var_put_date.set(asset["put_to_use_date"])
+            self.var_cost.set(f"{asset['cost']:.2f}")
+            self.var_useful_life.set(f"{asset['useful_life']:.2f}")
+            self.var_residual_pct.set(f"{asset['residual_pct']:.2f}")
+            self.var_residual_val.set(f"{asset['residual_value']:.2f}")
+            self.var_ca_method.set(asset["ca_method"])
+            self.var_it_rate.set(f"{asset['it_rate']:.2f}")
+            self.var_it_add_dep.set(int(asset["it_additional_dep"]))
+            self.var_remarks.set(asset["remarks"])
+
+            for item in self.tree_sched.get_children():
+                self.tree_sched.delete(item)
+
+            sched = calculate_depreciation_schedule(asset)
+            eff_rate_str = f"{sched[0]['ca_rate_pct']:.2f}%" if sched else "N/A"
+            self.lbl_sched_banner.config(
+                text=(
+                    f"Asset: {asset['asset_code']} - {asset['asset_name']}  |  "
+                    f"Cost: Rs. {asset['cost']:,.2f}  |  Residual: Rs. {asset['residual_value']:,.2f}  |  "
+                    f"Co. Act: {asset['ca_method']} ({asset['useful_life']:g} Yrs, Eff. Rate: {eff_rate_str})  |  "
+                    f"IT Act WDV Rate: {asset['it_rate']:g}%"
+                )
+            )
+
+            for row in sched:
+                self.tree_sched.insert(
+                    "",
+                    tk.END,
+                    values=(
+                        row["year_no"],
+                        row["fy_label"],
+                        row["ca_days"],
+                        f"{row['ca_opening_wdv']:,.2f}",
+                        f"{row['ca_depreciation']:,.2f}",
+                        f"{row['ca_accum_dep']:,.2f}",
+                        f"{row['ca_closing_wdv']:,.2f}",
+                        row["it_rule_note"],
+                        f"{row['it_opening_wdv']:,.2f}",
+                        f"{row['it_normal_dep']:,.2f}",
+                        f"{row['it_add_dep']:,.2f}",
+                        f"{row['it_total_dep']:,.2f}",
+                        f"{row['it_closing_wdv']:,.2f}",
+                        f"{row['dep_diff']:+,.2f}",
+                    ),
+                )
+
+        def _populate_fy_dropdown(self) -> None:
+            assets = self.db.get_all_assets()
+            fy_years = set()
+            for a in assets:
+                for r in calculate_depreciation_schedule(a):
+                    fy_years.add(r["fy_start_yr"])
+
+            if not fy_years:
+                cur_fy, _, _ = get_fy_bounds(date.today())
+                fy_years.add(cur_fy)
+
+            sorted_fys = sorted(fy_years)
+            fy_labels = [format_fy(y) for y in sorted_fys]
+            self.cb_fy["values"] = fy_labels
+            if self.var_selected_fy.get() not in fy_labels:
+                self.var_selected_fy.set(fy_labels[0])
+
+        def refresh_fy_summary(self) -> None:
+            for item in self.tree_fy.get_children():
+                self.tree_fy.delete(item)
+
+            target_fy = self.var_selected_fy.get()
+            if not target_fy:
+                return
+
+            assets = self.db.get_all_assets()
+            tot_cost = 0.0
+            tot_ca_open = 0.0
+            tot_ca_dep = 0.0
+            tot_ca_close = 0.0
+            tot_it_open = 0.0
+            tot_it_dep = 0.0
+            tot_it_close = 0.0
+
+            for a in assets:
+                sched = calculate_depreciation_schedule(a)
+                for r in sched:
+                    if r["fy_label"] == target_fy:
+                        self.tree_fy.insert(
+                            "",
+                            tk.END,
+                            values=(
+                                a["asset_code"],
+                                a["asset_name"],
+                                a["category"],
+                                a["put_to_use_date"],
+                                f"{a['cost']:,.2f}",
+                                a["ca_method"],
+                                f"{r['ca_opening_wdv']:,.2f}",
+                                f"{r['ca_depreciation']:,.2f}",
+                                f"{r['ca_closing_wdv']:,.2f}",
+                                f"{a['it_rate']:.1f}%",
+                                r["it_rule_note"],
+                                f"{r['it_opening_wdv']:,.2f}",
+                                f"{r['it_total_dep']:,.2f}",
+                                f"{r['it_closing_wdv']:,.2f}",
+                            ),
+                        )
+                        tot_cost += a["cost"]
+                        tot_ca_open += r["ca_opening_wdv"]
+                        tot_ca_dep += r["ca_depreciation"]
+                        tot_ca_close += r["ca_closing_wdv"]
+                        tot_it_open += r["it_opening_wdv"]
+                        tot_it_dep += r["it_total_dep"]
+                        tot_it_close += r["it_closing_wdv"]
+                        break
+
+            self.lbl_fy_totals.config(
+                text=(
+                    f"{target_fy} Summary  |  Original Cost: Rs. {tot_cost:,.2f}  |  "
+                    f"Co. Act Dep: Rs. {tot_ca_dep:,.2f} (Closing WDV: Rs. {tot_ca_close:,.2f})  |  "
+                    f"IT Act Dep: Rs. {tot_it_dep:,.2f} (Closing WDV: Rs. {tot_it_close:,.2f})"
+                )
+            )
+
+        def export_master_csv(self) -> None:
+            assets = self.db.get_all_assets()
+            if not assets:
+                messagebox.showwarning("Empty Register", "No assets available to export.")
+                return
+            path = filedialog.asksaveasfilename(
+                defaultextension=".csv",
+                initialfile="Fixed_Asset_Master_Register.csv",
+                filetypes=[("CSV Files", "*.csv")],
+            )
+            if not path:
+                return
+            fieldnames = [
+                "asset_code",
+                "asset_name",
+                "category",
+                "location",
+                "vendor",
+                "invoice_no",
+                "acq_date",
+                "put_to_use_date",
+                "cost",
+                "useful_life",
+                "residual_pct",
+                "residual_value",
+                "ca_method",
+                "it_rate",
+                "it_additional_dep",
+                "remarks",
+            ]
+            with open(path, "w", newline="", encoding="utf-8-sig") as f:
+                writer = csv.DictWriter(f, fieldnames=fieldnames, extrasaction="ignore")
+                writer.writeheader()
+                writer.writerows(assets)
+            messagebox.showinfo("Export Complete", f"Asset Master exported to:\n{path}")
+
+        def export_selected_schedule_csv(self) -> None:
+            if self.selected_asset_id is None:
+                messagebox.showwarning("No Asset Selected", "Please select an asset first.")
+                return
+            asset = self.db.get_asset_by_id(self.selected_asset_id)
+            if not asset:
+                return
+            sched = calculate_depreciation_schedule(asset)
+            path = filedialog.asksaveasfilename(
+                defaultextension=".csv",
+                initialfile=f"Depreciation_Schedule_{asset['asset_code']}.csv",
+                filetypes=[("CSV Files", "*.csv")],
+            )
+            if not path:
+                return
+            with open(path, "w", newline="", encoding="utf-8-sig") as f:
+                writer = csv.writer(f)
+                writer.writerow(["Asset Code", asset["asset_code"], "Asset Name", asset["asset_name"]])
+                writer.writerow(
+                    [
+                        "Category",
+                        asset["category"],
+                        "Acquisition Date",
+                        asset["acq_date"],
+                        "Put to Use Date",
+                        asset["put_to_use_date"],
+                    ]
+                )
+                writer.writerow(
+                    [
+                        "Original Cost",
+                        asset["cost"],
+                        "Useful Life (Yrs)",
+                        asset["useful_life"],
+                        "Residual Value",
+                        asset["residual_value"],
+                        "Co. Act Method",
+                        asset["ca_method"],
+                        "IT Act Rate %",
+                        asset["it_rate"],
+                    ]
+                )
+                writer.writerow([])
+                writer.writerow(
+                    [
+                        "Year #",
+                        "Financial Year",
+                        "CA Days Used",
+                        "CA Opening WDV",
+                        "CA Depreciation",
+                        "CA Accumulated Dep",
+                        "CA Closing WDV",
+                        "IT Act Rule",
+                        "IT Opening WDV",
+                        "IT Normal Dep",
+                        "IT Additional Dep",
+                        "IT Total Dep",
+                        "IT Closing WDV",
+                        "Timing Difference (CA - IT)",
+                    ]
+                )
+                for r in sched:
+                    writer.writerow(
+                        [
+                            r["year_no"],
+                            r["fy_label"],
+                            r["ca_days"],
+                            r["ca_opening_wdv"],
+                            r["ca_depreciation"],
+                            r["ca_accum_dep"],
+                            r["ca_closing_wdv"],
+                            r["it_rule_note"],
+                            r["it_opening_wdv"],
+                            r["it_normal_dep"],
+                            r["it_add_dep"],
+                            r["it_total_dep"],
+                            r["it_closing_wdv"],
+                            r["dep_diff"],
+                        ]
+                    )
+            messagebox.showinfo("Export Complete", f"Lifecycle Schedule exported to:\n{path}")
+
+        def export_fy_summary_csv(self) -> None:
+            target_fy = self.var_selected_fy.get()
+            if not target_fy:
+                return
+            path = filedialog.asksaveasfilename(
+                defaultextension=".csv",
+                initialfile=f"Fixed_Asset_Register_{target_fy.replace(' ', '_')}.csv",
+                filetypes=[("CSV Files", "*.csv")],
+            )
+            if not path:
+                return
+            with open(path, "w", newline="", encoding="utf-8-sig") as f:
+                writer = csv.writer(f)
+                writer.writerow([f"Fixed Asset Register Summary - {target_fy}"])
+                writer.writerow(
+                    [
+                        "Asset Code",
+                        "Asset Name",
+                        "Category",
+                        "Put to Use Date",
+                        "Original Cost",
+                        "CA Method",
+                        "CA Opening WDV",
+                        "CA Depreciation",
+                        "CA Closing WDV",
+                        "IT Rate %",
+                        "IT Rule Applied",
+                        "IT Opening WDV",
+                        "IT Depreciation",
+                        "IT Closing WDV",
+                    ]
+                )
+                for iid in self.tree_fy.get_children():
+                    writer.writerow(self.tree_fy.item(iid)["values"])
+            messagebox.showinfo("Export Complete", f"FY Summary exported to:\n{path}")
+
+
+def main() -> None:
+    db = AssetDatabase()
+    if HAS_TKINTER:
+        app = FixedAssetRegisterApp(db)
+        app.mainloop()
+    else:
+        print(
+            "Note: Tkinter GUI module is not installed in this Python environment.\n"
+            "On standard Windows Python installations, Tkinter launches the desktop window automatically."
+        )
+
+
+if __name__ == "__main__":
+    main()
+</script>
+</body>
+</html>
