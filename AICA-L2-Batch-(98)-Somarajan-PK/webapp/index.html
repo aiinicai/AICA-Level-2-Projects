@@ -1,0 +1,179 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Bank Reconciliation Assistant</title><link rel="icon" href="icon.svg"><meta name="theme-color" content="#1F3864">
+<style>
+:root{--bg:#f4f6fb;--card:#fff;--ink:#1b2333;--mut:#667085;--line:#e1e6ef;--pri:#1F3864;--acc:#2f6fed;--ok:#0a7d4f;--bad:#c0392b;--warn:#b7791f}
+@media(prefers-color-scheme:dark){:root{--bg:#0f1420;--card:#171d2c;--ink:#e8ecf5;--mut:#9aa6bd;--line:#2a3350;--pri:#7fa6ff;--acc:#7fa6ff;--ok:#3ecf8e;--bad:#ff7b6b;--warn:#f0b34a}}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.5 system-ui,Segoe UI,Arial,sans-serif}
+header{padding:14px 18px;background:#1F3864;color:#fff;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+header h1{margin:0;font-size:18px}header small{opacity:.8}
+#cstat{font-size:12.5px;padding:4px 10px;border-radius:99px;background:rgba(255,255,255,.15)}
+.banner{background:#fff4d6;color:#7a5200;padding:7px 18px;font-size:12.5px}
+nav#stepper{display:flex;gap:6px;max-width:1150px;margin:14px auto 0;padding:0 16px;overflow-x:auto}
+nav button{flex:1;min-width:130px;display:flex;align-items:center;gap:8px;border:1px solid var(--line);background:var(--card);color:var(--mut);padding:8px 10px;border-radius:10px;cursor:pointer;font:inherit;text-align:left}
+nav button b{display:inline-flex;width:24px;height:24px;border-radius:50%;background:var(--line);color:var(--mut);align-items:center;justify-content:center;font-size:12px;flex:none}
+nav button.on{border-color:var(--acc);color:var(--ink);font-weight:600}nav button.on b{background:var(--acc);color:#fff}
+nav button.done b{background:var(--ok);color:#fff}nav button:disabled{opacity:.45;cursor:not-allowed}
+main{max-width:1150px;margin:auto;padding:12px 16px 50px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px;margin:12px 0}
+.card h2{margin:0 0 4px;font-size:16px}.mut{color:var(--mut)}.small{font-size:12.5px}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end}
+label{font-size:12px;color:var(--mut);display:flex;flex-direction:column;gap:3px}
+input,select,textarea{padding:7px;border:1px solid var(--line);border-radius:8px;background:var(--card);color:var(--ink);font:inherit}
+textarea{width:100%;min-height:70px}
+.btn{border:1px solid var(--line);background:var(--card);color:var(--ink);padding:8px 14px;border-radius:9px;cursor:pointer;font:inherit}
+.btn.pri{background:var(--acc);color:#fff;border-color:var(--acc);font-weight:600}.btn.ok{background:var(--ok);color:#fff;border-color:var(--ok);font-weight:600}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px}
+.kpi b{display:block;font-size:22px}.kpi span{color:var(--mut);font-size:12px}
+.tabs{display:flex;gap:6px;overflow-x:auto;padding:2px 0 6px}.tabs button{border:1px solid var(--line);background:var(--card);color:var(--ink);padding:6px 12px;border-radius:8px;cursor:pointer;white-space:nowrap;font:inherit}
+.tabs button.on{background:var(--pri);color:#fff;border-color:var(--pri)}
+.wrap{overflow-x:auto}table{border-collapse:collapse;width:100%;font-size:12.5px}th,td{padding:6px 8px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+th{background:var(--pri);color:#fff;position:sticky;top:0}[data-theme]{}td.n{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
+tr.sel td{background:rgba(47,111,237,.08)}
+.tag{padding:1px 8px;border-radius:99px;font-size:11.5px;font-weight:600}.High{background:#fde2de;color:#a12a1d}.Medium{background:#fdf0cf;color:#8a5a00}.Low{background:#e3f1ff;color:#1d5a99}
+.ok{color:var(--ok)}.bad{color:var(--bad)}.bar{height:14px;background:var(--acc);border-radius:4px}
+.stamp{border:2px solid var(--ok);color:var(--ok);border-radius:10px;padding:10px 14px;font-weight:700}
+.nav2{display:flex;justify-content:space-between;gap:10px;margin-top:6px}
+.msg{margin-top:8px}
+</style></head><body>
+<header><div><h1>AI-Powered Bank Reconciliation &amp; Audit Assistant</h1><small>AICA Level 2 Capstone &middot; calculations are done by code; AI explains, you approve</small></div><span id="cstat">checking connector&hellip;</span></header>
+<div class="banner">Privacy: use synthetic or anonymised data only. Everything runs on this computer; nothing is sent to any AI service unless you paste it yourself.</div>
+<nav id="stepper"></nav>
+<main id="app"></main>
+<script>
+const $=s=>document.querySelector(s),esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const inr=v=>v==null?'-':(v<0?'(':'')+Math.abs(v).toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2})+(v<0?')':'');
+const STEPS=['Tally & bank','Bank statement','Reconcile','Review results','Approve & export'];
+const fresh=()=>({step:1,conn:false,pulled:null,source:'',bank:'',stmt:null,openCsv:null,openName:'',set:{approval_limit:50000,stale_days:90,date_tolerance:3,bank_opening:''},
+ result:null,runId:null,tab:'Dashboard',dec:[],approved:null,exported:null,demo:null,msg:{},t:{host:'localhost',port:9000,company:'',from:'',to:''},rev:'',remarks:'',ack:false});
+let ST=fresh();
+const bankObj=()=>ST.pulled&&ST.pulled.banks.find(b=>b.name===ST.bank);
+async function api(p,b){const r=await fetch(p,{method:b?'POST':'GET',headers:b?{'Content-Type':'application/json'}:{},body:b?JSON.stringify(b):undefined});
+ const ct=r.headers.get('Content-Type')||'';if(!ct.includes('json')){if(!r.ok)throw new Error(r.statusText);return r}
+ const j=await r.json().catch(()=>({error:'Unreadable reply from the application server'}));if(!r.ok)throw new Error(j.error||r.statusText);return j}
+const maxStep=()=>!ST.bank?1:!ST.stmt?2:!ST.result?3:5;
+function go(n){if(n<=maxStep()){ST.step=n;render()}}
+function setMsg(k,t,bad){ST.msg[k]={t,bad};const e=document.getElementById('m_'+k);if(e){e.textContent=t;e.className='msg '+(bad?'bad':'mut')}}
+const msgHtml=k=>`<div id="m_${k}" class="msg ${ST.msg[k]&&ST.msg[k].bad?'bad':'mut'}">${esc(ST.msg[k]?ST.msg[k].t:'')}</div>`;
+function render(){
+ $('#stepper').innerHTML=STEPS.map((t,i)=>{const n=i+1;return`<button class="${ST.step===n?'on':''} ${n<ST.step?'done':''}" ${n>maxStep()?'disabled':''} onclick="go(${n})"><b>${n<ST.step?'&#10003;':n}</b>${t}</button>`}).join('');
+ $('#app').innerHTML=[null,v1,v2,v3,v4,v5][ST.step]();window.scrollTo(0,0);if(ST.step===5)updApprove()}
+/* ---------- Step 1: Tally + bank selection ---------- */
+function v1(){const T=ST.t,p=ST.pulled,off=!ST.conn;
+return`<div class="card"><h2>Step 1 &ndash; Pull bank books from Tally</h2><div class="mut small">Reads every ledger under Current Assets &rsaquo; Bank Accounts. Open Tally Prime with the company loaded and enable its XML server (F1 Help &rsaquo; Settings &rsaquo; Connectivity &rsaquo; Client/Server &rsaquo; Server/Both, port 9000).</div>
+<div class="row" style="margin-top:10px"><label>Tally host<input id="th" value="${esc(T.host)}" style="width:120px"></label><label>Port<input id="tp" type="number" value="${T.port}" style="width:80px"></label>
+<label>Company (blank = company open in Tally)<input id="tc" list="tcl" value="${esc(T.company)}" style="width:230px"><datalist id="tcl">${(ST.companies||[]).map(c=>`<option value="${esc(c)}">`).join('')}</datalist></label>
+<label>From (DD-MM-YYYY)<input id="tf" value="${esc(T.from)}" style="width:115px" placeholder="01-10-2026"></label><label>To (DD-MM-YYYY)<input id="tt" value="${esc(T.to)}" style="width:115px" placeholder="31-10-2026"></label>
+<button class="btn" ${off?'disabled':''} onclick="testConn()">Test connection</button><button class="btn pri" id="bpull" ${off?'disabled':''} onclick="pullTally()">Pull bank books</button></div>${msgHtml('tally')}
+${off?'<div class="bad small msg">The application server is not running. Start the tool with run_project.bat.</div>':''}</div>
+<div class="card"><b>No Tally available?</b> <span class="mut small">Load synthetic demo data (2 banks) to try the whole flow.</span> <button class="btn" ${off?'disabled':''} onclick="loadDemo()">Load demo data</button>${msgHtml('demo')}</div>
+${p?`<div class="card"><h2>Select the bank to reconcile</h2><div class="mut small">${esc(ST.source)} &middot; ${esc(p.company)} &middot; ${esc(p.period_from)} to ${esc(p.period_to)} &middot; ${p.banks.length} bank account(s) under ${esc(p.group)}</div>
+<div class="wrap" style="margin-top:8px"><table><tr><th></th><th>Bank ledger</th><th>Entries</th><th>Opening (per books)</th><th>Closing (per books)</th></tr>
+${p.banks.map((b,i)=>`<tr class="${b.name===ST.bank?'sel':''}"><td><input type="radio" name="bk" ${b.name===ST.bank?'checked':''} onchange="pickBank(${i})"></td><td>${esc(b.name)}</td><td class="n">${b.rows.length}</td><td class="n">${inr(b.opening_balance)}</td><td class="n">${inr(b.closing_balance)}</td></tr>`).join('')}</table></div>
+<div class="mut small msg">Check the closing balance against Tally (Display &rsaquo; Account Books &rsaquo; Bank Books) before continuing.</div></div>`:''}
+<div class="nav2"><span></span><button class="btn pri" ${ST.bank?'':'disabled'} onclick="go(2)">Continue to bank statement &rarr;</button></div>`}
+function readT(){const g=i=>document.getElementById(i);if(g('th'))ST.t={host:g('th').value.trim(),port:+g('tp').value,company:g('tc').value.trim(),from:g('tf').value.trim(),to:g('tt').value.trim()}}
+async function testConn(){readT();setMsg('tally','Testing connection...');try{const r=await api('/api/tally/test',ST.t);ST.companies=r.companies;const dl=document.getElementById('tcl');if(dl)dl.innerHTML=r.companies.map(c=>`<option value="${esc(c)}">`).join('');
+ setMsg('tally',`Connected to Tally. Companies: ${r.companies.join(', ')||'(not listed)'} | Bank accounts found: ${r.bank_ledgers.length}${r.bank_ledgers.length?' ('+r.bank_ledgers.join('; ')+')':''}`)}catch(e){setMsg('tally','Not connected: '+e.message,1)}}
+async function pullTally(){readT();if(!ST.t.from||!ST.t.to)return setMsg('tally','Enter the From and To dates (DD-MM-YYYY).',1);
+ setMsg('tally','Pulling bank books from Tally (a full year of vouchers can take a while)...');$('#bpull').disabled=true;
+ try{const r=await api('/api/tally/pull',{host:ST.t.host,port:ST.t.port,company:ST.t.company,from:ST.t.from,to:ST.t.to});setPulled(r.data,'Pulled from Tally',false);
+  setMsg('tally',`Pulled ${r.data.banks.length} bank account(s). Saved to ${r.saved_to}.`)}catch(e){setMsg('tally','Pull failed: '+e.message,1);$('#bpull').disabled=false}}
+async function loadDemo(){setMsg('demo','Preparing demo data...');try{const d=await api('/api/demo');ST.demo=d;ST.set.approval_limit=d.settings.approval_limit;ST.set.stale_days=d.settings.stale_days;ST.set.date_tolerance=d.settings.date_tolerance;
+ setPulled(d.tally,'Demo data (synthetic)',true);setMsg('demo','Demo data loaded.')}catch(e){setMsg('demo','Could not load demo: '+e.message,1)}}
+function setPulled(j,src,demo){const keep=ST.demo;ST=Object.assign(fresh(),{conn:true,pulled:j,source:src,t:ST.t,companies:ST.companies,msg:ST.msg,set:ST.set,demo:demo?keep:null,step:1});render();
+ if(j.banks.length===1)pickBank(0)}
+function pickBank(i){const nb=ST.pulled.banks[i].name;if(nb!==ST.bank){ST.bank=nb;ST.stmt=null;ST.openCsv=null;ST.openName='';ST.result=null;ST.runId=null;ST.dec=[];ST.approved=null;ST.exported=null}render()}
+/* ---------- Step 2: statement ---------- */
+function v2(){const b=bankObj(),s=ST.stmt,i=s&&s.info;
+return`<div class="card"><h2>Step 2 &ndash; Add the bank statement</h2><div class="mut small">Statement for <b>${esc(ST.bank)}</b> &middot; ${b.rows.length} bank-book entries &middot; books opening ${inr(b.opening_balance)}, closing ${inr(b.closing_balance)}</div>
+<div class="row" style="margin-top:10px"><label>Bank statement (CSV) <input type="file" id="fst" accept=".csv,.txt" onchange="upStmt(this)" style="width:260px"></label>
+${ST.demo?`<button class="btn" onclick="demoStmt()">Use demo statement</button>`:''}</div>
+<div class="mut small msg">Headers such as Date, Narration, Ref_No, Withdrawal, Deposit, Balance (common variants like Debit/Credit or Particulars are recognised).</div>${msgHtml('stmt')}
+${i?`<div class="grid" style="margin-top:10px"><div class="card kpi"><b>${i.rows}</b><span>transactions in ${esc(s.name)}</span></div><div class="card kpi"><b>${esc(i.date_from)}</b><span>first date &rarr; ${esc(i.date_to)}</span></div><div class="card kpi"><b>${inr(i.opening)}</b><span>opening (derived)</span></div><div class="card kpi"><b>${inr(i.closing)}</b><span>closing per statement</span></div></div>
+${i.warnings.map(w=>`<div class="bad small msg">&#9888; ${esc(w)}</div>`).join('')}`:''}</div>
+<div class="card"><h2>Optional inputs and settings</h2><div class="row">
+<label>Cheques outstanding at period start (CSV: Date, Narration, Ref, Amount) <input type="file" id="fop" accept=".csv" onchange="upOpen(this)" style="width:300px"></label>${ST.openName?`<span class="small ok">&#10003; ${esc(ST.openName)}</span>`:''}${ST.demo?`<button class="btn" onclick="demoOpen()">Use demo B/F items</button>`:''}</div>
+<div class="row" style="margin-top:10px"><label>Approval limit (Rs)<input type="number" value="${ST.set.approval_limit}" oninput="ST.set.approval_limit=+this.value" style="width:120px"></label>
+<label>Stale cheque days<input type="number" value="${ST.set.stale_days}" oninput="ST.set.stale_days=+this.value" style="width:100px"></label>
+<label>Date tolerance (days)<input type="number" value="${ST.set.date_tolerance}" oninput="ST.set.date_tolerance=+this.value" style="width:100px"></label>
+<label>Bank opening override (blank = from statement)<input type="number" value="${ST.set.bank_opening}" oninput="ST.set.bank_opening=this.value" style="width:170px"></label></div></div>
+<div class="nav2"><button class="btn" onclick="go(1)">&larr; Back</button><button class="btn pri" ${s?'':'disabled'} onclick="go(3)">Continue &rarr;</button></div>`}
+const rdFile=f=>new Promise((res,rej)=>{const r=new FileReader;r.onload=()=>res(r.result);r.onerror=()=>rej(new Error('Could not read the file'));r.readAsText(f)});
+async function setStmt(name,text){setMsg('stmt','Checking statement...');try{const info=await api('/api/statement/check',{csv:text});ST.stmt={name,text,info};ST.result=null;ST.runId=null;ST.dec=[];ST.approved=null;ST.exported=null;ST.msg.stmt=null;render()}
+ catch(e){ST.stmt=null;setMsg('stmt','Statement problem: '+e.message,1)}}
+async function upStmt(el){if(el.files[0])setStmt(el.files[0].name,await rdFile(el.files[0]))}
+function demoStmt(){setStmt('demo_bank_statement.csv',ST.demo.statements[ST.bank])}
+async function upOpen(el){if(el.files[0]){ST.openCsv=await rdFile(el.files[0]);ST.openName=el.files[0].name;render()}}
+function demoOpen(){ST.openCsv=ST.demo.opening[ST.bank];ST.openName='demo_opening_items.csv';render()}
+/* ---------- Step 3: reconcile ---------- */
+function v3(){const b=bankObj(),i=ST.stmt.info,p=ST.pulled;
+return`<div class="card"><h2>Step 3 &ndash; Process the reconciliation</h2><div class="mut small">Nothing has been calculated yet. Check the inputs, then run.</div>
+<div class="wrap" style="margin-top:8px"><table>
+<tr><th>Input</th><th>Value</th></tr>
+<tr><td>Company</td><td>${esc(p.company)}</td></tr><tr><td>Bank</td><td>${esc(ST.bank)}</td></tr><tr><td>Period (books)</td><td>${esc(p.period_from)} to ${esc(p.period_to)}</td></tr>
+<tr><td>Bank books (${esc(ST.source)})</td><td>${b.rows.length} entries &middot; opening ${inr(b.opening_balance)} &middot; closing ${inr(b.closing_balance)}</td></tr>
+<tr><td>Bank statement</td><td>${esc(ST.stmt.name)} &middot; ${i.rows} rows &middot; ${esc(i.date_from)} to ${esc(i.date_to)} &middot; closing ${inr(i.closing)}</td></tr>
+<tr><td>B/F outstanding items</td><td>${esc(ST.openName||'none')}</td></tr>
+<tr><td>Settings</td><td>limit Rs ${inr(ST.set.approval_limit)} &middot; stale ${ST.set.stale_days} days &middot; date tolerance ${ST.set.date_tolerance} days</td></tr></table></div>
+<div class="row" style="margin-top:12px"><button class="btn pri" id="brun" onclick="runRecon()">Run reconciliation</button></div>${msgHtml('run')}</div>
+<div class="nav2"><button class="btn" onclick="go(2)">&larr; Back</button><span></span></div>`}
+async function runRecon(){const b=bankObj(),p=ST.pulled;$('#brun').disabled=true;setMsg('run','Matching transactions, applying audit rules...');
+ try{const r=await api('/api/reconcile',{bank:ST.bank,entity:p.company,period_from:p.period_from,period_to:p.period_to,books:{opening_balance:b.opening_balance,rows:b.rows},statement_csv:ST.stmt.text,opening_csv:ST.openCsv||'',settings:ST.set});
+  ST.result=r.result;ST.runId=r.run_id;ST.dec=r.result.entries.map(()=>null);ST.approved=null;ST.exported=null;ST.tab='Dashboard';ST.step=4;ST.msg.run=null;render()}
+ catch(e){setMsg('run','Reconciliation failed: '+e.message,1);$('#brun').disabled=false}}
+/* ---------- Step 4: results ---------- */
+const TABS=['Dashboard','Matched','Reconciling items','BRS','Exceptions','Proposed entries','Data checks'];
+const tbl=(h,rows,nc=[])=>`<div class="wrap"><table><tr>${h.map(x=>`<th>${x}</th>`).join('')}</tr>${rows.map(r=>`<tr>${r.map((c,i)=>`<td class="${nc.includes(i)?'n':''}">${c}</td>`).join('')}</tr>`).join('')||`<tr><td colspan="${h.length}" class="mut">Nothing to show.</td></tr>`}</table></div>`;
+const tag=r=>`<span class="tag ${r}">${r}</span>`;
+function v4(){const R=ST.result;return`<div class="card"><h2>Step 4 &ndash; Reconciliation results</h2><div class="mut small">${esc(R.bank)} &middot; ${esc(R.entity)} &middot; ${esc(R.period)}</div>
+<div class="tabs" style="margin-top:8px">${TABS.map(t=>`<button class="${t===ST.tab?'on':''}" onclick="ST.tab='${t}';render()">${t}</button>`).join('')}</div>${RV[ST.tab](R)}</div>
+<div class="nav2"><button class="btn" onclick="go(3)">&larr; Back</button><button class="btn pri" onclick="go(5)">Proceed to approval &rarr;</button></div>`}
+const RV={
+Dashboard(R){const m=R.metrics,cnt={};R.flags.forEach(f=>cnt[f.code]=(cnt[f.code]||0)+1);const mx=Math.max(1,...Object.values(cnt));
+return`<div class="grid"><div class="card kpi"><b>${m.bank_matched}/${m.bank_n}</b><span>bank transactions matched (${m.bank_n?Math.round(100*m.bank_matched/m.bank_n):0}%)</span></div><div class="card kpi"><b>${m.items}</b><span>reconciling items</span></div><div class="card kpi"><b>${m.flags}</b><span>audit exceptions (${m.high} High)</span></div><div class="card kpi"><b class="${R.reconciled?'ok':'bad'}">${inr(R.diff)}</b><span>${R.reconciled?'RECONCILED':'UNRECONCILED - investigate'}</span></div></div>
+<div class="card"><b>Exceptions by type</b>${Object.entries(cnt).map(([k,v])=>`<div class="row" style="margin:5px 0;align-items:center"><span style="width:200px">${k}</span><div class="bar" style="width:${v/mx*50}%"></div><span>${v}</span></div>`).join('')||'<div class="mut">None</div>'}</div>
+<div class="card row" style="align-items:center"><button class="btn" onclick="copyAI()">Copy summary for Claude</button><button class="btn" onclick="dlAI()">Download summary JSON</button><span class="mut small">Paste into Claude with claude_commentary_prompt.md for the audit memo (optional).</span></div>`},
+Matched:R=>tbl(['#','Type','Confidence','Bank','Books'],R.matches.map(m=>[m.id,esc(m.kind),tag(m.conf),m.bank.map(x=>`${esc(x.date)} ${esc(x.ref)} ${inr(x.amount)}`).join('<br>'),m.books.map(x=>`${esc(x.date)} ${esc(x.ref||'(blank)')} ${inr(x.amount)}`).join('<br>')])),
+'Reconciling items':R=>tbl(['Source','Date','Narration','Ref','Amount','Category','Action','Books adj','Bank adj'],R.items.map(i=>[esc(i.source),esc(i.date),esc(i.narration),esc(i.ref),inr(i.amount),esc(i.category),esc(i.action),inr(i.books_adj),inr(i.bank_adj)]),[4,7,8]),
+BRS(R){const b=R.brs,L=(a,v,bold)=>`<tr><td>${bold?'<b>'+a+'</b>':a}</td><td class="n">${bold?'<b>'+inr(v)+'</b>':inr(v)}</td></tr>`;
+return`<table style="max-width:640px"><tr><th colspan="2">A. From bank side</th></tr>${L('Balance as per Bank Statement',b.bank_close)}${L('Add: Deposits in transit',b.dit)}${L('Less: Outstanding cheques (current)',b.oc)}${L('Less: Outstanding cheques (B/F)',b.ocbf)}${L('Adjusted Bank Balance',b.adj_bank,1)}
+<tr><th colspan="2">B. From books side</th></tr>${L('Balance as per Bank Books',b.books_close)}${L('Add: Bank interest not in books',b.interest)}${L('Less: Bank charges not in books',b.charges)}${L('Add back: Duplicate posting',b.dup)}${L('Correct: Amount errors',b.err)}${L('Unidentified bank items',b.unid)}${L('Adjusted Books Balance',b.adj_books,1)}${L('Difference (A - B)',R.diff,1)}</table>
+<p class="${R.reconciled?'ok':'bad'}"><b>${R.reconciled?'RECONCILED':'UNRECONCILED - INVESTIGATE'}</b></p>`},
+Exceptions(R){const o={High:0,Medium:1,Low:2};return tbl(['Flag','Ref','Date','Narration','Amount','Risk','Why it matters','Evidence to request'],[...R.flags].sort((a,b)=>o[a.risk]-o[b.risk]).map(f=>[esc(f.code),esc(f.ref||'(blank)'),esc(f.date),esc(f.narration),inr(f.amount),tag(f.risk),esc(f.issue),esc(f.evidence)]),[4])},
+'Proposed entries':R=>`<div class="mut small" style="margin-bottom:6px">Proposed - subject to CA approval. You decide on each entry in Step 5.</div>`+tbl(['#','Debit','Credit','Amount','Reason'],R.entries.map((e,i)=>[i+1,esc(e.dr),esc(e.cr),inr(e.amount),esc(e.why)]),[3]),
+'Data checks':R=>`<div>${R.issues.length?R.issues.map(x=>'<div>&bull; '+esc(x)+'</div>').join(''):'No data-quality issues.'}</div>`};
+function copyAI(){const t=JSON.stringify(ST.result.ai,null,2);navigator.clipboard?.writeText(t).then(()=>alert('Summary copied. Paste it into Claude.'),()=>dlAI())}
+function dlAI(){saveBlob(new Blob([JSON.stringify(ST.result.ai,null,2)],{type:'application/json'}),'summary_for_ai.json')}
+function saveBlob(blob,name){const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;document.body.appendChild(a);a.click();a.remove()}
+/* ---------- Step 5: approval + export ---------- */
+function v5(){const R=ST.result,A=ST.approved,lock=A?'disabled':'',n=R.entries.length;
+return`<div class="card"><h2>Step 5 &ndash; Approve and export</h2><div class="grid">
+<div class="card kpi"><b class="${R.reconciled?'ok':'bad'}">${inr(R.diff)}</b><span>${R.reconciled?'reconciled':'UNRECONCILED difference'}</span></div>
+<div class="card kpi"><b>${R.metrics.high}</b><span>High-risk exceptions (of ${R.metrics.flags})</span></div>
+<div class="card kpi"><b>${R.metrics.items}</b><span>reconciling items</span></div><div class="card kpi"><b>${n}</b><span>proposed journal entries</span></div></div>
+<div class="mut small msg">Review the results in Step 4 first. <a href="#" onclick="go(4);return false">Go back to results</a></div></div>
+<div class="card"><h2>Proposed journal entries</h2>${n?`<div class="row" style="align-items:center;margin-bottom:6px"><button class="btn" ${lock} onclick="decAll('Approved')">Approve all</button><button class="btn" ${lock} onclick="decAll('Rejected')">Reject all</button></div>
+${tbl(['#','Debit','Credit','Amount','Reason','Decision'],R.entries.map((e,i)=>[i+1,esc(e.dr),esc(e.cr),inr(e.amount),esc(e.why),`<b class="${ST.dec[i]==='Approved'?'ok':ST.dec[i]==='Rejected'?'bad':'mut'}">${ST.dec[i]||'Pending'}</b><br><button class="btn" ${lock} onclick="dec(${i},'Approved')">Approve</button> <button class="btn" ${lock} onclick="dec(${i},'Rejected')">Reject</button>`]),[3])}`:'<div class="mut">No journal entries are proposed.</div>'}</div>
+<div class="card"><h2>Reviewer approval</h2><div class="row"><label>Reviewer name<input id="rv" value="${esc(ST.rev)}" ${lock} oninput="ST.rev=this.value;updApprove()" style="width:260px"></label></div>
+<label style="margin-top:10px">Remarks${R.reconciled?' (optional)':' (required - the reconciliation has an unreconciled difference)'}<textarea id="rm" ${lock} oninput="ST.remarks=this.value;updApprove()">${esc(ST.remarks)}</textarea></label>
+<label style="flex-direction:row;align-items:center;gap:8px;margin-top:10px;font-size:13px;color:var(--ink)"><input type="checkbox" id="ak" ${ST.ack?'checked':''} ${lock} onchange="ST.ack=this.checked;updApprove()">I have reviewed the results, exceptions and proposed entries.</label>
+<div class="row" style="margin-top:12px;align-items:center">${A?`<div class="stamp">&#10003; APPROVED by ${esc(A.reviewer)} on ${esc(A.at)}</div><button class="btn" onclick="withdraw()">Withdraw approval</button>`:`<button class="btn ok" id="bapp" onclick="approve()">Approve reconciliation</button><span id="whyapp" class="mut small"></span>`}</div></div>
+<div class="card"><h2>Export to Excel</h2><div class="mut small">Available only after approval. The workbook includes the reconciliation, exceptions, journal-entry decisions and the approval record.</div>
+<div class="row" style="margin-top:10px;align-items:center"><button class="btn pri" id="bexp" ${A?'':'disabled'} onclick="exportXlsx()">Export approved reconciliation to Excel</button>${A?'':'<span class="mut small">Approve first.</span>'}</div>${msgHtml('exp')}
+${ST.exported?`<div class="ok small msg">&#10003; Saved as ${esc(ST.exported.name)} in ${esc(ST.exported.path)}</div>`:''}</div>
+<div class="nav2"><button class="btn" onclick="go(4)">&larr; Back to results</button><button class="btn" onclick="if(confirm('Start a new reconciliation? Current results will be cleared.')){ST=Object.assign(fresh(),{conn:ST.conn,companies:ST.companies,t:ST.t});render()}">Start new reconciliation</button></div>`}
+function dec(i,v){ST.dec[i]=v;render()}function decAll(v){ST.dec=ST.dec.map(()=>v);render()}
+function blocker(){const R=ST.result;if(!ST.rev.trim())return'Enter the reviewer name.';if(ST.dec.some(d=>!d))return'Approve or reject every proposed journal entry.';if(!R.reconciled&&!ST.remarks.trim())return'Add remarks explaining the unreconciled difference.';if(!ST.ack)return'Tick the review confirmation.';return''}
+function updApprove(){const b=document.getElementById('bapp');if(!b)return;const w=blocker();b.disabled=!!w;document.getElementById('whyapp').textContent=w}
+function approve(){if(blocker())return;ST.approved={reviewer:ST.rev.trim(),at:new Date().toLocaleString('en-GB')};ST.exported=null;render()}
+function withdraw(){ST.approved=null;ST.exported=null;render()}
+async function exportXlsx(){if(!ST.approved)return;setMsg('exp','Creating Excel file...');
+ try{const r=await api('/api/export',{run_id:ST.runId,approval:{approved:true,reviewer:ST.rev.trim(),remarks:ST.remarks.trim(),decisions:ST.dec}});
+  const name=r.headers.get('X-File-Name')||'reconciliation.xlsx',path=r.headers.get('X-Saved-To')||'';saveBlob(await r.blob(),name);ST.exported={name,path};render()}
+ catch(e){setMsg('exp','Export failed: '+e.message,1)}}
+/* ---------- boot ---------- */
+(async()=>{try{if(!/^https?:/.test(location.protocol))throw 0;await api('/api/ping');ST.conn=true;$('#cstat').textContent='● application server running'}catch(e){ST.conn=false;$('#cstat').textContent='○ server not running - start run_project.bat'}
+ const e=new Date(),y=e.getFullYear(),m=e.getMonth();const pm=new Date(y,m,0),p2=n=>String(n).padStart(2,'0');ST.t.from=`01-${p2(pm.getMonth()+1)}-${pm.getFullYear()}`;ST.t.to=`${p2(pm.getDate())}-${p2(pm.getMonth()+1)}-${pm.getFullYear()}`;render()})();
+</script></body></html>
