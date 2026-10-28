@@ -1,0 +1,328 @@
+Prompt for BRS Tool:
+Step  1
+Build a complete web application named BRS Tool for bank reconciliation across more than 300 bank accounts, multiple companies, multiple banks, and multiple currencies.
+Act as a senior full-stack developer, reconciliation specialist, and finance dashboard designer. Deliver a working application with persistent storage, document processing, reconciliation logic, dashboards, reports, and approval workflows. All buttons and workflows must function.
+1. Business objective
+Users upload:
+Bank ledgers exported from Oracle Accounting System.
+Bank statements downloaded from different banks.
+The application must extract, validate, standardize, and reconcile transactions, identify outstanding items and variances, and generate account-wise Bank Reconciliation Statements.
+Support monthly reconciliation, year-to-date analysis, historical comparisons, and consolidated management dashboards.
+2. Application design
+Create a professional, responsive finance application with:
+A light theme using navy blue, white, teal, and amber.
+Clear tables, searchable filters, charts, and KPI cards.
+Sidebar navigation: Dashboard, Companies, Banks & Accounts, Upload Centre, Data Validation, Reconciliation Workspace, Outstanding Items, Reports, Approvals, Audit Trail, and Settings.
+Desktop-first design with tablet compatibility.
+Clear loading indicators, upload progress, validation messages, and processing status.
+Display amounts with currency codes, thousands separators, and configurable decimal precision.
+3. Company, bank, and account master data
+Maintain:
+Company name, company code, and reporting currency.
+Bank name, branch, bank account number, IBAN, and account currency.
+Oracle cash/bank GL account, ledger, and legal entity.
+Account owner, preparer, reviewer, and approver.
+Active/inactive status.
+Opening balance and reconciliation start date.
+Allow bulk master-data import from Excel or CSV.
+Support one Oracle GL account mapping to multiple bank accounts, but require an additional account identifier or allocation mapping before reconciliation. Never assign transactions to an account by guessing.
+Preserve leading zeros in account numbers and references. Mask bank account numbers in dashboards while allowing authorized users to view full details.
+4. Upload and document processing
+Provide drag-and-drop and batch uploads for multiple companies, accounts, and periods.
+Implement support for:
+Excel: XLSX and XLS.
+CSV and TSV.
+Text-based PDF statements.
+Scanned PDF statements using OCR.
+PNG, JPG, JPEG, and TIFF using OCR.
+Structured bank formats: OFX, QFX, MT940, and CAMT.053 XML.
+Oracle ledger exports in Excel, CSV, and supported PDF layouts.
+Do not claim universal support for every file format. Display supported formats clearly and reject unsupported files with helpful instructions.
+For password-protected files, request the password securely, use it only for processing, and do not retain it.
+Include:
+Automatic layout detection where reliable.
+Reusable bank-specific statement templates.
+Reusable Oracle export mapping templates.
+A preview and column-mapping screen.
+Selection of worksheets and header rows.
+Configurable date formats, decimal separators, and debit/credit conventions.
+Multiple-account statement detection.
+User confirmation of company, account, currency, and period.
+Source filename, sheet/page, row reference, and original values for every extracted transaction.
+Extraction confidence and mandatory review of uncertain OCR values.
+Validation before committing transactions.
+Never invent transactions, amounts, dates, balances, or references. If extraction fails, show the reason and allow correction or an alternative upload format.
+Process large uploads in background jobs with progress, retry, and error details.
+5. Standardized transaction data
+Normalize ledger and statement records into:
+Unique transaction ID.
+Company ID and bank account ID.
+Source: Oracle ledger or bank statement.
+Transaction date, posting date, and value date where available.
+Description and counterparty.
+Reference, cheque number, payment ID, and Oracle journal/batch ID.
+Debit, credit, and signed amount.
+Currency.
+Running balance where available.
+Opening/closing balance records stored separately from transactions.
+Source document and source row/page.
+Import batch ID.
+Validation status.
+Reconciliation status and match group ID.
+Use exact decimal arithmetic or integer minor units for financial calculations. Do not use binary floating-point arithmetic for money.
+Normalize both sources into a common cash perspective:
+Money received increases the account balance.
+Money paid decreases the account balance.
+Require explicit confirmation of source debit/credit conventions before import. Do not assume bank-statement debit/credit labels have the same meaning as Oracle GL labels.
+6. Import validation and duplicate controls
+Validate:
+Missing mandatory fields.
+Invalid or ambiguous dates.
+Incorrect amounts and currency.
+Account and company mismatches.
+Transactions outside the selected period.
+Statement opening balance + signed movements = closing balance.
+Ledger opening balance + signed movements = closing balance, where complete source data is available.
+Gaps and overlaps in statement coverage.
+Multiple currencies in a single account upload.
+OCR uncertainty and unparseable rows.
+Detect duplicate files using file hashes.
+Identify potential duplicate transactions using available source identifiers and transaction attributes. Identical date/amount/description combinations can represent legitimate repeated payments; flag them for review rather than automatically deleting them.
+Make re-imports idempotent. Replacing a batch must require confirmation and preserve its audit history.
+Show imported, rejected, flagged, and duplicate-candidate record counts. Never silently discard records.
+7. Reconciliation engine
+Reconcile within the same company, bank account, and currency.
+Implement configurable matching rules in this order:
+Exact unique reference and exact amount.
+Exact cheque/payment/journal reference and amount.
+Exact amount with configurable date tolerance and supporting reference evidence.
+Normalized reference/description with exact amount and date tolerance.
+One ledger transaction to multiple bank transactions.
+Multiple ledger transactions to one bank transaction.
+Controlled many-to-many matching with exact net amounts and bounded group sizes.
+Fuzzy descriptions as suggested matches requiring review.
+Default amount tolerance must be zero. Allow approved, currency-specific tolerance settings.
+Do not mark tolerance differences as fully reconciled without a separately identified and approved adjustment.
+Include:
+Configurable date tolerance by account or rule.
+Matching across month boundaries for outstanding items.
+Rule priority and versioning.
+Match confidence, explanation, and supporting evidence.
+Exact sum validation for grouped matches.
+Configurable limits on group size and search window.
+No reuse of a transaction in another match.
+Transaction locking and atomic updates to prevent concurrent double matching.
+Ambiguous matches routed to review.
+Manual matching, partial allocations, and unmatching with mandatory reasons.
+For partial allocations, track the allocated and remaining amount explicitly; prevent allocation above the original transaction amount.
+Only unique, approved-rule deterministic matches may be automatically confirmed. AI-assisted or fuzzy suggestions require human confirmation.
+Statuses should include Unmatched, Suggested Match, Matched, Partially Matched, Exception, and Carried Forward.
+8. Reconciliation workspace
+Create a side-by-side workspace:
+Oracle ledger transactions on the left.
+Bank statement transactions on the right.
+Match details and supporting documents in a detail panel.
+Provide:
+Search by amount, date, reference, description, cheque number, and counterparty.
+Filters by status, transaction type, source batch, and age.
+Selection of one or several transactions on either side.
+Selected totals and the difference between both sides.
+Auto-match, confirm match, reject suggestion, manual match, split allocation, and unmatch actions.
+Comments, attachments, assigned owner, and due date.
+Source document preview.
+Clear match history.
+9. Outstanding items and period management
+Classify outstanding items as:
+Outstanding payments or cheques.
+Deposits in transit.
+Bank charges not recorded in the ledger.
+Bank interest not recorded in the ledger.
+Direct debits or credits.
+Timing differences.
+Possible duplicates.
+Reversals.
+Amount differences.
+Unidentified transactions.
+Potential ledger or bank errors.
+Support configurable aging buckets such as 0–30, 31–60, 61–90, and over 90 days.
+Carry unresolved items into subsequent periods without duplicating them. Preserve their original date and history. When cleared later, record the clearing date and period.
+Maintain immutable approved period snapshots. Later clearance of an item must not change a previously approved report.
+Period workflow:
+Draft → In Progress → Submitted → Reviewed → Approved → Locked.
+Reopening a locked period requires permission, a reason, and an audit entry.
+10. Bank Reconciliation Statement
+For each account and period, display:
+Opening and closing bank statement balances.
+Opening and closing Oracle ledger balances.
+Raw closing balance difference.
+Matched transaction counts and amounts.
+Ledger-only outstanding items.
+Bank-only outstanding items.
+Approved adjustments.
+Adjusted bank balance.
+Adjusted ledger balance.
+Residual unreconciled difference.
+Build the reconciliation using documented cash-sign conventions.
+For validated timing items:
+Adjusted bank balance = bank statement closing balance + signed ledger-only movements not yet reflected by the bank.
+Adjusted ledger balance = ledger closing balance + signed bank-only movements not yet recorded in the ledger.
+Treat errors and other reconciling adjustments explicitly with reviewed signs and explanations. Do not apply the timing-item formula indiscriminately to every unmatched item.
+Require:
+Each reconciling amount to link to supporting transaction evidence.
+Separate treatment of opening/prior-period differences.
+No double counting of carry-forward items or adjustments.
+A visible residual difference.
+Clear identification of missing or invalid source balances.
+Never force the residual to zero or create a balancing adjustment automatically. Reconciliation is complete only when required validations pass, the residual is zero at the account currency precision, and approvals are completed.
+Proposed journal entries are suggestions for review only. Do not post entries to Oracle automatically.
+11. Management dashboards
+Create interactive dashboards with filters for:
+Company.
+Bank.
+Bank account.
+Account currency.
+Month.
+Quarter.
+Year.
+Reconciliation status.
+Preparer, reviewer, or owner.
+Include these dashboards:
+Group overview
+Total active bank accounts.
+Accounts with complete source uploads.
+Accounts reconciled, approved, pending, and overdue.
+Ledger and bank balances by currency.
+Raw balance differences and residual differences shown separately.
+Unmatched item count and gross outstanding exposure.
+Match rate by transaction count and amount, with denominator definitions.
+Outstanding-item aging.
+Accounts with the largest residual differences.
+Bank dashboard
+Account count and balances by bank and currency.
+Reconciliation completion by bank.
+Outstanding items, bank charges, and interest.
+Monthly trends and unresolved variances.
+Company dashboard
+All bank accounts belonging to a company.
+Bank versus ledger balances.
+Reconciliation progress.
+Outstanding items and aging.
+Company-wise residual differences.
+Month and year dashboard
+Monthly bank and ledger closing balance trends.
+Month-on-month changes in balances and residual differences.
+Year-on-year comparison for comparable accounts and periods.
+Outstanding-item movements and clearance trends.
+Reconciliation completion trends.
+Exception and processing-volume trends.
+Closing balances are point-in-time values: do not sum monthly closing balances to calculate annual balances.
+Do not aggregate different currencies directly. Provide separate currency views. Optional reporting-currency views must use configured exchange rates with visible rate dates, sources, and conversion methods.
+Show both net differences and gross absolute exposure so offsetting account variances do not hide unresolved issues.
+All charts must support drill-down to account, period, and underlying transactions.
+12. Reports and exports
+Generate:
+Account-wise Bank Reconciliation Statement.
+Company-wise reconciliation summary.
+Bank-wise summary.
+Monthly and annual management summaries.
+Matched transaction report.
+Unmatched ledger report.
+Unmatched bank statement report.
+Outstanding-item aging report.
+Variance analysis.
+Proposed adjustment report.
+Approval and audit history.
+Export to Excel, CSV, and formatted PDF.
+Include company, bank, masked account identifier, currency, period, balances, reconciling items, residual difference, preparer, reviewer, approver, and generation timestamp.
+Excel exports should contain separate worksheets for Summary, Matched Items, Ledger Outstanding, Bank Outstanding, Aging, Adjustments, and Audit Trail.
+Support batch generation for selected accounts and bulk download. Protect exported spreadsheets against formula injection from uploaded text fields.
+13. Roles, security, and audit trail
+Implement authenticated users and roles:
+Administrator.
+Preparer.
+Reviewer.
+Approver.
+Read-only Auditor.
+Enforce company/account permissions on the server for every request.
+Provide segregation of duties. A preparer must not approve their own reconciliation unless an administrator has explicitly configured a documented exception.
+Include:
+Secure file storage.
+Encryption in transit and at rest.
+Server-side secrets and API keys.
+File type/content validation, size limits, and safe handling of archives.
+Backup and restore procedures.
+Configurable retention.
+Audit records for uploads, corrections, matching, unmatching, rule changes, approvals, reopening, and exports.
+Before/after values, user, timestamp, and reason where applicable.
+Do not log passwords, full bank account details, or complete uploaded documents in application logs.
+External AI document processing must be optional and clearly disclosed. Do not send financial documents to an external AI service without an authorized configuration and explicit upload consent. Core reconciliation calculations and deterministic matching must work without AI.
+14. Architecture and performance
+Use a full-stack architecture compatible with the current Google AI Studio environment:
+React and TypeScript frontend.
+Server-side APIs.
+Persistent database.
+Private document storage.
+Background jobs for extraction, OCR, matching, and exports.
+Prefer relational storage for financial transactions, match allocations, period snapshots, and audit records. If the available environment uses a different database, implement equivalent consistency and transaction controls and explain deployment requirements.
+Support at least 300 accounts and design for growth beyond 1,000 accounts.
+Use:
+Server-side pagination and filtering.
+Indexed account, period, date, amount, reference, and status fields.
+Bulk processing.
+Background queues.
+Bounded grouped-match searches.
+Account-level reconciliation jobs.
+Progress and cancellation controls.
+Isolation between users and concurrent operations.
+Do not store production financial data only in browser localStorage. Persist data across refreshes and sessions.
+If a required OCR engine, parser, storage service, or background worker is unavailable in the development environment, identify it explicitly and provide the integration code and setup instructions. Never simulate a successful production operation.
+15. Sample data and acceptance tests
+Provide a clearly labeled demo mode containing fictional companies, banks, accounts, and transactions. Keep demo data separate from real uploads.
+Create automated tests covering:
+Debit/credit normalization for both sources.
+Exact decimal calculations.
+Exact, grouped, partial, and ambiguous matches.
+Bank charges and interest.
+Outstanding payments and deposits.
+Cross-period clearance and carry-forward without duplication.
+Duplicate uploads and legitimate identical transactions.
+OCR uncertainty.
+Incomplete statement coverage.
+Missing balances.
+Currency isolation.
+Concurrent match attempts.
+Approval restrictions.
+Locked-period immutability.
+Dashboard totals agreeing with reconciliation reports.
+Include this numeric acceptance example:
+Ledger closing balance: 100,000.
+Bank closing balance: 108,500.
+Ledger-only outstanding payment: signed amount −10,000.
+Ledger-only deposit in transit: signed amount +2,000.
+Bank-only charge: signed amount −500.
+Adjusted bank balance: 108,500 − 10,000 + 2,000 = 100,500.
+Adjusted ledger balance: 100,000 − 500 = 99,500.
+Residual difference: 1,000.
+The app must flag this account as unreconciled and must not invent an adjustment.
+16. Implementation and deliverables
+Build incrementally, starting with a working end-to-end flow:
+Company and account setup.
+Excel/CSV upload and mapping.
+Validation and persistent import.
+Deterministic reconciliation.
+Outstanding items and BRS calculation.
+Dashboards and exports.
+PDF/OCR and structured-bank format adapters.
+Approval workflows, audit controls, and performance improvements.
+Deliver:
+Working frontend and backend source code.
+Database schema and migrations.
+Document parsers and mapping templates.
+Reconciliation engine.
+Dashboard and report implementations.
+Automated tests.
+Fictional demo data.
+Environment configuration template.
+Setup, deployment, backup, and user instructions.
+A clear list of implemented features and any remaining integration requirements.
+Begin implementation now. Make reasonable assumptions, list them briefly, and keep all financial logic transparent and reviewable.

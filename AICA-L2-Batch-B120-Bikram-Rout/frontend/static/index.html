@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BRS Tool - Enterprise Bank Reconciliation System</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Chart.js CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              navy: '#0F172A',
+              dark: '#1E293B',
+              slate: '#334155',
+              teal: '#0D9488',
+              teallight: '#14B8A6',
+              amber: '#F59E0B',
+              amberlight: '#FEF3C7',
+              surface: '#F8FAFC'
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+    body { font-family: 'Inter', sans-serif; }
+    .custom-scroll::-webkit-scrollbar { width: 6px; height: 6px; }
+    .custom-scroll::-webkit-scrollbar-track { background: #f1f5f9; }
+    .custom-scroll::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+    .custom-scroll::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-800 flex h-screen overflow-hidden">
+
+  <!-- SIDEBAR NAVIGATION -->
+  <aside class="w-64 bg-brand-navy text-white flex flex-col flex-shrink-0 border-r border-slate-800">
+    <!-- Brand Header -->
+    <div class="h-16 flex items-center px-6 border-b border-slate-800/80 bg-slate-900/60">
+      <div class="flex items-center space-x-3">
+        <div class="w-9 h-9 rounded-lg bg-gradient-to-tr from-brand-teal to-teal-400 flex items-center justify-center shadow-lg shadow-teal-500/20">
+          <i data-lucide="scale" class="w-5 h-5 text-white"></i>
+        </div>
+        <div>
+          <h1 class="font-bold text-base tracking-wide text-white">BRS Tool</h1>
+          <p class="text-[10px] text-teal-400 font-semibold tracking-wider uppercase">Enterprise Recon 2.0</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- User / Role Switcher Widget -->
+    <div class="px-4 py-3 border-b border-slate-800/60 bg-slate-900/40">
+      <div class="flex items-center justify-between">
+        <div class="flex items-center space-x-2">
+          <div class="w-7 h-7 rounded-full bg-slate-700 flex items-center justify-center text-xs font-bold text-teal-300" id="userAvatar">AD</div>
+          <div class="text-xs">
+            <p class="font-medium text-slate-200 leading-tight" id="activeUserName">Admin User</p>
+            <p class="text-[10px] text-amber-400 font-semibold uppercase tracking-wider" id="activeUserRole">Administrator</p>
+          </div>
+        </div>
+        <select id="roleSelector" onchange="switchUserRole(this.value)" class="bg-slate-800 text-[11px] text-slate-300 rounded border border-slate-700 px-2 py-1 focus:outline-none focus:border-brand-teal">
+          <option value="Administrator">Admin</option>
+          <option value="Preparer">Preparer</option>
+          <option value="Reviewer">Reviewer</option>
+          <option value="Approver">Approver</option>
+          <option value="Auditor">Auditor</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- Navigation Items -->
+    <nav class="flex-1 px-3 py-4 space-y-1 overflow-y-auto custom-scroll text-sm">
+      <button onclick="navigateTo('dashboard')" id="nav-dashboard" class="nav-item w-full flex items-center space-x-3 px-3 py-2.5 rounded-lg text-slate-300 hover:bg-slate-800/70 hover:text-white transition">
+        <i data-lucide="layout-dashboard" class="w-4 h-4 text-brand-teal"></i>
+        <span class="font-medium">Dashboard</span>
+      </button>
+
+      <button onclick="navigateTo('workspace')" id="nav-workspace" class="nav-item w-full flex items-center space-x-3 px-3 py-2.5 rounded-lg text-slate-300 hover:bg-slate-800/70 hover:text-white transition">
+        <i data-lucide="split-square-vertical" class="w-4 h-4 text-brand-teal"></i>
+        <span class="font-medium">Recon Workspace</span>
+        <span class="ml-auto bg-brand-teal/20 text-brand-teal text-[10px] font-bold px-2 py-0.5 rounded-full">Core</span>
+      </button>
+
+      <button onclick="navigateTo('brs')" id="nav-brs" class="nav-item w-full flex items-center space-x-3 px-3 py-2.5 rounded-lg text-slate-300 hover:bg-slate-800/70 hover:text-white transition">
+        <i data-lucide="file-check-2" class="w-4 h-4 text-brand-teal"></i>
+        <span class="font-medium">BRS Statement</span>
+      </button>
+
+      <button onclick="navigateTo('outstanding')" id="nav-outstanding" class="nav-item w-full flex items-center space-x-3 px-3 py-2.5 rounded-lg text-slate-300 hover:bg-slate-800/70 hover:text-white transition">
+        <i data-lucide="clock" class="w-4 h-4 text-brand-teal"></i>
+        <span class="font-medium">Outstanding Items</span>
+      </button>
+
+      <button onclick="navigateTo('upload')" id="nav-upload" class="nav-item w-full flex items-center space-x-3 px-3 py-2.5 rounded-lg text-slate-300 hover:bg-slate-800/70 hover:text-white transition">
+        <i data-lucide="upload-cloud" class="w-4 h-4 text-brand-teal"></i>
+        <span class="font-medium">Upload Centre</span>
+      </button>
+
+      <button onclick="navigateTo('validation')" id="nav-validation" class="nav-item w-full flex items-center space-x-3 px-3 py-2.5 rounded-lg text-slate-300 hover:bg-slate-800/70 hover:text-white transition">
+        <i data-lucide="shield-check" class="w-4 h-4 text-brand-teal"></i>
+        <span class="font-medium">Data Validation</span>
+      </button>
+
+      <button onclick="navigateTo('approvals')" id="nav-approvals" class="nav-item w-full flex items-center space-x-3 px-3 py-2.5 rounded-lg text-slate-300 hover:bg-slate-800/70 hover:text-white transition">
+        <i data-lucide="check-circle" class="w-4 h-4 text-brand-teal"></i>
+        <span class="font-medium">Approvals & Workflow</span>
+      </button>
+
+      <div class="pt-3 pb-1 px-3 text-[10px] uppercase font-bold tracking-wider text-slate-500">Master Data & Audit</div>
+
+      <button onclick="navigateTo('companies')" id="nav-companies" class="nav-item w-full flex items-center space-x-3 px-3 py-2.5 rounded-lg text-slate-300 hover:bg-slate-800/70 hover:text-white transition">
+        <i data-lucide="building-2" class="w-4 h-4 text-slate-400"></i>
+        <span class="font-medium">Companies</span>
+      </button>
+
+      <button onclick="navigateTo('accounts')" id="nav-accounts" class="nav-item w-full flex items-center space-x-3 px-3 py-2.5 rounded-lg text-slate-300 hover:bg-slate-800/70 hover:text-white transition">
+        <i data-lucide="landmark" class="w-4 h-4 text-slate-400"></i>
+        <span class="font-medium">Banks & Accounts</span>
+      </button>
+
+      <button onclick="navigateTo('reports')" id="nav-reports" class="nav-item w-full flex items-center space-x-3 px-3 py-2.5 rounded-lg text-slate-300 hover:bg-slate-800/70 hover:text-white transition">
+        <i data-lucide="file-spreadsheet" class="w-4 h-4 text-slate-400"></i>
+        <span class="font-medium">Reports & Exports</span>
+      </button>
+
+      <button onclick="navigateTo('audit')" id="nav-audit" class="nav-item w-full flex items-center space-x-3 px-3 py-2.5 rounded-lg text-slate-300 hover:bg-slate-800/70 hover:text-white transition">
+        <i data-lucide="history" class="w-4 h-4 text-slate-400"></i>
+        <span class="font-medium">Audit Trail</span>
+      </button>
+
+      <button onclick="navigateTo('settings')" id="nav-settings" class="nav-item w-full flex items-center space-x-3 px-3 py-2.5 rounded-lg text-slate-300 hover:bg-slate-800/70 hover:text-white transition">
+        <i data-lucide="sliders" class="w-4 h-4 text-slate-400"></i>
+        <span class="font-medium">Rules & Settings</span>
+      </button>
+    </nav>
+
+    <!-- LAN IP Banner & Demo Reset in Sidebar Footer -->
+    <div class="p-3 border-t border-slate-800 bg-slate-950/60 text-xs">
+      <div class="flex items-center justify-between text-slate-400 mb-1">
+        <span class="flex items-center space-x-1">
+          <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+          <span>LAN Hosted</span>
+        </span>
+        <button onclick="resetDemoData()" title="Reset Demo Data to clean Section 15 state" class="text-[10px] text-teal-400 hover:text-teal-300 font-semibold uppercase">Reset Demo</button>
+      </div>
+      <p class="font-mono text-[11px] text-emerald-300 select-all" id="sidebarIpDisplay">http://172.20.31.32:8000</p>
+    </div>
+  </aside>
+
+  <!-- MAIN VIEWPORT -->
+  <main class="flex-1 flex flex-col h-screen overflow-hidden bg-slate-100">
+    
+    <!-- Top Global Header -->
+    <header class="h-16 bg-white border-b border-slate-200 px-6 flex items-center justify-between shadow-sm z-10 flex-shrink-0">
+      <div class="flex items-center space-x-4">
+        <h2 id="pageTitle" class="text-xl font-bold text-slate-800">Executive Dashboard</h2>
+        <span id="pageBadge" class="hidden px-2.5 py-0.5 rounded-full text-xs font-semibold bg-teal-50 text-teal-700 border border-teal-200">Live</span>
+      </div>
+
+      <!-- Account & Period Global Selectors -->
+      <div class="flex items-center space-x-3">
+        <div class="flex items-center bg-slate-50 border border-slate-200 rounded-lg p-1 text-xs">
+          <span class="px-2 font-medium text-slate-500">Account:</span>
+          <select id="globalAccountSelect" onchange="onGlobalAccountChange()" class="bg-transparent font-semibold text-slate-700 focus:outline-none pr-3">
+            <option value="ACC-01">JPMorgan Chase - •••• 9482 (USD) [Acceptance Test]</option>
+            <option value="ACC-02">HSBC Commercial - •••• 3941 (USD) [Auto-Match Demo]</option>
+            <option value="ACC-03">First Abu Dhabi Bank - •••• 4851 (AED) [Reconciled]</option>
+            <option value="ACC-04">BNP Paribas - •••• 3841 (EUR)</option>
+            <option value="ACC-05">Barclays Corporate - •••• 4821 (GBP)</option>
+          </select>
+        </div>
+
+        <div class="flex items-center bg-slate-50 border border-slate-200 rounded-lg p-1 text-xs">
+          <span class="px-2 font-medium text-slate-500">Period:</span>
+          <select id="globalPeriodSelect" onchange="onGlobalPeriodChange()" class="bg-transparent font-semibold text-slate-700 focus:outline-none pr-3">
+            <option value="PER-01">2026-09 (Sep 2026)</option>
+          </select>
+        </div>
+
+        <div class="flex items-center space-x-2 pl-2">
+          <button onclick="downloadReport('excel')" class="flex items-center space-x-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold shadow-sm transition">
+            <i data-lucide="download" class="w-3.5 h-3.5"></i>
+            <span>Export Excel</span>
+          </button>
+          <button onclick="downloadReport('pdf')" class="flex items-center space-x-1.5 px-3 py-1.5 bg-brand-navy hover:bg-slate-800 text-white rounded-lg text-xs font-semibold shadow-sm transition">
+            <i data-lucide="file-text" class="w-3.5 h-3.5"></i>
+            <span>Export PDF</span>
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <!-- DYNAMIC CONTENT CONTAINER -->
+    <div id="contentContainer" class="flex-1 overflow-y-auto p-6 custom-scroll">
+      <!-- Injected dynamically via app.js -->
+    </div>
+  </main>
+
+  <!-- NOTIFICATION TOAST -->
+  <div id="toast" class="fixed bottom-5 right-5 z-50 transform translate-y-24 opacity-0 transition duration-300 bg-brand-navy text-white px-5 py-3 rounded-xl shadow-2xl flex items-center space-x-3 border border-slate-700">
+    <div id="toastIcon" class="text-teal-400"><i data-lucide="check-circle" class="w-5 h-5"></i></div>
+    <div class="text-xs">
+      <p id="toastTitle" class="font-bold text-white">Notification</p>
+      <p id="toastMsg" class="text-slate-300">Operation completed successfully.</p>
+    </div>
+  </div>
+
+  <script src="/static/js/app.js"></script>
+</body>
+</html>
