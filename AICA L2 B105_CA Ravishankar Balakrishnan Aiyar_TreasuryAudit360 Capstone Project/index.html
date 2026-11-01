@@ -1,0 +1,414 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TreasuryAudit360 – Treasury Audit Workbench</title>
+<meta name="description" content="Automated audit of a bank treasury in India (RBI, SEBI, IFSCA, FEMA) aligned to ICAI Standards on Auditing. Front end for the n8n Treasury Audit workflows.">
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#16213a">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="TreasuryAudit">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+<link rel="alternate icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23d4a017'/%3E%3Cpath d='M6 13h20L16 6zM8 14h3v9H8zm6.5 0h3v9h-3zM21 14h3v9h-3zM6 24h20v2H6z' fill='%2316213a'/%3E%3C/svg%3E">
+<style>
+:root{--navy:#16213a;--navy2:#1f2a44;--gold:#d4a017;--bg:#f4f6fa;--card:#fff;--ink:#101828;--muted:#667085;--line:#e4e7ec;--high:#b42318;--highbg:#fee4e2;--med:#b54708;--medbg:#fef0c7;--low:#027a48;--lowbg:#d1fadf;--blue:#1f5fbf}
+*{box-sizing:border-box}
+body{margin:0;font-family:"Segoe UI",system-ui,-apple-system,Roboto,Arial,sans-serif;background:var(--bg);color:var(--ink);font-size:14px}
+a{color:var(--blue)}
+.layout{display:flex;min-height:100vh}
+aside{width:240px;background:var(--navy);color:#d0d5dd;flex-shrink:0;position:sticky;top:0;height:100vh;display:flex;flex-direction:column}
+.brand{display:flex;gap:10px;align-items:center;padding:18px 16px;border-bottom:1px solid #2b3654}
+.logo{width:36px;height:36px;border-radius:8px;background:var(--gold);display:grid;place-items:center;color:var(--navy);font-weight:800}
+.brand b{color:#fff;display:block;font-size:15px}.brand small{color:#98a2b3;font-size:11px}
+nav a{display:block;padding:10px 18px;color:#d0d5dd;text-decoration:none;border-left:3px solid transparent}
+nav a:hover{background:#1f2a44}nav a.active{background:#1f2a44;color:#fff;border-left-color:var(--gold)}
+.side-foot{margin-top:auto;padding:14px 16px;font-size:11px;color:#98a2b3;line-height:1.5}
+main{flex:1;min-width:0;padding:26px 32px 60px}
+.topbar{display:none}
+h1{font-family:Georgia,"Times New Roman",serif;font-size:28px;margin:0 0 4px;color:var(--navy)}
+.sub{color:var(--muted);margin:0 0 20px}
+.row{display:flex;gap:16px;flex-wrap:wrap}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:16px 18px;margin-bottom:16px}
+.card h3{margin:0 0 12px;font-size:15px;color:var(--navy)}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:14px;margin-bottom:16px}
+.kpi{background:#fff;border:1px solid var(--line);border-radius:10px;padding:14px}
+.kpi .l{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted)}
+.kpi .v{font-size:22px;font-weight:700;margin-top:6px;font-family:Georgia,serif}
+.grid3{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px}
+.btn{background:var(--navy);color:#fff;border:0;border-radius:8px;padding:10px 16px;font-weight:600;cursor:pointer;font-size:14px;text-decoration:none;display:inline-block}
+.btn:hover{background:#24345a}.btn.sec{background:#fff;color:var(--navy);border:1px solid var(--line)}
+.btn:disabled{opacity:.55;cursor:wait}
+.badge{display:inline-block;padding:2px 9px;border-radius:999px;font-size:12px;font-weight:600;white-space:nowrap}
+.High,.bad{background:var(--highbg);color:var(--high)}.Medium,.warn{background:var(--medbg);color:var(--med)}.Low,.good{background:var(--lowbg);color:var(--low)}
+.neutral{background:#eef2f6;color:#344054}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{background:#f2f4f7;text-align:left;padding:8px 10px;color:#344054;font-weight:600;position:sticky;top:0}
+td{padding:8px 10px;border-top:1px solid var(--line);vertical-align:top}
+tr.click{cursor:pointer}tr.click:hover td{background:#f9fafb}
+.scroll{overflow:auto;max-height:620px;border:1px solid var(--line);border-radius:8px}
+label{display:block;font-weight:600;font-size:13px;margin:10px 0 4px}
+input,select,textarea{width:100%;padding:9px 10px;border:1px solid #d0d5dd;border-radius:8px;font:inherit;background:#fff}
+textarea{min-height:90px}
+.filters{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:12px}
+.filters label{margin-top:0}
+.stages li{list-style:none;padding:6px 0;color:var(--muted)}
+.stages li.on{color:var(--ink);font-weight:600}.stages li.done{color:var(--low)}
+.stages li::before{content:"○ ";}.stages li.on::before{content:"◔ ";color:var(--gold)}.stages li.done::before{content:"✔ "}
+.bars .b{display:flex;align-items:center;gap:8px;margin:7px 0}
+.bars .b span:first-child{width:110px;font-size:12px;color:#344054}
+.bars .t{flex:1;background:#eef2f6;border-radius:4px;height:16px;overflow:hidden}
+.bars .f{height:100%;background:var(--navy)}
+.err{background:var(--highbg);color:var(--high);padding:12px;border-radius:8px;margin:10px 0}
+.note{background:#fff8e6;border:1px solid #f5d77a;padding:10px 12px;border-radius:8px;font-size:13px}
+.skel{background:linear-gradient(90deg,#eef2f6,#f8f9fb,#eef2f6);background-size:200% 100%;animation:sk 1.2s infinite;border-radius:8px;height:80px}
+@keyframes sk{to{background-position:-200% 0}}
+.drawer{position:fixed;top:0;right:0;width:min(560px,100%);height:100vh;background:#fff;box-shadow:-8px 0 30px rgba(16,24,40,.18);padding:20px 22px;overflow:auto;z-index:20;display:none}
+.drawer.open{display:block}
+.drawer h4{margin:14px 0 4px;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.drawer p{margin:0}
+.x{float:right;background:none;border:0;font-size:22px;cursor:pointer;color:var(--muted)}
+.report{background:#fff;max-width:900px;margin:0 auto;padding:40px 48px;border:1px solid var(--line);box-shadow:0 4px 18px rgba(16,24,40,.08)}
+.flow{display:flex;flex-wrap:wrap;gap:10px;align-items:stretch}
+.flow .n{flex:1 1 150px;background:#fff;border:2px solid var(--navy2);border-radius:10px;padding:10px;font-size:13px}
+.flow .n b{display:block;color:var(--navy);margin-bottom:4px}
+.flow .a{align-self:center;color:var(--muted);font-size:20px}
+.tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}
+.tabs button{border:1px solid var(--line);background:#fff;border-radius:999px;padding:6px 12px;cursor:pointer;font:inherit}
+.tabs button.active{background:var(--navy);color:#fff;border-color:var(--navy)}
+.toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--navy);color:#fff;padding:10px 18px;border-radius:8px;display:none;z-index:30}
+footer{color:var(--muted);font-size:12px;margin-top:30px}
+code{background:#eef2f6;padding:1px 5px;border-radius:4px;font-size:12px}
+@media (max-width:860px){
+ .layout{display:block}aside{position:fixed;left:-260px;z-index:25;transition:left .2s}aside.show{left:0}
+ .topbar{display:flex;align-items:center;gap:10px;background:var(--navy);color:#fff;padding:10px 16px;position:sticky;top:0;z-index:15}
+ .topbar button{background:none;border:0;color:#fff;font-size:22px}
+ main{padding:18px 16px 50px}.report{padding:22px 16px}.hide-sm{display:none}td,th{padding:7px 6px}
+}
+@media print{aside,.topbar,.noprint,footer{display:none!important}main{padding:0}.report{border:0;box-shadow:none;max-width:none;padding:0}body{background:#fff}}
+</style>
+</head>
+<body>
+<div class="topbar"><button onclick="document.querySelector('aside').classList.toggle('show')" aria-label="Menu">☰</button><b>TreasuryAudit360</b></div>
+<div class="layout">
+<aside>
+  <div class="brand"><div class="logo">₹</div><div><b>TreasuryAudit360</b><small>Treasury audit workbench</small></div></div>
+  <nav id="nav">
+    <a href="#/dashboard">Dashboard</a>
+    <a href="#/run">Run Audit</a>
+    <a href="#/report">Audit Report</a>
+    <a href="#/findings">Findings Register</a>
+    <a href="#/compliance">Compliance Matrix</a>
+    <a href="#/data">Data Explorer</a>
+    <a href="#/about">About / Architecture</a>
+    <a href="#/settings">Settings</a>
+  </nav>
+  <div style="padding:0 16px"><button class="btn" id="installBtn" style="display:none;width:100%;background:var(--gold);color:var(--navy)">⬇ Install app</button></div>
+  <div class="side-foot">CA Ravishankar Balakrishnan Aiyar<br>Membership No. 040524 · Batch AIL2B105<br>Demo data – fictitious bank</div>
+</aside>
+<main id="app"></main>
+</div>
+<div class="drawer" id="drawer"></div>
+<div class="toast" id="toast"></div>
+
+<script>
+/* ===== Configuration =====
+   N8N_BASE is the base URL of your n8n webhooks. Change it here, or at run time on the Settings page. */
+const DEFAULT_N8N_BASE = "https://nonchallant.app.n8n.cloud/webhook";
+const RUN_TIMEOUT_MS = 180000;
+
+const store = {
+  get(k, d) { try { const v = localStorage.getItem(k); return v === null ? d : JSON.parse(v); } catch (e) { return d; } },
+  set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { /* storage unavailable */ } }
+};
+const base = () => (store.get("ta360.base", "") || DEFAULT_N8N_BASE).replace(/\/+$/, "");
+const app = document.getElementById("app");
+const esc = s => String(s == null ? "" : s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const inr = n => "Rs " + Number(n || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " cr";
+const ratingCls = r => /High/i.test(r || "") ? "bad" : /Medium/i.test(r || "") ? "warn" : "good";
+const statusCls = s => /Compliant$/.test(s || "") && !/Non/.test(s) ? "good" : /Partially/.test(s || "") ? "warn" : /Non/.test(s || "") ? "bad" : "neutral";
+let cache = { findings: null, data: null };
+
+/* Inside the Android app, window.TA360Android is the native bridge (print service, Downloads folder). */
+const native = window.TA360Android || null;
+function saveFile(name, mime, text) {
+  if (native) { const r = native.saveFile(name, mime, text); toast(r || ("Saved " + name)); return; }
+  const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([text], { type: mime })); a.download = name; a.click();
+}
+function printReport(title) { if (native) native.print(title); else window.print(); }
+
+function toast(msg) { const t = document.getElementById("toast"); t.textContent = msg; t.style.display = "block"; clearTimeout(toast.h); toast.h = setTimeout(() => t.style.display = "none", 3000); }
+
+async function api(path, opts = {}, timeout = 60000) {
+  const ctl = new AbortController(); const tm = setTimeout(() => ctl.abort(), timeout);
+  try {
+    const r = await fetch(base() + path, { ...opts, signal: ctl.signal, headers: { "Content-Type": "application/json" } });
+    if (!r.ok) throw new Error("HTTP " + r.status + " from " + path);
+    return await r.json();
+  } catch (e) {
+    throw new Error(e.name === "AbortError" ? "Request timed out (" + path + ")" : e.message);
+  } finally { clearTimeout(tm); }
+}
+
+function errBox(e, retry) { return `<div class="err"><b>Could not load data.</b> ${esc(e.message)}<br><small>Check the n8n base URL on the Settings page and that the n8n workflows are published.</small> ${retry ? `<button class="btn sec" style="margin-left:10px" onclick="${retry}">Retry</button>` : ""}</div>`; }
+const skel = n => Array.from({ length: n }, () => `<div class="skel" style="margin-bottom:12px"></div>`).join("");
+const foot = () => `<footer>Demo data – fictitious bank. Built with n8n + Claude. Back end: <code>${esc(base())}</code></footer>`;
+
+function bars(obj) {
+  const e = Object.entries(obj || {}); const max = Math.max(1, ...e.map(x => x[1]));
+  return `<div class="bars">${e.map(([k, v]) => `<div class="b"><span>${esc(k)}</span><div class="t"><div class="f" style="width:${v / max * 100}%"></div></div><span>${v}</span></div>`).join("") || "<p class='sub'>No data</p>"}</div>`;
+}
+function donut(obj) {
+  const colors = { High: "#b42318", Medium: "#f79009", Low: "#12b76a" };
+  const e = Object.entries(obj || {}); const tot = e.reduce((a, x) => a + x[1], 0) || 1; let acc = 0;
+  const segs = e.map(([k, v]) => { const s = acc / tot * 100; acc += v; return `${colors[k] || "#667085"} ${s}% ${acc / tot * 100}%`; }).join(",");
+  return `<div style="display:flex;align-items:center;gap:20px"><div style="width:130px;height:130px;border-radius:50%;background:conic-gradient(${segs || "#eef2f6 0 100%"});display:grid;place-items:center"><div style="width:72px;height:72px;border-radius:50%;background:#fff;display:grid;place-items:center;font-weight:700">${tot}</div></div><div>${e.map(([k, v]) => `<div><span class="badge ${k}">${esc(k)}</span> ${v}</div>`).join("")}</div></div>`;
+}
+
+/* ===== Pages ===== */
+async function pageDashboard() {
+  app.innerHTML = `<div class="row" style="justify-content:space-between;align-items:center"><div><h1>Treasury Audit Dashboard</h1><p class="sub">Overview of the latest audit run and the findings register</p></div><a class="btn noprint" href="#/run">▶ Run New Audit</a></div>${skel(3)}`;
+  try {
+    const d = cache.findings = await api("/treasury-audit/findings");
+    const run = (d.runs || [])[0] || {};
+    const s = d.summary || {};
+    app.innerHTML = `<div class="row" style="justify-content:space-between;align-items:center"><div><h1>Treasury Audit Dashboard</h1><p class="sub">Overview of the latest audit run and the findings register</p></div><a class="btn noprint" href="#/run">▶ Run New Audit</a></div>
+    <div class="kpis">
+      <div class="kpi"><div class="l">Overall rating</div><div style="margin-top:8px"><span class="badge ${ratingCls(run.overall_rating)}">${esc(run.overall_rating || "No run yet")}</span></div><small class="sub">${esc(run.run_at || "")}</small></div>
+      <div class="kpi"><div class="l">Total findings</div><div class="v">${s.total || 0}</div></div>
+      <div class="kpi"><div class="l">High risk</div><div class="v" style="color:var(--high)">${(s.by_risk || {}).High || 0}</div></div>
+      <div class="kpi"><div class="l">Medium risk</div><div class="v" style="color:var(--med)">${(s.by_risk || {}).Medium || 0}</div></div>
+      <div class="kpi"><div class="l">Amount flagged</div><div class="v">${inr(run.amount_flagged_cr)}</div></div>
+      <div class="kpi"><div class="l">Tests run</div><div class="v">${run.tests_run || 0}</div></div>
+    </div>
+    <div class="grid3">
+      <div class="card"><h3>Findings by regulator</h3>${bars(s.by_regulator)}</div>
+      <div class="card"><h3>Findings by risk</h3>${donut(s.by_risk)}</div>
+      <div class="card"><h3>Findings by status</h3>${bars(s.by_status)}</div>
+    </div>
+    <div class="card"><h3>Recent audit runs</h3><div class="scroll"><table><tr><th>Run</th><th>Run at</th><th>Engagement</th><th>Prepared by</th><th>Reviewed by</th><th>Rating</th><th>Tests</th><th>Findings</th><th>High</th><th>Amount flagged</th></tr>
+    ${(d.runs || []).map(r => `<tr><td>${esc(r.run_id)}</td><td>${esc(r.run_at)}</td><td>${esc(r.engagement)}</td><td>${esc(r.prepared_by)}</td><td>${esc(r.reviewed_by)}</td><td><span class="badge ${ratingCls(r.overall_rating)}">${esc(r.overall_rating)}</span></td><td>${r.tests_run}</td><td>${r.findings}</td><td>${r.high}</td><td>${inr(r.amount_flagged_cr)}</td></tr>`).join("")}</table></div></div>${foot()}`;
+  } catch (e) { app.innerHTML += errBox(e, "route()"); }
+}
+
+let running = false;
+function pageRun() {
+  const last = store.get("ta360.lastRun", null);
+  const stages = ["Loading treasury data from Google Sheets", "Running 23 RBI / SEBI / IFSCA / FEMA tests", "Mapping to ICAI Standards on Auditing", "Claude drafting Audit Committee report", "Saving findings register & SA 230 audit trail", "Emailing report"];
+  app.innerHTML = `<h1>Run Audit</h1><p class="sub">Executes the full-population treasury audit through the n8n Audit Engine (takes 1–2 minutes)</p>
+  <div class="grid3">
+    <div class="card"><h3>Engagement details</h3>
+      <label for="an">Auditor name</label><input id="an" value="${esc(store.get("ta360.auditor", "CA Ravishankar Balakrishnan Aiyar"))}">
+      <label for="ae">Auditor email (optional – report is emailed if given)</label><input id="ae" type="email" placeholder="auditor@firm.in" value="${esc(store.get("ta360.email", ""))}">
+      <label for="en">Engagement</label><input id="en" value="Concurrent Audit – Treasury Operations, Q2 FY2026-27">
+      <div style="margin-top:14px"><button class="btn" id="go" ${running ? "disabled" : ""}>${running ? "Running…" : "Run Audit"}</button></div>
+    </div>
+    <div class="card"><h3>Audit stages</h3><ul class="stages" id="st" style="padding:0;margin:0">${stages.map(s => `<li>${s}</li>`).join("")}</ul><p class="sub" id="timer"></p></div>
+  </div><div id="res">${last ? resultHtml(last) : ""}</div>${foot()}`;
+  document.getElementById("go").onclick = async () => {
+    const body = { auditor_name: document.getElementById("an").value.trim(), auditor_email: document.getElementById("ae").value.trim(), engagement: document.getElementById("en").value.trim() };
+    store.set("ta360.auditor", body.auditor_name); store.set("ta360.email", body.auditor_email);
+    running = true; const btn = document.getElementById("go"); btn.disabled = true; btn.textContent = "Running…";
+    const li = [...document.querySelectorAll("#st li")]; const t0 = Date.now();
+    const plan = [0, 4, 8, 12, 60, 75];
+    const tick = setInterval(() => {
+      const s = (Date.now() - t0) / 1000; const tm = document.getElementById("timer"); if (tm) tm.textContent = "Elapsed " + Math.round(s) + " s";
+      li.forEach((x, i) => { x.className = s >= (plan[i + 1] || 999) ? "done" : s >= plan[i] ? "on" : ""; });
+    }, 500);
+    try {
+      const r = await api("/treasury-audit/run", { method: "POST", body: JSON.stringify(body) }, RUN_TIMEOUT_MS);
+      store.set("ta360.lastRun", r); cache.findings = null;
+      li.forEach(x => x.className = "done"); toast("Audit completed – " + r.run_id);
+      const res = document.getElementById("res"); if (res) res.innerHTML = resultHtml(r);
+    } catch (e) { const res = document.getElementById("res"); if (res) res.innerHTML = errBox(e); }
+    finally { clearInterval(tick); running = false; const b = document.getElementById("go"); if (b) { b.disabled = false; b.textContent = "Run Audit"; } }
+  };
+}
+
+function resultHtml(r) {
+  const s = r.stats || {};
+  return `<div class="card"><div class="row" style="justify-content:space-between;align-items:center"><div><h3 style="margin:0">Audit result – ${esc(r.bank_name)}</h3><small class="sub">${esc(r.engagement)} · Period ${esc(r.period)} · Run ${esc(r.run_id)} (${esc(r.run_at)}) · Materiality ${inr(r.materiality_cr)}</small></div>
+  <div class="noprint"><a class="btn" href="#/report">View Full Report</a> <a class="btn sec" href="#/findings">Open Findings Register</a></div></div>
+  <div class="kpis" style="margin-top:14px">
+   <div class="kpi"><div class="l">Rating</div><div style="margin-top:8px"><span class="badge ${ratingCls(r.overall_rating)}">${esc(r.overall_rating)}</span></div></div>
+   <div class="kpi"><div class="l">Tests run</div><div class="v">${s.tests_run}</div><small class="sub">${s.tests_with_exceptions} with exceptions</small></div>
+   <div class="kpi"><div class="l">Findings</div><div class="v">${s.findings}</div></div>
+   <div class="kpi"><div class="l">High / Med / Low</div><div class="v">${s.high} / ${s.medium} / ${s.low}</div></div>
+   <div class="kpi"><div class="l">Deals / Investments</div><div class="v">${s.deals} / ${s.investments}</div></div>
+   <div class="kpi"><div class="l">Total notional</div><div class="v">${inr(s.total_notional_cr)}</div></div>
+   <div class="kpi"><div class="l">Amount flagged</div><div class="v">${inr(s.amount_flagged_cr)}</div></div>
+  </div></div>
+  <div class="card"><h3>Compliance matrix</h3>${complianceTable(r.compliance)}</div>
+  <div class="card"><h3>Tests performed (100% population – CAAT)</h3><div class="scroll"><table><tr><th></th><th>ID</th><th>Test</th><th>Regulator</th><th>Population</th><th>Exceptions</th></tr>
+  ${(r.tests || []).map(t => `<tr><td>${t.exceptions ? "<span style='color:var(--high)'>✖</span>" : "<span style='color:var(--low)'>✔</span>"}</td><td>${esc(t.id)}</td><td>${esc(t.name)}<br><small class="sub">${esc(t.area)}</small></td><td>${esc(t.regulator)}</td><td>${t.population} ${esc(t.population_type)}</td><td>${t.exceptions}</td></tr>`).join("")}</table></div></div>
+  <div class="card"><h3>SA 530 walkthrough sample</h3><table><tr><th>Deal</th><th>Instrument</th><th>Counterparty</th><th>Notional</th><th>Reason</th></tr>
+  ${(r.sample || []).map(x => `<tr><td>${esc(x.deal_id)}</td><td>${esc(x.instrument)}</td><td>${esc(x.counterparty)}</td><td>${inr(x.notional_inr_cr)}</td><td>${esc(x.reason)}</td></tr>`).join("")}</table></div>`;
+}
+const complianceTable = c => `<table><tr><th>Framework</th><th>Tests</th><th>Exceptions</th><th>High</th><th>Status</th></tr>${(c || []).map(x => `<tr><td><b>${esc(x.framework)}</b></td><td>${x.tests}</td><td>${x.exceptions}</td><td>${x.high}</td><td><span class="badge ${statusCls(x.status)}">${esc(x.status)}</span></td></tr>`).join("")}</table>`;
+
+function pageReport() {
+  const r = store.get("ta360.lastRun", null);
+  if (!r || !r.report_html) { app.innerHTML = `<h1>Audit Report</h1><p class="sub">No report in this browser yet.</p><div class="card">Run an audit to generate the Audit Committee report. <a class="btn" href="#/run">Run Audit</a></div>${foot()}`; return; }
+  app.innerHTML = `<div class="row noprint" style="justify-content:space-between;align-items:center"><div><h1>Audit Report</h1><p class="sub">${esc(r.bank_name)} · ${esc(r.engagement)} · ${esc(r.run_id)}</p></div>
+  <div><button class="btn" onclick="printReport('Treasury_Audit_Report_${esc(r.run_id)}')">Print / Save as PDF</button> <button class="btn sec" id="dl">Download HTML</button></div></div>
+  <div class="report">${r.report_html}</div>${foot()}`;
+  document.getElementById("dl").onclick = () => saveFile(`Treasury_Audit_Report_${r.run_id}.html`, "text/html", `<!doctype html><html><head><meta charset="utf-8"><title>${esc(r.run_id)}</title></head><body>${r.report_html}</body></html>`);
+}
+
+let fState = { run: "", reg: "", risk: "", status: "", q: "" };
+async function pageFindings() {
+  app.innerHTML = `<div class="row" style="justify-content:space-between;align-items:center"><div><h1>Findings Register</h1><p class="sub">Audit observations, regulatory references and management responses</p></div><button class="btn sec noprint" id="csv">Export CSV</button></div>${skel(4)}`;
+  try {
+    const d = cache.findings = await api("/treasury-audit/findings" + (fState.run ? "?run_id=" + encodeURIComponent(fState.run) : ""));
+    renderFindings(d);
+  } catch (e) { app.innerHTML += errBox(e, "route()"); }
+}
+function renderFindings(d) {
+  const all = d.findings || [];
+  const uniq = k => [...new Set(all.map(f => f[k]).filter(Boolean))].sort();
+  const list = all.filter(f => (!fState.reg || f.regulator === fState.reg) && (!fState.risk || f.risk === fState.risk) && (!fState.status || f.status === fState.status) && (!fState.q || JSON.stringify(f).toLowerCase().includes(fState.q.toLowerCase())));
+  const opt = (arr, v) => `<option value="">All</option>` + arr.map(x => `<option ${x === v ? "selected" : ""}>${esc(x)}</option>`).join("");
+  app.innerHTML = `<div class="row" style="justify-content:space-between;align-items:center"><div><h1>Findings Register</h1><p class="sub">Audit observations, regulatory references and management responses</p></div><button class="btn sec noprint" id="csv">Export CSV</button></div>
+  <div class="card"><div class="filters">
+    <div><label for="fr">Audit run</label><select id="fr">${(d.runs || []).map(r => `<option value="${esc(r.run_id)}" ${r.run_id === d.run_id ? "selected" : ""}>${esc(r.run_at)} · ${esc(r.prepared_by)} · ${r.findings} findings</option>`).join("")}</select></div>
+    <div><label for="fg">Regulator</label><select id="fg">${opt(uniq("regulator"), fState.reg)}</select></div>
+    <div><label for="fk">Risk</label><select id="fk">${opt(uniq("risk"), fState.risk)}</select></div>
+    <div><label for="fs">Status</label><select id="fs">${opt(uniq("status"), fState.status)}</select></div>
+    <div><label for="fq">Search</label><input id="fq" placeholder="Observation, entity…" value="${esc(fState.q)}"></div>
+  </div>
+  <div class="scroll"><table><tr><th class="hide-sm">ID</th><th>Risk</th><th>Test / observation</th><th>Regulator</th><th class="hide-sm">Entity</th><th>Impact</th><th>Status</th></tr>
+  ${list.map(f => `<tr class="click" data-id="${esc(f.finding_id)}"><td class="hide-sm"><small>${esc(f.finding_id)}</small></td><td><span class="badge ${esc(f.risk)}">${esc(f.risk)}</span></td><td><b>${esc(f.test_name)}</b><br><small class="sub">${esc(f.observation)}</small></td><td>${esc(f.regulator)}</td><td class="hide-sm">${esc(f.ref_entity)}</td><td style="white-space:nowrap">${inr(f.impact_inr_cr)}</td><td><span class="badge neutral">${esc(f.status)}</span></td></tr>`).join("") || `<tr><td colspan="7">No findings match the filters.</td></tr>`}
+  </table></div><p class="sub">${list.length} of ${all.length} findings</p></div>${foot()}`;
+  const re = () => renderFindings(d);
+  document.getElementById("fr").onchange = e => { fState.run = e.target.value; pageFindings(); };
+  document.getElementById("fg").onchange = e => { fState.reg = e.target.value; re(); };
+  document.getElementById("fk").onchange = e => { fState.risk = e.target.value; re(); };
+  document.getElementById("fs").onchange = e => { fState.status = e.target.value; re(); };
+  document.getElementById("fq").oninput = e => { fState.q = e.target.value; clearTimeout(re.h); re.h = setTimeout(() => { re(); const q = document.getElementById("fq"); q.focus(); q.setSelectionRange(q.value.length, q.value.length); }, 350); };
+  document.getElementById("csv").onclick = () => {
+    const cols = ["finding_id", "run_id", "test_id", "test_name", "area", "regulator", "risk", "ref_entity", "observation", "impact_inr_cr", "regulation_ref", "icai_standard", "recommendation", "status", "management_response", "action_owner", "target_date", "response_at"];
+    const csv = [cols.join(",")].concat(list.map(f => cols.map(c => '"' + String(f[c] == null ? "" : f[c]).replace(/"/g, '""') + '"').join(","))).join("\r\n");
+    saveFile(`findings_${d.run_id}.csv`, "text/csv", "﻿" + csv);
+  };
+  document.querySelectorAll("tr.click").forEach(tr => tr.onclick = () => openFinding(all.find(f => f.finding_id === tr.dataset.id)));
+}
+function openFinding(f) {
+  const dr = document.getElementById("drawer");
+  const st = ["Open", "Response Received", "Action Initiated", "Closed"];
+  dr.innerHTML = `<button class="x" onclick="closeDrawer()" aria-label="Close">×</button>
+  <span class="badge ${esc(f.risk)}">${esc(f.risk)}</span> <small class="sub">${esc(f.finding_id)} · ${esc(f.test_id)}</small>
+  <h2 style="font-family:Georgia,serif;color:var(--navy);margin:8px 0 2px">${esc(f.test_name)}</h2><small class="sub">${esc(f.area)} · ${esc(f.regulator)} · ${esc(f.ref_entity)}</small>
+  <h4>Observation</h4><p>${esc(f.observation)}</p>
+  <h4>Financial impact</h4><p>${inr(f.impact_inr_cr)}</p>
+  <h4>Regulation reference</h4><p>${esc(f.regulation_ref)}</p>
+  <h4>ICAI standard</h4><p>${esc(f.icai_standard)}</p>
+  <h4>Recommendation</h4><p>${esc(f.recommendation)}</p>
+  <hr style="margin:18px 0;border:0;border-top:1px solid var(--line)">
+  <h3 style="color:var(--navy);margin:0">Management Response</h3>
+  <label for="ms">Status</label><select id="ms">${st.map(s => `<option ${s === f.status ? "selected" : ""}>${s}</option>`).join("")}</select>
+  <label for="mr">Management response</label><textarea id="mr">${esc(f.management_response)}</textarea>
+  <div class="row"><div style="flex:1"><label for="mo">Action owner</label><input id="mo" value="${esc(f.action_owner)}"></div><div style="flex:1"><label for="mt">Target date</label><input id="mt" type="date" value="${esc(f.target_date)}"></div></div>
+  <div style="margin-top:14px"><button class="btn" id="ms_go">Submit response</button></div>
+  ${f.response_at ? `<p class="sub">Last response: ${esc(f.response_at)}</p>` : ""}`;
+  dr.classList.add("open");
+  document.getElementById("ms_go").onclick = async e => {
+    e.target.disabled = true; e.target.textContent = "Saving…";
+    try {
+      const r = await api("/treasury-audit/response", { method: "POST", body: JSON.stringify({ finding_id: f.finding_id, status: document.getElementById("ms").value, management_response: document.getElementById("mr").value, action_owner: document.getElementById("mo").value, target_date: document.getElementById("mt").value }) });
+      if (!r.ok) throw new Error(r.error || "Update failed");
+      toast("Response saved for " + f.finding_id); closeDrawer(); pageFindings();
+    } catch (err) { toast("Error: " + err.message); e.target.disabled = false; e.target.textContent = "Submit response"; }
+  };
+}
+function closeDrawer() { document.getElementById("drawer").classList.remove("open"); }
+
+const FRAMEWORK = ["RBI Master Direction – Risk Management & Inter-Bank Dealings, 2016", "RBI (Classification, Valuation and Operation of Investment Portfolio of Commercial Banks) Directions, 2023", "RBI Call, Notice and Term Money Markets Directions, 2021", "RBI Master Circular – Exposure Norms", "RBI (Market-makers in OTC Derivatives) Directions, 2021", "RBI Master Direction – KYC, 2016", "SEBI (Prohibition of Insider Trading) Regulations, 2015", "SEBI (Depositories and Participants) Regulations, 2018", "IFSCA (Banking) Regulations, 2020", "FEMA, 1999", "ICAI Standards on Auditing – SA 200, 230, 240, 250, 265, 315, 320, 330, 450, 500, 505, 520, 530, 540, 580", "ICAI Standards on Internal Audit – SIA 370 (reporting)"];
+function pageCompliance() {
+  const r = store.get("ta360.lastRun", null);
+  const fw = `<div class="card"><h3>Regulatory framework covered</h3><ul>${FRAMEWORK.map(x => `<li>${esc(x)}</li>`).join("")}</ul><div class="note">Thresholds are parameters in the Google Sheet – verify against the latest RBI / SEBI / IFSCA circulars.</div></div>`;
+  if (!r) { app.innerHTML = `<h1>Compliance Matrix</h1><p class="sub">Regulator-wise view of treasury audit tests</p><div class="card">No audit run in this browser yet. <a class="btn" href="#/run">Run Audit</a></div>${fw}${foot()}`; return; }
+  const groups = {}; (r.tests || []).forEach(t => (groups[t.regulator] = groups[t.regulator] || []).push(t));
+  app.innerHTML = `<h1>Compliance Matrix</h1><p class="sub">Based on run ${esc(r.run_id)} · ${esc(r.engagement)}</p>
+  <div class="kpis">${(r.compliance || []).map(c => `<div class="kpi"><div class="l">${esc(c.framework === "IFSCA" ? "IFSCA (GIFT City)" : c.framework)}</div><div style="margin:8px 0 4px"><span class="badge ${statusCls(c.status)}">${esc(c.status.length > 40 ? "Applied" : c.status)}</span></div><small class="sub">${c.tests} tests · ${c.exceptions} exceptions · ${c.high} high</small></div>`).join("")}</div>
+  <div class="card"><h3>Tests by regulator (${(r.tests || []).length})</h3><div class="scroll"><table><tr><th>ID</th><th>Test</th><th>Regulation reference</th><th>ICAI standard</th><th>Exceptions</th></tr>
+  ${Object.keys(groups).sort().map(g => `<tr><td colspan="5" style="background:#eef2f6"><b>${esc(g)}</b></td></tr>` + groups[g].map(t => `<tr><td>${esc(t.id)}</td><td>${esc(t.name)}</td><td>${esc(t.reference)}</td><td>${esc(t.icai)}</td><td>${t.exceptions ? `<span class="badge bad">${t.exceptions}</span>` : `<span class="badge good">0</span>`}</td></tr>`).join("")).join("")}</table></div></div>
+  <div class="card"><h3>ICAI Standards applied</h3><p>${(r.icai_standards || []).map(s => `<span class="badge neutral" style="margin:2px">${esc(s)}</span>`).join(" ")}</p></div>${fw}${foot()}`;
+}
+
+let dataTab = "deals";
+async function pageData() {
+  app.innerHTML = `<h1>Population tested (100% – CAAT)</h1><p class="sub">Source data extracted from treasury systems, as used by the audit engine</p>${skel(3)}`;
+  try { cache.data = cache.data || await api("/treasury-audit/data"); renderData(); }
+  catch (e) { app.innerHTML += errBox(e, "route()"); }
+}
+function renderData(q = "") {
+  const d = cache.data; const names = { deals: "Deals", investments: "Investments", counterparties: "Counterparties", dealers: "Dealers", positions: "Positions", restricted_list: "Restricted List", parameters: "Parameters" };
+  const rows = (d[dataTab] || []).filter(r => !q || JSON.stringify(r).toLowerCase().includes(q.toLowerCase()));
+  const cols = [...new Set((d[dataTab] || []).flatMap(r => Object.keys(r)))];
+  app.innerHTML = `<h1>Population tested (100% – CAAT)</h1><p class="sub">Source data extracted from treasury systems, as used by the audit engine</p>
+  <div class="tabs">${Object.keys(names).map(k => `<button class="${k === dataTab ? "active" : ""}" data-k="${k}">${names[k]} (${(d[k] || []).length})</button>`).join("")}</div>
+  <div class="card"><input id="dq" placeholder="Search ${names[dataTab]}…" value="${esc(q)}" style="max-width:320px;margin-bottom:10px"><div class="scroll"><table><tr>${cols.map(c => `<th>${esc(c.replace(/_/g, " "))}</th>`).join("")}</tr>
+  ${rows.map(r => `<tr>${cols.map(c => `<td>${esc(r[c])}</td>`).join("")}</tr>`).join("")}</table></div><p class="sub">${rows.length} of ${(d[dataTab] || []).length} rows</p></div>${foot()}`;
+  document.querySelectorAll(".tabs button").forEach(b => b.onclick = () => { dataTab = b.dataset.k; renderData(); });
+  const dq = document.getElementById("dq"); dq.oninput = () => { clearTimeout(renderData.h); renderData.h = setTimeout(() => { renderData(dq.value); const n = document.getElementById("dq"); n.focus(); n.setSelectionRange(n.value.length, n.value.length); }, 300); };
+}
+
+function pageAbout() {
+  const n = (t, s) => `<div class="n"><b>${t}</b>${s}</div>`, a = `<div class="a">→</div>`;
+  app.innerHTML = `<h1>About / Architecture</h1><p class="sub">An automated, full-population treasury audit pipeline for Chartered Accountants</p>
+  <div class="card"><h3>End-to-end flow</h3><div class="flow">${n("Treasury system extracts", "Deals, investments, limits, positions")}${a}${n("Google Sheets", "7 data tabs + Parameters")}${a}${n("n8n Audit Engine", "23 rule-based tests (JavaScript)")}${a}${n("Claude Sonnet 5.5", "Drafts the Audit Committee report")}${a}${n("Findings register + audit trail", "Google Sheets (SA 230)")}${a}${n("Gmail report", "HTML report to auditor")}${a}${n("This web app", "Management response loop")}</div></div>
+  <div class="card"><h3>API endpoints (n8n webhooks)</h3><table><tr><th>Method</th><th>Endpoint</th><th>Purpose</th></tr>
+  <tr><td>POST</td><td><code>${esc(base())}/treasury-audit/run</code></td><td>Run a full audit (60–120 s)</td></tr>
+  <tr><td>GET</td><td><code>${esc(base())}/treasury-audit/findings</code></td><td>Findings register and run history</td></tr>
+  <tr><td>GET</td><td><code>${esc(base())}/treasury-audit/data</code></td><td>Population tested and parameters</td></tr>
+  <tr><td>POST</td><td><code>${esc(base())}/treasury-audit/response</code></td><td>Record a management response</td></tr></table></div>
+  <div class="grid3">
+   <div class="card"><h3>AI tools</h3><ul><li><b>Claude Sonnet 5.5</b> – drafts the report at run time inside n8n</li><li><b>Claude Opus 5.5 (Claude Code)</b> – designed and built the workflows, tests, data, documents and this app</li><li><b>Lovable AI</b> – generated the hosted React version of the app</li><li>Findings are decided by deterministic rules, not by AI</li></ul></div>
+   <div class="card"><h3>Languages & technology</h3><ul><li>TypeScript – n8n Workflow SDK</li><li>JavaScript – n8n Code nodes (23 tests) and this page</li><li>JSON – webhook APIs</li><li>HTML / CSS – report and this page</li><li>React + TypeScript, Tailwind, shadcn/ui – Lovable version</li><li>Google Sheets API, Gmail API</li></ul></div>
+   <div class="card"><h3>Hosting</h3><ul><li>Back end: n8n Cloud (published webhooks)</li><li>This page: any static host – GitHub Pages, Netlify, Vercel, or open the file locally</li><li>Hosted Lovable version: <a href="https://treasuryaudit360.lovable.app" target="_blank" rel="noopener">treasuryaudit360.lovable.app</a></li></ul></div>
+  </div>${foot()}`;
+}
+
+function pageSettings() {
+  app.innerHTML = `<h1>Settings</h1><p class="sub">Point this app at your own n8n instance (after importing the workflows from the <code>n8n-workflows</code> folder)</p>
+  <div class="card" style="max-width:720px"><label for="b">n8n webhook base URL</label><input id="b" value="${esc(base())}"><p class="sub">Default: <code>${esc(DEFAULT_N8N_BASE)}</code>. Saved in this browser only.</p>
+  <button class="btn" id="save">Save & test connection</button> <button class="btn sec" id="reset">Reset to default</button><div id="out" style="margin-top:12px"></div></div>${foot()}`;
+  const test = async () => { const o = document.getElementById("out"); o.innerHTML = "Testing…"; try { const d = await api("/treasury-audit/findings"); o.innerHTML = `<div class="note">✔ Connected – ${(d.runs || []).length} audit runs found.</div>`; } catch (e) { o.innerHTML = errBox(e); } };
+  document.getElementById("save").onclick = () => { store.set("ta360.base", document.getElementById("b").value.trim()); cache = { findings: null, data: null }; test(); };
+  document.getElementById("reset").onclick = () => { store.set("ta360.base", ""); cache = { findings: null, data: null }; pageSettings(); test(); };
+}
+
+const routes = { dashboard: pageDashboard, run: pageRun, report: pageReport, findings: pageFindings, compliance: pageCompliance, data: pageData, about: pageAbout, settings: pageSettings };
+function route() {
+  const key = (location.hash.replace(/^#\/?/, "") || "dashboard").split("?")[0];
+  const fn = routes[key] || pageDashboard;
+  document.querySelectorAll("#nav a").forEach(a => a.classList.toggle("active", a.getAttribute("href") === "#/" + (routes[key] ? key : "dashboard")));
+  document.querySelector("aside").classList.remove("show"); closeDrawer(); window.scrollTo(0, 0);
+  const titles = { dashboard: "Dashboard", run: "Run Audit", report: "Audit Report", findings: "Findings Register", compliance: "Compliance Matrix", data: "Data Explorer", about: "About", settings: "Settings" };
+  document.title = (titles[key] || "Dashboard") + " – TreasuryAudit360";
+  fn();
+}
+/* ===== Installable app (Android / desktop) ===== */
+if (!native && "serviceWorker" in navigator && /^https?:$/.test(location.protocol)) {
+  window.addEventListener("load", () => navigator.serviceWorker.register("sw.js").catch(() => { /* offline shell unavailable */ }));
+}
+let installEvt = null;
+window.addEventListener("beforeinstallprompt", e => {
+  e.preventDefault(); installEvt = e;
+  document.getElementById("installBtn").style.display = "block";
+});
+document.getElementById("installBtn").onclick = async () => {
+  if (!installEvt) return;
+  installEvt.prompt(); await installEvt.userChoice; installEvt = null;
+  document.getElementById("installBtn").style.display = "none";
+};
+window.addEventListener("appinstalled", () => { document.getElementById("installBtn").style.display = "none"; toast("TreasuryAudit360 installed"); });
+
+window.addEventListener("hashchange", route);
+document.addEventListener("keydown", e => { if (e.key === "Escape") closeDrawer(); });
+route();
+</script>
+</body>
+</html>
