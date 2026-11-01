@@ -1,0 +1,190 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#0b5cab">
+<link rel="manifest" href="manifest.json">
+<title>UAE CT Workpaper Assistant</title>
+<style>
+:root{--bg:#f4f7fb;--card:#fff;--ink:#14213d;--mute:#5b6b85;--brand:#0b5cab;--ok:#1b8a4b;--warn:#c77d00;--bad:#c62828;--line:#dde4ee}
+*{box-sizing:border-box}
+body{margin:0;font:15px/1.5 system-ui,Segoe UI,Roboto,sans-serif;background:var(--bg);color:var(--ink)}
+header{background:var(--brand);color:#fff;padding:16px 20px}
+header h1{margin:0;font-size:20px}header p{margin:2px 0 0;opacity:.85;font-size:13px}
+main{max-width:1100px;margin:0 auto;padding:16px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:16px;margin-bottom:16px}
+.row{display:flex;gap:16px;flex-wrap:wrap}.row>*{flex:1 1 220px}
+label{display:block;font-weight:600;margin-bottom:6px}
+input[type=file],input[type=number],input[type=password],select{width:100%;padding:8px;border:1px solid var(--line);border-radius:6px;background:#fff}
+button{background:var(--brand);color:#fff;border:0;border-radius:6px;padding:9px 16px;font-size:14px;cursor:pointer;margin-right:6px}
+button.sec{background:#fff;color:var(--brand);border:1px solid var(--brand)}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px}
+.kpi{border:1px solid var(--line);border-radius:8px;padding:12px}
+.kpi b{display:block;font-size:21px}.kpi span{color:var(--mute);font-size:12px}
+.kpi.main b{color:var(--brand)}
+.tablewrap{overflow:auto;max-height:380px;border:1px solid var(--line);border-radius:8px}
+table{border-collapse:collapse;width:100%;font-size:13px}
+th,td{padding:7px 9px;border-bottom:1px solid var(--line);text-align:left;white-space:nowrap}
+th{position:sticky;top:0;background:#eef3fa}
+.n{text-align:right}
+tr.total td{font-weight:700;background:#f7f9fc}
+tr.auto td:first-child{border-left:4px solid var(--warn)}
+.alert{background:#fff7e0;border:1px solid #f0d58a;padding:10px;border-radius:8px;font-size:13px;margin-bottom:16px}
+.alert.bad{background:#fdecea;border-color:#f3b4ae}
+.note{color:var(--mute);font-size:12px}
+textarea{width:100%;min-height:160px;padding:8px;border:1px solid var(--line);border-radius:6px;font:13px/1.5 inherit}
+h3{margin:0 0 10px}
+@media print{header button,.noprint{display:none}}
+</style>
+</head>
+<body>
+<header>
+  <h1>UAE Corporate Tax Workpaper Assistant</h1>
+  <p>Trial balance to accounting profit, tax adjustments, taxable income and 9% CT. Runs fully in your browser, works offline.</p>
+</header>
+<main>
+  <div class="alert">Educational tool for the AICA Level 2 capstone. Do not enter real client data. Rates and rules are simplified; always verify against current FTA guidance before relying on any figure.</div>
+
+  <div class="card">
+    <div class="row">
+      <div><label for="f">Trial balance (CSV)</label><input id="f" type="file" accept=".csv"></div>
+      <div><label for="loss">Tax losses brought forward (AED)</label><input id="loss" type="number" min="0" value="0"></div>
+      <div><label for="sbr">Small Business Relief</label>
+        <select id="sbr"><option value="0">Not elected</option><option value="1">Elected (revenue up to AED 3m)</option></select></div>
+    </div>
+    <p class="note">Columns: account_code, account_name, debit, credit, category (optional), business_use_pct (optional, for mixed-use).</p>
+    <button id="demo">Load sample data</button>
+  </div>
+
+  <div id="out" hidden>
+    <div id="warn"></div>
+    <div class="card"><div class="kpis" id="kpis"></div></div>
+
+    <div class="card">
+      <h3>1. Account mapping (review and correct)</h3>
+      <p class="note">Rows marked with an orange edge were auto-classified. Change the category if needed and everything recalculates.</p>
+      <div class="tablewrap"><table id="map"></table></div>
+    </div>
+
+    <div class="card">
+      <h3>2. Tax computation</h3>
+      <div class="tablewrap" style="max-height:none"><table id="comp"></table></div>
+      <p class="noprint"><button id="csv">Export workpaper CSV</button><button class="sec" id="prn">Print / PDF</button></p>
+    </div>
+
+    <div class="card">
+      <h3>3. Explanation note (optional AI)</h3>
+      <div class="row">
+        <div><label for="key">Gemini API key (kept only in this session)</label><input id="key" type="password" autocomplete="off" placeholder="Blank = template note"></div>
+      </div>
+      <p><button id="gen">Generate note</button></p>
+      <textarea id="note" aria-label="Explanation note"></textarea>
+      <p class="note">Only aggregated figures are sent to the AI. Review before use.</p>
+    </div>
+  </div>
+</main>
+<script src="core.js"></script>
+<script>
+"use strict";
+const SAMPLE = `account_code,account_name,debit,credit,category,business_use_pct
+1000,Cash and Bank,1500000,0,bs,
+3000,Share Capital,0,456000,bs,
+4000,Sales Revenue,0,5200000,revenue,
+4100,Service Income,0,300000,revenue,
+4200,Dividend Income,0,50000,dividend_income,
+4300,Interest Income,0,12000,interest_income,
+5000,Cost of Goods Sold,3000000,0,cogs,
+5100,Salaries,800000,0,opex,
+5200,Office Rent,240000,0,opex,
+5300,Client Entertainment,60000,0,entertainment_client,
+5400,Traffic Fines and Penalties,8000,0,fines,
+5500,Donations (Unapproved),25000,0,donations,
+5600,Vehicle Expenses,90000,0,mixed,70
+5700,Depreciation,120000,0,depreciation,
+5800,Interest Expense,45000,0,interest_expense,
+5900,Owner Personal Expenses,30000,0,personal,
+6000,Staff Welfare,40000,0,opex,
+6100,Professional Fees,60000,0,opex,`;
+const $ = id => document.getElementById(id);
+const aed = n => "AED " + Number(n).toLocaleString("en-US", {minimumFractionDigits: 0, maximumFractionDigits: 2});
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+let rows = [], res = null;
+
+function load(text) {
+  try { rows = CT.loadTB(text); if (!rows.length) throw new Error("No rows found"); run(); }
+  catch (e) { alert("Could not read the trial balance: " + e.message); }
+}
+function run() {
+  res = CT.compute(rows, {lossBF: +$("loss").value || 0, sbr: $("sbr").value === "1"});
+  draw();
+}
+function draw() {
+  $("out").hidden = false;
+  let w = "";
+  if (Math.abs(res.tbDiff) > 1) w += `<div class="alert bad">Trial balance does not balance: debits minus credits = ${aed(res.tbDiff)}.</div>`;
+  if (res.reviewCount) w += `<div class="alert">${res.reviewCount} profit and loss account(s) were auto-classified. Please review the mapping below.</div>`;
+  if (res.sbrBlocked) w += `<div class="alert bad">Small Business Relief not applied: revenue ${aed(res.revenue)} exceeds AED 3,000,000. The relief is also time-limited, so confirm it is available for the tax period.</div>`;
+  if (res.sbrApplied) w += `<div class="alert">Small Business Relief applied: taxable income treated as nil. Confirm eligibility and that the relief covers this tax period.</div>`;
+  $("warn").innerHTML = w;
+  $("kpis").innerHTML =
+    k("Accounting profit", res.profit) + k("Taxable income", res.taxableIncome) + k("Corporate tax payable", res.tax, true) +
+    `<div class="kpi"><b>${(res.effectiveRate * 100).toFixed(2)}%</b><span>Effective rate on accounting profit</span></div>`;
+  const opts = c => Object.entries(CT.CATS).map(([key, v]) => `<option value="${key}"${key === c ? " selected" : ""}>${v[0]}</option>`).join("");
+  $("map").innerHTML = `<tr><th>Code</th><th>Account</th><th class="n">Debit</th><th class="n">Credit</th><th>Tax category</th><th class="n">Business use %</th></tr>` +
+    rows.map((r, i) => `<tr class="${r.auto && r.cat !== "bs" ? "auto" : ""}"><td>${esc(r.code)}</td><td>${esc(r.name)}</td><td class="n">${r.debit || ""}</td><td class="n">${r.credit || ""}</td>
+      <td><select data-i="${i}" class="cat">${opts(r.cat)}</select></td>
+      <td class="n">${r.cat === "mixed" ? `<input type="number" min="0" max="100" value="${r.usePct}" data-i="${i}" class="pct" style="width:70px">` : ""}</td></tr>`).join("");
+  document.querySelectorAll(".cat").forEach(s => s.onchange = e => { rows[+e.target.dataset.i].cat = e.target.value; rows[+e.target.dataset.i].auto = false; run(); });
+  document.querySelectorAll(".pct").forEach(s => s.onchange = e => { rows[+e.target.dataset.i].usePct = Math.min(100, Math.max(0, +e.target.value || 0)); run(); });
+  const line = (l, v, cls = "") => `<tr class="${cls}"><td>${l}</td><td class="n">${aed(v)}</td></tr>`;
+  $("comp").innerHTML =
+    line("Accounting profit per trial balance", res.profit, "total") +
+    res.adjustments.map(a => `<tr><td>${esc(a.label)} <span class="note">(${esc(a.basis)})</span></td><td class="n">${a.amount < 0 ? "(" + aed(-a.amount) + ")" : aed(a.amount)}</td></tr>`).join("") +
+    line("Taxable income before losses", res.taxableBeforeLoss, "total") +
+    line("Less: tax losses utilised (max 75% of taxable income)", -res.lossUsed) +
+    line("Taxable income", res.taxableIncome, "total") +
+    line("Less: 0% band", -Math.min(Math.max(res.taxableIncome, 0), CT.RULES.zeroBand)) +
+    line("Income taxable at 9%", res.sbrApplied ? 0 : res.taxBase) +
+    line("Corporate tax payable", res.tax, "total") +
+    line("Tax losses carried forward", res.lossCF);
+}
+const k = (l, v, main) => `<div class="kpi ${main ? "main" : ""}"><b>${aed(v)}</b><span>${l}</span></div>`;
+
+function templateNote() {
+  const a = res.adjustments.map(x => `- ${x.label}: ${aed(x.amount)}`).join("\n") || "- No adjustments";
+  return `Corporate tax summary\n\nAccounting profit is ${aed(res.profit)}. After the tax adjustments below, taxable income is ${aed(res.taxableIncome)}.\n\n${a}\n\nThe first AED 375,000 is taxed at 0% and the balance at 9%, giving corporate tax payable of ${aed(res.tax)} (${(res.effectiveRate * 100).toFixed(2)}% of accounting profit).`;
+}
+async function aiNote(key) {
+  const facts = JSON.stringify({profit: res.profit, adjustments: res.adjustments.map(a => [a.label, a.amount]), taxableIncome: res.taxableIncome, lossesUsed: res.lossUsed, tax: res.tax});
+  const r = await fetch("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent", {
+    method: "POST", headers: {"Content-Type": "application/json", "x-goog-api-key": key},
+    body: JSON.stringify({contents: [{parts: [{text: "You are assisting a UAE chartered accountant. Write a concise explanation note (max 150 words) of this corporate tax computation for a client. Use only these figures, invent nothing, currency AED:\n" + facts}]}]})
+  });
+  if (!r.ok) throw new Error("AI request failed (" + r.status + ")");
+  const j = await r.json(); return j.candidates?.[0]?.content?.parts?.[0]?.text || "";
+}
+function exportCSV() {
+  const q = v => '"' + String(v).replace(/"/g, '""') + '"';
+  const out = [["Item", "AED"], ["Accounting profit", res.profit], ...res.adjustments.map(a => [a.label, a.amount]),
+    ["Taxable income before losses", res.taxableBeforeLoss], ["Losses utilised", -res.lossUsed], ["Taxable income", res.taxableIncome],
+    ["Corporate tax payable", res.tax], ["Losses carried forward", res.lossCF]];
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([out.map(r => r.map(q).join(",")).join("\n")], {type: "text/csv"}));
+  a.download = "ct_workpaper.csv"; a.click();
+}
+
+$("f").onchange = e => { const f = e.target.files[0]; if (!f) return; const fr = new FileReader(); fr.onload = () => load(fr.result); fr.readAsText(f); };
+$("demo").onclick = () => load(SAMPLE);
+$("loss").onchange = $("sbr").onchange = () => rows.length && run();
+$("gen").onclick = async () => {
+  const key = $("key").value.trim(); $("note").value = "Generating...";
+  try { $("note").value = key ? await aiNote(key) : templateNote(); }
+  catch (e) { $("note").value = templateNote() + "\n\n[AI unavailable: " + e.message + ". Template used.]"; }
+};
+$("csv").onclick = exportCSV;
+$("prn").onclick = () => window.print();
+if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => {});
+</script>
+</body>
+</html>
