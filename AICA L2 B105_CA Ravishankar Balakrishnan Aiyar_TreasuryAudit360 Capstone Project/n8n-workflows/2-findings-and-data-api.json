@@ -1,0 +1,819 @@
+{
+  "name": "Treasury Audit - 2 Findings & Data API",
+  "nodes": [
+    {
+      "id": "86b5ad53-4483-4a74-838b-2592b29e4783",
+      "name": "GET Findings",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "httpMethod": "GET",
+        "path": "treasury-audit/findings",
+        "responseMode": "responseNode",
+        "options": {
+          "allowedOrigins": "*"
+        }
+      },
+      "webhookId": "520b8836-0b34-4ad4-a350-517afb4a2ba8"
+    },
+    {
+      "id": "c732f3ef-40d2-4f5a-a232-ce2aaa3a3422",
+      "name": "Read Findings",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        240,
+        0
+      ],
+      "parameters": {
+        "resource": "sheet",
+        "operation": "read",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "YOUR_GOOGLE_SHEET_ID"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Findings"
+        },
+        "options": {}
+      },
+      "alwaysOutputData": true,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "id": "9abc75ed-0daf-4736-9e95-321db69d61ae",
+      "name": "Read Audit Runs",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        460,
+        0
+      ],
+      "parameters": {
+        "resource": "sheet",
+        "operation": "read",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "YOUR_GOOGLE_SHEET_ID"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Audit_Runs"
+        },
+        "options": {}
+      },
+      "executeOnce": true,
+      "alwaysOutputData": true,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "id": "385fd750-f85b-413e-9dd2-828fbe030c7d",
+      "name": "Build Findings Payload",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        680,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const clean = function (n) { try { return $(n).all().map(function (i) { return i.json; }).filter(function (r) { return r && (r.finding_id || r.run_id); }); } catch (e) { return []; } };\nconst findings = clean('Read Findings').filter(function (f) { return f.finding_id; });\nconst runs = clean('Read Audit Runs').filter(function (r) { return r.run_id; });\nconst q = ($('GET Findings').first().json.query) || {};\nconst latest = runs.length ? runs[runs.length - 1].run_id : (findings.length ? findings[findings.length - 1].run_id : '');\nconst runId = q.run_id || latest;\nconst sel = q.all === 'true' ? findings : findings.filter(function (f) { return f.run_id === runId; });\nconst by = function (k) { const o = {}; sel.forEach(function (f) { o[f[k]] = (o[f[k]] || 0) + 1; }); return o; };\nreturn [{ json: { ok: true, run_id: runId, runs: runs.slice().reverse(), findings: sel, summary: { total: sel.length, by_risk: by('risk'), by_regulator: by('regulator'), by_status: by('status') } } }];"
+      }
+    },
+    {
+      "id": "f7296afe-916d-4772-8431-d337fb3fd409",
+      "name": "Respond Findings",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        900,
+        0
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Access-Control-Allow-Origin",
+                "value": "*"
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "beb92c55-8698-4bdb-8e87-ca9170e3e27a",
+      "name": "GET Treasury Data",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        300
+      ],
+      "parameters": {
+        "httpMethod": "GET",
+        "path": "treasury-audit/data",
+        "responseMode": "responseNode",
+        "options": {
+          "allowedOrigins": "*"
+        }
+      },
+      "webhookId": "5a5f6de4-c1ff-44cf-8dc3-988e7c7d058c"
+    },
+    {
+      "id": "6fd2c2de-35b1-4960-b022-7f6ae6cc5194",
+      "name": "Data - Parameters",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        240,
+        300
+      ],
+      "parameters": {
+        "resource": "sheet",
+        "operation": "read",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "YOUR_GOOGLE_SHEET_ID"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Parameters"
+        },
+        "options": {}
+      },
+      "executeOnce": true,
+      "alwaysOutputData": true,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "id": "4169cfe2-28b2-4438-bbae-983beb57aa2b",
+      "name": "Data - Deals",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        440,
+        300
+      ],
+      "parameters": {
+        "resource": "sheet",
+        "operation": "read",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "YOUR_GOOGLE_SHEET_ID"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Deals"
+        },
+        "options": {}
+      },
+      "executeOnce": true,
+      "alwaysOutputData": true,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "id": "630a9730-60b9-40bd-ad39-5bfd0220dbec",
+      "name": "Data - Investments",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        640,
+        300
+      ],
+      "parameters": {
+        "resource": "sheet",
+        "operation": "read",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "YOUR_GOOGLE_SHEET_ID"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Investments"
+        },
+        "options": {}
+      },
+      "executeOnce": true,
+      "alwaysOutputData": true,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "id": "79e14f01-ff20-47fe-8a30-7f907714596c",
+      "name": "Data - Counterparties",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        840,
+        300
+      ],
+      "parameters": {
+        "resource": "sheet",
+        "operation": "read",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "YOUR_GOOGLE_SHEET_ID"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Counterparties"
+        },
+        "options": {}
+      },
+      "executeOnce": true,
+      "alwaysOutputData": true,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "id": "8d677372-561f-4190-9eab-4240eeee5ffc",
+      "name": "Data - Dealers",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        1040,
+        300
+      ],
+      "parameters": {
+        "resource": "sheet",
+        "operation": "read",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "YOUR_GOOGLE_SHEET_ID"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Dealers"
+        },
+        "options": {}
+      },
+      "executeOnce": true,
+      "alwaysOutputData": true,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "id": "4555ffe3-281e-4310-85cb-b8f7c67ec9b2",
+      "name": "Data - Positions",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        1240,
+        300
+      ],
+      "parameters": {
+        "resource": "sheet",
+        "operation": "read",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "YOUR_GOOGLE_SHEET_ID"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Positions"
+        },
+        "options": {}
+      },
+      "executeOnce": true,
+      "alwaysOutputData": true,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "id": "370fc04d-b277-4fd1-bee0-e9c961f8e1a6",
+      "name": "Data - Restricted List",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        1440,
+        300
+      ],
+      "parameters": {
+        "resource": "sheet",
+        "operation": "read",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "YOUR_GOOGLE_SHEET_ID"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Restricted_List"
+        },
+        "options": {}
+      },
+      "executeOnce": true,
+      "alwaysOutputData": true,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "id": "f5dc5e34-08a8-479e-a804-8845b323e6d2",
+      "name": "Build Data Payload",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1640,
+        300
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const g = function (n) { try { return $(n).all().map(function (i) { const o = Object.assign({}, i.json); delete o.row_number; return o; }).filter(function (r) { return Object.keys(r).length > 0; }); } catch (e) { return []; } };\nreturn [{ json: { ok: true, parameters: g('Data - Parameters'), deals: g('Data - Deals'), investments: g('Data - Investments'), counterparties: g('Data - Counterparties'), dealers: g('Data - Dealers'), positions: g('Data - Positions'), restricted_list: g('Data - Restricted List') } }];"
+      }
+    },
+    {
+      "id": "888c2657-79fe-4618-a29a-ace5e671c10c",
+      "name": "Respond Data",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        1840,
+        300
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Access-Control-Allow-Origin",
+                "value": "*"
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "d6622fcb-ee1c-49cb-9f5f-09d2e8f02601",
+      "name": "POST Management Response",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        600
+      ],
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "treasury-audit/response",
+        "responseMode": "responseNode",
+        "options": {
+          "allowedOrigins": "*"
+        }
+      },
+      "webhookId": "1c117bcd-e43a-4dbe-881f-cf8019d97af1"
+    },
+    {
+      "id": "597f3be0-8649-4d77-9ada-68ced0fd6aaf",
+      "name": "Normalize Response",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        240,
+        600
+      ],
+      "parameters": {
+        "mode": "manual",
+        "includeOtherFields": false,
+        "assignments": {
+          "assignments": [
+            {
+              "id": "m1",
+              "name": "finding_id",
+              "value": "={{ $json.body?.finding_id || '' }}",
+              "type": "string"
+            },
+            {
+              "id": "m2",
+              "name": "status",
+              "value": "={{ $json.body?.status || 'Response Received' }}",
+              "type": "string"
+            },
+            {
+              "id": "m3",
+              "name": "management_response",
+              "value": "={{ $json.body?.management_response || '' }}",
+              "type": "string"
+            },
+            {
+              "id": "m4",
+              "name": "action_owner",
+              "value": "={{ $json.body?.action_owner || '' }}",
+              "type": "string"
+            },
+            {
+              "id": "m5",
+              "name": "target_date",
+              "value": "={{ $json.body?.target_date || '' }}",
+              "type": "string"
+            },
+            {
+              "id": "m6",
+              "name": "response_at",
+              "value": "={{ $now.setZone('Asia/Kolkata').toFormat('yyyy-MM-dd HH:mm') }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "2137cdb1-bef6-4ee0-93c2-5c33fa83fd3f",
+      "name": "Update Finding in Register",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        460,
+        600
+      ],
+      "parameters": {
+        "resource": "sheet",
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "YOUR_GOOGLE_SHEET_ID"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Findings"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "matchingColumns": [
+            "finding_id"
+          ],
+          "value": {
+            "finding_id": "={{ $json.finding_id }}",
+            "status": "={{ $json.status }}",
+            "management_response": "={{ $json.management_response }}",
+            "action_owner": "={{ $json.action_owner }}",
+            "target_date": "={{ $json.target_date }}",
+            "response_at": "={{ $json.response_at }}"
+          },
+          "schema": [
+            {
+              "id": "finding_id",
+              "displayName": "finding_id",
+              "required": false,
+              "defaultMatch": true,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "management_response",
+              "displayName": "management_response",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "action_owner",
+              "displayName": "action_owner",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "target_date",
+              "displayName": "target_date",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "response_at",
+              "displayName": "response_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ]
+        },
+        "options": {
+          "cellFormat": "RAW"
+        }
+      },
+      "onError": "continueRegularOutput",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "id": "5e83a59d-54f1-4d7c-8a5a-244af1131b7d",
+      "name": "Respond Update",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        680,
+        600
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { ok: !$json.error, finding_id: $('Normalize Response').first().json.finding_id, status: $('Normalize Response').first().json.status, error: $json.error ? String($json.error.message || $json.error) : null } }}",
+        "options": {
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Access-Control-Allow-Origin",
+                "value": "*"
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "20b1aea2-0a7c-44ab-b6cf-0e166b3c3580",
+      "name": "Sticky Note ca497426",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -40,
+        -300
+      ],
+      "parameters": {
+        "content": "## Treasury Audit - Findings & Data API\nUsed by the Lovable web app.\n- **GET /webhook/treasury-audit/findings** (optional ?run_id= or ?all=true) - findings register + audit run history\n- **GET /webhook/treasury-audit/data** - raw treasury data for the data explorer\n- **POST /webhook/treasury-audit/response** - management response / status update on a finding (closes the audit loop, SIA 370 follow-up)",
+        "color": 4,
+        "width": 640,
+        "height": 240
+      }
+    }
+  ],
+  "connections": {
+    "GET Findings": {
+      "main": [
+        [
+          {
+            "node": "Read Findings",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Findings": {
+      "main": [
+        [
+          {
+            "node": "Read Audit Runs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Audit Runs": {
+      "main": [
+        [
+          {
+            "node": "Build Findings Payload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Findings Payload": {
+      "main": [
+        [
+          {
+            "node": "Respond Findings",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GET Treasury Data": {
+      "main": [
+        [
+          {
+            "node": "Data - Parameters",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Data - Parameters": {
+      "main": [
+        [
+          {
+            "node": "Data - Deals",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Data - Deals": {
+      "main": [
+        [
+          {
+            "node": "Data - Investments",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Data - Investments": {
+      "main": [
+        [
+          {
+            "node": "Data - Counterparties",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Data - Counterparties": {
+      "main": [
+        [
+          {
+            "node": "Data - Dealers",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Data - Dealers": {
+      "main": [
+        [
+          {
+            "node": "Data - Positions",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Data - Positions": {
+      "main": [
+        [
+          {
+            "node": "Data - Restricted List",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Data - Restricted List": {
+      "main": [
+        [
+          {
+            "node": "Build Data Payload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Data Payload": {
+      "main": [
+        [
+          {
+            "node": "Respond Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "POST Management Response": {
+      "main": [
+        [
+          {
+            "node": "Normalize Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize Response": {
+      "main": [
+        [
+          {
+            "node": "Update Finding in Register",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Finding in Register": {
+      "main": [
+        [
+          {
+            "node": "Respond Update",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "tags": []
+}

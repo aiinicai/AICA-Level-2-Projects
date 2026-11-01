@@ -1,0 +1,881 @@
+{
+  "name": "Treasury Audit - 1 Audit Engine",
+  "nodes": [
+    {
+      "id": "7dd2f33e-3fef-40f0-b098-26a8e356bbc8",
+      "name": "POST Run Audit",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        300
+      ],
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "treasury-audit/run",
+        "responseMode": "responseNode",
+        "options": {
+          "allowedOrigins": "*"
+        }
+      },
+      "webhookId": "bacacec1-e713-485b-a93d-2353651aab6c"
+    },
+    {
+      "id": "ecbf410f-f81d-45fa-8316-0c5aada8b5c9",
+      "name": "Normalize Request",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        240,
+        400
+      ],
+      "parameters": {
+        "mode": "manual",
+        "includeOtherFields": false,
+        "assignments": {
+          "assignments": [
+            {
+              "id": "a1",
+              "name": "auditor_name",
+              "value": "={{ $json.body?.auditor_name || 'Concurrent Auditor (scheduled run)' }}",
+              "type": "string"
+            },
+            {
+              "id": "a2",
+              "name": "auditor_email",
+              "value": "={{ $json.body?.auditor_email || '' }}",
+              "type": "string"
+            },
+            {
+              "id": "a3",
+              "name": "engagement",
+              "value": "={{ $json.body?.engagement || 'Concurrent Audit - Treasury Operations' }}",
+              "type": "string"
+            },
+            {
+              "id": "a4",
+              "name": "trigger_source",
+              "value": "={{ $json.body ? 'Web app' : 'Schedule' }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "b35dc9c3-9e1d-49b1-af81-553bc67110c4",
+      "name": "Daily Concurrent Audit 7pm",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        520
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "days",
+              "daysInterval": 1,
+              "triggerAtHour": 19
+            }
+          ]
+        }
+      },
+      "disabled": true
+    },
+    {
+      "id": "0e467ef6-ecb5-431d-9d2b-868b75b00ff6",
+      "name": "Read Parameters",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        480,
+        400
+      ],
+      "parameters": {
+        "resource": "sheet",
+        "operation": "read",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "YOUR_GOOGLE_SHEET_ID"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Parameters"
+        },
+        "options": {}
+      },
+      "executeOnce": true,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "id": "ad72bac5-6c96-4817-b9c1-598220cee7c2",
+      "name": "Read Deals",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        700,
+        400
+      ],
+      "parameters": {
+        "resource": "sheet",
+        "operation": "read",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "YOUR_GOOGLE_SHEET_ID"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Deals"
+        },
+        "options": {}
+      },
+      "executeOnce": true,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "id": "8f086d8a-0f66-4379-85e8-071ad53d12c1",
+      "name": "Read Investments",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        920,
+        400
+      ],
+      "parameters": {
+        "resource": "sheet",
+        "operation": "read",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "YOUR_GOOGLE_SHEET_ID"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Investments"
+        },
+        "options": {}
+      },
+      "executeOnce": true,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "id": "0a4fad7e-378c-4676-9653-978a6d57ba23",
+      "name": "Read Counterparties",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        1140,
+        400
+      ],
+      "parameters": {
+        "resource": "sheet",
+        "operation": "read",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "YOUR_GOOGLE_SHEET_ID"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Counterparties"
+        },
+        "options": {}
+      },
+      "executeOnce": true,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "id": "582f7b99-2aa3-4e5d-bad5-2fdee0dabea8",
+      "name": "Read Dealers",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        1360,
+        400
+      ],
+      "parameters": {
+        "resource": "sheet",
+        "operation": "read",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "YOUR_GOOGLE_SHEET_ID"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Dealers"
+        },
+        "options": {}
+      },
+      "executeOnce": true,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "id": "96e52432-2fd7-46a0-b64f-dedd25741ef1",
+      "name": "Read Positions",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        1580,
+        400
+      ],
+      "parameters": {
+        "resource": "sheet",
+        "operation": "read",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "YOUR_GOOGLE_SHEET_ID"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Positions"
+        },
+        "options": {}
+      },
+      "executeOnce": true,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "id": "e02869c4-d019-4e0e-a4d7-51626cfdb977",
+      "name": "Read Restricted List",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        1800,
+        400
+      ],
+      "parameters": {
+        "resource": "sheet",
+        "operation": "read",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "YOUR_GOOGLE_SHEET_ID"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Restricted_List"
+        },
+        "options": {}
+      },
+      "executeOnce": true,
+      "alwaysOutputData": true,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "id": "3f4ebae1-9569-4ea2-9136-554775198be7",
+      "name": "Run Audit Tests",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2040,
+        400
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const rows = function (name) {\n  try { return $(name).all().map(function (i) { return i.json; }).filter(function (r) { return r && Object.keys(r).length > 0 && !r.error; }); } catch (e) { return []; }\n};\nconst req = $('Normalize Request').first().json;\nconst P = {};\nrows('Read Parameters').forEach(function (r) { const v = r.value; P[r.key] = (v !== '' && v !== null && v !== undefined && !isNaN(Number(v))) ? Number(v) : v; });\nconst deals = rows('Read Deals');\nconst inv = rows('Read Investments');\nconst cps = rows('Read Counterparties');\nconst dealers = rows('Read Dealers');\nconst pos = rows('Read Positions');\nconst rl = rows('Read Restricted List').filter(function (r) { return r.isin; });\nconst num = function (x) { const n = Number(x); return isNaN(n) ? 0 : n; };\nconst r2 = function (x) { return Math.round(x * 100) / 100; };\nconst cpMap = {}; cps.forEach(function (c) { cpMap[c.counterparty] = c; });\nconst dlMap = {}; dealers.forEach(function (d) { dlMap[d.dealer_id] = d; });\nconst hm = function (t) { if (!t) return null; const p = String(t).split(':'); return num(p[0]) * 60 + num(p[1]); };\nconst ts = function (d, t) { if (!d || !t) return null; const dp = String(d).split('-'); const tp = String(t).split(':'); return Date.UTC(num(dp[0]), num(dp[1]) - 1, num(dp[2]), num(tp[0]), num(tp[1])); };\nconst periodTo = String(P.audit_period_to || '');\nconst mat = num(P.materiality_cr) || 5;\n\nconst CAT = [\n ['TR-01','Unconfirmed / unmatched deals','Back Office - Deal Confirmation','RBI','RBI Master Direction - Risk Management and Inter-Bank Dealings, 2016 (independent back-office confirmation); FEDAI Rules; CCIL trade matching','SA 505 External Confirmations; SA 330 Responses to Assessed Risks','High','Obtain and match confirmations for all outstanding deals; escalate unconfirmed deals daily to Mid Office and CRO.','deals'],\n ['TR-02','Delayed deal confirmation','Back Office - Deal Confirmation','RBI','RBI MD - Risk Management and Inter-Bank Dealings, 2016; Back-office SOP (confirmation SLA)','SA 330; SA 315 (Revised) - Internal Control','Medium','Enforce confirmation SLA; system alert for deals not confirmed within SLA.','deals'],\n ['TR-03','Segregation of duties - dealer confirming own deal','Front / Mid / Back Office Segregation','RBI','RBI guidelines on internal control in treasury (functional separation of front, mid and back office)','SA 315 (Revised); SA 265 Communicating Deficiencies in Internal Control; SA 240 Fraud','High','Restrict confirmation rights in the treasury system to back-office user IDs; review the user access matrix.','deals'],\n ['TR-04','Off-market rate deals','Dealing Room - Rate Reasonability','RBI / FEMA','RBI MD - Risk Management and Inter-Bank Dealings, 2016 (no off-market rate deals); FEDAI Code of Conduct; FBIL/FIMMDA benchmarks','SA 240 Fraud in an Audit; SA 520 Analytical Procedures','High','Mid office to rate-scan every deal against a market snapshot; obtain dealer justification and escalate.','deals'],\n ['TR-05','Dealing outside hours / unrecorded lines','Dealing Room Controls','RBI','RBI MD - Risk Management and Inter-Bank Dealings; Treasury Dealing Policy (deals only on recorded lines from dealing room)','SA 315 (Revised); SA 330','Medium','Prohibit after-hours deals without prior written approval; ensure all deals are on voice-recorded lines or electronic platforms.','deals'],\n ['TR-06','Counterparty exposure limit breach','Credit Risk - Counterparty Limits','RBI','RBI Master Circular - Exposure Norms; RBI Large Exposures Framework; Board-approved counterparty limits','SA 250 Consideration of Laws and Regulations; SA 330','High','Implement a hard pre-deal limit check in the treasury system; report breaches to the Risk Management Committee for ratification.','counterparties'],\n ['TR-07','Dealer per-deal limit breach','Delegation of Powers','RBI','Board-approved Treasury Policy / dealer limits under RBI MD - Risk Management and Inter-Bank Dealings','SA 315 (Revised); SA 265','Medium','Configure dealer-wise deal size limits in the system; obtain post-facto approval from the competent authority.','deals'],\n ['TR-08','Stop-loss limit breach','Market Risk - Stop-loss','RBI','RBI MD - Risk Management and Inter-Bank Dealings (stop-loss limits); Board Market Risk Policy','SA 315 (Revised); SA 540 (Revised)','High','Mid office to monitor stop-loss in real time; suspend dealing authority on breach until ALCO approval.','dealers'],\n ['TR-09','Net Overnight Open Position (NOOP) breach','Forex Risk - Open Position','RBI / FEMA','RBI MD - Risk Management and Inter-Bank Dealings, 2016 (Board-approved NOOP / AGL); FEMA 1999','SA 250; SA 330','High','Square off the excess; report to ALCO and RBI as required; strengthen intraday NOOP monitoring.','positions'],\n ['TR-10','Call money prudential limit breach','Money Market - Call / Notice','RBI','RBI Call, Notice and Term Money Markets Directions, 2021 - prudential limits linked to capital funds','SA 250; SA 330','High','Monitor call borrowing/lending against capital-fund-based limits in real time; plan liquidity via TREPS / term money.','positions'],\n ['TR-11','Settlement failure / SGL bounce','Settlement - SGL / CSGL','RBI','RBI instructions on SGL bouncing (penalties; repeated bounces can lead to suspension of SGL facility); CCIL settlement rules','SA 330; SA 505','High','Investigate root cause; ensure adequate SGL / fund balance before settlement; report the bounce as required.','deals'],\n ['TR-12','HTM sales - approval and disclosure','Investment Portfolio - HTM','RBI','RBI (Classification, Valuation and Operation of Investment Portfolio of Commercial Banks) Directions, 2023 - sales out of HTM','SA 250; SA 450 Evaluation of Misstatements','High','Obtain Board approval for HTM sales; disclose HTM sales above threshold in Notes to Accounts.','investments'],\n ['TR-13','Fair value loss not recognised','Investment Portfolio - Valuation','RBI','RBI Investment Portfolio Directions, 2023 (AFS through AFS-Reserve; FVTPL / HFT through P and L)','SA 540 (Revised) Auditing Accounting Estimates; SA 450','High','Recognise the unrecognised fair value loss; use FBIL / exchange prices; independent valuation by mid office.','investments'],\n ['TR-14','Stale valuation','Investment Portfolio - Valuation','RBI','RBI Investment Portfolio Directions, 2023 (HFT valued daily; AFS / FVTPL at each reporting date)','SA 540 (Revised); SA 500 Audit Evidence','Medium','Revalue securities as at the reporting date using FBIL / exchange prices.','investments'],\n ['TR-15','Non-SLR investment below investment grade / unrated','Investment Portfolio - Non-SLR','RBI','RBI Investment Portfolio Directions, 2023 - non-SLR investments (unrated / unlisted ceilings, credit appraisal)','SA 250; SA 540 (Revised)','Medium','Obtain credit appraisal and Board approval; monitor the unrated / unlisted ceiling; assess impairment.','investments'],\n ['TR-16','Capital market exposure ceiling breach','Exposure Norms - Capital Market','RBI','RBI Master Circular - Exposure Norms (capital market exposure ceiling linked to net worth)','SA 250; SA 330','High','Bring exposure within the ceiling; report to the Board; add a CME check to pre-deal limits.','positions'],\n ['TR-17','Trade in scrip on restricted (insider) list','Capital Markets - Insider Trading','SEBI','SEBI (Prohibition of Insider Trading) Regulations, 2015 - Code of Conduct, restricted list, Chinese walls (Reg 9, Schedule B)','SA 250; SA 240 Fraud','High','Block restricted scrips in the order management system; investigate and report to the Compliance Officer and Audit Committee.','deals'],\n ['TR-18','Derivative with user without suitability / ISDA','Derivatives - User Suitability','RBI','RBI (Market-makers in OTC Derivatives) Directions, 2021 - user classification, suitability and appropriateness; ISDA / CSA documentation','SA 250; SA 315 (Revised)','High','Complete suitability assessment and execute ISDA / CSA before dealing; review all user derivatives.','deals'],\n ['TR-19','IBU transaction in INR','IFSC Banking Unit - Currency','IFSCA','IFSCA (Banking) Regulations, 2020 - IBU to transact in specified foreign currencies; FEMA 1999','SA 250; SA 330','High','Reverse / regularise the INR transaction; configure the IBU book to block INR deals.','deals'],\n ['TR-20','IBU ring-fencing breach','IFSC Banking Unit - Ring-fencing','IFSCA','IFSCA (Banking) Regulations, 2020 - separate books and ring-fencing of IBU from domestic operations','SA 315 (Revised); SA 265','High','Rebook the deal in the correct book; enforce book-level segregation and separate dealer IDs for IBU.','deals'],\n ['TR-21','IBU dealing with resident individual','IFSC Banking Unit - Permissible Persons','IFSCA / FEMA','IFSCA Banking Regulations / Handbook - dealings with resident individuals only as permitted (e.g. under LRS); FEMA 1999','SA 250','Medium','Verify permissibility and LRS documentation; obtain Compliance sign-off.','deals'],\n ['TR-22','Counterparty KYC pending','KYC / AML','RBI','RBI Master Direction - Know Your Customer (KYC) Direction, 2016; PMLA 2002','SA 250; SA 240','Medium','Stop fresh deals until KYC is complete; review AML monitoring for the counterparty.','counterparties'],\n ['TR-23','Holdings not reconciled with depository / SGL','Custody and Reconciliation','SEBI / RBI','SEBI (Depositories and Participants) Regulations, 2018 (demat holdings); RBI SGL / CSGL reconciliation','SA 505 External Confirmations; SA 500 Audit Evidence','High','Reconcile holdings with NSDL / CDSL / SGL statements; investigate and rectify differences.','investments']\n];\nconst TM = {};\nCAT.forEach(function (c) { TM[c[0]] = { id: c[0], name: c[1], area: c[2], regulator: c[3], ref: c[4], icai: c[5], risk: c[6], rec: c[7], pop: c[8] }; });\n\nconst findings = [];\nconst add = function (tid, entity, obs, impact, riskOverride, regOverride) {\n  const t = TM[tid];\n  findings.push({ test_id: tid, test_name: t.name, area: t.area, regulator: regOverride || t.regulator, regulation_ref: t.ref, icai_standard: t.icai, risk: riskOverride || t.risk, ref_entity: entity, observation: obs, impact_inr_cr: r2(impact || 0), recommendation: t.rec });\n};\nconst cr = function (x) { return 'Rs ' + r2(num(x)) + ' cr'; };\n\ndeals.forEach(function (d) {\n  const n = num(d.notional_inr_cr);\n  const label = d.deal_id + ' (' + d.instrument + ', ' + cr(n) + ', ' + d.counterparty + ')';\n  if (d.confirmation_status !== 'Matched') add('TR-01', d.deal_id, 'Deal ' + label + ' is ' + String(d.confirmation_status || 'blank').toUpperCase() + ' - no matched counterparty confirmation on record.', n);\n  if (d.confirmation_date && d.confirmation_time) {\n    const delay = (ts(d.confirmation_date, d.confirmation_time) - ts(d.trade_date, d.trade_time)) / 3600000;\n    if (delay > num(P.confirmation_sla_hours || 2)) add('TR-02', d.deal_id, 'Deal ' + label + ' confirmed ' + r2(delay) + ' hours after trade, against SLA of ' + P.confirmation_sla_hours + ' hours.', n);\n  }\n  const conf = dlMap[d.confirmed_by];\n  if (d.confirmed_by && (d.confirmed_by === d.dealer_id || (conf && conf.role === 'Front'))) add('TR-03', d.deal_id, 'Deal ' + label + ' was executed by dealer ' + d.dealer_id + ' and confirmed by ' + d.confirmed_by + ' (same person / front office).', n);\n  const dr = num(d.deal_rate); const mr = num(d.market_rate);\n  if (mr) {\n    if (d.rate_type === 'yield') {\n      const bps = Math.abs(dr - mr) * 100;\n      if (bps > num(P.rate_tolerance_bps || 10)) add('TR-04', d.deal_id, 'Deal ' + label + ' done at ' + dr + '% vs market ' + mr + '% - deviation ' + r2(bps) + ' bps (tolerance ' + P.rate_tolerance_bps + ' bps).', n * bps / 10000);\n    } else {\n      const pct = Math.abs(dr - mr) / mr * 100;\n      if (pct > num(P.price_tolerance_pct || 0.25)) add('TR-04', d.deal_id, 'Deal ' + label + ' done at ' + dr + ' vs market ' + mr + ' - deviation ' + r2(pct) + '% (tolerance ' + P.price_tolerance_pct + '%).', n * pct / 100);\n    }\n  }\n  const m = hm(d.trade_time);\n  if (m !== null && (m < hm(P.dealing_start || '09:00') || m > hm(P.dealing_end || '17:30')) && d.after_hours_approval !== 'Y') add('TR-05', d.deal_id, 'Deal ' + label + ' executed at ' + d.trade_time + ', outside dealing hours ' + P.dealing_start + '-' + P.dealing_end + ', without prior approval.', n);\n  if (d.recorded_line === 'N') add('TR-05', d.deal_id, 'Deal ' + label + ' was not executed on a recorded line / electronic platform.', n);\n  const dl = dlMap[d.dealer_id];\n  if (dl && num(dl.per_deal_limit_cr) > 0 && n > num(dl.per_deal_limit_cr)) add('TR-07', d.deal_id, 'Deal ' + label + ' by ' + dl.name + ' (' + d.dealer_id + ') exceeds per-deal limit of ' + cr(dl.per_deal_limit_cr) + ' by ' + cr(n - num(dl.per_deal_limit_cr)) + '.', n - num(dl.per_deal_limit_cr));\n  if (d.settlement_status === 'Failed' || d.sgl_bounce === 'Y') add('TR-11', d.deal_id, 'Deal ' + label + ' failed in settlement' + (d.sgl_bounce === 'Y' ? ' (SGL bounce).' : '.'), n);\n  if (d.desk === 'Equity' && d.isin) {\n    const hit = rl.filter(function (r) { return r.isin === d.isin && String(d.trade_date) >= String(r.restricted_from) && String(d.trade_date) <= String(r.restricted_to); })[0];\n    if (hit) add('TR-17', d.deal_id, 'Deal ' + label + ' on ' + d.trade_date + ' in ' + hit.scrip + ', which was on the restricted list from ' + hit.restricted_from + ' to ' + hit.restricted_to + ' (' + hit.reason + ').', n);\n  }\n  const cp = cpMap[d.counterparty] || {};\n  if (d.desk === 'Derivatives' && String(cp.type || '').indexOf('Corporate') === 0 && (d.isda_csa !== 'Y' || d.suitability_done !== 'Y')) add('TR-18', d.deal_id, 'Derivative ' + label + ' with user ' + d.counterparty + ' - ISDA/CSA: ' + d.isda_csa + ', suitability assessment: ' + d.suitability_done + '.', n);\n  if (d.book === 'IBU' && d.currency === 'INR') add('TR-19', d.deal_id, 'IBU deal ' + label + ' is denominated in INR.', n);\n  if ((d.desk === 'IBU') !== (d.book === 'IBU')) add('TR-20', d.deal_id, 'Deal ' + label + ' executed by the ' + d.desk + ' desk but booked in the ' + d.book + ' book.', n);\n  if (d.book === 'IBU' && cp.type === 'Resident Individual') add('TR-21', d.deal_id, 'IBU deal ' + label + ' with a resident individual - permissibility and LRS documentation to be verified.', n);\n});\n\nconst expo = {};\ndeals.forEach(function (d) { expo[d.counterparty] = (expo[d.counterparty] || 0) + num(d.notional_inr_cr); });\nObject.keys(expo).forEach(function (k) {\n  const c = cpMap[k];\n  if (c && expo[k] > num(c.limit_cr)) add('TR-06', k, 'Aggregate exposure on ' + k + ' of ' + cr(expo[k]) + ' exceeds approved limit of ' + cr(c.limit_cr) + ' by ' + cr(expo[k] - num(c.limit_cr)) + '.', expo[k] - num(c.limit_cr));\n  if (c && c.kyc_status !== 'Complete') add('TR-22', k, 'Deals of ' + cr(expo[k]) + ' done with ' + k + ' while KYC status is ' + c.kyc_status + '.', expo[k]);\n});\n\ndealers.forEach(function (d) {\n  const loss = -num(d.period_pnl_lakh);\n  if (d.role === 'Front' && num(d.stop_loss_lakh) > 0 && loss > num(d.stop_loss_lakh)) add('TR-08', d.dealer_id, 'Dealer ' + d.name + ' (' + d.desk + ') period loss of Rs ' + loss + ' lakh breached stop-loss of Rs ' + d.stop_loss_lakh + ' lakh.', loss / 100);\n});\n\nconst cap = num(P.capital_funds_cr); const nw = num(P.net_worth_cr);\npos.forEach(function (p) {\n  if (num(p.noop_usd_mn) > num(P.noop_limit_usd_mn)) add('TR-09', p.date, 'NOOP on ' + p.date + ' was USD ' + p.noop_usd_mn + ' mn against limit of USD ' + P.noop_limit_usd_mn + ' mn.', (num(p.noop_usd_mn) - num(P.noop_limit_usd_mn)) * 8.4 / 10);\n  const bl = cap * num(P.call_borrow_limit_pct) / 100; const ll = cap * num(P.call_lend_limit_pct) / 100;\n  if (num(p.call_borrow_cr) > bl) add('TR-10', p.date, 'Call borrowing on ' + p.date + ' of ' + cr(p.call_borrow_cr) + ' exceeded ' + P.call_borrow_limit_pct + '% of capital funds (' + cr(bl) + ').', num(p.call_borrow_cr) - bl);\n  if (num(p.call_lend_cr) > ll) add('TR-10', p.date, 'Call lending on ' + p.date + ' of ' + cr(p.call_lend_cr) + ' exceeded ' + P.call_lend_limit_pct + '% of capital funds (' + cr(ll) + ').', num(p.call_lend_cr) - ll);\n  const cl = nw * num(P.cme_limit_pct) / 100;\n  if (num(p.cme_cr) > cl) add('TR-16', p.date, 'Capital market exposure on ' + p.date + ' of ' + cr(p.cme_cr) + ' exceeded ' + P.cme_limit_pct + '% of net worth (' + cr(cl) + ').', num(p.cme_cr) - cl);\n});\n\nconst IG = ['SOV','AAA','AA+','AA','AA-','A+','A','A-','BBB+','BBB','BBB-'];\nlet htmSold = 0;\ninv.forEach(function (s) {\n  const bv = num(s.book_value_cr); const mv = num(s.market_value_cr);\n  const label = s.security + ' (' + s.isin + ', ' + s.category + ')';\n  if (s.category === 'HTM' && s.sold_in_period === 'Y') {\n    htmSold += num(s.sale_book_value_cr);\n    if (!s.board_approval_ref) add('TR-12', s.isin, 'Sale of ' + cr(s.sale_book_value_cr) + ' of ' + label + ' from HTM without Board approval reference.', num(s.sale_book_value_cr));\n  }\n  if (s.category !== 'HTM') {\n    const loss = bv - mv;\n    if (loss > 0) {\n      const provided = Math.max(0, -num(s.mtm_booked_cr));\n      const short = loss - provided;\n      if (short > 0.01) add('TR-13', s.isin, label + ': fair value loss ' + cr(loss) + ', recognised only ' + cr(provided) + ' - shortfall ' + cr(short) + '.', short, short >= mat ? 'High' : 'Medium');\n    }\n    if (s.valuation_date && periodTo && String(s.valuation_date) < periodTo) add('TR-14', s.isin, label + ' last valued on ' + s.valuation_date + ', not as at period end ' + periodTo + '.', bv);\n  }\n  if (s.slr !== 'Y' && (s.issuer_type === 'Corporate' || s.issuer_type === 'Bank') && IG.indexOf(String(s.rating)) < 0) add('TR-15', s.isin, label + ' is rated ' + s.rating + (s.listed === 'N' ? ' and unlisted' : '') + ' - below investment grade / unrated non-SLR exposure of ' + cr(bv) + '.', bv);\n  if (num(s.holding_units) !== num(s.depository_units)) add('TR-23', s.isin, label + ': books show ' + s.holding_units + ' units, ' + s.custodian + ' statement shows ' + s.depository_units + ' units (difference ' + (num(s.holding_units) - num(s.depository_units)) + ').', bv * Math.abs(num(s.holding_units) - num(s.depository_units)) / Math.max(1, num(s.holding_units)), null, (s.custodian === 'NSDL' || s.custodian === 'CDSL') ? 'SEBI' : 'RBI');\n});\nconst htmOpen = num(P.htm_opening_book_cr);\nif (htmOpen > 0) {\n  const pct = htmSold / htmOpen * 100;\n  if (pct > num(P.htm_sale_threshold_pct)) add('TR-12', 'HTM portfolio', 'HTM sales during the period of ' + cr(htmSold) + ' = ' + r2(pct) + '% of opening HTM book (' + cr(htmOpen) + '), above the ' + P.htm_sale_threshold_pct + '% threshold - disclosure in Notes to Accounts required.', htmSold, 'Medium');\n}\n\nconst now = $now.setZone('Asia/Kolkata');\nconst runId = 'TA-' + now.toFormat('yyyyMMdd-HHmmss');\nfindings.forEach(function (f, i) { f.finding_id = runId + '-' + String(i + 1).padStart(2, '0'); f.run_id = runId; f.status = 'Open'; f.management_response = ''; f.action_owner = ''; f.target_date = ''; f.created_at = now.toFormat('yyyy-MM-dd HH:mm'); });\n\nconst popCount = { deals: deals.length, investments: inv.length, counterparties: cps.length, dealers: dealers.length, positions: pos.length };\nconst tests = CAT.map(function (c) {\n  const t = TM[c[0]];\n  const ex = findings.filter(function (f) { return f.test_id === t.id; });\n  return { id: t.id, name: t.name, area: t.area, regulator: t.regulator, reference: t.ref, icai: t.icai, population: popCount[t.pop] || 0, population_type: t.pop, exceptions: ex.length, status: ex.length ? 'Exceptions' : 'No exceptions' };\n});\nconst fw = ['RBI','SEBI','IFSCA','FEMA'];\nconst compliance = fw.map(function (k) {\n  const ts2 = tests.filter(function (t) { return t.regulator.indexOf(k) >= 0; });\n  const fs = findings.filter(function (f) { return f.regulator.indexOf(k) >= 0; });\n  const hi = fs.filter(function (f) { return f.risk === 'High'; }).length;\n  return { framework: k, tests: ts2.length, exceptions: fs.length, high: hi, status: fs.length === 0 ? 'Compliant' : (hi > 0 ? 'Non-compliant - High risk' : 'Partially compliant') };\n});\nconst saSet = {};\n['SA 200','SA 230','SA 265','SA 315 (Revised)','SA 320','SA 330','SA 500','SA 530','SA 580'].forEach(function (s) { saSet[s] = 1; });\ntests.forEach(function (t) { t.icai.split(';').forEach(function (s) { const m2 = s.trim().match(/^SA [0-9]+( [(]Revised[)])?/); if (m2) saSet[m2[0]] = 1; }); });\nconst icaiApplied = Object.keys(saSet).sort();\ncompliance.push({ framework: 'ICAI Standards', tests: icaiApplied.length, exceptions: 0, high: 0, status: 'Applied: ' + icaiApplied.join(', ') });\n\nconst high = findings.filter(function (f) { return f.risk === 'High'; }).length;\nconst med = findings.filter(function (f) { return f.risk === 'Medium'; }).length;\nconst low = findings.filter(function (f) { return f.risk === 'Low'; }).length;\nconst overall = high >= 8 ? 'High Risk - Unsatisfactory' : (high >= 3 ? 'Medium Risk - Needs Improvement' : 'Low Risk - Satisfactory');\nconst totalNotional = deals.reduce(function (a, d) { return a + num(d.notional_inr_cr); }, 0);\nconst atRisk = findings.reduce(function (a, f) { return a + num(f.impact_inr_cr); }, 0);\nconst sample = deals.slice().sort(function (a, b) { return num(b.notional_inr_cr) - num(a.notional_inr_cr); }).slice(0, 5).map(function (d) { return { deal_id: d.deal_id, instrument: d.instrument, counterparty: d.counterparty, notional_inr_cr: num(d.notional_inr_cr), reason: 'Top value - vouch to deal ticket, voice log, CCIL / SWIFT confirmation and accounting entry' }; });\nconst fingerprint = 'D' + deals.length + '-I' + inv.length + '-C' + cps.length + '-L' + dealers.length + '-P' + pos.length + '-N' + r2(totalNotional);\nconst stats = { tests_run: tests.length, tests_with_exceptions: tests.filter(function (t) { return t.exceptions > 0; }).length, findings: findings.length, high: high, medium: med, low: low, deals: deals.length, investments: inv.length, total_notional_cr: r2(totalNotional), amount_flagged_cr: r2(atRisk) };\nconst brief = {\n  bank: P.bank_name, period: P.audit_period_from + ' to ' + P.audit_period_to, engagement: req.engagement, auditor: req.auditor_name, run_id: runId,\n  overall_rating: overall, materiality_cr: mat, stats: stats,\n  compliance: compliance, icai_standards_applied: icaiApplied,\n  tests: tests.map(function (t) { return { id: t.id, name: t.name, regulator: t.regulator, reference: t.reference, icai: t.icai, population: t.population, exceptions: t.exceptions }; }),\n  findings: findings.map(function (f) { return { id: f.finding_id, test: f.test_id, risk: f.risk, regulator: f.regulator, entity: f.ref_entity, observation: f.observation, impact_cr: f.impact_inr_cr }; }),\n  walkthrough_sample: sample\n};\nreturn [{ json: { run_id: runId, run_at: now.toFormat('yyyy-MM-dd HH:mm:ss'), bank_name: P.bank_name, period: P.audit_period_from + ' to ' + P.audit_period_to, engagement: req.engagement, auditor_name: req.auditor_name, auditor_email: req.auditor_email || P.default_auditor_email || '', trigger_source: req.trigger_source, overall_rating: overall, materiality_cr: mat, stats: stats, tests: tests, findings: findings, compliance: compliance, icai_standards: icaiApplied, sample: sample, data_fingerprint: fingerprint, ai_brief: JSON.stringify(brief) } }];"
+      }
+    },
+    {
+      "id": "b23c9c65-9262-4349-8183-a762ef64ef24",
+      "name": "Draft Audit Report with Claude",
+      "type": "@n8n/n8n-nodes-langchain.anthropic",
+      "typeVersion": 1,
+      "position": [
+        2280,
+        400
+      ],
+      "parameters": {
+        "resource": "text",
+        "operation": "message",
+        "modelId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "claude-sonnet-5-5",
+          "cachedResultName": "claude-sonnet-5-5"
+        },
+        "messages": {
+          "values": [
+            {
+              "role": "user",
+              "content": "=Prepare the treasury audit report for the engagement below. Use ONLY the facts in the JSON; do not invent numbers, deals or regulations. Keep the whole report under 1,100 words and finish every section - the detailed findings register is appended separately as Annexure A, so summarise rather than list every exception.\n\nAUDIT DATA (JSON):\n{{ $json.ai_brief }}"
+            }
+          ]
+        },
+        "simplify": true,
+        "options": {
+          "maxTokens": 14000,
+          "system": "You are a senior Chartered Accountant and bank treasury auditor in India. You draft internal / concurrent audit reports on bank treasury operations for the Audit Committee of the Board, following the ICAI Standards on Auditing and Standards on Internal Audit (reporting: SIA 370; deficiencies: SA 265; documentation: SA 230) and the RBI Risk-Based Internal Audit framework.\n\nOutput a single self-contained HTML fragment (no <html>, <head> or <body> tags, no markdown, no code fences). Use <h2>, <h3>, <p>, <ul>, <table border=\"1\" cellpadding=\"6\" style=\"border-collapse:collapse;width:100%\"> and inline styles only. Keep it professional and concise (about 900-1300 words).\n\nSections, in order:\n1. Report heading: bank, engagement, period, run id, addressed to the Audit Committee of the Board.\n2. Executive summary with the overall risk rating and 3-5 key messages.\n3. Scope, objectives and methodology: risk-based approach, 100% population testing through automated audit tests (CAAT), walkthrough sample for vouching (SA 530 / SA 500), materiality (SA 320), regulatory frameworks covered (RBI, SEBI, IFSCA, FEMA).\n4. Regulatory compliance matrix as a table (framework, tests, exceptions, high-risk, status).\n5. Key observations grouped by regulator, highest risk first: observation, regulation, ICAI standard, risk, impact in Rs crore, recommendation. Summarise similar exceptions together.\n6. Significant deficiencies in internal control (SA 265) - the control failures behind the High risk items.\n7. Matters for management response and follow-up (owner, target date to be filled by management).\n8. Limitations and auditor declaration: automated tests on data provided by management, regulatory thresholds are configurable parameters to be verified against current RBI / SEBI / IFSCA circulars, report subject to management responses (SA 580 written representations), working papers retained (SA 230).\nUse Rs crore for amounts."
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "efd58714-c8ec-4271-baf4-667ef85bf51d",
+      "name": "Assemble Report",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2520,
+        400
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const E = $('Run Audit Tests').first().json;\nconst a = $input.first().json || {};\nlet text = '';\nif (Array.isArray(a.content)) { const b = a.content.filter(function (c) { return c && c.type === 'text'; }).map(function (c) { return c.text; }); text = b.join(String.fromCharCode(10)); }\nelse if (typeof a.merged_response === 'string') text = a.merged_response;\nelse if (typeof a.content === 'string') text = a.content;\nelse if (typeof a.text === 'string') text = a.text;\nconst fence = String.fromCharCode(96, 96, 96);\ntext = String(text || '').split(fence + 'html').join('').split(fence).join('').trim();\nconst esc = function (s) { return String(s === undefined || s === null ? '' : s).split('&').join('&amp;').split('<').join('&lt;').split('>').join('&gt;'); };\nconst color = function (r) { return r === 'High' ? '#b42318' : (r === 'Medium' ? '#b54708' : '#027a48'); };\nconst aiOk = text.length > 200;\nlet aiHtml = aiOk ? text : '<h2>Treasury Audit Report - ' + esc(E.bank_name) + '</h2><p>AI narrative could not be generated for this run. The automated findings register below is complete and forms the basis of this report.</p>';\nlet rows = E.findings.map(function (f) { return '<tr><td>' + esc(f.finding_id) + '</td><td>' + esc(f.regulator) + '</td><td style=\"color:' + color(f.risk) + ';font-weight:bold\">' + esc(f.risk) + '</td><td>' + esc(f.observation) + '</td><td>' + esc(f.regulation_ref) + '</td><td>' + esc(f.icai_standard) + '</td><td style=\"text-align:right\">' + esc(f.impact_inr_cr) + '</td></tr>'; }).join('');\nconst appendix = '<h2>Annexure A - Findings Register (system generated)</h2><table border=\"1\" cellpadding=\"6\" style=\"border-collapse:collapse;width:100%;font-size:12px\"><tr style=\"background:#f2f4f7\"><th>ID</th><th>Regulator</th><th>Risk</th><th>Observation</th><th>Regulation</th><th>ICAI Standard</th><th>Impact (Rs cr)</th></tr>' + rows + '</table>' +\n  '<h2>Annexure B - Audit Tests Performed</h2><table border=\"1\" cellpadding=\"6\" style=\"border-collapse:collapse;width:100%;font-size:12px\"><tr style=\"background:#f2f4f7\"><th>Test</th><th>Description</th><th>Regulator</th><th>Population</th><th>Exceptions</th></tr>' + E.tests.map(function (t) { return '<tr><td>' + t.id + '</td><td>' + esc(t.name) + '</td><td>' + esc(t.regulator) + '</td><td>' + t.population + ' ' + t.population_type + '</td><td>' + t.exceptions + '</td></tr>'; }).join('') + '</table>' +\n  '<p style=\"font-size:11px;color:#667085\">Run ' + esc(E.run_id) + ' | ' + esc(E.run_at) + ' IST | Data fingerprint ' + esc(E.data_fingerprint) + ' | Prepared by ' + esc(E.auditor_name) + ' | Generated by n8n Treasury Audit Automation. Demonstration data - fictitious bank.</p>';\nconst reportHtml = '<div style=\"font-family:Arial,sans-serif;color:#101828;max-width:1000px\">' + aiHtml + appendix + '</div>';\nconst response = { ok: true, run_id: E.run_id, run_at: E.run_at, bank_name: E.bank_name, period: E.period, engagement: E.engagement, auditor_name: E.auditor_name, overall_rating: E.overall_rating, materiality_cr: E.materiality_cr, stats: E.stats, compliance: E.compliance, icai_standards: E.icai_standards, tests: E.tests, findings: E.findings, sample: E.sample, data_fingerprint: E.data_fingerprint, ai_generated: aiOk, report_html: reportHtml };\nreturn [{ json: { run_id: E.run_id, auditor_email: E.auditor_email, subject: 'Treasury Audit Report - ' + E.bank_name + ' - ' + E.run_id + ' - ' + E.overall_rating, report_html: reportHtml, response: response } }];"
+      }
+    },
+    {
+      "id": "17ec7b31-7723-45de-a453-99f9d3d88668",
+      "name": "Prepare Findings Rows",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2760,
+        400
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const E = $('Run Audit Tests').first().json;\nreturn E.findings.map(function (f) { return { json: { finding_id: f.finding_id, run_id: f.run_id, created_at: f.created_at, test_id: f.test_id, test_name: f.test_name, area: f.area, regulator: f.regulator, risk: f.risk, ref_entity: f.ref_entity, observation: f.observation, impact_inr_cr: f.impact_inr_cr, regulation_ref: f.regulation_ref, icai_standard: f.icai_standard, recommendation: f.recommendation, status: f.status, management_response: '', action_owner: '', target_date: '', response_at: '' } }; });"
+      }
+    },
+    {
+      "id": "0129f321-f731-4649-90c1-7ab8dea52b4c",
+      "name": "Save Findings Register",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        3000,
+        400
+      ],
+      "parameters": {
+        "resource": "sheet",
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "YOUR_GOOGLE_SHEET_ID"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Findings"
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "value": {},
+          "schema": []
+        },
+        "options": {
+          "cellFormat": "RAW"
+        }
+      },
+      "onError": "continueRegularOutput",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "id": "1635ebf6-98b8-4189-94c2-7e120aa29009",
+      "name": "Build Audit Trail Record",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        3240,
+        400
+      ],
+      "parameters": {
+        "mode": "manual",
+        "includeOtherFields": false,
+        "assignments": {
+          "assignments": [
+            {
+              "id": "r1",
+              "name": "run_id",
+              "value": "={{ $('Run Audit Tests').first().json.run_id }}",
+              "type": "string"
+            },
+            {
+              "id": "r2",
+              "name": "run_at",
+              "value": "={{ $('Run Audit Tests').first().json.run_at }}",
+              "type": "string"
+            },
+            {
+              "id": "r3",
+              "name": "engagement",
+              "value": "={{ $('Run Audit Tests').first().json.engagement }}",
+              "type": "string"
+            },
+            {
+              "id": "r4",
+              "name": "prepared_by",
+              "value": "={{ $('Run Audit Tests').first().json.auditor_name }}",
+              "type": "string"
+            },
+            {
+              "id": "r5",
+              "name": "reviewed_by",
+              "value": "Pending review",
+              "type": "string"
+            },
+            {
+              "id": "r6",
+              "name": "trigger_source",
+              "value": "={{ $('Run Audit Tests').first().json.trigger_source }}",
+              "type": "string"
+            },
+            {
+              "id": "r7",
+              "name": "period",
+              "value": "={{ $('Run Audit Tests').first().json.period }}",
+              "type": "string"
+            },
+            {
+              "id": "r8",
+              "name": "overall_rating",
+              "value": "={{ $('Run Audit Tests').first().json.overall_rating }}",
+              "type": "string"
+            },
+            {
+              "id": "r9",
+              "name": "tests_run",
+              "value": "={{ $('Run Audit Tests').first().json.stats.tests_run }}",
+              "type": "number"
+            },
+            {
+              "id": "r10",
+              "name": "findings",
+              "value": "={{ $('Run Audit Tests').first().json.stats.findings }}",
+              "type": "number"
+            },
+            {
+              "id": "r11",
+              "name": "high",
+              "value": "={{ $('Run Audit Tests').first().json.stats.high }}",
+              "type": "number"
+            },
+            {
+              "id": "r12",
+              "name": "medium",
+              "value": "={{ $('Run Audit Tests').first().json.stats.medium }}",
+              "type": "number"
+            },
+            {
+              "id": "r13",
+              "name": "amount_flagged_cr",
+              "value": "={{ $('Run Audit Tests').first().json.stats.amount_flagged_cr }}",
+              "type": "number"
+            },
+            {
+              "id": "r14",
+              "name": "data_fingerprint",
+              "value": "={{ $('Run Audit Tests').first().json.data_fingerprint }}",
+              "type": "string"
+            },
+            {
+              "id": "r15",
+              "name": "ai_report",
+              "value": "={{ $('Assemble Report').first().json.response.ai_generated ? 'Generated' : 'Fallback' }}",
+              "type": "string"
+            },
+            {
+              "id": "r16",
+              "name": "emailed_to",
+              "value": "={{ $('Assemble Report').first().json.auditor_email }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "executeOnce": true
+    },
+    {
+      "id": "6255d376-870c-4228-a3df-05b2b8637b61",
+      "name": "Log Audit Trail (SA 230)",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        3480,
+        400
+      ],
+      "parameters": {
+        "resource": "sheet",
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "YOUR_GOOGLE_SHEET_ID"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Audit_Runs"
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "value": {},
+          "schema": []
+        },
+        "options": {
+          "cellFormat": "RAW"
+        }
+      },
+      "onError": "continueRegularOutput",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "id": "12bfd27b-ac80-48cf-9ee6-1f6e0caffdd2",
+      "name": "Email Report to Auditor",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        3720,
+        400
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "send",
+        "sendTo": "={{ $('Assemble Report').first().json.auditor_email }}",
+        "subject": "={{ $('Assemble Report').first().json.subject }}",
+        "emailType": "html",
+        "message": "={{ $('Assemble Report').first().json.report_html }}",
+        "options": {
+          "appendAttribution": false,
+          "senderName": "Treasury Audit Automation"
+        }
+      },
+      "executeOnce": true,
+      "onError": "continueRegularOutput",
+      "webhookId": "2950af13-40d3-4279-a4cc-fc1f60a4c3f2",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "id": "5518c671-6190-4925-858a-04bc89d28434",
+      "name": "Respond with Results",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        3960,
+        400
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $('Assemble Report').first().json.response }}",
+        "options": {
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Access-Control-Allow-Origin",
+                "value": "*"
+              }
+            ]
+          }
+        }
+      },
+      "executeOnce": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "6c022894-21d1-4215-9f9c-2ae2453f370a",
+      "name": "Sticky Note 757e3585",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -40,
+        -40
+      ],
+      "parameters": {
+        "content": "## Treasury Audit Engine\n**Trigger:** POST /webhook/treasury-audit/run from the Lovable web app (body: auditor_name, auditor_email, engagement) or the daily schedule (disabled by default - enable for continuous concurrent audit).\n\n**Flow:** read 7 data tabs from Google Sheets -> run 23 automated audit tests (RBI, SEBI, IFSCA, FEMA) mapped to ICAI Standards on Auditing -> Claude drafts the SIA 370 / SA 265 style report -> findings register + audit trail saved -> report emailed -> JSON returned to the web app.",
+        "color": 4,
+        "width": 640,
+        "height": 260
+      }
+    },
+    {
+      "id": "3f559c50-e3a8-4362-b102-4ba7ff742103",
+      "name": "Sticky Note 19888cf7",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        1940,
+        120
+      ],
+      "parameters": {
+        "content": "### Regulatory thresholds are parameters\nAll limits (capital funds, call money %, NOOP, CME %, tolerances, materiality) live in the **Parameters** tab of the Google Sheet, so the auditor can update them to the latest RBI / SEBI / IFSCA circulars without editing the workflow.",
+        "color": 6,
+        "width": 420,
+        "height": 200
+      }
+    }
+  ],
+  "connections": {
+    "POST Run Audit": {
+      "main": [
+        [
+          {
+            "node": "Normalize Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize Request": {
+      "main": [
+        [
+          {
+            "node": "Read Parameters",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Daily Concurrent Audit 7pm": {
+      "main": [
+        [
+          {
+            "node": "Normalize Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Parameters": {
+      "main": [
+        [
+          {
+            "node": "Read Deals",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Deals": {
+      "main": [
+        [
+          {
+            "node": "Read Investments",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Investments": {
+      "main": [
+        [
+          {
+            "node": "Read Counterparties",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Counterparties": {
+      "main": [
+        [
+          {
+            "node": "Read Dealers",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Dealers": {
+      "main": [
+        [
+          {
+            "node": "Read Positions",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Positions": {
+      "main": [
+        [
+          {
+            "node": "Read Restricted List",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Restricted List": {
+      "main": [
+        [
+          {
+            "node": "Run Audit Tests",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Run Audit Tests": {
+      "main": [
+        [
+          {
+            "node": "Draft Audit Report with Claude",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Draft Audit Report with Claude": {
+      "main": [
+        [
+          {
+            "node": "Assemble Report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Assemble Report": {
+      "main": [
+        [
+          {
+            "node": "Prepare Findings Rows",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Findings Rows": {
+      "main": [
+        [
+          {
+            "node": "Save Findings Register",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save Findings Register": {
+      "main": [
+        [
+          {
+            "node": "Build Audit Trail Record",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Audit Trail Record": {
+      "main": [
+        [
+          {
+            "node": "Log Audit Trail (SA 230)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log Audit Trail (SA 230)": {
+      "main": [
+        [
+          {
+            "node": "Email Report to Auditor",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Email Report to Auditor": {
+      "main": [
+        [
+          {
+            "node": "Respond with Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "tags": []
+}

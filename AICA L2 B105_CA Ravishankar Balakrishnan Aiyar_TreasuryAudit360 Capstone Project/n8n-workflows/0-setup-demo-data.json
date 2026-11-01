@@ -1,0 +1,588 @@
+{
+  "name": "Treasury Audit - 0 Setup Demo Data",
+  "nodes": [
+    {
+      "id": "90669e67-cffb-4078-bff5-30d054105eee",
+      "name": "Run Setup Once",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        400
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "247ff3ba-94fd-4bda-aad4-8a7391621220",
+      "name": "Create Audit Workbook",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        240,
+        400
+      ],
+      "parameters": {
+        "resource": "spreadsheet",
+        "operation": "create",
+        "title": "Treasury Audit - Demo Bank (Capstone)",
+        "sheetsUi": {
+          "sheetValues": [
+            {
+              "title": "Parameters"
+            },
+            {
+              "title": "Deals"
+            },
+            {
+              "title": "Investments"
+            },
+            {
+              "title": "Counterparties"
+            },
+            {
+              "title": "Dealers"
+            },
+            {
+              "title": "Positions"
+            },
+            {
+              "title": "Restricted_List"
+            },
+            {
+              "title": "Findings"
+            },
+            {
+              "title": "Audit_Runs"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "id": "d39f5941-0ec9-42ba-a882-4f6453bd2850",
+      "name": "Seed Parameters",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        520,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const H = ['key','value','description','source'];\nconst D = [\n ['bank_name','Bharat Demo Bank Ltd (fictitious)','Name of auditee bank','Engagement letter'],\n ['audit_period_from','2026-07-01','Start of audit period','Engagement letter'],\n ['audit_period_to','2026-09-30','End of audit period','Engagement letter'],\n ['capital_funds_cr',12000,'Tier I + Tier II capital (Rs crore) per last audited balance sheet','Audited financials'],\n ['net_worth_cr',9500,'Net worth (Rs crore) used for capital market exposure','Audited financials'],\n ['call_borrow_limit_pct',125,'Max call money borrowing on any day, % of capital funds','RBI Call, Notice and Term Money Markets Directions, 2021 / Board policy'],\n ['call_lend_limit_pct',50,'Max call money lending on any day, % of capital funds','RBI Call, Notice and Term Money Markets Directions, 2021 / Board policy'],\n ['cme_limit_pct',40,'Aggregate capital market exposure ceiling, % of net worth','RBI Master Circular - Exposure Norms'],\n ['noop_limit_usd_mn',150,'Net Overnight Open Position limit (USD mn)','Board approved; RBI MD - Risk Management and Inter-Bank Dealings'],\n ['rate_tolerance_bps',10,'Max deviation of deal yield from market (bps)','Bank Market Risk Policy'],\n ['price_tolerance_pct',0.25,'Max deviation of FX rate / price from market (%)','Bank Market Risk Policy'],\n ['confirmation_sla_hours',2,'Max time to confirm a deal (hours)','Back-office SOP / FEDAI'],\n ['dealing_start','09:00','Dealing room opening time','Treasury Dealing Policy'],\n ['dealing_end','17:30','Dealing room closing time','Treasury Dealing Policy'],\n ['htm_opening_book_cr',18000,'Opening book value of HTM portfolio (Rs crore)','Investment register'],\n ['htm_sale_threshold_pct',5,'HTM sales above this % of opening HTM need disclosure in Notes to Accounts','RBI MD - Investment Portfolio of Commercial Banks, 2023'],\n ['materiality_cr',5,'Performance materiality for the audit (Rs crore)','SA 320 - auditor judgement'],\n ['default_auditor_email','','Email used for scheduled (concurrent audit) runs','Set by auditor']\n];\nreturn D.map(function (r) { const o = {}; H.forEach(function (h, i) { o[h] = r[i]; }); return { json: o }; });"
+      }
+    },
+    {
+      "id": "bb1f3860-837a-4e6b-ae20-f8221f4a3ef5",
+      "name": "Write Parameters",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        780,
+        0
+      ],
+      "parameters": {
+        "resource": "sheet",
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $('Create Audit Workbook').first().json.spreadsheetId }}"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Parameters"
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "value": {},
+          "schema": []
+        },
+        "options": {
+          "cellFormat": "RAW"
+        }
+      },
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "id": "16698deb-34e5-4889-a396-e6ec6c934260",
+      "name": "Seed Deals",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        520,
+        160
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const H = ['deal_id','trade_date','trade_time','desk','book','instrument','counterparty','side','currency','notional_fc_mn','notional_inr_cr','deal_rate','market_rate','rate_type','dealer_id','confirmed_by','confirmation_date','confirmation_time','confirmation_status','settlement_status','sgl_bounce','isda_csa','suitability_done','after_hours_approval','recorded_line','isin'];\nconst D = [\n ['TD001','2026-07-02','10:15','Money Market','Domestic','Call Money Borrowing','Aravali Bank Ltd','Borrow','INR',0,800,6.50,6.48,'yield','D101','B201','2026-07-02','10:40','Matched','Settled','N','NA','NA','NA','Y',''],\n ['TD002','2026-07-03','11:05','G-Sec','Domestic','7.10% GS 2034','Deccan Primary Dealers Ltd','Buy','INR',0,250,6.92,6.90,'yield','D102','B201','2026-07-03','11:30','Matched','Settled','N','NA','NA','NA','Y','IN0020240019'],\n ['TD003','2026-07-08','14:20','G-Sec','Domestic','7.18% GS 2037','Bengal Commercial Bank','Sell','INR',0,200,7.05,6.88,'yield','D102','B202','2026-07-08','15:00','Matched','Settled','N','NA','NA','NA','Y','IN0020230085'],\n ['TD004','2026-07-10','12:00','Forex','Domestic','USD/INR Spot','Thames Global Bank London','Buy','USD',20,168,84.10,84.05,'fx','D103','B201','2026-07-10','12:20','Matched','Settled','N','Y','NA','NA','Y',''],\n ['TD005','2026-07-15','18:45','Forex','Domestic','USD/INR 3M Forward','Gulf Star Bank Dubai','Sell','USD',17.8,150,84.60,84.55,'fx','D103','B202','2026-07-16','10:30','Matched','Settled','N','Y','NA','N','Y',''],\n ['TD006','2026-07-18','10:30','Money Market','Domestic','Call Money Lending','Coromandel Bank Ltd','Lend','INR',0,700,6.45,6.46,'yield','D101','D101','2026-07-18','10:35','Matched','Settled','N','NA','NA','NA','Y',''],\n ['TD007','2026-07-22','11:45','Derivatives','Domestic','IRS 5Y MIBOR-OIS','Sunrise Textiles Pvt Ltd','Pay Fixed','INR',0,30,6.30,6.25,'yield','D104','B201','2026-07-22','12:10','Matched','Settled','N','N','N','NA','Y',''],\n ['TD008','2026-07-25','15:10','G-Sec','Domestic','6.79% GS 2031','Deccan Primary Dealers Ltd','Buy','INR',0,350,6.75,6.74,'yield','D102','B201','2026-07-25','15:30','Matched','Failed','Y','NA','NA','NA','Y','IN0020210044'],\n ['TD009','2026-08-01','10:00','Equity','Domestic','Konkan Steel Ltd - Equity','NSE Clearing Ltd','Buy','INR',0,12,152.40,152.10,'price','D105','B202','2026-08-01','10:30','Matched','Settled','N','NA','NA','NA','Y','INE0KS101015'],\n ['TD010','2026-08-05','11:20','Equity','Domestic','Narmada Petrochem Ltd - Equity','NSE Clearing Ltd','Buy','INR',0,18,2410,2405,'price','D105','B202','2026-08-05','11:50','Matched','Settled','N','NA','NA','NA','Y','INE0NP201018'],\n ['TD011','2026-08-07','09:40','IBU','IBU','USD Term Placement 3M','Gulf Star Bank Dubai','Lend','USD',50,420,5.35,5.33,'yield','D106','B202','2026-08-07','10:05','Matched','Settled','N','NA','NA','NA','Y',''],\n ['TD012','2026-08-12','13:15','IBU','IBU','INR Term Placement 1M','Coromandel Bank Ltd','Lend','INR',0,100,6.60,6.55,'yield','D106','B202','2026-08-12','13:40','Matched','Settled','N','NA','NA','NA','Y',''],\n ['TD013','2026-08-14','16:00','IBU','Domestic','EUR/USD FX Swap 1M','Thames Global Bank London','Buy','EUR',9.6,90,1.0920,1.0915,'fx','D106','B201','2026-08-14','16:25','Matched','Settled','N','Y','NA','NA','Y',''],\n ['TD014','2026-08-20','11:00','IBU','IBU','USD Fixed Deposit 1Y (accepted)','R. Mehta (Resident Individual)','Borrow','USD',0.48,4,4.80,4.75,'yield','D106','B202','2026-08-20','11:30','Matched','Settled','N','NA','NA','NA','Y',''],\n ['TD015','2026-08-22','10:10','Money Market','Domestic','Call Money Borrowing','Bengal Commercial Bank','Borrow','INR',0,1500,6.55,6.52,'yield','D101','B201','2026-08-22','10:30','Matched','Settled','N','NA','NA','NA','Y',''],\n ['TD016','2026-08-28','12:30','Derivatives','Domestic','USD/INR FX Option 6M','Konkan Steel Ltd','Buy','USD',9.5,80,1.842,1.840,'price','D104','B201','2026-08-28','12:50','Matched','Settled','N','Y','Y','NA','Y',''],\n ['TD017','2026-09-02','10:45','Money Market','Domestic','182-Day T-Bill','Aravali Bank Ltd','Buy','INR',0,400,6.10,6.09,'yield','D101','B202','','','Pending','Pending','N','NA','NA','NA','Y','IN002026Z182'],\n ['TD018','2026-09-09','14:00','Forex','Domestic','USD/INR Spot','Coromandel Bank Ltd','Sell','USD',15,126,84.30,83.95,'fx','D103','B201','2026-09-09','14:20','Matched','Settled','N','NA','NA','NA','N',''],\n ['TD019','2026-09-15','11:30','Money Market','Domestic','Zenith Infra CP 90D','Zenith Infra Ltd','Buy','INR',0,40,9.20,9.18,'yield','D101','B202','2026-09-15','11:55','Matched','Settled','N','NA','NA','NA','Y','INE0ZI214015'],\n ['TD020','2026-09-18','10:20','G-Sec','Domestic','7.10% GS 2034 (sold from HTM)','Aravali Bank Ltd','Sell','INR',0,300,6.85,6.84,'yield','D102','B201','2026-09-18','10:45','Matched','Settled','N','NA','NA','NA','Y','IN0020240019'],\n ['TD021','2026-09-24','15:40','Derivatives','Domestic','IRS 3Y MIBOR-OIS','Coromandel Bank Ltd','Pay Fixed','INR',0,500,6.05,6.04,'yield','D104','B202','2026-09-24','16:00','Matched','Settled','N','Y','NA','NA','Y',''],\n ['TD022','2026-09-29','11:10','Forex','Domestic','USD/INR Spot','Thames Global Bank London','Buy','USD',10,84,84.02,84.00,'fx','D103','B201','','','Unmatched','Pending','N','NA','NA','NA','Y',''],\n ['TD023','2026-09-10','10:05','Money Market','Domestic','TREPS Lending','CCIL','Lend','INR',0,600,6.20,6.21,'yield','D101','B201','2026-09-10','10:20','Matched','Settled','N','NA','NA','NA','Y',''],\n ['TD024','2026-08-18','11:15','G-Sec','Domestic','7.65% Maharashtra SDL 2035','Deccan Primary Dealers Ltd','Buy','INR',0,150,7.12,7.11,'yield','D102','B202','2026-08-18','11:40','Matched','Settled','N','NA','NA','NA','Y','IN1520240123'],\n ['TD025','2026-09-21','12:40','Forex','Domestic','USD/INR Buy-Sell Swap 1M','Gulf Star Bank Dubai','Buy','USD',22.6,190,84.20,84.18,'fx','D103','B202','2026-09-21','13:00','Matched','Settled','N','Y','NA','NA','Y',''],\n ['TD026','2026-07-29','10:50','IBU','IBU','USD Interbank Borrowing 1W','Thames Global Bank London','Borrow','USD',30,252,5.30,5.31,'yield','D106','B202','2026-07-29','11:10','Matched','Settled','N','NA','NA','NA','Y','']\n];\nreturn D.map(function (r) { const o = {}; H.forEach(function (h, i) { o[h] = r[i]; }); return { json: o }; });"
+      }
+    },
+    {
+      "id": "12164b42-bd31-4323-8197-96acbaad1413",
+      "name": "Write Deals",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        780,
+        160
+      ],
+      "parameters": {
+        "resource": "sheet",
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $('Create Audit Workbook').first().json.spreadsheetId }}"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Deals"
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "value": {},
+          "schema": []
+        },
+        "options": {
+          "cellFormat": "RAW"
+        }
+      },
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "id": "8b493551-bd54-4d01-a2c4-bb61ceddf526",
+      "name": "Seed Investments",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        520,
+        320
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const H = ['isin','security','issuer_type','book','slr','category','rating','listed','book_value_cr','market_value_cr','mtm_booked_cr','valuation_date','sold_in_period','sale_book_value_cr','board_approval_ref','custodian','holding_units','depository_units'];\nconst D = [\n ['IN0020240019','7.10% GS 2034','GoI','Domestic','Y','HTM','SOV','Y',6500,6620,0,'2026-09-30','Y',300,'','SGL',6500,6500],\n ['IN0020190040','6.45% GS 2029','GoI','Domestic','Y','HTM','SOV','Y',5200,5150,0,'2026-09-30','Y',700,'BRD/2026-27/14 dated 2026-09-05','SGL',5200,5200],\n ['IN0020210044','6.79% GS 2031','GoI','Domestic','Y','HTM','SOV','Y',5600,5580,0,'2026-09-30','N',0,'','SGL',5600,5600],\n ['IN0020230085','7.18% GS 2037','GoI','Domestic','Y','AFS','SOV','Y',4200,4110,-90,'2026-09-30','N',0,'','SGL',4200,4200],\n ['IN0020220011','7.26% GS 2032','GoI','Domestic','Y','AFS','SOV','Y',3000,2945,-20,'2026-09-30','N',0,'','SGL',3000,3000],\n ['IN1520240123','7.65% Maharashtra SDL 2035','SDL','Domestic','Y','AFS','SOV','Y',1200,1215,0,'2026-09-30','N',0,'','SGL',1200,1200],\n ['IN002026Z182','182-Day T-Bill','GoI','Domestic','Y','FVTPL-HFT','SOV','Y',400,400.5,0.5,'2026-09-30','N',0,'','SGL',400,400],\n ['INE0NP207015','8.10% Narmada Petrochem NCD 2029','Corporate','Domestic','N','AFS','AAA','Y',500,498,-2,'2026-09-30','N',0,'','NSDL',5000,5000],\n ['INE0CB208011','Coromandel Bank AT1 Perpetual Bond','Bank','Domestic','N','AFS','AA','Y',300,288,-12,'2026-09-30','N',0,'','NSDL',3000,3000],\n ['INE0ZI214015','Zenith Infra CP 90D','Corporate','Domestic','N','FVTPL-Other','BB','N',40,39.6,-0.4,'2026-09-30','N',0,'','NSDL',800,800],\n ['INE0ST209019','Sunrise Textiles 11% Debenture 2028','Corporate','Domestic','N','AFS','Unrated','N',15,15,0,'2026-09-30','N',0,'','NSDL',150,150],\n ['INE0KS101015','Konkan Steel Ltd - Equity','Equity','Domestic','N','FVTPL-HFT','NA','Y',85,79,-6,'2026-09-30','N',0,'','NSDL',557000,557000],\n ['INE0NP201018','Narmada Petrochem Ltd - Equity','Equity','Domestic','N','FVTPL-HFT','NA','Y',140,131,-4,'2026-09-26','N',0,'','NSDL',58000,56500],\n ['INF0LQ01A011','Demo Liquid Fund - Direct Growth','Mutual Fund','Domestic','N','FVTPL-Other','NA','Y',750,752,2,'2026-09-30','N',0,'','CDSL',2400000,2400000],\n ['US0DEMO30001','UST 4.125% 2030 (held in IBU)','Foreign Sovereign','IBU','N','AFS','AA+','Y',840,832,-8,'2026-09-30','N',0,'','Custodian-IFSC',100,100]\n];\nreturn D.map(function (r) { const o = {}; H.forEach(function (h, i) { o[h] = r[i]; }); return { json: o }; });"
+      }
+    },
+    {
+      "id": "43f80dbd-4e60-421f-8311-3f445c85cbdd",
+      "name": "Write Investments",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        780,
+        320
+      ],
+      "parameters": {
+        "resource": "sheet",
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $('Create Audit Workbook').first().json.spreadsheetId }}"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Investments"
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "value": {},
+          "schema": []
+        },
+        "options": {
+          "cellFormat": "RAW"
+        }
+      },
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "id": "9af09d0c-5446-49db-8362-6bc1dc615bbc",
+      "name": "Seed Counterparties",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        520,
+        480
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const H = ['counterparty','type','limit_cr','rating','kyc_status','country'];\nconst D = [\n ['Aravali Bank Ltd','Bank',2000,'AAA','Complete','India'],\n ['Bengal Commercial Bank','Bank',1500,'AAA','Complete','India'],\n ['Coromandel Bank Ltd','Bank',1500,'AA+','Complete','India'],\n ['Deccan Primary Dealers Ltd','Primary Dealer',800,'AAA','Complete','India'],\n ['Konkan Steel Ltd','Corporate',300,'AA+','Complete','India'],\n ['Narmada Petrochem Ltd','Corporate',400,'AAA','Complete','India'],\n ['Sunrise Textiles Pvt Ltd','Corporate (SME)',25,'BBB-','Pending','India'],\n ['Zenith Infra Ltd','Corporate',50,'BB','Complete','India'],\n ['Thames Global Bank London','Non-resident Bank',800,'AA','Complete','United Kingdom'],\n ['Gulf Star Bank Dubai','Non-resident Bank',1000,'A+','Complete','UAE'],\n ['R. Mehta (Resident Individual)','Resident Individual',5,'NA','Complete','India'],\n ['CCIL','CCP',999999,'AAA','Complete','India'],\n ['NSE Clearing Ltd','CCP',999999,'AAA','Complete','India']\n];\nreturn D.map(function (r) { const o = {}; H.forEach(function (h, i) { o[h] = r[i]; }); return { json: o }; });"
+      }
+    },
+    {
+      "id": "4bcf16ff-44a1-4bae-8527-6f708a58e0ab",
+      "name": "Write Counterparties",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        780,
+        480
+      ],
+      "parameters": {
+        "resource": "sheet",
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $('Create Audit Workbook').first().json.spreadsheetId }}"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Counterparties"
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "value": {},
+          "schema": []
+        },
+        "options": {
+          "cellFormat": "RAW"
+        }
+      },
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "id": "1c4e21b8-51f7-4900-a3c9-3c31a7068e10",
+      "name": "Seed Dealers",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        520,
+        640
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const H = ['dealer_id','name','desk','role','per_deal_limit_cr','stop_loss_lakh','period_pnl_lakh','pit_designated'];\nconst D = [\n ['D101','A. Sharma','Money Market','Front',2000,50,12,'Y'],\n ['D102','P. Iyer','G-Sec','Front',300,75,-20,'Y'],\n ['D103','K. Rao','Forex','Front',200,40,-55,'Y'],\n ['D104','S. Khan','Derivatives','Front',600,60,18,'Y'],\n ['D105','M. Das','Equity','Front',50,30,5,'Y'],\n ['D106','L. Pillai','IBU','Front',500,50,9,'Y'],\n ['B201','N. Gupta','Back Office','Back',0,0,0,'N'],\n ['B202','V. Menon','Back Office','Back',0,0,0,'N'],\n ['M301','R. Joshi','Mid Office','Mid',0,0,0,'N']\n];\nreturn D.map(function (r) { const o = {}; H.forEach(function (h, i) { o[h] = r[i]; }); return { json: o }; });"
+      }
+    },
+    {
+      "id": "8cc86cb9-329f-43d5-9a03-534f3dd49133",
+      "name": "Write Dealers",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        780,
+        640
+      ],
+      "parameters": {
+        "resource": "sheet",
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $('Create Audit Workbook').first().json.spreadsheetId }}"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Dealers"
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "value": {},
+          "schema": []
+        },
+        "options": {
+          "cellFormat": "RAW"
+        }
+      },
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "id": "3a5c0165-a9c2-4ac8-9b7e-1427c9b19204",
+      "name": "Seed Positions",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        520,
+        800
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const H = ['date','noop_usd_mn','call_borrow_cr','call_lend_cr','cme_cr','remarks'];\nconst D = [\n ['2026-07-15',120,9800,2100,3100,'Mid-office daily risk report'],\n ['2026-07-31',135,11200,3000,3300,'Month-end'],\n ['2026-08-14',162,12500,2800,3500,'Forex desk long USD ahead of holiday'],\n ['2026-08-22',140,15600,2600,3600,'Large call borrowing for CRR shortfall'],\n ['2026-08-31',128,11800,6300,3700,'Month-end surplus lent in call'],\n ['2026-09-15',145,12100,3200,3900,'Equity desk build-up'],\n ['2026-09-30',130,11000,3100,3750,'Quarter-end']\n];\nreturn D.map(function (r) { const o = {}; H.forEach(function (h, i) { o[h] = r[i]; }); return { json: o }; });"
+      }
+    },
+    {
+      "id": "e30b7124-fbd0-411c-8eeb-f96e19a25ad6",
+      "name": "Write Positions",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        780,
+        800
+      ],
+      "parameters": {
+        "resource": "sheet",
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $('Create Audit Workbook').first().json.spreadsheetId }}"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Positions"
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "value": {},
+          "schema": []
+        },
+        "options": {
+          "cellFormat": "RAW"
+        }
+      },
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "id": "fd513723-3ef6-4259-bdb9-a60d18f8b84d",
+      "name": "Seed Restricted List",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        520,
+        960
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const H = ['scrip','isin','restricted_from','restricted_to','reason'];\nconst D = [\n ['Konkan Steel Ltd','INE0KS101015','2026-07-28','2026-08-14','Bank is lead arranger for proposed QIP - UPSI held'],\n ['Narmada Petrochem Ltd','INE0NP201018','2026-09-20','2026-10-05','Debt restructuring discussions - UPSI held']\n];\nreturn D.map(function (r) { const o = {}; H.forEach(function (h, i) { o[h] = r[i]; }); return { json: o }; });"
+      }
+    },
+    {
+      "id": "7e24db4d-b931-43c6-96f2-b1bde06f2ea3",
+      "name": "Write Restricted List",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        780,
+        960
+      ],
+      "parameters": {
+        "resource": "sheet",
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $('Create Audit Workbook').first().json.spreadsheetId }}"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Restricted_List"
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "value": {},
+          "schema": []
+        },
+        "options": {
+          "cellFormat": "RAW"
+        }
+      },
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "id": "e22137d2-fcb4-477f-a9b3-c151687d4f04",
+      "name": "Sticky Note 7697a96c",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -60,
+        -260
+      ],
+      "parameters": {
+        "content": "## Step 1 - One-time setup\nRun this workflow ONCE. It creates the Google Sheet **Treasury Audit - Demo Bank (Capstone)** with fictitious sample treasury data (deal blotter, investment register, counterparty & dealer limits, daily risk positions, SEBI PIT restricted list) plus empty Findings and Audit_Runs tabs.\n\nAll names and numbers are fictitious and for demonstration only. Replace with CBS / treasury-system extracts for a live audit.",
+        "color": 4,
+        "width": 520,
+        "height": 240
+      }
+    }
+  ],
+  "connections": {
+    "Run Setup Once": {
+      "main": [
+        [
+          {
+            "node": "Create Audit Workbook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Audit Workbook": {
+      "main": [
+        [
+          {
+            "node": "Seed Parameters",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Seed Deals",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Seed Investments",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Seed Counterparties",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Seed Dealers",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Seed Positions",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Seed Restricted List",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Seed Parameters": {
+      "main": [
+        [
+          {
+            "node": "Write Parameters",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Seed Deals": {
+      "main": [
+        [
+          {
+            "node": "Write Deals",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Seed Investments": {
+      "main": [
+        [
+          {
+            "node": "Write Investments",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Seed Counterparties": {
+      "main": [
+        [
+          {
+            "node": "Write Counterparties",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Seed Dealers": {
+      "main": [
+        [
+          {
+            "node": "Write Dealers",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Seed Positions": {
+      "main": [
+        [
+          {
+            "node": "Write Positions",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Seed Restricted List": {
+      "main": [
+        [
+          {
+            "node": "Write Restricted List",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "tags": []
+}
