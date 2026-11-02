@@ -1,0 +1,1 @@
+"""FinSight AI analytics package."""
