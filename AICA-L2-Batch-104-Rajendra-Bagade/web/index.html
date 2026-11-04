@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#1E5A4A">
+<title>AuditLens</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand">
+    <svg class="mark" viewBox="0 0 24 24" aria-hidden="true">
+      <circle cx="10.5" cy="10.5" r="6.5" fill="none" stroke="currentColor" stroke-width="1.8"/>
+      <path d="M15.4 15.4 L21 21" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+      <path d="M7.5 11.5 L9.8 13.6 L13.6 8.2" fill="none" stroke="currentColor" stroke-width="1.6"
+            stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+    <div>
+      <strong>AuditLens</strong>
+      <span>Statutory audit analytical review</span>
+    </div>
+  </div>
+  <div class="topbar-actions">
+    <span id="engagement-label" class="engagement-label" hidden></span>
+    <button id="download-workbook" class="btn btn-quiet" hidden>Download workpaper</button>
+  </div>
+</header>
+
+<main>
+
+  <!-- ==================== SETUP ==================== -->
+  <section id="setup" class="panel">
+    <div class="panel-head">
+      <h1>Run an analytical review</h1>
+      <p>Upload the trial balance, the comparative, and the general ledger. Everything
+         is computed on the server and nothing is stored after the process ends.</p>
+    </div>
+
+    <form id="engagement-form">
+      <div class="field-grid">
+        <label class="field">
+          <span>Client name</span>
+          <input type="text" name="client_name" value="Bharat Precision Components Private Limited" required>
+        </label>
+        <label class="field">
+          <span>Financial year</span>
+          <input type="text" name="financial_year" value="2024-25" required>
+        </label>
+        <label class="field">
+          <span>Year end</span>
+          <input type="date" name="year_end" value="2025-03-31" required>
+        </label>
+        <label class="field">
+          <span>Class of company</span>
+          <select name="company_class">
+            <option value="private" selected>Private</option>
+            <option value="public">Public</option>
+          </select>
+        </label>
+      </div>
+
+      <details class="advanced">
+        <summary>Engagement parameters</summary>
+        <div class="field-grid">
+          <label class="field">
+            <span>Principal repayments during the year (Rs)</span>
+            <input type="number" name="principal_repayments" value="7500000" step="1">
+            <small>Used in the debt service coverage ratio; not derivable from the trial balance.</small>
+          </label>
+          <label class="field">
+            <span>Proportion of revenue on credit</span>
+            <input type="number" name="credit_sales_ratio" value="0.92" step="0.01" min="0" max="1">
+            <small>Drives the trade receivables turnover ratio.</small>
+          </label>
+          <label class="field">
+            <span>Proportion of purchases on credit</span>
+            <input type="number" name="credit_purchase_ratio" value="0.95" step="0.01" min="0" max="1">
+            <small>Drives the trade payables turnover ratio.</small>
+          </label>
+          <label class="field">
+            <span>Working capital limits sanctioned (Rs)</span>
+            <input type="number" name="working_capital_limit" value="60000000" step="1">
+            <small>Above Rs 5 crore, CARO clause (ii)(b) requires the quarterly returns to be agreed.</small>
+          </label>
+          <label class="field">
+            <span>Materiality benchmark</span>
+            <select name="materiality_benchmark">
+              <option value="" selected>Let the engine suggest one</option>
+              <option value="profit_before_tax">Profit before tax</option>
+              <option value="revenue">Revenue from operations</option>
+              <option value="total_assets">Total assets</option>
+              <option value="equity">Shareholders' equity</option>
+            </select>
+          </label>
+          <label class="field">
+            <span>Performance materiality</span>
+            <select name="performance_pct">
+              <option value="0.75" selected>75% of overall materiality</option>
+              <option value="0.65">65% of overall materiality</option>
+              <option value="0.50">50% of overall materiality</option>
+            </select>
+            <small>Lower where the expectation of misstatement is higher.</small>
+          </label>
+        </div>
+      </details>
+
+      <div class="uploads">
+        <label class="drop">
+          <span class="drop-label">Trial balance — current year</span>
+          <input type="file" name="trial_balance" accept=".csv,.xlsx,.xls">
+          <span class="drop-hint">CSV or Excel. Required.</span>
+        </label>
+        <label class="drop">
+          <span class="drop-label">Trial balance — comparative</span>
+          <input type="file" name="prior_trial_balance" accept=".csv,.xlsx,.xls">
+          <span class="drop-hint">Needed for ratio variances.</span>
+        </label>
+        <label class="drop">
+          <span class="drop-label">General ledger</span>
+          <input type="file" name="general_ledger" accept=".csv,.xlsx,.xls">
+          <span class="drop-hint">Needed for SA 240 testing.</span>
+        </label>
+      </div>
+
+      <div class="actions">
+        <button type="submit" class="btn btn-primary">Run the review</button>
+        <button type="button" id="use-samples" class="btn">Use the sample client</button>
+        <span id="setup-status" class="status" role="status"></span>
+      </div>
+      <p class="finepoint">The sample client, Bharat Precision Components Private Limited, is
+         fictitious. No client data is used anywhere in this project.</p>
+    </form>
+  </section>
+
+  <!-- ==================== RESULTS ==================== -->
+  <section id="results" hidden>
+
+    <div class="tiles" id="tiles"></div>
+    <div id="reconciliation" class="banner" hidden></div>
+
+    <nav class="tabs" role="tablist">
+      <button class="tab is-active" data-tab="ratios" role="tab">Ratios</button>
+      <button class="tab" data-tab="statements" role="tab">Statements</button>
+      <button class="tab" data-tab="mapping" role="tab">Mapping queue</button>
+      <button class="tab" data-tab="je" role="tab">Journal entries</button>
+      <button class="tab" data-tab="sample" role="tab">Sample</button>
+      <button class="tab" data-tab="caro" role="tab">CARO 2020</button>
+      <button class="tab" data-tab="drafts" role="tab">Drafts</button>
+    </nav>
+
+    <div class="tabpanel is-active" data-panel="ratios">
+      <div class="panel-head">
+        <h2>The eleven ratios required by Schedule III</h2>
+        <p>Inserted by MCA notification G.S.R. 207(E) dated 24 March 2021. Schedule III
+           requires an explanation in the notes wherever a ratio moves by more than
+           25 per cent against the preceding year.</p>
+      </div>
+      <div id="ratios-grid" class="ratio-grid"></div>
+    </div>
+
+    <div class="tabpanel" data-panel="statements">
+      <div class="panel-head">
+        <h2>Face of the financial statements</h2>
+        <p>Schedule III, Division I presentation, built from the mapped trial balance.</p>
+      </div>
+      <div class="two-up">
+        <div><h3>Balance Sheet</h3><div class="tscroll"><table id="bs-table"></table></div></div>
+        <div><h3>Statement of Profit and Loss</h3><div class="tscroll"><table id="pl-table"></table></div></div>
+      </div>
+    </div>
+
+    <div class="tabpanel" data-panel="mapping">
+      <div class="panel-head">
+        <h2>Ledgers awaiting your classification</h2>
+        <p>Mapped on the account code, the engine is certain and says nothing. Everything
+           below was mapped on the ledger name, or could not be mapped at all, and needs
+           your confirmation before it reaches the face of the statements.</p>
+      </div>
+      <div class="tscroll"><table id="mapping-table"></table></div>
+    </div>
+
+    <div class="tabpanel" data-panel="je">
+      <div class="panel-head">
+        <h2>Journal entry testing under SA 240</h2>
+        <p>A flag is a selection for examination, not a finding.</p>
+      </div>
+      <div class="two-up">
+        <div><h3>Routines</h3><div class="tscroll"><table id="je-tests"></table></div></div>
+        <div><h3>Benford first-digit distribution</h3>
+             <div id="benford"></div></div>
+      </div>
+      <h3>Selections</h3>
+      <div class="tscroll"><table id="je-flags"></table></div>
+    </div>
+
+    <div class="tabpanel" data-panel="sample">
+      <div class="panel-head">
+        <h2>Monetary unit sample under SA 530</h2>
+        <p>The seed and the random start are recorded so a reviewer can re-perform
+           the selection exactly.</p>
+      </div>
+      <div id="sample-warnings"></div>
+      <div class="tscroll"><table id="sample-params"></table></div>
+      <h3>Items selected</h3>
+      <div class="tscroll"><table id="sample-items"></table></div>
+    </div>
+
+    <div class="tabpanel" data-panel="caro">
+      <div class="panel-head">
+        <h2>CARO 2020 — paragraph 3 clause checklist</h2>
+        <p id="caro-applicability"></p>
+      </div>
+      <div id="caro-list" class="clause-list"></div>
+    </div>
+
+    <div class="tabpanel" data-panel="drafts">
+      <div class="panel-head">
+        <h2>Drafts for your review</h2>
+        <p>The model writes prose; it never computes a figure and never concludes on a
+           clause. Every draft below is a starting point requiring your judgement.</p>
+      </div>
+      <div class="actions">
+        <button id="generate-drafts" class="btn btn-primary">Generate drafts</button>
+        <span id="drafts-status" class="status" role="status"></span>
+      </div>
+      <div id="drafts"></div>
+    </div>
+
+    <p class="disclaimer" id="disclaimer"></p>
+  </section>
+
+</main>
+
+<script src="app.js"></script>
+</body>
+</html>
