@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>WhatsApp Date Range Exporter</title>
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <header>
+      <img src="../icons/icon32.png" alt="" width="22" height="22" />
+      <h1>WhatsApp Date Range Exporter</h1>
+      <span id="ver" class="ver"></span>
+    </header>
+
+    <div id="conn" class="conn"></div>
+
+    <!-- ===================== Export form ===================== -->
+    <main id="formView" class="hidden">
+      <section>
+        <h2>Chats</h2>
+        <label class="radio"><input type="radio" name="scope" value="current" checked /> Current chat <span id="currentName" class="pill"></span></label>
+        <label class="radio"><input type="radio" name="scope" value="selected" /> Selected chats or groups</label>
+        <label class="radio"><input type="radio" name="scope" value="all" /> All chats in WhatsApp Web</label>
+
+        <div id="pickerBox" class="sub hidden">
+          <div class="row">
+            <button id="loadChats" class="small">Load chat list</button>
+            <input id="chatFilter" type="search" placeholder="Filter…" class="grow" />
+          </div>
+          <div id="chatList" class="chatlist"></div>
+          <div class="row muted small-text"><span id="selCount">0 selected</span><span class="grow"></span><a href="#" id="selNone">Clear</a></div>
+        </div>
+        <div id="allBox" class="sub hidden">
+          <button id="loadAll" class="small">Load chat list</button>
+          <span id="allCount" class="muted small-text"></span>
+        </div>
+      </section>
+
+      <section>
+        <h2>Dates</h2>
+        <div class="grid2">
+          <label>From<input type="date" id="from" /></label>
+          <label>To<input type="date" id="to" /></label>
+        </div>
+        <label>Time zone<select id="tz"></select></label>
+        <p class="muted small-text">Both dates are included in full (00:00–23:59). Messages are matched by their own timestamp.</p>
+      </section>
+
+      <section>
+        <h2>Content</h2>
+        <label class="radio"><input type="radio" name="mode" value="both" checked /> Messages and media</label>
+        <label class="radio"><input type="radio" name="mode" value="messages" /> Messages only</label>
+        <label class="radio"><input type="radio" name="mode" value="media" /> Media only</label>
+      </section>
+
+      <section id="attFilterBox">
+        <h2>Attachments to save</h2>
+        <div class="seg">
+          <label><input type="radio" name="dir" value="all" checked /> Sent and received</label>
+          <label><input type="radio" name="dir" value="received" /> Received only</label>
+          <label><input type="radio" name="dir" value="sent" /> Sent only</label>
+        </div>
+        <div id="typeList" class="types"></div>
+        <div class="row small-text"><a href="#" id="typesAll">All types</a> · <a href="#" id="typesNone">None</a><span class="grow"></span><span class="muted" id="filterNote"></span></div>
+      </section>
+
+      <section>
+        <h2>Save to</h2>
+        <label>Client folder name <span class="muted">(optional)</span><input type="text" id="client" maxlength="60" placeholder="e.g. Al Noor Trading LLC" /></label>
+        <label class="check"><input type="checkbox" id="review" /> Let me choose which attachments to save (and rename them)</label>
+        <div class="path" id="pathPreview"></div>
+        <details>
+          <summary>Advanced</summary>
+          <label>Date format used by WhatsApp
+            <select id="dateOrder">
+              <option value="auto">Detect automatically</option>
+              <option value="DMY">Day/Month/Year</option>
+              <option value="MDY">Month/Day/Year</option>
+            </select>
+          </label>
+          <div class="row">
+            <button id="diagBtn" class="small">Check this WhatsApp page</button>
+          </div>
+          <pre id="diagOut" class="diag hidden"></pre>
+        </details>
+      </section>
+
+      <section class="summary">
+        <h2>Will export</h2>
+        <div id="summary" class="muted"></div>
+        <div id="formError" class="error hidden"></div>
+        <button id="startBtn" class="primary">Start export</button>
+        <p class="tip">First time? Chrome may ask to allow <b>multiple downloads</b> from web.whatsapp.com — choose Allow.
+          <a href="#" data-open="chrome://settings/content/automaticDownloads">Download permissions</a> ·
+          <a href="#" data-open="chrome://settings/downloads">Turn off “Ask where to save”</a></p>
+      </section>
+    </main>
+
+    <!-- ===================== Progress ===================== -->
+    <main id="progressView" class="hidden">
+      <section>
+        <div class="row"><h2 id="pTitle" class="grow">Exporting…</h2><span id="pRange" class="muted small-text"></span></div>
+        <div id="pWarning" class="warn hidden"></div>
+        <div id="pChats"></div>
+        <div class="totals" id="pTotals"></div>
+        <div id="pError" class="error hidden"></div>
+      </section>
+
+      <section id="reviewBox" class="hidden">
+        <h2>Choose attachments — <span id="rChat"></span></h2>
+        <p class="muted small-text">Tick the files to save. Optionally type a new name; leave it empty to keep WhatsApp's name. The extension and the original name are always kept, and unticked files are listed as "Not selected" in the index.</p>
+        <div class="seg small-text" id="rDir"></div>
+        <div class="types small-text" id="rTypes"></div>
+        <div class="row small-text">Tick: <a href="#" data-sel="all">All</a> · <a href="#" data-sel="none">None</a> · <a href="#" data-sel="filter">Match the filters above</a></div>
+        <div id="rList" class="rlist"></div>
+        <div class="row">
+          <button id="rSave" class="primary grow">Save selected</button>
+          <button id="rSkip">Save none</button>
+        </div>
+      </section>
+
+      <section class="row">
+        <button id="cancelBtn" class="danger">Cancel export</button>
+        <button id="openFolder" class="hidden">Open Downloads folder</button>
+        <button id="showTranscript" class="hidden">Show files</button>
+        <button id="newExport" class="hidden primary">New export</button>
+      </section>
+
+      <details>
+        <summary>Activity log</summary>
+        <pre id="pLog" class="log"></pre>
+      </details>
+    </main>
+
+    <script src="../shared/util.js"></script>
+    <script src="../shared/tz.js"></script>
+    <script src="popup.js"></script>
+  </body>
+</html>
