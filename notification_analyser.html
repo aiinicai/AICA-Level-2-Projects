@@ -1,0 +1,1222 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>CA Notification Analyser — India</title>
+<style>
+  /* ── Reset & Base ────────────────────────────────────────────── */
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --navy:    #0f2044;
+    --blue:    #1a4a9e;
+    --accent:  #f59e0b;
+    --green:   #10b981;
+    --red:     #ef4444;
+    --orange:  #f97316;
+    --purple:  #8b5cf6;
+    --gray-50: #f9fafb;
+    --gray-100:#f3f4f6;
+    --gray-200:#e5e7eb;
+    --gray-400:#9ca3af;
+    --gray-600:#4b5563;
+    --gray-800:#1f2937;
+    --white:   #ffffff;
+    --shadow:  0 4px 24px rgba(0,0,0,.10);
+    --radius:  12px;
+    --font:    'Segoe UI', system-ui, -apple-system, sans-serif;
+  }
+
+  body {
+    font-family: var(--font);
+    background: var(--gray-50);
+    color: var(--gray-800);
+    min-height: 100vh;
+  }
+
+  /* ── Top Bar ─────────────────────────────────────────────────── */
+  header {
+    background: linear-gradient(135deg, var(--navy) 0%, var(--blue) 100%);
+    color: var(--white);
+    padding: 0 32px;
+    height: 64px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    box-shadow: 0 2px 12px rgba(0,0,0,.25);
+  }
+  header .brand {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 1.15rem;
+    font-weight: 700;
+    letter-spacing: .3px;
+  }
+  header .brand svg { width:30px;height:30px;fill:var(--accent); }
+  header .meta { font-size:.78rem; opacity:.75; text-align:right; }
+
+  /* ── Layout ──────────────────────────────────────────────────── */
+  .app-grid {
+    display: grid;
+    grid-template-columns: 280px 1fr;
+    grid-template-rows: auto 1fr;
+    min-height: calc(100vh - 64px);
+  }
+
+  /* ── Sidebar ─────────────────────────────────────────────────── */
+  aside {
+    background: var(--white);
+    border-right: 1px solid var(--gray-200);
+    padding: 24px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    grid-row: 1 / 3;
+  }
+  .sidebar-section-title {
+    font-size: .68rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--gray-400);
+    padding: 12px 8px 4px;
+  }
+  .nav-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 14px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: .88rem;
+    color: var(--gray-600);
+    transition: background .15s, color .15s;
+    user-select: none;
+  }
+  .nav-item:hover { background: var(--gray-100); color: var(--blue); }
+  .nav-item.active { background: #e8eefa; color: var(--blue); font-weight: 600; }
+  .nav-item .icon { font-size: 1.1rem; width: 22px; text-align: center; }
+  .badge {
+    margin-left: auto;
+    background: var(--red);
+    color: #fff;
+    border-radius: 99px;
+    font-size: .68rem;
+    padding: 1px 7px;
+    font-weight: 700;
+  }
+  .badge.green { background: var(--green); }
+  .badge.orange { background: var(--orange); }
+
+  /* ── Main Content ────────────────────────────────────────────── */
+  main {
+    padding: 28px 32px;
+    overflow-y: auto;
+  }
+
+  .page { display: none; }
+  .page.active { display: block; }
+
+  h2 {
+    font-size: 1.35rem;
+    font-weight: 700;
+    color: var(--navy);
+    margin-bottom: 4px;
+  }
+  .subtitle {
+    color: var(--gray-400);
+    font-size: .85rem;
+    margin-bottom: 24px;
+  }
+
+  /* ── Stat Cards ──────────────────────────────────────────────── */
+  .stat-row {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 16px;
+    margin-bottom: 28px;
+  }
+  .stat-card {
+    background: var(--white);
+    border-radius: var(--radius);
+    padding: 20px 22px;
+    box-shadow: var(--shadow);
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    border-left: 4px solid transparent;
+  }
+  .stat-card.red    { border-color: var(--red); }
+  .stat-card.orange { border-color: var(--orange); }
+  .stat-card.green  { border-color: var(--green); }
+  .stat-card.blue   { border-color: var(--blue); }
+  .stat-label { font-size: .76rem; color: var(--gray-400); font-weight: 600; text-transform: uppercase; letter-spacing: .5px; }
+  .stat-value { font-size: 2rem; font-weight: 800; color: var(--navy); line-height: 1; }
+  .stat-sub   { font-size: .75rem; color: var(--gray-600); }
+
+  /* ── Notification Feed ───────────────────────────────────────── */
+  .feed { display: flex; flex-direction: column; gap: 16px; }
+  .notif-card {
+    background: var(--white);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    border: 1px solid var(--gray-200);
+    overflow: hidden;
+    transition: box-shadow .2s;
+  }
+  .notif-card:hover { box-shadow: 0 8px 32px rgba(0,0,0,.13); }
+
+  .notif-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    padding: 18px 22px 12px;
+    border-bottom: 1px solid var(--gray-100);
+    cursor: pointer;
+  }
+  .notif-left { display: flex; flex-direction: column; gap: 6px; }
+  .notif-source {
+    font-size: .72rem;
+    color: var(--gray-400);
+    text-transform: uppercase;
+    letter-spacing: .5px;
+    font-weight: 600;
+  }
+  .notif-title { font-size: 1rem; font-weight: 700; color: var(--navy); }
+  .notif-date  { font-size: .73rem; color: var(--gray-400); }
+
+  .notif-badges { display: flex; gap: 6px; align-items: flex-start; flex-wrap: wrap; justify-content: flex-end; }
+
+  .tag {
+    border-radius: 99px;
+    padding: 3px 10px;
+    font-size: .70rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .5px;
+  }
+  .tag.breaking  { background: #fee2e2; color: #b91c1c; }
+  .tag.high      { background: #ffedd5; color: #c2410c; }
+  .tag.medium    { background: #fef9c3; color: #854d0e; }
+  .tag.low       { background: #d1fae5; color: #065f46; }
+  .tag.feature   { background: #ede9fe; color: #6d28d9; }
+  .tag.patch     { background: #e0f2fe; color: #0369a1; }
+  .tag.api       { background: #f3f4f6; color: #374151; }
+
+  .notif-body { padding: 18px 22px; }
+
+  /* ── Expandable Detail ───────────────────────────────────────── */
+  .notif-detail { display: none; }
+  .notif-detail.open { display: block; }
+
+  .detail-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin-top: 16px;
+  }
+  .detail-box {
+    background: var(--gray-50);
+    border: 1px solid var(--gray-200);
+    border-radius: 8px;
+    padding: 14px 16px;
+  }
+  .detail-box h4 { font-size: .78rem; font-weight: 700; color: var(--gray-600); text-transform: uppercase; letter-spacing: .5px; margin-bottom: 10px; }
+  .detail-box ul { list-style: none; display: flex; flex-direction: column; gap: 6px; }
+  .detail-box ul li {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    font-size: .84rem;
+    color: var(--gray-800);
+    line-height: 1.4;
+  }
+  .detail-box ul li::before { content: "▸"; color: var(--blue); flex-shrink: 0; margin-top: 1px; }
+
+  .action-li::before { content: "✅" !important; color: transparent !important; }
+  .service-chip {
+    display: inline-flex;
+    background: #e8eefa;
+    color: var(--blue);
+    border-radius: 6px;
+    padding: 3px 10px;
+    font-size: .76rem;
+    font-weight: 600;
+    margin: 2px;
+  }
+
+  .impact-box {
+    grid-column: 1 / -1;
+    background: #fffbeb;
+    border: 1px solid #fcd34d;
+    border-radius: 8px;
+    padding: 14px 16px;
+  }
+  .impact-box h4 { font-size: .78rem; font-weight: 700; color: #92400e; text-transform: uppercase; letter-spacing: .5px; margin-bottom: 8px; }
+  .impact-box p { font-size: .86rem; color: #78350f; line-height: 1.6; }
+
+  .json-view-btn {
+    margin-top: 14px;
+    background: var(--navy);
+    color: var(--white);
+    border: none;
+    border-radius: 7px;
+    padding: 7px 16px;
+    font-size: .78rem;
+    font-weight: 600;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    transition: background .15s;
+  }
+  .json-view-btn:hover { background: var(--blue); }
+
+  .json-modal-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,.55);
+    z-index: 1000;
+    align-items: center;
+    justify-content: center;
+  }
+  .json-modal-overlay.open { display: flex; }
+  .json-modal {
+    background: #0d1b2a;
+    border-radius: 14px;
+    padding: 28px;
+    max-width: 680px;
+    width: 95%;
+    max-height: 85vh;
+    overflow-y: auto;
+    box-shadow: 0 20px 80px rgba(0,0,0,.5);
+    position: relative;
+  }
+  .json-modal h3 { color: var(--accent); font-size: .9rem; margin-bottom: 14px; font-family: monospace; }
+  .json-modal pre {
+    color: #e2e8f0;
+    font-size: .82rem;
+    line-height: 1.7;
+    white-space: pre-wrap;
+    word-break: break-word;
+    font-family: 'Consolas', 'Fira Code', monospace;
+  }
+  .json-key    { color: #93c5fd; }
+  .json-string { color: #86efac; }
+  .json-bool   { color: #f9a8d4; }
+  .json-num    { color: #fcd34d; }
+  .json-null   { color: #9ca3af; }
+  .modal-close {
+    position: absolute;
+    top: 14px; right: 18px;
+    background: none;
+    border: none;
+    color: var(--gray-400);
+    font-size: 1.4rem;
+    cursor: pointer;
+    line-height: 1;
+  }
+  .modal-close:hover { color: var(--white); }
+
+  /* ── Ingestion / Add Notification Page ──────────────────────── */
+  .ingest-card {
+    background: var(--white);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    padding: 28px 32px;
+    max-width: 760px;
+  }
+  .form-group { margin-bottom: 18px; }
+  label { display: block; font-size: .82rem; font-weight: 600; color: var(--gray-600); margin-bottom: 6px; }
+  input[type=text], textarea, select {
+    width: 100%;
+    border: 1.5px solid var(--gray-200);
+    border-radius: 8px;
+    padding: 10px 14px;
+    font-size: .88rem;
+    font-family: var(--font);
+    color: var(--gray-800);
+    background: var(--white);
+    transition: border-color .15s;
+    outline: none;
+  }
+  input[type=text]:focus, textarea:focus, select:focus { border-color: var(--blue); }
+  textarea { resize: vertical; min-height: 90px; }
+  .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .btn-primary {
+    background: var(--blue);
+    color: var(--white);
+    border: none;
+    border-radius: 8px;
+    padding: 11px 28px;
+    font-size: .92rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: background .15s, transform .1s;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .btn-primary:hover { background: var(--navy); transform: translateY(-1px); }
+  .btn-secondary {
+    background: var(--gray-100);
+    color: var(--gray-600);
+    border: none;
+    border-radius: 8px;
+    padding: 11px 22px;
+    font-size: .88rem;
+    font-weight: 600;
+    cursor: pointer;
+    margin-left: 10px;
+    transition: background .15s;
+  }
+  .btn-secondary:hover { background: var(--gray-200); }
+
+  /* ── Diff View ───────────────────────────────────────────────── */
+  .diff-card {
+    background: var(--white);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    padding: 24px 28px;
+    margin-bottom: 20px;
+  }
+  .diff-card h3 { font-size: .95rem; font-weight: 700; color: var(--navy); margin-bottom: 14px; }
+  .diff-table { width: 100%; border-collapse: collapse; font-size: .83rem; }
+  .diff-table th { background: var(--gray-100); padding: 9px 14px; text-align: left; font-size: .75rem; text-transform: uppercase; letter-spacing: .5px; color: var(--gray-600); }
+  .diff-table td { padding: 10px 14px; border-bottom: 1px solid var(--gray-100); vertical-align: top; line-height: 1.5; }
+  .diff-add { background: #f0fdf4; color: #15803d; }
+  .diff-rem { background: #fef2f2; color: #b91c1c; text-decoration: line-through; }
+  .diff-mod { background: #fffbeb; color: #92400e; }
+
+  /* ── Alert bar ───────────────────────────────────────────────── */
+  .alert {
+    border-radius: 8px;
+    padding: 12px 18px;
+    font-size: .85rem;
+    margin-bottom: 18px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .alert.danger  { background: #fee2e2; color: #991b1b; border: 1px solid #fca5a5; }
+  .alert.warning { background: #fffbeb; color: #92400e; border: 1px solid #fcd34d; }
+  .alert.info    { background: #eff6ff; color: #1d4ed8; border: 1px solid #93c5fd; }
+
+  /* ── Toggle arrow ────────────────────────────────────────────── */
+  .toggle-arrow { font-size: .75rem; color: var(--gray-400); transition: transform .2s; }
+  .toggle-arrow.open { transform: rotate(180deg); }
+
+  /* ── Filters bar ─────────────────────────────────────────────── */
+  .filters-bar {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+  }
+  .filter-btn {
+    border: 1.5px solid var(--gray-200);
+    background: var(--white);
+    color: var(--gray-600);
+    border-radius: 99px;
+    padding: 5px 16px;
+    font-size: .8rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all .15s;
+  }
+  .filter-btn:hover, .filter-btn.active { border-color: var(--blue); background: #e8eefa; color: var(--blue); }
+
+  /* ── Empty state ─────────────────────────────────────────────── */
+  .empty { text-align: center; padding: 60px 20px; color: var(--gray-400); font-size: .95rem; }
+  .empty .em-icon { font-size: 3rem; margin-bottom: 12px; }
+
+  /* ── Toast ───────────────────────────────────────────────────── */
+  #toast {
+    position: fixed;
+    bottom: 30px; right: 30px;
+    background: var(--navy);
+    color: var(--white);
+    padding: 12px 22px;
+    border-radius: 10px;
+    font-size: .88rem;
+    font-weight: 600;
+    box-shadow: 0 8px 32px rgba(0,0,0,.3);
+    transform: translateY(80px);
+    opacity: 0;
+    transition: transform .3s, opacity .3s;
+    z-index: 2000;
+  }
+  #toast.show { transform: translateY(0); opacity: 1; }
+
+  /* ── Responsive tweak ────────────────────────────────────────── */
+  @media (max-width: 900px) {
+    .app-grid { grid-template-columns: 1fr; }
+    aside { display: none; }
+    .stat-row { grid-template-columns: 1fr 1fr; }
+    .detail-grid { grid-template-columns: 1fr; }
+  }
+
+  /* ── Summary highlight ───────────────────────────────────────── */
+  .summary-text {
+    font-size: .88rem;
+    color: var(--gray-600);
+    line-height: 1.6;
+    background: var(--gray-50);
+    border-left: 3px solid var(--blue);
+    padding: 10px 14px;
+    border-radius: 0 6px 6px 0;
+  }
+
+  /* ── Timeline dot ────────────────────────────────────────────── */
+  .timeline-dot {
+    width: 10px; height: 10px;
+    border-radius: 50%;
+    display: inline-block;
+    margin-right: 8px;
+  }
+  .dot-red    { background: var(--red); }
+  .dot-orange { background: var(--orange); }
+  .dot-green  { background: var(--green); }
+  .dot-blue   { background: var(--blue); }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-thumb { background: var(--gray-200); border-radius: 3px; }
+</style>
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════════════════════════════
+     HEADER
+════════════════════════════════════════════════════════════════ -->
+<header>
+  <div class="brand">
+    <svg viewBox="0 0 36 36" xmlns="http://www.w3.org/2000/svg">
+      <rect x="3" y="3" width="30" height="30" rx="5" fill="none" stroke="currentColor" stroke-width="2.5" stroke-opacity=".4"/>
+      <path d="M8 18h6l4-8 4 16 4-8h6" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+    </svg>
+    CA Notification Analyser &nbsp;<span style="opacity:.5;font-weight:400">India</span>
+  </div>
+  <div class="meta">
+    Chartered Accountant Intelligence Platform<br>
+    <span id="clock"></span>
+  </div>
+</header>
+
+<!-- ═══════════════════════════════════════════════════════════════
+     APP GRID
+════════════════════════════════════════════════════════════════ -->
+<div class="app-grid">
+
+  <!-- SIDEBAR -->
+  <aside>
+    <div class="sidebar-section-title">Navigation</div>
+    <div class="nav-item active" onclick="showPage('dashboard')">
+      <span class="icon">🏠</span> Dashboard <span class="badge green" id="badge-dash">5</span>
+    </div>
+    <div class="nav-item" onclick="showPage('feed')">
+      <span class="icon">📋</span> Notification Feed <span class="badge" id="badge-feed">2</span>
+    </div>
+    <div class="nav-item" onclick="showPage('ingest')">
+      <span class="icon">➕</span> Add Notification
+    </div>
+    <div class="nav-item" onclick="showPage('diff')">
+      <span class="icon">🔍</span> Diff &amp; Changes
+    </div>
+    <div class="nav-item" onclick="showPage('impact')">
+      <span class="icon">⚡</span> Impact Analysis
+    </div>
+
+    <div class="sidebar-section-title" style="margin-top:12px">Filters</div>
+    <div class="nav-item" onclick="filterSidebar('ALL')"><span class="icon">📌</span> All Updates</div>
+    <div class="nav-item" onclick="filterSidebar('CRITICAL')"><span class="icon">🔴</span> Critical / Breaking</div>
+    <div class="nav-item" onclick="filterSidebar('HIGH')"><span class="icon">🟠</span> High Severity</div>
+    <div class="nav-item" onclick="filterSidebar('MEDIUM')"><span class="icon">🟡</span> Medium Severity</div>
+    <div class="nav-item" onclick="filterSidebar('LOW')"><span class="icon">🟢</span> Low / Feature</div>
+
+    <div class="sidebar-section-title" style="margin-top:12px">Sources</div>
+    <div class="nav-item" onclick="filterSource('GST')"><span class="icon">📑</span> GSTN / GST Portal</div>
+    <div class="nav-item" onclick="filterSource('IT')"><span class="icon">🏦</span> Income Tax Dept.</div>
+    <div class="nav-item" onclick="filterSource('MCA')"><span class="icon">🏛️</span> MCA / ROC</div>
+    <div class="nav-item" onclick="filterSource('API')"><span class="icon">🔌</span> API / Tech Updates</div>
+  </aside>
+
+  <!-- MAIN -->
+  <main>
+
+    <!-- ═══════════ DASHBOARD PAGE ═══════════ -->
+    <div class="page active" id="page-dashboard">
+      <h2>📊 Dashboard Overview</h2>
+      <p class="subtitle">Real-time summary of regulatory &amp; technical notifications — as of <span id="dash-date"></span></p>
+
+      <div class="stat-row">
+        <div class="stat-card red">
+          <div class="stat-label">Breaking / Critical</div>
+          <div class="stat-value" id="stat-breaking">0</div>
+          <div class="stat-sub">Require immediate action</div>
+        </div>
+        <div class="stat-card orange">
+          <div class="stat-label">High Severity</div>
+          <div class="stat-value" id="stat-high">0</div>
+          <div class="stat-sub">Action in 30 days</div>
+        </div>
+        <div class="stat-card green">
+          <div class="stat-label">Total Notifications</div>
+          <div class="stat-value" id="stat-total">0</div>
+          <div class="stat-sub">This session</div>
+        </div>
+        <div class="stat-card blue">
+          <div class="stat-label">Action Items</div>
+          <div class="stat-value" id="stat-actions">0</div>
+          <div class="stat-sub">Pending checklist items</div>
+        </div>
+      </div>
+
+      <div class="alert danger" id="alert-breaking" style="display:none">
+        ⚠️ <strong>Breaking Changes Detected!</strong>&nbsp; You have notifications that require immediate developer/compliance action.
+      </div>
+
+      <h3 style="font-size:.95rem;font-weight:700;color:var(--navy);margin-bottom:14px">📌 Recent Notifications</h3>
+      <div class="feed" id="dash-feed"></div>
+    </div>
+
+    <!-- ═══════════ FEED PAGE ═══════════ -->
+    <div class="page" id="page-feed">
+      <h2>📋 Notification Feed</h2>
+      <p class="subtitle">Browse, filter and analyse all ingested notifications</p>
+
+      <div class="filters-bar" id="filter-bar">
+        <button class="filter-btn active" onclick="applyFilter('ALL', this)">All</button>
+        <button class="filter-btn" onclick="applyFilter('breaking', this)">🔴 Breaking</button>
+        <button class="filter-btn" onclick="applyFilter('HIGH', this)">🟠 High</button>
+        <button class="filter-btn" onclick="applyFilter('MEDIUM', this)">🟡 Medium</button>
+        <button class="filter-btn" onclick="applyFilter('LOW', this)">🟢 Low</button>
+        <button class="filter-btn" onclick="applyFilter('API Change', this)">🔌 API</button>
+        <button class="filter-btn" onclick="applyFilter('GST', this)">📑 GST</button>
+        <button class="filter-btn" onclick="applyFilter('Income Tax', this)">🏦 IT</button>
+      </div>
+
+      <div class="feed" id="main-feed"></div>
+    </div>
+
+    <!-- ═══════════ ADD NOTIFICATION PAGE ═══════════ -->
+    <div class="page" id="page-ingest">
+      <h2>➕ Add Notification</h2>
+      <p class="subtitle">Manually ingest a new regulatory or API notification</p>
+
+      <div class="ingest-card">
+        <div class="alert info">💡 Paste a raw notification text or fill in structured fields. The analyser will auto-tag severity and extract action items.</div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label>Notification ID</label>
+            <input type="text" id="f-id" placeholder="e.g. notif_2025"/>
+          </div>
+          <div class="form-group">
+            <label>Source</label>
+            <input type="text" id="f-source" placeholder="e.g. GSTN, Income Tax Dept."/>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>Title</label>
+          <input type="text" id="f-title" placeholder="Notification heading / subject"/>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label>Category</label>
+            <select id="f-category">
+              <option>API Change</option>
+              <option>GST Update</option>
+              <option>Income Tax</option>
+              <option>MCA / ROC</option>
+              <option>Compliance</option>
+              <option>Feature</option>
+              <option>Patch</option>
+              <option>Security</option>
+              <option>Deprecation</option>
+              <option>Other</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Severity</label>
+            <select id="f-severity">
+              <option value="CRITICAL">CRITICAL</option>
+              <option value="HIGH" selected>HIGH</option>
+              <option value="MEDIUM">MEDIUM</option>
+              <option value="LOW">LOW</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label>Published Date</label>
+            <input type="text" id="f-date" placeholder="YYYY-MM-DD"/>
+          </div>
+          <div class="form-group">
+            <label>Affected Services (comma-separated)</label>
+            <input type="text" id="f-services" placeholder="e.g. GST Portal, E-Invoicing"/>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>Summary / Description</label>
+          <textarea id="f-summary" placeholder="Paste the full notification text or a short summary…"></textarea>
+        </div>
+
+        <div class="form-group">
+          <label>Key Changes (one per line)</label>
+          <textarea id="f-changes" placeholder="Change 1&#10;Change 2&#10;Change 3" style="min-height:70px"></textarea>
+        </div>
+
+        <div class="form-group">
+          <label>Action Items for CA / Developer (one per line)</label>
+          <textarea id="f-actions" placeholder="Action 1&#10;Action 2" style="min-height:70px"></textarea>
+        </div>
+
+        <div class="form-group">
+          <label>CA Impact Statement</label>
+          <textarea id="f-impact" placeholder="Describe the practical impact on clients, filings, or systems…" style="min-height:60px"></textarea>
+        </div>
+
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:4px">
+          <label style="margin:0;display:flex;align-items:center;gap:8px;cursor:pointer;font-size:.88rem;font-weight:600;color:var(--gray-600)">
+            <input type="checkbox" id="f-breaking" style="width:16px;height:16px;accent-color:var(--red)"/>
+            Mark as Breaking Change
+          </label>
+        </div>
+
+        <div style="margin-top:22px">
+          <button class="btn-primary" onclick="ingestNotification()">📥 Ingest Notification</button>
+          <button class="btn-secondary" onclick="loadDemo()">Load Demo JSON</button>
+          <button class="btn-secondary" onclick="resetForm()">Reset</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══════════ DIFF PAGE ═══════════ -->
+    <div class="page" id="page-diff">
+      <h2>🔍 Diff &amp; Change Detection</h2>
+      <p class="subtitle">Side-by-side comparison of what changed between notification versions</p>
+
+      <div class="diff-card">
+        <h3>🔌 Stripe API — v1/charges → PaymentIntents (Auto-detected)</h3>
+        <table class="diff-table">
+          <thead>
+            <tr>
+              <th>Field</th><th>Previous Version</th><th>New / Updated</th><th>Type</th>
+            </tr>
+          </thead>
+          <tbody id="diff-body"></tbody>
+        </table>
+      </div>
+
+      <div class="diff-card">
+        <h3>📋 Text Diff — Summary Changes</h3>
+        <div id="text-diff" style="font-family:monospace;font-size:.83rem;line-height:1.8;white-space:pre-wrap;"></div>
+      </div>
+    </div>
+
+    <!-- ═══════════ IMPACT PAGE ═══════════ -->
+    <div class="page" id="page-impact">
+      <h2>⚡ Impact Analysis</h2>
+      <p class="subtitle">Structured JSON output — exactly as requested in the task specification</p>
+
+      <div class="alert warning">
+        ⚙️ For each ingested notification the system outputs a <strong>strictly valid JSON</strong> analysis object covering: breaking-change flag, key modifications bullet list, and developer action items.
+      </div>
+
+      <div id="impact-list" style="display:flex;flex-direction:column;gap:20px;"></div>
+    </div>
+
+  </main>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════
+     JSON MODAL
+════════════════════════════════════════════════════════════════ -->
+<div class="json-modal-overlay" id="json-overlay">
+  <div class="json-modal">
+    <button class="modal-close" onclick="closeJsonModal()">✕</button>
+    <h3>// Notification JSON Output</h3>
+    <pre id="json-content"></pre>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div id="toast"></div>
+
+<!-- ═══════════════════════════════════════════════════════════════
+     JAVASCRIPT
+════════════════════════════════════════════════════════════════ -->
+<script>
+"use strict";
+
+/* ── Seed Data ───────────────────────────────────────────────── */
+const SEED_DATA = [
+  {
+    id: "notif_1024",
+    source: "Stripe API Updates",
+    title: "Deprecation of v1/charges API",
+    published_at: "2026-10-12T10:00:00Z",
+    category: "API Change",
+    severity: "HIGH",
+    is_breaking: true,
+    summary: "The v1/charges endpoint will be deprecated in favor of PaymentIntents by Q1 2027. All integrations relying on the legacy charges API must migrate to the payment_intents workflow before the cut-off date to avoid service disruption.",
+    key_changes: [
+      "Replaced 'charges' endpoint with 'payment_intents'",
+      "Added mandatory 3D Secure 2 (3DS2) authentication support",
+      "New idempotency key requirements for all payment API calls",
+      "Webhook event names updated from 'charge.*' to 'payment_intent.*'"
+    ],
+    action_items: [
+      "Audit all codebases using /v1/charges and create a migration plan",
+      "Implement PaymentIntents API in Billing Engine and Checkout modules",
+      "Enable 3DS2 authentication in payment flows",
+      "Update webhook listeners to handle payment_intent.* events",
+      "Test migration in staging environment before Q4 2026 cutover",
+      "Notify finance team about potential transaction flow changes"
+    ],
+    affected_services: ["Billing Engine", "Checkout"],
+    ca_impact: "Any SaaS product billing Indian clients via Stripe must complete this migration before Q1 2027 or face payment gateway failures, directly impacting collections and revenue recognition."
+  },
+  {
+    id: "notif_1025",
+    source: "GSTN Portal",
+    title: "Mandatory E-Invoicing for Taxpayers above ₹5 Crore Turnover",
+    published_at: "2026-10-01T08:30:00Z",
+    category: "GST Update",
+    severity: "CRITICAL",
+    is_breaking: true,
+    summary: "CBIC has mandated E-Invoicing for all registered taxpayers with Annual Aggregate Turnover (AATO) exceeding ₹5 Crore with effect from 01-Nov-2026. Non-compliance will result in invalid invoices not eligible for ITC.",
+    key_changes: [
+      "E-Invoicing threshold reduced from ₹10 Crore to ₹5 Crore AATO",
+      "IRN (Invoice Reference Number) mandatory on all B2B tax invoices",
+      "QR code embedding compulsory on printed invoices",
+      "API integration with IRP (Invoice Registration Portal) required"
+    ],
+    action_items: [
+      "Identify all clients with AATO between ₹5-10 Crore and notify them immediately",
+      "Configure billing / ERP software for E-Invoice generation",
+      "Register on IRP portal and obtain API credentials",
+      "Train accounting staff on E-Invoice workflow and error handling",
+      "Implement QR code printing in invoice templates",
+      "Test E-Invoice generation in sandbox before 01-Nov-2026"
+    ],
+    affected_services: ["GST Billing", "ERP Integration", "Client Portal"],
+    ca_impact: "CAs must proactively contact clients in the ₹5–10 Crore turnover bracket to ensure compliance. Failure to issue valid E-Invoices means recipients cannot claim Input Tax Credit, creating significant financial exposure."
+  },
+  {
+    id: "notif_1026",
+    source: "Income Tax Department",
+    title: "New ITR-3 Schema for AY 2026-27 — Crypto Disclosure Schedule",
+    published_at: "2026-09-28T11:00:00Z",
+    category: "Income Tax",
+    severity: "HIGH",
+    is_breaking: false,
+    summary: "The Income Tax Department has released the updated ITR-3 XML schema for AY 2026-27 introducing a new Schedule VDA (Virtual Digital Assets) for mandatory disclosure of crypto-asset income, gains, and TDS deducted under Section 194S.",
+    key_changes: [
+      "New Schedule VDA added to ITR-3 and ITR-2 forms",
+      "Mandatory disclosure of all VDA transactions above ₹50,000",
+      "TDS credit under Section 194S must match Form 26AS/AIS",
+      "Loss from VDA not eligible for set-off against other heads"
+    ],
+    action_items: [
+      "Download and integrate new ITR-3 / ITR-2 XML schema into tax software",
+      "Collect VDA transaction statements from all clients holding crypto assets",
+      "Reconcile TDS under 194S with Form 26AS before filing",
+      "Advise clients on non-set-off rules for VDA losses"
+    ],
+    affected_services: ["Income Tax Filing", "Client Data Portal"],
+    ca_impact: "Every client involved in crypto trading or P2P transfers must now separately disclose VDA income. CAs need updated software and client data collection before the filing window opens."
+  },
+  {
+    id: "notif_1027",
+    source: "MCA / ROC",
+    title: "V3 MCA Portal — Director KYC (DIR-3 KYC) Deadline Extended",
+    published_at: "2026-10-05T09:00:00Z",
+    category: "MCA / ROC",
+    severity: "MEDIUM",
+    is_breaking: false,
+    summary: "MCA has extended the deadline for DIR-3 KYC (Director KYC) filing for the financial year 2025-26 from 30-Sep-2026 to 31-Oct-2026. The V3 MCA portal is the mandatory platform for submission.",
+    key_changes: [
+      "DIR-3 KYC deadline extended to 31-Oct-2026",
+      "V3 MCA portal now mandatory (V2 portal decommissioned)",
+      "OTP-based Aadhaar verification now required",
+      "Late filing fee waived for filings completed before extended deadline"
+    ],
+    action_items: [
+      "File DIR-3 KYC for all directors before 31-Oct-2026",
+      "Ensure all directors have active mobile linked to Aadhaar for OTP",
+      "Update login credentials on V3 MCA portal",
+      "Check deactivated DINs and file reactivation requests if any"
+    ],
+    affected_services: ["MCA Portal", "Company Secretarial Module"],
+    ca_impact: "CAs must fast-track DIR-3 KYC filings for all director clients before 31-Oct-2026 to avoid DIN deactivation which would disrupt board operations."
+  },
+  {
+    id: "notif_1028",
+    source: "CBDT / NSDL",
+    title: "TDS Return — New FVU Version 8.5 Mandatory from Nov 2026",
+    published_at: "2026-10-08T14:00:00Z",
+    category: "Compliance",
+    severity: "MEDIUM",
+    is_breaking: false,
+    summary: "NSDL has released File Validation Utility (FVU) version 8.5 for quarterly TDS/TCS returns. Version 8.5 is mandatory for returns for the quarter ending Sep 2026 onwards. Previous FVU versions will be rejected by the portal.",
+    key_changes: [
+      "FVU version 8.5 replaces 8.4 for TDS/TCS returns",
+      "New validation for Section 194Q transactions",
+      "Enhanced PAN verification checks integrated",
+      "Form 24Q salary TDS computation rules updated for new tax regime"
+    ],
+    action_items: [
+      "Download and install FVU version 8.5 from NSDL portal immediately",
+      "Update TDS return software to generate FVU 8.5 compatible files",
+      "Re-validate pending Q2 TDS returns with new FVU before submission",
+      "Inform payroll team of updated 24Q salary TDS rules"
+    ],
+    affected_services: ["TDS Return Filing", "Payroll Processing"],
+    ca_impact: "All Q2 (Jul-Sep 2026) TDS returns must be filed using FVU 8.5. Returns prepared with older FVU will be rejected at the portal, risking late filing interest under Section 234E."
+  }
+];
+
+/* ── State ───────────────────────────────────────────────────── */
+let notifications = [...SEED_DATA];
+let currentFilter = 'ALL';
+
+/* ── Clock ───────────────────────────────────────────────────── */
+function updateClock() {
+  const now = new Date();
+  const opts = { timeZone: 'Asia/Kolkata', hour12: true, weekday:'short', year:'numeric', month:'short', day:'2-digit', hour:'2-digit', minute:'2-digit' };
+  document.getElementById('clock').textContent = now.toLocaleString('en-IN', opts) + ' IST';
+}
+setInterval(updateClock, 1000);
+updateClock();
+
+/* ── Page Navigation ─────────────────────────────────────────── */
+function showPage(name) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.getElementById('page-' + name).classList.add('active');
+  const idx = ['dashboard','feed','ingest','diff','impact'].indexOf(name);
+  document.querySelectorAll('.nav-item')[idx]?.classList.add('active');
+  if (name === 'dashboard') renderDashboard();
+  if (name === 'feed') renderFeed(notifications);
+  if (name === 'diff') renderDiff();
+  if (name === 'impact') renderImpact();
+}
+
+/* ── Severity helpers ────────────────────────────────────────── */
+function sevClass(sev, breaking) {
+  if (breaking) return 'breaking';
+  const m = { CRITICAL:'breaking', HIGH:'high', MEDIUM:'medium', LOW:'low', FEATURE:'feature', PATCH:'patch' };
+  return m[sev] || 'api';
+}
+function sevLabel(sev, breaking) {
+  if (breaking) return '⚠️ BREAKING';
+  return sev;
+}
+
+/* ── Notification Card ───────────────────────────────────────── */
+function buildCard(n) {
+  const tagHtml = `
+    <span class="tag ${sevClass(n.severity, n.is_breaking)}">${sevLabel(n.severity, n.is_breaking)}</span>
+    <span class="tag api">${n.category}</span>
+    ${n.severity === 'CRITICAL' ? '<span class="tag breaking">CRITICAL</span>' : ''}
+  `;
+  const changesHtml = (n.key_changes||[]).map(c => `<li>${c}</li>`).join('');
+  const actionsHtml = (n.action_items||[]).map(a => `<li class="action-li" style="list-style:none">${a}</li>`).join('');
+  const servicesHtml = (n.affected_services||[]).map(s => `<span class="service-chip">${s}</span>`).join('');
+  const pubDate = n.published_at ? n.published_at.substring(0,10) : '';
+
+  return `
+  <div class="notif-card" id="card-${n.id}">
+    <div class="notif-header" onclick="toggleDetail('${n.id}')">
+      <div class="notif-left">
+        <div class="notif-source">${n.source}</div>
+        <div class="notif-title">${n.title}</div>
+        <div class="notif-date">📅 ${pubDate} &nbsp;|&nbsp; ID: ${n.id}</div>
+      </div>
+      <div style="display:flex;flex-direction:column;align-items:flex-end;gap:10px">
+        <div class="notif-badges">${tagHtml}</div>
+        <span class="toggle-arrow" id="arrow-${n.id}">▼</span>
+      </div>
+    </div>
+    <div class="notif-body">
+      <p class="summary-text">${n.summary}</p>
+      <div class="notif-detail" id="detail-${n.id}">
+        <div class="detail-grid">
+          <div class="detail-box">
+            <h4>🔧 Key Changes</h4>
+            <ul>${changesHtml}</ul>
+          </div>
+          <div class="detail-box">
+            <h4>✅ Action Items</h4>
+            <ul>${actionsHtml || '<li>No specific actions listed.</li>'}</ul>
+          </div>
+          <div class="detail-box" style="grid-column:1/-1">
+            <h4>🔗 Affected Services / Modules</h4>
+            <div style="margin-top:4px">${servicesHtml || '<span style="color:var(--gray-400);font-size:.83rem">None specified</span>'}</div>
+          </div>
+          ${n.ca_impact ? `<div class="impact-box"><h4>⚡ CA Impact Statement</h4><p>${n.ca_impact}</p></div>` : ''}
+        </div>
+        <button class="json-view-btn" onclick="showJson('${n.id}')">
+          { } View JSON Output
+        </button>
+      </div>
+    </div>
+  </div>`;
+}
+
+function toggleDetail(id) {
+  const det = document.getElementById('detail-' + id);
+  const arr = document.getElementById('arrow-' + id);
+  det.classList.toggle('open');
+  arr.classList.toggle('open');
+}
+
+/* ── Dashboard ───────────────────────────────────────────────── */
+function renderDashboard() {
+  const breaking = notifications.filter(n => n.is_breaking || n.severity === 'CRITICAL').length;
+  const high     = notifications.filter(n => n.severity === 'HIGH' && !n.is_breaking).length;
+  const actions  = notifications.reduce((acc, n) => acc + (n.action_items||[]).length, 0);
+
+  document.getElementById('stat-breaking').textContent = breaking;
+  document.getElementById('stat-high').textContent     = high;
+  document.getElementById('stat-total').textContent    = notifications.length;
+  document.getElementById('stat-actions').textContent  = actions;
+  document.getElementById('badge-dash').textContent    = notifications.length;
+  document.getElementById('badge-feed').textContent    = breaking;
+
+  const alertEl = document.getElementById('alert-breaking');
+  alertEl.style.display = breaking > 0 ? 'flex' : 'none';
+
+  const now = new Date();
+  document.getElementById('dash-date').textContent = now.toLocaleDateString('en-IN', { timeZone:'Asia/Kolkata', dateStyle:'long' });
+
+  const feedEl = document.getElementById('dash-feed');
+  const topN = [...notifications].sort((a,b) => {
+    const sOrder = { CRITICAL:0, HIGH:1, MEDIUM:2, LOW:3 };
+    return (sOrder[a.severity]||9) - (sOrder[b.severity]||9);
+  });
+  feedEl.innerHTML = topN.map(buildCard).join('');
+}
+
+/* ── Feed ────────────────────────────────────────────────────── */
+function renderFeed(data) {
+  const feedEl = document.getElementById('main-feed');
+  if (!data || data.length === 0) {
+    feedEl.innerHTML = '<div class="empty"><div class="em-icon">📭</div>No notifications match this filter.</div>';
+    return;
+  }
+  feedEl.innerHTML = data.map(buildCard).join('');
+}
+
+function applyFilter(key, btn) {
+  currentFilter = key;
+  document.querySelectorAll('#filter-bar .filter-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  let filtered = notifications;
+  if (key === 'breaking') filtered = notifications.filter(n => n.is_breaking);
+  else if (key !== 'ALL') filtered = notifications.filter(n => n.severity === key || n.category.includes(key) || n.source.includes(key));
+  renderFeed(filtered);
+}
+
+function filterSidebar(key) {
+  showPage('feed');
+  let filtered = notifications;
+  if (key !== 'ALL') {
+    if (key === 'CRITICAL') filtered = notifications.filter(n => n.is_breaking || n.severity === 'CRITICAL');
+    else filtered = notifications.filter(n => n.severity === key);
+  }
+  renderFeed(filtered);
+}
+
+function filterSource(key) {
+  showPage('feed');
+  const map = { GST: 'GST', IT: 'Income Tax', MCA: 'MCA', API: 'API' };
+  const kw = map[key] || key;
+  renderFeed(notifications.filter(n => n.source.includes(kw) || n.category.includes(kw)));
+}
+
+/* ── Diff ────────────────────────────────────────────────────── */
+const DIFF_ROWS = [
+  { field: 'API Endpoint',       old: '/v1/charges',                 newv: '/v1/payment_intents',         type: 'Modified' },
+  { field: 'Authentication',     old: 'Basic / None',                newv: '3D Secure 2 (Mandatory)',     type: 'Modified' },
+  { field: 'Idempotency Key',    old: 'Optional',                    newv: 'Mandatory for all requests',  type: 'Modified' },
+  { field: 'Webhook Events',     old: 'charge.succeeded, charge.failed', newv: 'payment_intent.succeeded, payment_intent.payment_failed', type: 'Modified' },
+  { field: 'charge object',      old: 'Returned in response',        newv: '—',                           type: 'Removed' },
+  { field: 'PaymentIntent obj',  old: '—',                           newv: 'New response object',         type: 'Added' },
+  { field: 'capture_method',     old: '—',                           newv: '"automatic" or "manual"',     type: 'Added' },
+  { field: 'confirm flag',       old: '—',                           newv: 'confirm: true required',      type: 'Added' },
+  { field: 'Deprecation Date',   old: 'N/A',                         newv: 'Q1 2027',                     type: 'Modified' },
+];
+
+function renderDiff() {
+  const tbody = document.getElementById('diff-body');
+  tbody.innerHTML = DIFF_ROWS.map(r => {
+    const cls = r.type === 'Added' ? 'diff-add' : r.type === 'Removed' ? 'diff-rem' : 'diff-mod';
+    return `<tr>
+      <td><strong>${r.field}</strong></td>
+      <td>${r.old}</td>
+      <td class="${cls}">${r.newv}</td>
+      <td><span class="tag ${r.type==='Added'?'low':r.type==='Removed'?'breaking':'high'}">${r.type}</span></td>
+    </tr>`;
+  }).join('');
+
+  document.getElementById('text-diff').innerHTML =
+    `<span style="color:#ef4444">- endpoint: /v1/charges</span>
+<span style="color:#10b981">+ endpoint: /v1/payment_intents</span>
+<span style="color:#ef4444">- auth: none</span>
+<span style="color:#10b981">+ auth: 3ds2_mandatory</span>
+<span style="color:#9ca3af">  currency: INR</span>
+<span style="color:#9ca3af">  amount: integer</span>
+<span style="color:#ef4444">- idempotency_key: optional</span>
+<span style="color:#10b981">+ idempotency_key: required</span>
+<span style="color:#10b981">+ confirm: true</span>
+<span style="color:#10b981">+ capture_method: automatic</span>`;
+}
+
+/* ── Impact JSON output ──────────────────────────────────────── */
+function buildAnalysisJSON(n) {
+  return {
+    id: n.id,
+    source: n.source,
+    title: n.title,
+    published_at: n.published_at,
+    category: n.category,
+    severity: n.severity,
+    is_breaking: n.is_breaking,
+    summary: n.summary,
+    key_changes: n.key_changes || [],
+    action_items_for_developers: n.action_items || [],
+    affected_services: n.affected_services || [],
+    ca_impact_statement: n.ca_impact || null,
+    analysis: {
+      breaking_change_detected: n.is_breaking || n.severity === 'CRITICAL',
+      risk_level: n.is_breaking ? "HIGH — Immediate action required" : n.severity === 'HIGH' ? "MEDIUM-HIGH — Action within 30 days" : "MEDIUM — Monitor and plan",
+      recommended_deadline: n.is_breaking ? "Immediate / Before live cutover date" : "Within 30-60 days"
+    }
+  };
+}
+
+function renderImpact() {
+  const container = document.getElementById('impact-list');
+  container.innerHTML = notifications.map(n => {
+    const json = buildAnalysisJSON(n);
+    const jsonStr = syntaxHighlight(JSON.stringify(json, null, 2));
+    const breaking = n.is_breaking || n.severity === 'CRITICAL';
+    return `
+    <div class="diff-card">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+        <div>
+          <h3>${n.title}</h3>
+          <div style="font-size:.76rem;color:var(--gray-400);margin-top:3px">${n.source} &nbsp;|&nbsp; ${n.category} &nbsp;|&nbsp; ${n.published_at?.substring(0,10)}</div>
+        </div>
+        <span class="tag ${sevClass(n.severity, n.is_breaking)}">${sevLabel(n.severity, n.is_breaking)}</span>
+      </div>
+      <div style="background:#0d1b2a;border-radius:10px;padding:20px;overflow-x:auto">
+        <pre style="font-family:'Consolas','Fira Code',monospace;font-size:.80rem;line-height:1.7;color:#e2e8f0;white-space:pre-wrap;word-break:break-word">${jsonStr}</pre>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function syntaxHighlight(json) {
+  return json
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?)/g, match => {
+      let cls = 'json-num';
+      if (/^"/.test(match)) { cls = /:$/.test(match) ? 'json-key' : 'json-string'; }
+      else if (/true|false/.test(match)) cls = 'json-bool';
+      else if (/null/.test(match)) cls = 'json-null';
+      return `<span class="${cls}">${match}</span>`;
+    });
+}
+
+/* ── JSON Modal ──────────────────────────────────────────────── */
+function showJson(id) {
+  const n = notifications.find(x => x.id === id);
+  if (!n) return;
+  const json = buildAnalysisJSON(n);
+  document.getElementById('json-content').innerHTML = syntaxHighlight(JSON.stringify(json, null, 2));
+  document.getElementById('json-overlay').classList.add('open');
+}
+function closeJsonModal() {
+  document.getElementById('json-overlay').classList.remove('open');
+}
+document.getElementById('json-overlay').addEventListener('click', e => {
+  if (e.target.id === 'json-overlay') closeJsonModal();
+});
+
+/* ── Ingestion Form ──────────────────────────────────────────── */
+function ingestNotification() {
+  const title = document.getElementById('f-title').value.trim();
+  if (!title) { showToast('⚠️ Title is required!'); return; }
+
+  const id = document.getElementById('f-id').value.trim() || 'notif_' + Date.now();
+  const raw = {
+    id,
+    source:           document.getElementById('f-source').value.trim() || 'Manual Entry',
+    title,
+    published_at:     (document.getElementById('f-date').value.trim() || new Date().toISOString().substring(0,10)) + 'T00:00:00Z',
+    category:         document.getElementById('f-category').value,
+    severity:         document.getElementById('f-severity').value,
+    is_breaking:      document.getElementById('f-breaking').checked,
+    summary:          document.getElementById('f-summary').value.trim(),
+    key_changes:      document.getElementById('f-changes').value.split('\n').map(s=>s.trim()).filter(Boolean),
+    action_items:     document.getElementById('f-actions').value.split('\n').map(s=>s.trim()).filter(Boolean),
+    affected_services:document.getElementById('f-services').value.split(',').map(s=>s.trim()).filter(Boolean),
+    ca_impact:        document.getElementById('f-impact').value.trim(),
+  };
+
+  notifications.unshift(raw);
+  showToast('✅ Notification ingested successfully!');
+  resetForm();
+  showPage('dashboard');
+}
+
+function loadDemo() {
+  document.getElementById('f-id').value = 'notif_demo_' + Math.floor(Math.random()*900+100);
+  document.getElementById('f-source').value = 'CBIC GST Circular';
+  document.getElementById('f-title').value = 'Circular No. 211/2026 — Clarification on ITC availment for works contract services';
+  document.getElementById('f-category').value = 'GST Update';
+  document.getElementById('f-severity').value = 'HIGH';
+  document.getElementById('f-date').value = '2026-10-10';
+  document.getElementById('f-services').value = 'GST Returns, ITC Ledger, GSTR-3B';
+  document.getElementById('f-summary').value = 'CBIC has issued clarification on ITC availment in respect of works contract services used for construction of immovable property. Businesses cannot claim ITC on materials and services embedded in the construction of plant and machinery exceptions.';
+  document.getElementById('f-changes').value = `ITC on works contract services for immovable property blocked\nException carved out for plant and machinery embedded in structure\nNew definition of "plant and machinery" provided`;
+  document.getElementById('f-actions').value = `Review all ongoing construction projects and assess ITC eligibility\nAdjust GSTR-3B for any wrongly claimed ITC\nConsult circular before filing GSTR-9 annual return`;
+  document.getElementById('f-impact').value = 'Construction companies and real-estate developers must reverse blocked ITC. CAs filing annual returns must review and reconcile ITC claims against this circular.';
+  document.getElementById('f-breaking').checked = false;
+  showToast('📄 Demo data loaded — review and click Ingest');
+}
+
+function resetForm() {
+  ['f-id','f-source','f-title','f-date','f-services','f-summary','f-changes','f-actions','f-impact'].forEach(id => {
+    document.getElementById(id).value = '';
+  });
+  document.getElementById('f-breaking').checked = false;
+}
+
+/* ── Toast ───────────────────────────────────────────────────── */
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 3000);
+}
+
+/* ── Init ────────────────────────────────────────────────────── */
+renderDashboard();
+</script>
+</body>
+</html>
