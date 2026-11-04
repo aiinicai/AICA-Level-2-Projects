@@ -1,0 +1,200 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Global default-deny safety net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Helper functions
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isVerified() {
+      return isSignedIn() && (request.auth.token.email_verified == true || request.auth.token.firebase.sign_in_provider == 'google.com');
+    }
+
+    function isOwner(uid) {
+      return isSignedIn() && request.auth.uid == uid;
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() > 0 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    // Users collection
+    match /users/{userId} {
+      allow get: if isSignedIn();
+      allow list: if isSignedIn();
+      allow create: if isOwner(userId)
+        && incoming().id == userId
+        && incoming().email is string && incoming().email.size() <= 255
+        && incoming().display_name is string && incoming().display_name.size() > 0 && incoming().display_name.size() <= 80;
+      allow update: if isOwner(userId)
+        && incoming().id == userId
+        && incoming().diff(existing()).affectedKeys().hasOnly(['display_name', 'email', 'email_verified', 'phone_number', 'avatar_url', 'push_tokens', 'updated_at', 'is_deleted'])
+        && (incoming().display_name is string && incoming().display_name.size() <= 80);
+      allow delete: if isOwner(userId);
+    }
+
+    // Friendships collection
+    match /friendships/{friendshipId} {
+      allow get: if isSignedIn() && (
+        resource == null ||
+        request.auth.uid in existing().users ||
+        existing().sender_id == request.auth.uid ||
+        existing().receiver_id == request.auth.uid ||
+        (request.auth.token.email != null && (existing().receiver_email == request.auth.token.email.lower() || existing().receiver_email == request.auth.token.email))
+      );
+      allow list: if isSignedIn() && (
+        request.auth.uid in resource.data.users ||
+        resource.data.sender_id == request.auth.uid ||
+        resource.data.receiver_id == request.auth.uid ||
+        (request.auth.token.email != null && (resource.data.receiver_email == request.auth.token.email.lower() || resource.data.receiver_email == request.auth.token.email))
+      );
+      allow create: if isSignedIn()
+        && incoming().id == friendshipId
+        && incoming().users is list && incoming().users.size() >= 1 && incoming().users.size() <= 2
+        && request.auth.uid in incoming().users
+        && (incoming().sender_id == request.auth.uid || incoming().receiver_id == request.auth.uid)
+        && incoming().status in ['pending', 'accepted', 'declined'];
+      allow update: if isSignedIn() && (
+        request.auth.uid in existing().users ||
+        request.auth.uid in incoming().users ||
+        existing().sender_id == request.auth.uid ||
+        existing().receiver_id == request.auth.uid ||
+        (request.auth.token.email != null && (existing().receiver_email == request.auth.token.email.lower() || existing().receiver_email == request.auth.token.email))
+      )
+        && incoming().diff(existing()).affectedKeys().hasOnly(['status', 'users', 'receiver_id', 'receiver_email', 'updated_at']);
+      allow delete: if isSignedIn() && (
+        request.auth.uid in existing().users ||
+        existing().sender_id == request.auth.uid ||
+        existing().receiver_id == request.auth.uid
+      );
+    }
+
+    // Groups collection
+    match /groups/{groupId} {
+      allow get: if isSignedIn() && (resource == null || request.auth.uid in existing().member_ids || existing().invite_code != null);
+      allow list: if isSignedIn() && (request.auth.uid in resource.data.member_ids || resource.data.invite_code != null);
+      allow create: if isSignedIn()
+        && incoming().id == groupId
+        && incoming().name is string && incoming().name.size() > 0 && incoming().name.size() <= 80
+        && incoming().created_by == request.auth.uid
+        && incoming().member_ids is list && request.auth.uid in incoming().member_ids;
+      allow update: if isSignedIn() && (request.auth.uid in existing().member_ids || request.auth.uid in incoming().member_ids || existing().invite_code != null)
+        && incoming().diff(existing()).affectedKeys().hasOnly(['name', 'category', 'currency', 'invite_code', 'member_ids', 'archived_at', 'updated_at'])
+        && (incoming().name is string && incoming().name.size() > 0 && incoming().name.size() <= 80);
+      allow delete: if isSignedIn() && (existing().created_by == request.auth.uid || request.auth.uid in existing().member_ids);
+
+      // Group members subcollection
+      match /members/{memberId} {
+        allow get: if isSignedIn();
+        allow list: if isSignedIn();
+        allow create: if isSignedIn();
+        allow update: if isSignedIn();
+        allow delete: if isSignedIn();
+      }
+    }
+
+    // Expenses collection
+    match /expenses/{expenseId} {
+      allow get: if isSignedIn() && (
+        resource == null ||
+        request.auth.uid in existing().participant_uids ||
+        existing().group_id != null
+      );
+      allow list: if isSignedIn() && (
+        request.auth.uid in resource.data.participant_uids ||
+        resource.data.group_id != null
+      );
+      allow create: if isSignedIn()
+        && incoming().id == expenseId
+        && incoming().description is string && incoming().description.size() > 0 && incoming().description.size() <= 200
+        && incoming().amount_units is int && incoming().amount_units > 0
+        && incoming().currency is string && incoming().currency.size() <= 3
+        && incoming().created_by == request.auth.uid
+        && incoming().participant_uids is list && request.auth.uid in incoming().participant_uids;
+      allow update: if isSignedIn() && (
+        request.auth.uid in existing().participant_uids ||
+        request.auth.uid in incoming().participant_uids ||
+        existing().group_id != null
+      )
+        && incoming().description is string && incoming().description.size() > 0 && incoming().description.size() <= 200
+        && incoming().amount_units is int && incoming().amount_units > 0;
+      allow delete: if isSignedIn() && (
+        existing().created_by == request.auth.uid ||
+        request.auth.uid in existing().participant_uids ||
+        existing().group_id != null
+      );
+    }
+
+    // Settlements collection
+    match /settlements/{settlementId} {
+      allow get: if isSignedIn() && (
+        resource == null ||
+        request.auth.uid in existing().participant_uids ||
+        existing().group_id != null
+      );
+      allow list: if isSignedIn() && (
+        request.auth.uid in resource.data.participant_uids ||
+        resource.data.group_id != null
+      );
+      allow create: if isSignedIn()
+        && incoming().id == settlementId
+        && incoming().amount_units is int && incoming().amount_units > 0
+        && incoming().currency is string && incoming().currency.size() <= 3
+        && incoming().from_uid != incoming().to_uid
+        && incoming().participant_uids is list && request.auth.uid in incoming().participant_uids;
+      allow update: if isSignedIn() && (
+        existing().created_by == request.auth.uid ||
+        request.auth.uid in existing().participant_uids ||
+        request.auth.uid in incoming().participant_uids ||
+        existing().group_id != null
+      )
+        && incoming().amount_units is int && incoming().amount_units > 0;
+      allow delete: if isSignedIn() && (
+        existing().created_by == request.auth.uid ||
+        request.auth.uid in existing().participant_uids ||
+        existing().group_id != null
+      );
+    }
+
+    // Notifications collection
+    match /notifications/{notificationId} {
+      allow get: if isSignedIn() && (resource == null || existing().recipient_uid == request.auth.uid || existing().sender_uid == request.auth.uid);
+      allow list: if isSignedIn() && (resource.data.recipient_uid == request.auth.uid || resource.data.sender_uid == request.auth.uid);
+      allow create: if isSignedIn() && incoming().sender_uid == request.auth.uid;
+      allow update: if isSignedIn() && existing().recipient_uid == request.auth.uid
+        && incoming().diff(existing()).affectedKeys().hasOnly(['is_read']);
+      allow delete: if isSignedIn() && (existing().recipient_uid == request.auth.uid || existing().sender_uid == request.auth.uid);
+    }
+
+    // Activity collection
+    match /activity/{activityId} {
+      allow get: if isSignedIn() && (resource == null || request.auth.uid in existing().participant_uids || existing().group_id != null);
+      allow list: if isSignedIn() && (request.auth.uid in resource.data.participant_uids || resource.data.group_id != null);
+      allow create: if isSignedIn() && incoming().actor_uid == request.auth.uid;
+      allow update, delete: if false;
+    }
+
+    // Invitations collection
+    match /invitations/{invitationId} {
+      allow get: if isSignedIn();
+      allow list: if isSignedIn();
+      allow create: if isSignedIn() && incoming().sender_uid == request.auth.uid;
+      allow update: if isSignedIn();
+      allow delete: if isSignedIn() && existing().sender_uid == request.auth.uid;
+    }
+  }
+}
