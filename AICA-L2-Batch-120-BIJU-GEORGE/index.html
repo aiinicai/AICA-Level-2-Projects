@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="theme-color" content="#0284c7">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="description" content="High performance deterministic 3x3 Rubik's Cube Solver with 3D animated playback, 6-face camera scanner, and Layer-by-Layer tutorials.">
+
+    <title>CubeSolver 3D - Rubik's Cube Solver & Vision PWA</title>
+
+    <link rel="manifest" href="./manifest.webmanifest">
+    <link rel="icon" type="image/png" href="./assets/icon-192.png">
+    <link rel="apple-touch-icon" href="./assets/icon-192.png">
+    <link rel="stylesheet" href="./css/styles.css?v=29">
+    <script src="./js/lib/three.min.js?v=29"></script>
+    <script src="./js/lib/OrbitControls.js?v=29"></script>
+    <script src="./js/lib/cube.js?v=29"></script>
+    <script src="./js/lib/solve.js?v=29"></script>
+</head>
+<body>
+    <!-- App Header with Unified Inline Navigation -->
+    <header class="app-header">
+        <div class="brand-wrapper">
+            <span class="brand-logo-icon">🧊</span>
+            <div class="brand-text-block">
+                <h1 class="brand-title">CubeSolver 3D</h1>
+                <span class="brand-badge">Optimal Kociemba & Vision</span>
+            </div>
+        </div>
+
+        <!-- App Navigation Tabs (Single Row) -->
+        <nav class="app-nav">
+            <button class="nav-tab-btn active" data-tab="3d-solver">
+                <span>🎲</span> 3D Solver
+            </button>
+            <button class="nav-tab-btn" data-tab="camera-scanner">
+                <span>📷</span> Scanner
+            </button>
+            <button class="nav-tab-btn" data-tab="manual-editor">
+                <span>🎨</span> Net Editor
+            </button>
+            <button class="nav-tab-btn" data-tab="notation-guide">
+                <span>📖</span> Notation
+            </button>
+            <button class="nav-tab-btn" data-tab="cube-academy">
+                <span>🎓</span> Academy
+            </button>
+            <button class="nav-tab-btn" data-tab="speed-timer">
+                <span>⏱</span> Timer
+            </button>
+            <button class="nav-tab-btn" data-tab="user-manual">
+                <span>📘</span> Manual
+            </button>
+        </nav>
+
+        <div class="header-actions">
+            <button id="btn-header-manual" class="header-btn manual-btn-accent" title="Open User Manual">📘 User Manual</button>
+            <button id="btn-sound-toggle" class="header-btn" title="Toggle Sound">🔊</button>
+            <button id="btn-pwa-install" class="header-btn pwa-install-btn" style="display: none;">⬇ Install</button>
+        </div>
+    </header>
+
+    <!-- Main Container -->
+    <main class="app-main">
+        <!-- Panel 1: 3D Solver & Free Play -->
+        <section id="panel-3d-solver" class="tab-view-panel">
+            <div class="solver-layout-grid">
+                <!-- 3D Stage Card -->
+                <div class="cube-3d-stage-card">
+                    <div class="stage-top-bar">
+                        <span id="cube-status-banner" class="status-banner solved">Cube is Solved</span>
+                        <button id="btn-reset-camera" class="btn-icon-circle" title="Reset 3D Camera">↺</button>
+                    </div>
+
+                    <div id="cube-3d-canvas-container">
+                        <div class="canvas-hint-overlay">Drag to rotate • Pinch / Scroll to zoom</div>
+                    </div>
+                </div>
+
+                <!-- Solver Controls Panel (Setup Mode) -->
+                <div id="solver-setup-card" class="solver-controls-card">
+                    <!-- Setup Card Header with Toggle Button -->
+                    <div class="card-header-toggle-row">
+                        <div class="panel-mode-toggle">
+                            <button id="btn-setup-tab-controls" class="btn-mode-pill active" type="button" title="Show original cube controls & solve setup">⚙️ Controls</button>
+                            <button id="btn-setup-tab-reverse" class="btn-mode-pill" type="button" title="Show large 360° Reverse Angle 3D Cube">↻ Reverse 3D</button>
+                        </div>
+                        <span class="setup-mode-tag">Free Play & Setup</span>
+                    </div>
+
+                    <!-- Setup Mode View 1: Original Controls -->
+                    <div id="setup-controls-body" class="setup-card-content">
+                        <!-- Algorithm Selector -->
+                        <div>
+                            <div class="section-label">⚙️ Select Algorithm Mode</div>
+                            <div class="algo-choice-row">
+                                <label class="algo-choice-card">
+                                    <input type="radio" name="algo-choice" value="optimal" checked>
+                                    <div class="algo-card-body">
+                                        <div class="algo-card-title">Optimal Kociemba</div>
+                                        <div class="algo-card-desc">18-22 moves • Fastest speed</div>
+                                    </div>
+                                </label>
+                                <label class="algo-choice-card">
+                                    <input type="radio" name="algo-choice" value="beginner">
+                                    <div class="algo-card-body">
+                                        <div class="algo-card-title">Beginner LBL</div>
+                                        <div class="algo-card-desc">7 Tutorial Stages • Explanations</div>
+                                    </div>
+                                </label>
+                            </div>
+                        </div>
+
+                        <!-- Presets & Scramble Controls -->
+                        <div class="scramble-box">
+                            <div class="section-label">🔀 Patterns & Scrambles</div>
+                            <div class="scramble-row">
+                                <select id="preset-pattern-select" class="scramble-select">
+                                    <option value="">Select Famous Pattern...</option>
+                                    <option value="checkerboard">Checkerboard</option>
+                                    <option value="superflip">Superflip (God's Number 20)</option>
+                                    <option value="easy">Easy Scramble (7 moves)</option>
+                                    <option value="cubeInCube">Cube in a Cube</option>
+                                    <option value="anaconda">Anaconda</option>
+                                    <option value="python">Python</option>
+                                    <option value="cross">Cross Pattern</option>
+                                    <option value="wire">Wire</option>
+                                    <option value="fourSpots">Four Spots</option>
+                                </select>
+                                <button id="btn-random-scramble" class="btn-scramble">🔀 Scramble</button>
+                                <button id="btn-cube-reset-solved" class="btn-scramble" style="background: rgba(16, 185, 129, 0.15); border-color: rgba(16, 185, 129, 0.4); color: #34d399;">↺ Solved</button>
+                            </div>
+                            <div id="active-scramble-display" class="scramble-display-text">Solved State (Ready to scramble or solve)</div>
+                        </div>
+
+                        <!-- Quick Face Twists -->
+                        <div>
+                            <div class="section-label">🖐 Quick Face Twists</div>
+                            <div class="face-twists-grid">
+                                <button class="twist-btn" data-move="U">U</button>
+                                <button class="twist-btn" data-move="U'">U'</button>
+                                <button class="twist-btn" data-move="D">D</button>
+                                <button class="twist-btn" data-move="D'">D'</button>
+                                <button class="twist-btn" data-move="R">R</button>
+                                <button class="twist-btn" data-move="R'">R'</button>
+                                <button class="twist-btn" data-move="L">L</button>
+                                <button class="twist-btn" data-move="L'">L'</button>
+                                <button class="twist-btn" data-move="F">F</button>
+                                <button class="twist-btn" data-move="F'">F'</button>
+                                <button class="twist-btn" data-move="B">B</button>
+                                <button class="twist-btn" data-move="B'">B'</button>
+                            </div>
+                        </div>
+
+                        <!-- Primary Solve Button -->
+                        <button id="btn-solve-main" class="btn-primary-solve">
+                            <span class="solve-btn-glow"></span>
+                            <span class="solve-btn-icon">⚡</span>
+                            <span class="solve-btn-text">Solve All 6 Sides</span>
+                        </button>
+
+                        <!-- Direct Link to Illustrated Manual -->
+                        <button id="btn-card-manual" class="btn-card-manual" type="button">
+                            <span>📘</span> Read Complete Illustrated User Manual & Instructions
+                        </button>
+                    </div>
+
+                    <!-- Setup Mode View 2: Large 360° Reverse Angle 3D Cube -->
+                    <div id="setup-reverse-body" class="setup-reverse-view hidden">
+                        <div class="reverse-toolbar-row">
+                            <div class="reverse-toolbar-left">
+                                <span class="view-pulse-dot"></span>
+                                <span class="reverse-view-title">360° Reverse Angle (D • B • L)</span>
+                            </div>
+                            <div class="reverse-toolbar-actions">
+                                <button id="btn-setup-reverse-sync" class="btn-opposite-tool active" title="Toggle 360° Antipodal Camera Synchronization">
+                                    <span class="sync-icon">🔗</span> Synced
+                                </button>
+                                <button id="btn-setup-reverse-reset" class="btn-opposite-tool" title="Reset Camera to Canonical D-B-L Angle">
+                                    <span>↺</span> Reset
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Large Spacious 3D Canvas Box for Reverse View -->
+                        <div id="setup-opposite-canvas" class="reverse-3d-stage-box" title="Continuous 360° reverse perspective in lockstep with main cube">
+                            <div class="canvas-mini-tag">D • B • L Perspective (180° Antipodal)</div>
+                        </div>
+
+                        <!-- Face Legend Badges -->
+                        <div class="reverse-legend-bar">
+                            <div class="reverse-legend-item">
+                                <span class="legend-swatch" style="background:#FACC15;"></span>
+                                <span class="legend-text"><strong>Down (D)</strong> Yellow</span>
+                            </div>
+                            <div class="reverse-legend-item">
+                                <span class="legend-swatch" style="background:#2563EB;"></span>
+                                <span class="legend-text"><strong>Back (B)</strong> Blue</span>
+                            </div>
+                            <div class="reverse-legend-item">
+                                <span class="legend-swatch" style="background:#F97316;"></span>
+                                <span class="legend-text"><strong>Left (L)</strong> Orange</span>
+                            </div>
+                        </div>
+
+                        <!-- Quick twist row in reverse view so user can interact directly -->
+                        <div class="reverse-quick-twists">
+                            <div class="section-label" style="margin-bottom:3px;">🖐 Quick Twists:</div>
+                            <div class="face-twists-grid-compact">
+                                <button class="twist-btn" data-move="U">U</button>
+                                <button class="twist-btn" data-move="D">D</button>
+                                <button class="twist-btn" data-move="R">R</button>
+                                <button class="twist-btn" data-move="L">L</button>
+                                <button class="twist-btn" data-move="F">F</button>
+                                <button class="twist-btn" data-move="B">B</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Solver Controls Panel (Active Solution Player Mode) -->
+                <div id="solver-player-card" class="solver-controls-card hidden">
+                    <div class="player-top-bar">
+                        <!-- Toggle Button: Steps Guide vs Reverse 3D -->
+                        <div class="panel-mode-toggle">
+                            <button id="btn-player-tab-steps" class="btn-mode-pill active" type="button" title="Show step-by-step solution moves and timeline chips">📋 Steps Guide</button>
+                            <button id="btn-player-tab-reverse" class="btn-mode-pill" type="button" title="Show large 360° Reverse Angle 3D Cube">↻ Reverse 3D</button>
+                        </div>
+                        <div class="player-top-actions">
+                            <button id="btn-header-print-guide" class="header-btn guide-btn" type="button" title="Open illustrated printable solution guide">🖨️ Guide</button>
+                            <button id="btn-exit-solution" class="header-btn exit-btn" type="button" title="Exit to Setup & Free Play">✕ Exit</button>
+                        </div>
+                    </div>
+
+                    <!-- Player View 1: Original Steps Guide (Uncramped, with bottom steps timeline 100% visible) -->
+                    <div id="solution-visualizer-inline-container"></div>
+
+                    <!-- Player View 2: Large 360° Reverse Angle 3D Cube with Playback Controls -->
+                    <div id="player-reverse-body" class="player-reverse-view hidden">
+                        <!-- Mini Playback Bar for Reverse 3D (4 buttons matching Steps Guide) -->
+                        <div class="player-reverse-controls-bar">
+                            <button id="btn-rev-player-reset" class="ctrl-btn ghost-btn" title="Reset to Step 0 [Key: R]">↺ Reset</button>
+                            <button id="btn-rev-player-prev" class="ctrl-btn" title="Previous step [Key: ←]">⏮ Prev</button>
+                            <button id="btn-rev-player-play" class="ctrl-btn play-btn" title="Play / Pause solution [Key: Space]">▶ Play</button>
+                            <button id="btn-rev-player-next" class="ctrl-btn next-btn" title="Next step [Key: →]">Next ⏭</button>
+                        </div>
+
+                        <!-- Current Step Banner and Sync Action in single balanced row -->
+                        <div class="player-rev-banner-row">
+                            <div id="player-rev-step-banner" class="player-rev-step-banner">
+                                <span id="player-rev-step-bubble" class="player-rev-bubble">U</span>
+                                <span id="player-rev-step-text" class="player-rev-text">Step 1: Turn Top layer</span>
+                            </div>
+                            <button id="btn-player-reverse-sync" class="btn-opposite-tool active" title="Toggle 360° Antipodal Camera Synchronization">
+                                <span class="sync-icon">🔗</span> Synced
+                            </button>
+                        </div>
+
+                        <!-- Large Spacious 3D Canvas Box for Reverse View -->
+                        <div id="player-opposite-canvas" class="reverse-3d-stage-box" title="Watch solution moves from Down-Back-Left perspective">
+                            <div class="canvas-mini-tag">D • B • L Reverse Perspective</div>
+                        </div>
+
+                        <!-- Face Legend Badges -->
+                        <div class="reverse-legend-bar">
+                            <div class="reverse-legend-item">
+                                <span class="legend-swatch" style="background:#FACC15;"></span>
+                                <span class="legend-text"><strong>Down (D)</strong> Yellow</span>
+                            </div>
+                            <div class="reverse-legend-item">
+                                <span class="legend-swatch" style="background:#2563EB;"></span>
+                                <span class="legend-text"><strong>Back (B)</strong> Blue</span>
+                            </div>
+                            <div class="reverse-legend-item">
+                                <span class="legend-swatch" style="background:#F97316;"></span>
+                                <span class="legend-text"><strong>Left (L)</strong> Orange</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Panel 2: Camera Scanner -->
+        <section id="panel-camera-scanner" class="tab-view-panel hidden">
+            <div id="scanner-container"></div>
+        </section>
+
+        <!-- Panel 3: Manual Net Editor -->
+        <section id="panel-manual-editor" class="tab-view-panel hidden">
+            <div id="manual-editor-container"></div>
+        </section>
+
+        <!-- Panel 4: Move Notation Guide -->
+        <section id="panel-notation-guide" class="tab-view-panel hidden">
+            <div id="notation-guide-container"></div>
+        </section>
+
+        <!-- Panel 5: Cube Academy (Kid-Friendly 7-Stage Masterclass) -->
+        <section id="panel-cube-academy" class="tab-view-panel hidden">
+            <div id="academy-container"></div>
+        </section>
+
+        <!-- Panel 6: Speedcube Timer -->
+        <section id="panel-speed-timer" class="tab-view-panel hidden">
+            <div id="speed-timer-container"></div>
+        </section>
+
+        <!-- Panel 7: Illustrated User Manual -->
+        <section id="panel-user-manual" class="tab-view-panel hidden">
+            <div id="user-manual-container"></div>
+        </section>
+    </main>
+
+    <!-- Fullscreen Solution Player Modal -->
+    <div id="solution-player-modal" class="solution-modal hidden">
+        <div class="modal-header">
+            <div class="modal-title">⚡ Interactive 3D Solution Guide</div>
+            <button id="btn-close-solution" class="btn-close-modal" title="Close Solution">✕</button>
+        </div>
+        <div class="modal-content-area">
+            <div id="solution-visualizer-container"></div>
+        </div>
+    </div>
+
+    <!-- Loading Overlay -->
+    <div id="solver-loading-overlay" class="loading-overlay hidden">
+        <div class="loading-content">
+            <div class="spinner"></div>
+            <div class="loading-title">Calculating Solution...</div>
+            <div class="loading-desc">Herbert Kociemba Two-Phase Algorithm running in Web Worker</div>
+        </div>
+    </div>
+
+    <!-- Printable Solution Diagram Guide Modal -->
+    <div id="printable-sheet-modal" class="printable-modal hidden"></div>
+
+    <!-- Main Module Script -->
+    <script type="module" src="./js/app.js?v=29"></script>
+</body>
+</html>
