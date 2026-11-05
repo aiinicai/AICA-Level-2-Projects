@@ -1,592 +1,354 @@
 """
-Main Desktop Application Window for TDS & TCS Certificate PDF Auto-Renamer.
-Features complete batch workflow, live statistics cards, filterable data grid,
-non-blocking QThread execution, real-time logging, and Excel/CSV report exports.
+LexSecure India Pro - Master Window Architecture
+Unified Enterprise Legal & Regulatory Intelligence Desktop Suite
 """
 
-import os
-import sys
-import subprocess
-from pathlib import Path
-from datetime import datetime
-from typing import List, Optional
-
-from PyQt6.QtCore import Qt, QItemSelectionModel
 from PyQt6.QtWidgets import (
-    QMainWindow,
-    QWidget,
-    QVBoxLayout,
-    QHBoxLayout,
-    QLabel,
-    QPushButton,
-    QLineEdit,
-    QComboBox,
-    QCheckBox,
-    QTableView,
-    QProgressBar,
-    QPlainTextEdit,
-    QFileDialog,
-    QMessageBox,
-    QHeaderView,
-    QSplitter,
-    QMenu,
-    QFrame,
+    QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QLabel,
+    QFrame, QPushButton, QStackedWidget, QComboBox, QButtonGroup, QMessageBox
 )
-from PyQt6.QtGui import QAction, QIcon
+from PyQt6.QtCore import Qt, QSize
+from PyQt6.QtGui import QIcon, QFont, QColor
 
-import csv
-import openpyxl
-
-from config import AppConfig, ACT_1961, ACT_2025
-from core.models import CertificateData, ProcessingStatus
-from core.batch_processor import BatchWorkerThread
-from core.undo_manager import UndoManager
-from ui.table_model import CertificateTableModel, CertificateFilterProxyModel
-from ui.preview_dialog import CertificatePreviewDialog
-from ui.settings_dialog import SettingsDialog
-from ui.styles import APP_STYLESHEET
-
+from ui.styles import THEME_COLORS, MAIN_QSS
+from ui.views.dashboard_view import DashboardView
+from ui.views.contract_review_view import ContractReviewView
+from ui.views.regulatory_view import RegulatoryView
+from ui.views.tasks_view import TasksView
+from ui.views.calendar_view import CalendarView
+from ui.views.entity_user_management_view import EntityUserManagementView
+from ui.views.access_matrix_view import AccessMatrixView
+from ui.views.audit_dossier_view import AuditDossierView
+from ui.components.login_dialog import LoginDialog
+from models.entities import Entity, User
 
 class MainWindow(QMainWindow):
-    """Primary application window for the TDS & TCS Certificate PDF Auto-Renamer."""
-
-    def __init__(self, initial_folder: Optional[str] = None):
+    def __init__(self):
         super().__init__()
-        self.setWindowTitle("TDS & TCS Certificate PDF Auto-Renamer")
+        self.setWindowTitle("LexSecure India Pro — Enterprise Legal & Regulatory Intelligence")
         self.resize(1300, 840)
-        self.setMinimumSize(950, 600)
-        self.setStyleSheet(APP_STYLESHEET)
+        self.setMinimumSize(1020, 680)
+        
+        self.current_entity_id = 1
+        self.current_user = None
 
-        self.config = AppConfig.load()
-        self.source_folder: Optional[Path] = Path(initial_folder) if initial_folder else None
-        self.undo_manager = UndoManager()
-        self.worker: Optional[BatchWorkerThread] = None
+        # Load initial user (default to General Counsel)
+        default_user = User.get_by_id(1)
+        if default_user:
+            self.current_user = default_user
 
-        self._init_ui()
+        self.setStyleSheet(MAIN_QSS)
+        self.init_ui()
 
-        if self.source_folder and self.source_folder.exists():
-            self.folder_input.setText(str(self.source_folder))
-            self._start_analysis()
-
-    def _init_ui(self):
+    def init_ui(self):
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
-        main_layout = QVBoxLayout(central_widget)
-        main_layout.setContentsMargins(14, 14, 14, 14)
-        main_layout.setSpacing(12)
 
-        # ----------------------------------------------------------------------
-        # 1. Header Card Banner
-        # ----------------------------------------------------------------------
-        header_card = QFrame()
-        header_card.setObjectName("HeaderCard")
-        hdr_layout = QVBoxLayout(header_card)
-        hdr_layout.setContentsMargins(16, 12, 16, 12)
+        root_layout = QHBoxLayout(central_widget)
+        root_layout.setContentsMargins(0, 0, 0, 0)
+        root_layout.setSpacing(0)
 
-        hdr_title = QLabel("TDS & TCS Certificate PDF Auto-Renamer")
-        hdr_title.setObjectName("HeaderTitle")
-        hdr_sub = QLabel(
-            "TRACES Compliance Automation • Income-tax Act, 1961 (Forms 16, 16A, 16B, 16C, 16D, 27D) & Income-tax Act, 2025 (Forms 130, 131, 132, 133)"
-        )
-        hdr_sub.setObjectName("HeaderSubtitle")
-        hdr_layout.addWidget(hdr_title)
-        hdr_layout.addWidget(hdr_sub)
-        main_layout.addWidget(header_card)
+        # 1. Left Sidebar Navigation
+        sidebar = QFrame()
+        sidebar.setObjectName("sidebar")
+        sidebar.setFixedWidth(270)
+        s_layout = QVBoxLayout(sidebar)
+        s_layout.setContentsMargins(0, 16, 0, 16)
+        s_layout.setSpacing(4)
 
-        # ----------------------------------------------------------------------
-        # 2. Metric Statistics Cards
-        # ----------------------------------------------------------------------
-        stats_layout = QHBoxLayout()
-        stats_layout.setSpacing(10)
+        # App Brand Header
+        brand_frame = QFrame()
+        brand_frame.setStyleSheet("padding: 2px 16px 14px 16px; border-bottom: 1px solid #1E293B;")
+        b_layout = QVBoxLayout(brand_frame)
+        b_layout.setSpacing(3)
 
-        self.card_total = self._create_metric_card("Total Files", "0")
-        self.card_valid = self._create_metric_card("Extracted", "0")
-        self.card_1961 = self._create_metric_card("1961 Act", "0")
-        self.card_2025 = self._create_metric_card("2025 Act", "0")
-        self.card_renamed = self._create_metric_card("Renamed", "0")
-        self.card_errors = self._create_metric_card("Issues", "0")
+        app_name = QLabel("LexSecure India Pro")
+        app_name.setWordWrap(False)
+        app_name.setStyleSheet("color: #10B981; font-size: 17px; font-weight: 900; letter-spacing: 0.5px;")
+        b_layout.addWidget(app_name)
 
-        stats_layout.addWidget(self.card_total)
-        stats_layout.addWidget(self.card_valid)
-        stats_layout.addWidget(self.card_1961)
-        stats_layout.addWidget(self.card_2025)
-        stats_layout.addWidget(self.card_renamed)
-        stats_layout.addWidget(self.card_errors)
-        main_layout.addLayout(stats_layout)
+        app_tag = QLabel("Statutory & Regulatory Intel")
+        app_tag.setStyleSheet("color: #94A3B8; font-size: 11px; font-weight: 500;")
+        b_layout.addWidget(app_tag)
+        s_layout.addWidget(brand_frame)
 
-        # ----------------------------------------------------------------------
-        # 3. Source Folder Selection & Action Bar
-        # ----------------------------------------------------------------------
-        folder_bar = QHBoxLayout()
-        folder_bar.setSpacing(8)
+        s_layout.addSpacing(8)
 
-        folder_label = QLabel("<b>Source Folder:</b>")
-        self.folder_input = QLineEdit()
-        self.folder_input.setPlaceholderText("Select folder containing TDS/TCS certificate PDF files...")
-        self.browse_btn = QPushButton("Browse Folder...")
-        self.browse_btn.clicked.connect(self._on_browse_folder)
+        # Navigation Buttons
+        self.nav_group = QButtonGroup(self)
+        self.nav_group.setExclusive(True)
 
-        self.subfolders_check = QCheckBox("Include Subfolders")
-        self.subfolders_check.setChecked(self.config.include_subfolders)
-        self.subfolders_check.stateChanged.connect(self._on_subfolder_toggle)
+        nav_items = [
+            ("📊  Executive Dashboard", 0),
+            ("📄  Contract / Document Review", 1),
+            ("📡  Indian Regulatory Tracker", 2),
+            ("📋  Department Tasks", 3),
+            ("📅  Statutory Calendar", 4),
+            ("🏢  Entity & User Governance", 5),
+            ("🛡️  Access Matrix Control", 6),
+            ("🔒  SHA-256 Audit Dossier", 7)
+        ]
 
-        self.settings_btn = QPushButton("Settings...")
-        self.settings_btn.clicked.connect(self._open_settings)
+        self.nav_buttons = []
+        for label, idx in nav_items:
+            btn = QPushButton(label)
+            btn.setCheckable(True)
+            btn.setProperty("class", "nav-btn")
+            btn.clicked.connect(lambda checked, i=idx: self.switch_view(i))
+            self.nav_group.addButton(btn, idx)
+            s_layout.addWidget(btn)
+            self.nav_buttons.append(btn)
 
-        folder_bar.addWidget(folder_label)
-        folder_bar.addWidget(self.folder_input, 1)
-        folder_bar.addWidget(self.browse_btn)
-        folder_bar.addWidget(self.subfolders_check)
-        folder_bar.addWidget(self.settings_btn)
-        main_layout.addLayout(folder_bar)
+        # Default select dashboard
+        self.nav_buttons[0].setChecked(True)
 
-        # ----------------------------------------------------------------------
-        # 4. Action Command Buttons
-        # ----------------------------------------------------------------------
-        cmd_bar = QHBoxLayout()
-        cmd_bar.setSpacing(10)
+        s_layout.addStretch()
 
-        self.analyze_btn = QPushButton("1. Scan & Analyze (Preview)")
-        self.analyze_btn.setObjectName("PrimaryBtn")
-        self.analyze_btn.clicked.connect(self._start_analysis)
+        # Sidebar Footer: Jurisdiction Notice
+        footer_box = QFrame()
+        footer_box.setStyleSheet("background-color: #0F172A; border-radius: 8px; margin: 10px; padding: 10px; border: 1px solid #1E293B;")
+        f_layout = QVBoxLayout(footer_box)
+        f_layout.setSpacing(3)
 
-        self.rename_btn = QPushButton("2. Execute Renaming")
-        self.rename_btn.setObjectName("SuccessBtn")
-        self.rename_btn.setEnabled(False)
-        self.rename_btn.clicked.connect(self._start_renaming)
+        juris_lbl = QLabel("JURISDICTION: INDIA")
+        juris_lbl.setStyleSheet("color: #38BDF8; font-size: 10px; font-weight: bold;")
+        f_layout.addWidget(juris_lbl)
 
-        self.undo_btn = QPushButton("Undo Last Batch")
-        self.undo_btn.setObjectName("WarningBtn")
-        self.undo_btn.clicked.connect(self._rollback_batch)
+        ver_lbl = QLabel("FEMA • DPDP • Labour Codes • MSME")
+        ver_lbl.setStyleSheet("color: #64748B; font-size: 10px;")
+        f_layout.addWidget(ver_lbl)
+        s_layout.addWidget(footer_box)
 
-        self.cancel_btn = QPushButton("Cancel")
-        self.cancel_btn.setEnabled(False)
-        self.cancel_btn.clicked.connect(self._cancel_worker)
+        root_layout.addWidget(sidebar)
 
-        self.export_btn = QPushButton("Export Report...")
-        self.export_btn.clicked.connect(self._export_report)
+        # 2. Main Content Area (Header + Stacked Widget)
+        content_area = QWidget()
+        c_layout = QVBoxLayout(content_area)
+        c_layout.setContentsMargins(0, 0, 0, 0)
+        c_layout.setSpacing(0)
 
-        cmd_bar.addWidget(self.analyze_btn)
-        cmd_bar.addWidget(self.rename_btn)
-        cmd_bar.addWidget(self.undo_btn)
-        cmd_bar.addWidget(self.cancel_btn)
-        cmd_bar.addStretch()
-        cmd_bar.addWidget(self.export_btn)
-        main_layout.addLayout(cmd_bar)
+        # Top Header Bar
+        topbar = QFrame()
+        topbar.setObjectName("topbar")
+        topbar.setFixedHeight(54)
+        t_layout = QHBoxLayout(topbar)
+        t_layout.setContentsMargins(16, 0, 16, 0)
+        t_layout.setSpacing(12)
 
-        # ----------------------------------------------------------------------
-        # 5. Filter & Search Controls
-        # ----------------------------------------------------------------------
-        filter_bar = QHBoxLayout()
-        filter_bar.setSpacing(8)
+        # Entity Switcher
+        ent_lbl = QLabel("Entity:")
+        ent_lbl.setStyleSheet("color: #94A3B8; font-size: 12px; font-weight: bold;")
+        t_layout.addWidget(ent_lbl)
 
-        self.search_input = QLineEdit()
-        self.search_input.setPlaceholderText("Search by Name, PAN, TAN, Form, or File...")
-        self.search_input.textChanged.connect(self._on_search_text_changed)
+        self.entity_combo = QComboBox()
+        self.entity_combo.setMinimumWidth(260)
+        self.populate_entities()
+        self.entity_combo.currentIndexChanged.connect(self.on_entity_changed)
+        t_layout.addWidget(self.entity_combo)
 
-        self.act_combo = QComboBox()
-        self.act_combo.addItems(["All Acts", ACT_1961, ACT_2025])
-        self.act_combo.currentIndexChanged.connect(self._on_act_filter_changed)
+        t_layout.addStretch()
 
-        self.form_combo = QComboBox()
-        self.form_combo.addItems([
-            "All Forms",
-            "Form 16", "Form 16A", "Form 16B", "Form 16C", "Form 16D", "Form 16E", "Form 27D",
-            "Form 130", "Form 131", "Form 132", "Form 133",
-        ])
-        self.form_combo.currentIndexChanged.connect(self._on_form_filter_changed)
+        # Tamper-Evident Status Badge
+        self.tamper_pill = QLabel("● SHA-256 CHAIN VERIFIED")
+        self.tamper_pill.setStyleSheet("""
+            background-color: rgba(16, 185, 129, 0.15);
+            color: #10B981;
+            font-size: 10px;
+            font-weight: bold;
+            border: 1px solid #10B981;
+            border-radius: 10px;
+            padding: 3px 9px;
+        """)
+        t_layout.addWidget(self.tamper_pill)
 
-        self.status_combo = QComboBox()
-        self.status_combo.addItems([
-            "All Statuses",
-            "Pending", "Extracted", "Preview Ready", "Renamed", "Copied", "Skipped", "Error",
-        ])
-        self.status_combo.currentIndexChanged.connect(self._on_status_filter_changed)
+        # Active User Info Pill
+        self.user_pill = QLabel()
+        self.update_user_pill()
+        t_layout.addWidget(self.user_pill)
 
-        filter_bar.addWidget(QLabel("Filter:"))
-        filter_bar.addWidget(self.search_input, 1)
-        filter_bar.addWidget(self.act_combo)
-        filter_bar.addWidget(self.form_combo)
-        filter_bar.addWidget(self.status_combo)
-        main_layout.addLayout(filter_bar)
+        # Switch User / Login Button
+        self.btn_switch_user = QPushButton("🔑 Switch User")
+        self.btn_switch_user.setStyleSheet("""
+            background-color: #1E293B;
+            color: #38BDF8;
+            border: 1px solid #0284C7;
+            font-weight: 600;
+            padding: 5px 12px;
+            border-radius: 6px;
+            font-size: 11px;
+        """)
+        self.btn_switch_user.clicked.connect(self.open_login_dialog)
+        t_layout.addWidget(self.btn_switch_user)
 
-        # ----------------------------------------------------------------------
-        # 6. Central Table & Splitter for Activity Log
-        # ----------------------------------------------------------------------
-        splitter = QSplitter(Qt.Orientation.Vertical)
+        # Professional Dark / Light Theme Mode Toggle
+        self.current_theme_mode = "dark"
+        self.btn_theme_toggle = QPushButton("☀️ Light Mode")
+        self.btn_theme_toggle.setStyleSheet("""
+            background-color: #1E293B;
+            color: #F59E0B;
+            border: 1px solid #D97706;
+            font-weight: 600;
+            padding: 5px 12px;
+            border-radius: 6px;
+            font-size: 11px;
+        """)
+        self.btn_theme_toggle.clicked.connect(self.toggle_theme_mode)
+        t_layout.addWidget(self.btn_theme_toggle)
 
-        # Certificate Data Table
-        self.table_view = QTableView()
-        self.source_model = CertificateTableModel()
-        self.proxy_model = CertificateFilterProxyModel()
-        self.proxy_model.setSourceModel(self.source_model)
-        self.table_view.setModel(self.proxy_model)
+        c_layout.addWidget(topbar)
 
-        # Table Appearance & Behavior
-        self.table_view.setSortingEnabled(True)
-        self.table_view.setSelectionBehavior(QTableView.SelectionBehavior.SelectRows)
-        self.table_view.setAlternatingRowColors(True)
-        self.table_view.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Interactive)
-        self.table_view.horizontalHeader().setStretchLastSection(True)
-        self.table_view.doubleClicked.connect(self._on_table_double_clicked)
-        self.table_view.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
-        self.table_view.customContextMenuRequested.connect(self._show_context_menu)
+        # Stacked Views
+        self.stack = QStackedWidget()
 
-        splitter.addWidget(self.table_view)
+        # Instantiate Views
+        self.dashboard_view = DashboardView(self.current_entity_id)
+        self.contract_view = ContractReviewView(self.current_entity_id)
+        self.regulatory_view = RegulatoryView(self.current_entity_id)
+        self.tasks_view = TasksView(self.current_entity_id)
+        self.calendar_view = CalendarView(self.current_entity_id)
+        self.entity_user_view = EntityUserManagementView(1)
+        self.access_matrix_view = AccessMatrixView()
+        self.audit_dossier_view = AuditDossierView(1)
 
-        # Activity Log Box
-        log_panel = QWidget()
-        log_layout = QVBoxLayout(log_panel)
-        log_layout.setContentsMargins(0, 4, 0, 0)
-        log_layout.setSpacing(4)
+        # Connect Navigation Signals
+        self.dashboard_view.navigate_to_review.connect(lambda: self.switch_view(1))
+        self.dashboard_view.navigate_to_regulatory.connect(lambda: self.switch_view(2))
+        self.dashboard_view.navigate_to_calendar.connect(lambda: self.switch_view(4))
 
-        log_hdr = QHBoxLayout()
-        log_hdr.addWidget(QLabel("<b>Real-time Activity Log:</b>"))
-        clear_log_btn = QPushButton("Clear Log")
-        clear_log_btn.clicked.connect(self._clear_log)
-        log_hdr.addStretch()
-        log_hdr.addWidget(clear_log_btn)
-        log_layout.addLayout(log_hdr)
+        # Connect Cross-View Signals
+        self.contract_view.audit_event_logged.connect(self.audit_dossier_view.verify_and_refresh)
+        self.contract_view.entity_selection_requested.connect(self.on_entity_selection_requested)
+        self.regulatory_view.task_dispatched.connect(self.tasks_view.load_tasks)
+        self.regulatory_view.audit_event_logged.connect(self.audit_dossier_view.verify_and_refresh)
+        self.tasks_view.audit_event_logged.connect(self.audit_dossier_view.verify_and_refresh)
 
-        self.log_view = QPlainTextEdit()
-        self.log_view.setObjectName("LogView")
-        self.log_view.setReadOnly(True)
-        self.log_view.setMaximumHeight(200)
-        log_layout.addWidget(self.log_view)
+        # Connect Entity/User Governance Signals
+        self.entity_user_view.entities_changed.connect(self.on_entities_updated)
+        self.entity_user_view.users_changed.connect(self.on_users_updated)
+        self.entity_user_view.audit_event_logged.connect(self.audit_dossier_view.verify_and_refresh)
 
-        splitter.addWidget(log_panel)
-        splitter.setStretchFactor(0, 7)
-        splitter.setStretchFactor(1, 3)
+        # Add to stack
+        self.stack.addWidget(self.dashboard_view)      # 0
+        self.stack.addWidget(self.contract_view)       # 1
+        self.stack.addWidget(self.regulatory_view)     # 2
+        self.stack.addWidget(self.tasks_view)          # 3
+        self.stack.addWidget(self.calendar_view)       # 4
+        self.stack.addWidget(self.entity_user_view)    # 5
+        self.stack.addWidget(self.access_matrix_view)  # 6
+        self.stack.addWidget(self.audit_dossier_view)  # 7
 
-        main_layout.addWidget(splitter, 1)
+        c_layout.addWidget(self.stack, 1)
+        root_layout.addWidget(content_area, 1)
 
-        # ----------------------------------------------------------------------
-        # 7. Progress Bar & Status Bar
-        # ----------------------------------------------------------------------
-        self.progress_bar = QProgressBar()
-        self.progress_bar.setVisible(False)
-        main_layout.addWidget(self.progress_bar)
+    def update_user_pill(self):
+        if self.current_user:
+            role_fmt = self.current_user.role.replace("_", " ")
+            self.user_pill.setText(f"👤 {self.current_user.full_name}  [{role_fmt}]")
+            self.user_pill.setStyleSheet("""
+                background-color: #0B1120;
+                color: #F8FAFC;
+                font-size: 11px;
+                font-weight: 600;
+                border: 1px solid #334155;
+                border-radius: 6px;
+                padding: 4px 10px;
+            """)
+        else:
+            self.user_pill.setText("👤 Guest / Sign In")
+            self.user_pill.setStyleSheet("color: #94A3B8; font-size: 11px; padding: 4px 8px;")
 
-        self.status_label = QLabel("Ready. Select a folder and click 'Scan & Analyze'.")
-        self.statusBar().addWidget(self.status_label, 1)
-
-    def _create_metric_card(self, label: str, init_val: str) -> QFrame:
-        """Create a styled metric card widget."""
-        card = QFrame()
-        card.setProperty("class", "MetricCard")
-        card.setFrameShape(QFrame.Shape.StyledPanel)
-        c_layout = QVBoxLayout(card)
-        c_layout.setContentsMargins(8, 6, 8, 6)
-        c_layout.setSpacing(2)
-
-        lbl = QLabel(label)
-        lbl.setProperty("class", "MetricLabel")
-        val = QLabel(init_val)
-        val.setProperty("class", "MetricValue")
-        val.setObjectName(f"val_{label.replace(' ', '_')}")
-
-        c_layout.addWidget(lbl)
-        c_layout.addWidget(val)
-        return card
-
-    def _update_metrics(self):
-        """Recalculate and update the stat cards."""
-        certs = self.source_model.get_all()
-        total = len(certs)
-        valid = sum(1 for c in certs if c.deductee_name)
-        act1961 = sum(1 for c in certs if "1961" in c.act)
-        act2025 = sum(1 for c in certs if "2025" in c.act)
-        renamed = sum(1 for c in certs if c.status in (ProcessingStatus.RENAMED, ProcessingStatus.COPIED, ProcessingStatus.MOVED))
-        errors = sum(1 for c in certs if c.status == ProcessingStatus.ERROR)
-
-        self.card_total.findChild(QLabel, "val_Total_Files").setText(str(total))
-        self.card_valid.findChild(QLabel, "val_Extracted").setText(str(valid))
-        self.card_1961.findChild(QLabel, "val_1961_Act").setText(str(act1961))
-        self.card_2025.findChild(QLabel, "val_2025_Act").setText(str(act2025))
-        self.card_renamed.findChild(QLabel, "val_Renamed").setText(str(renamed))
-        self.card_errors.findChild(QLabel, "val_Issues").setText(str(errors))
-
-    # ==========================================================================
-    # WORKFLOW ACTIONS: ANALYZE, RENAME, ROLLBACK
-    # ==========================================================================
-
-    def _on_browse_folder(self):
-        folder = QFileDialog.getExistingDirectory(self, "Select TDS/TCS PDF Certificates Folder")
-        if folder:
-            self.source_folder = Path(folder)
-            self.folder_input.setText(folder)
-            self._start_analysis()
-
-    def _on_subfolder_toggle(self, state):
-        self.config.include_subfolders = (state == Qt.CheckState.Checked.value)
-        self.config.save()
-
-    def _open_settings(self):
-        dlg = SettingsDialog(self.config, self)
+    def open_login_dialog(self):
+        cur_id = self.current_user.id if self.current_user else 1
+        dlg = LoginDialog(self, cur_id)
         if dlg.exec():
-            self._append_log("INFO", "Settings updated. Re-evaluating planned filenames...")
-            certs = self.source_model.get_all()
-            if certs:
-                from core.renamer import CertificateRenamer
-                renamer = CertificateRenamer(
-                    template=self.config.naming_template,
-                    collision_policy=self.config.collision_policy,
-                    execution_mode=self.config.execution_mode,
-                    output_folder=Path(self.config.output_folder) if self.config.output_folder else None,
-                    max_length=self.config.max_filename_length,
-                )
-                renamer.plan_batch(certs)
-                self.source_model.set_data(certs)
-                self._update_metrics()
+            self.current_user = dlg.authenticated_user
+            self.update_user_pill()
+            self.audit_dossier_view.verify_and_refresh()
+            QMessageBox.information(
+                self, "Authenticated",
+                f"Welcome, {self.current_user.full_name}!\nSession authenticated under role '{self.current_user.role.replace('_', ' ')}'."
+            )
 
-    def _start_analysis(self):
-        folder_str = self.folder_input.text().strip()
-        if not folder_str or not Path(folder_str).exists():
-            QMessageBox.warning(self, "Invalid Folder", "Please select a valid folder containing PDF files.")
-            return
+    def populate_entities(self):
+        self.entity_combo.blockSignals(True)
+        self.entity_combo.clear()
+        entities = Entity.get_all(1)
+        cur_idx = 0
+        for idx, e in enumerate(entities):
+            self.entity_combo.addItem(f"{e.legal_name} ({e.registered_state})", e.id)
+            if e.id == self.current_entity_id:
+                cur_idx = idx
+        self.entity_combo.setCurrentIndex(cur_idx)
+        self.entity_combo.blockSignals(False)
 
-        folder = Path(folder_str)
-        pattern = "**/*.pdf" if self.subfolders_check.isChecked() else "*.pdf"
-        pdf_files = list(folder.glob(pattern))
+    def on_entities_updated(self):
+        self.populate_entities()
+        self.on_entity_changed(self.entity_combo.currentIndex())
 
-        if not pdf_files:
-            QMessageBox.information(self, "No PDFs Found", f"No PDF files found in:\n{folder}")
-            return
-
-        self.source_model.clear()
-        self._update_metrics()
-        self._set_ui_processing_state(True)
-        self.progress_bar.setVisible(True)
-        self.progress_bar.setRange(0, len(pdf_files))
-        self.progress_bar.setValue(0)
-
-        self._append_log("INFO", f"Discovered {len(pdf_files)} PDF files in {folder}")
-
-        self.worker = BatchWorkerThread(
-            files=pdf_files,
-            config=self.config,
-            phase="analyze",
-            parent=self,
-        )
-        self.worker.progress_changed.connect(self._on_worker_progress)
-        self.worker.item_analyzed.connect(self._on_item_analyzed)
-        self.worker.log_message.connect(self._append_log)
-        self.worker.batch_finished.connect(self._on_analysis_finished)
-        self.worker.start()
-
-    def _on_item_analyzed(self, cert: CertificateData):
-        self.source_model.update_item(cert)
-        self._update_metrics()
-
-    def _on_analysis_finished(self, summary: dict):
-        self._set_ui_processing_state(False)
-        self.progress_bar.setVisible(False)
-        self.rename_btn.setEnabled(summary.get("success", 0) > 0)
-        self.status_label.setText(
-            f"Analysis complete: {summary['processed']} analyzed, {summary['success']} ready to rename, {summary['errors']} issues."
-        )
-
-    def _start_renaming(self):
-        certs = self.source_model.get_all()
-        ready_certs = [c for c in certs if c.status != ProcessingStatus.ERROR and c.proposed_filename]
-
-        if not ready_certs:
-            QMessageBox.information(self, "No Files Ready", "No certificates ready for renaming.")
-            return
-
-        msg = (
-            f"You are about to execute renaming on {len(ready_certs)} files.\n"
-            f"Mode: {self.config.execution_mode.replace('_', ' ').title()}\n"
-            f"Template: {self.config.naming_template}\n\n"
-            f"Do you want to proceed?"
-        )
-        reply = QMessageBox.question(self, "Confirm Batch Rename", msg, QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
-        if reply != QMessageBox.StandardButton.Yes:
-            return
-
-        self._set_ui_processing_state(True)
-        self.progress_bar.setVisible(True)
-        self.progress_bar.setRange(0, len(ready_certs))
-        self.progress_bar.setValue(0)
-
-        self.worker = BatchWorkerThread(
-            files=[],
-            config=self.config,
-            phase="rename",
-            existing_certs=ready_certs,
-            parent=self,
-        )
-        self.worker.progress_changed.connect(self._on_worker_progress)
-        self.worker.item_renamed.connect(self._on_item_renamed)
-        self.worker.log_message.connect(self._append_log)
-        self.worker.batch_finished.connect(self._on_rename_finished)
-        self.worker.start()
-
-    def _on_item_renamed(self, cert: CertificateData):
-        self.source_model.update_item(cert)
-        self._update_metrics()
-
-    def _on_rename_finished(self, summary: dict):
-        self._set_ui_processing_state(False)
-        self.progress_bar.setVisible(False)
-        self.rename_btn.setEnabled(False)
-        self.status_label.setText(
-            f"Rename finished: {summary.get('renamed', 0)} renamed, {summary.get('skipped', 0)} skipped, {summary.get('errors', 0)} errors."
-        )
-        QMessageBox.information(
-            self,
-            "Batch Complete",
-            f"Batch operation completed!\n\n"
-            f"Renamed: {summary.get('renamed', 0)}\n"
-            f"Skipped: {summary.get('skipped', 0)}\n"
-            f"Errors: {summary.get('errors', 0)}\n"
-            f"Undo Checkpoint: {summary.get('session_id', 'None')}",
-        )
-
-    def _rollback_batch(self):
-        last_session = self.undo_manager.get_last_session()
-        if not last_session:
-            QMessageBox.information(self, "No Undo Available", "No recorded batch rename sessions found to undo.")
-            return
-
-        session_id = last_session["session_id"]
-        count = last_session["operations_count"]
-        timestamp = last_session["timestamp"]
-
-        msg = f"Rollback previous batch ({session_id})?\nRecorded: {timestamp}\nFiles to restore: {count}"
-        reply = QMessageBox.question(self, "Confirm Undo", msg, QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
-        if reply != QMessageBox.StandardButton.Yes:
-            return
-
-        succ, errs, logs = self.undo_manager.rollback_session(session_id)
-        for line in logs:
-            self._append_log("INFO", line)
-
-        QMessageBox.information(
-            self,
-            "Rollback Finished",
-            f"Rollback results:\nRestored: {succ} files\nErrors: {errs}",
-        )
-        self._start_analysis()
-
-    def _cancel_worker(self):
-        if self.worker and self.worker.isRunning():
-            self.worker.cancel()
-            self._append_log("WARNING", "Cancellation requested...")
-
-    def _on_worker_progress(self, current: int, total: int, filename: str):
-        self.progress_bar.setValue(current)
-        self.status_label.setText(f"Processing ({current}/{total}): {filename}")
-
-    def _set_ui_processing_state(self, is_running: bool):
-        self.analyze_btn.setEnabled(not is_running)
-        self.browse_btn.setEnabled(not is_running)
-        self.settings_btn.setEnabled(not is_running)
-        self.undo_btn.setEnabled(not is_running)
-        self.cancel_btn.setEnabled(is_running)
-
-    # ==========================================================================
-    # LOGGING & REPORTING
-    # ==========================================================================
-
-    def _append_log(self, level: str, message: str):
-        now_str = datetime.now().strftime("%H:%M:%S")
-        formatted = f"[{now_str}] [{level:7s}] {message}"
-        self.log_view.appendPlainText(formatted)
-
-    def _clear_log(self):
-        self.log_view.clear()
-
-    def _export_report(self):
-        certs = self.source_model.get_all()
-        if not certs:
-            QMessageBox.warning(self, "No Data", "No certificate data available to export.")
-            return
-
-        file_path, selected_filter = QFileDialog.getSaveFileName(
-            self,
-            "Export Certificate Reconciliation Report",
-            f"TDS_TCS_Renaming_Report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx",
-            "Excel Workbook (*.xlsx);;CSV File (*.csv)",
-        )
-        if not file_path:
-            return
-
-        try:
-            records = [c.to_dict() for c in certs]
-            if not records:
-                return
-
-            if file_path.endswith(".csv") or "CSV" in selected_filter:
-                fieldnames = list(records[0].keys())
-                with open(file_path, "w", newline="", encoding="utf-8-sig") as f:
-                    writer = csv.DictWriter(f, fieldnames=fieldnames)
-                    writer.writeheader()
-                    writer.writerows(records)
+    def on_users_updated(self):
+        # Refresh current user state if modified
+        if self.current_user:
+            updated = User.get_by_id(self.current_user.id)
+            if updated and updated.is_active:
+                self.current_user = updated
             else:
-                wb = openpyxl.Workbook()
-                ws = wb.active
-                ws.title = "TDS_TCS_Certificates"
-                headers = list(records[0].keys())
-                ws.append(headers)
-                for r in records:
-                    ws.append([str(r.get(h, "")) for h in headers])
-                wb.save(file_path)
+                self.current_user = User.get_all(1)[0] if User.get_all(1) else None
+        self.update_user_pill()
 
-            self._append_log("SUCCESS", f"Exported reconciliation report to: {file_path}")
-            QMessageBox.information(self, "Export Successful", f"Report saved successfully:\n{file_path}")
-        except Exception as e:
-            QMessageBox.critical(self, "Export Error", f"Failed to export report:\n{str(e)}")
+    def toggle_theme_mode(self):
+        from ui.styles import get_theme_qss
+        from PyQt6.QtWidgets import QApplication
+        if self.current_theme_mode == "dark":
+            self.current_theme_mode = "light"
+            self.btn_theme_toggle.setText("🌙 Dark Mode")
+            self.btn_theme_toggle.setStyleSheet("""
+                background-color: #E2E8F0;
+                color: #0F172A;
+                border: 1px solid #94A3B8;
+                font-weight: 600;
+                padding: 5px 12px;
+                border-radius: 6px;
+                font-size: 11px;
+            """)
+        else:
+            self.current_theme_mode = "dark"
+            self.btn_theme_toggle.setText("☀️ Light Mode")
+            self.btn_theme_toggle.setStyleSheet("""
+                background-color: #1E293B;
+                color: #F59E0B;
+                border: 1px solid #D97706;
+                font-weight: 600;
+                padding: 5px 12px;
+                border-radius: 6px;
+                font-size: 11px;
+            """)
+        app = QApplication.instance()
+        if app:
+            app.setStyleSheet(get_theme_qss(self.current_theme_mode))
 
-    # ==========================================================================
-    # TABLE INTERACTIONS & CONTEXT MENU
-    # ==========================================================================
+    def on_entity_selection_requested(self, entity_id: int):
+        idx = self.entity_combo.findData(entity_id)
+        if idx >= 0:
+            self.entity_combo.setCurrentIndex(idx)
 
-    def _on_search_text_changed(self, text: str):
-        self.proxy_model.set_search_text(text)
+    def on_entity_changed(self, index: int):
+        entity_id = self.entity_combo.currentData()
+        if entity_id:
+            self.current_entity_id = entity_id
+            self.dashboard_view.set_active_entity(entity_id)
+            self.contract_view.set_active_entity(entity_id)
+            self.regulatory_view.current_entity_id = entity_id
+            self.tasks_view.current_entity_id = entity_id
+            self.tasks_view.load_tasks()
+            self.calendar_view.current_entity_id = entity_id
+            self.calendar_view.load_calendar_events()
 
-    def _on_act_filter_changed(self, index: int):
-        self.proxy_model.set_act_filter(self.act_combo.currentText())
-
-    def _on_form_filter_changed(self, index: int):
-        self.proxy_model.set_form_filter(self.form_combo.currentText())
-
-    def _on_status_filter_changed(self, index: int):
-        self.proxy_model.set_status_filter(self.status_combo.currentText())
-
-    def _on_table_double_clicked(self, proxy_index):
-        source_index = self.proxy_model.mapToSource(proxy_index)
-        cert = self.source_model.get_certificate(source_index.row())
-        if cert:
-            dlg = CertificatePreviewDialog(cert, self)
-            if dlg.exec():
-                self.source_model.update_item(cert)
-
-    def _show_context_menu(self, pos):
-        proxy_index = self.table_view.indexAt(pos)
-        if not proxy_index.isValid():
-            return
-
-        source_index = self.proxy_model.mapToSource(proxy_index)
-        cert = self.source_model.get_certificate(source_index.row())
-        if not cert:
-            return
-
-        menu = QMenu(self)
-        view_action = menu.addAction("Inspect / Edit Details...")
-        open_file_action = menu.addAction("Open PDF in Default Viewer")
-        open_folder_action = menu.addAction("Show in File Explorer")
-
-        chosen = menu.exec(self.table_view.viewport().mapToGlobal(pos))
-        if chosen == view_action:
-            dlg = CertificatePreviewDialog(cert, self)
-            if dlg.exec():
-                self.source_model.update_item(cert)
-        elif chosen == open_file_action:
-            p = cert.final_filepath if (cert.final_filepath and cert.final_filepath.exists()) else cert.file_path
-            if p and Path(p).exists():
-                os.startfile(str(p))
-        elif chosen == open_folder_action:
-            p = cert.final_filepath if (cert.final_filepath and cert.final_filepath.exists()) else cert.file_path
-            if p and Path(p).exists():
-                subprocess.run(["explorer", f"/select,{str(Path(p).resolve())}"])
+    def switch_view(self, index: int):
+        self.stack.setCurrentIndex(index)
+        if 0 <= index < len(self.nav_buttons):
+            self.nav_buttons[index].setChecked(True)
+        if index == 5:
+            self.entity_user_view.load_entities()
+            self.entity_user_view.load_users()
+        elif index == 7:
+            self.audit_dossier_view.verify_and_refresh()

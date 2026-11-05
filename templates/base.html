@@ -1,21 +1,11 @@
 <!DOCTYPE html>
-<html lang="en" class="h-full bg-slate-50 text-slate-900 antialiased">
+<html lang="en" x-data="{ darkMode: localStorage.getItem('theme') === 'light' ? false : true, switchUserModal: false }" :class="{ 'dark': darkMode }">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes">
-    <title>{% block title %}What's cooking today? &bull; Zero-Waste AI Meal Planner{% endblock %}</title>
-    
-    <!-- PWA Web App Manifest & Meta Tags -->
-    <link rel="manifest" href="/manifest.json">
-    <meta name="theme-color" content="#ea580c">
-    <meta name="mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="default">
-    <meta name="apple-mobile-web-app-title" content="What's cooking today?">
-    <link rel="apple-touch-icon" href="/static/icons/apple-touch-icon.png">
-    <link rel="icon" type="image/png" sizes="64x64" href="/static/icons/favicon.png">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}LexSecure India Pro — Enterprise Legal & Regulatory Intelligence{% endblock %}</title>
 
-    <!-- Tailwind CSS CDN -->
+    <!-- Tailwind CSS CDN with Custom Dark Config -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
         tailwind.config = {
@@ -23,539 +13,200 @@
             theme: {
                 extend: {
                     colors: {
-                        brand: {
-                            50: '#fff7ed',
-                            100: '#ffedd5',
-                            200: '#fed7aa',
-                            300: '#fdba74',
-                            400: '#fb923c',
-                            500: '#f97316',
-                            600: '#ea580c',
-                            700: '#c2410c',
-                            800: '#9a3412',
-                            900: '#7c2d12',
+                        navy: {
+                            950: '#070D18',
+                            900: '#0F172A',
+                            800: '#1E293B',
+                            700: '#334155',
+                            600: '#475569',
                         },
-                        urgent: {
-                            light: '#ffe4e6',
-                            DEFAULT: '#f43f5e',
-                            dark: '#be123c',
-                        },
-                        sunshine: {
-                            400: '#fbbf24',
-                            500: '#f59e0b',
-                            600: '#d97706',
+                        accent: {
+                            teal: '#0D9488',
+                            emerald: '#10B981',
                         }
-                    },
-                    fontFamily: {
-                        sans: ['Plus Jakarta Sans', 'Inter', 'system-ui', 'sans-serif'],
-                    },
-                    screens: {
-                        'xs': '480px',
-                        'sm': '640px',
-                        'md': '768px',
-                        'lg': '1024px',
-                        'xl': '1280px',
-                        '2xl': '1536px',
                     }
                 }
             }
         }
     </script>
 
-    <!-- Google Fonts -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <!-- Alpine.js 3.x CDN -->
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.13.5/dist/cdn.min.js"></script>
 
-    <!-- HTMX 1.9+ -->
+    <!-- HTMX 1.9.10 CDN -->
     <script src="https://unpkg.com/htmx.org@1.9.10"></script>
-    
-    <!-- Alpine.js 3.x -->
-    <script defer src="https://unpkg.com/alpinejs@3.13.5/dist/cdn.min.js"></script>
 
     <style>
+        /* Custom scrollbars */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #475569; }
         [x-cloak] { display: none !important; }
-        
-        /* Lively micro-animations */
-        @keyframes pulse-subtle {
-            0%, 100% { transform: scale(1); opacity: 1; }
-            50% { transform: scale(1.05); opacity: 0.9; }
-        }
-        .animate-subtle-pulse {
-            animation: pulse-subtle 2.5s infinite ease-in-out;
-        }
-
-        /* Custom scrollbar */
-        ::-webkit-scrollbar {
-            width: 6px;
-            height: 6px;
-        }
-        ::-webkit-scrollbar-track {
-            background: #f1f5f9;
-        }
-        ::-webkit-scrollbar-thumb {
-            background: #cbd5e1;
-            border-radius: 9999px;
-        }
-        ::-webkit-scrollbar-thumb:hover {
-            background: #94a3b8;
-        }
-
-        /* HTMX request indicator animation */
-        .htmx-indicator {
-            display: none;
-            transition: opacity 200ms ease-in;
-        }
-        .htmx-request .htmx-indicator,
-        .htmx-request.htmx-indicator {
-            display: inline-flex;
-        }
-
-        /* Safe area padding for notched mobile displays */
-        .safe-bottom {
-            padding-bottom: max(0.5rem, env(safe-area-inset-bottom));
-        }
     </style>
-
-    <!-- PWA Service Worker & Install Prompt Registration Script -->
-    <script>
-        // Service worker registration with active cache updating
-        if ('serviceWorker' in navigator) {
-            window.addEventListener('load', () => {
-                navigator.serviceWorker.register('/sw.js?v=2', { scope: '/', updateViaCache: 'none' })
-                    .then((reg) => {
-                        reg.update();
-                        console.log('What\'s cooking today? PWA Service Worker registered:', reg.scope);
-                    })
-                    .catch((err) => {
-                        console.warn('Service Worker registration skipped/failed:', err);
-                    });
-            });
-        }
-
-        // Global manual cache clearing helper
-        window.clearPWACacheAndReload = async function() {
-            try {
-                if ('serviceWorker' in navigator) {
-                    const registrations = await navigator.serviceWorker.getRegistrations();
-                    for (let registration of registrations) {
-                        await registration.unregister();
-                    }
-                }
-                if ('caches' in window) {
-                    const keys = await caches.keys();
-                    for (let key of keys) {
-                        await caches.delete(key);
-                    }
-                }
-            } catch(e) {
-                console.error(e);
-            }
-            window.location.href = window.location.pathname + '?refresh=' + Date.now();
-        };
-
-        // Global state for PWA install prompt
-        window.deferredPWAInstallPrompt = null;
-        window.addEventListener('beforeinstallprompt', (e) => {
-            // Prevent auto mini-infobar on mobile Chrome
-            e.preventDefault();
-            window.deferredPWAInstallPrompt = e;
-            console.log('PWA beforeinstallprompt captured!');
-            // Dispatch event for Alpine.js or buttons
-            window.dispatchEvent(new CustomEvent('pwa-install-ready'));
-        });
-
-        window.addEventListener('appinstalled', () => {
-            window.deferredPWAInstallPrompt = null;
-            console.log('What\'s cooking today? was installed successfully!');
-            window.dispatchEvent(new CustomEvent('pwa-installed'));
-        });
-
-        // Trigger PWA Install
-        window.triggerPWAInstall = function() {
-            if (window.deferredPWAInstallPrompt) {
-                window.deferredPWAInstallPrompt.prompt();
-                window.deferredPWAInstallPrompt.userChoice.then((choiceResult) => {
-                    if (choiceResult.outcome === 'accepted') {
-                        console.log('User accepted What\'s cooking today? install prompt');
-                    } else {
-                        console.log('User dismissed What\'s cooking today? install prompt');
-                    }
-                    window.deferredPWAInstallPrompt = null;
-                });
-            } else {
-                // If iOS Safari
-                const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
-                if (isIOS) {
-                    alert('To install "What\'s cooking today?" on iPhone/iPad:\n1. Tap the Share button (⎙ / ⬆️) in Safari.\n2. Tap "Add to Home Screen" (+).');
-                } else {
-                    alert('To install on your Laptop / Desktop:\nClick the Install icon (💻 / ⊕) in your browser address bar at the top right!');
-                }
-            }
-        };
-
-        // Audio Synthesis Sound Effects for Timers
-        window.playKitchenTimerBeep = function() {
-            try {
-                const ctx = new (window.AudioContext || window.webkitAudioContext)();
-                const now = ctx.currentTime;
-                
-                const osc1 = ctx.createOscillator();
-                const gain1 = ctx.createGain();
-                osc1.type = 'sine';
-                osc1.frequency.setValueAtTime(880, now);
-                gain1.gain.setValueAtTime(0.3, now);
-                gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.35);
-                osc1.connect(gain1);
-                gain1.connect(ctx.destination);
-                osc1.start(now);
-                osc1.stop(now + 0.35);
-
-                const osc2 = ctx.createOscillator();
-                const gain2 = ctx.createGain();
-                osc2.type = 'triangle';
-                osc2.frequency.setValueAtTime(1174.66, now + 0.2);
-                gain2.gain.setValueAtTime(0.35, now + 0.2);
-                gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.6);
-                osc2.connect(gain2);
-                gain2.connect(ctx.destination);
-                osc2.start(now + 0.2);
-                osc2.stop(now + 0.6);
-
-                const osc3 = ctx.createOscillator();
-                const gain3 = ctx.createGain();
-                osc3.type = 'sine';
-                osc3.frequency.setValueAtTime(1760, now + 0.4);
-                gain3.gain.setValueAtTime(0.4, now + 0.4);
-                gain3.gain.exponentialRampToValueAtTime(0.001, now + 0.9);
-                osc3.connect(gain3);
-                gain3.connect(ctx.destination);
-                osc3.start(now + 0.4);
-                osc3.stop(now + 0.9);
-            } catch (err) {
-                console.warn('Audio synthesis waiting for interaction:', err);
-            }
-        };
-    </script>
 </head>
-<body class="h-full flex flex-col bg-gradient-to-br from-amber-50/50 via-slate-50 to-orange-50/40 text-slate-800"
-      hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
-      x-data="{
-          isInstallReady: false,
-          isIOS: /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream,
-          isStandalone: window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true,
-          showPWAFloat: true,
-          showMobileModal: false,
-          copiedMobileUrl: false
-      }"
-      @pwa-install-ready.window="isInstallReady = true"
-      @pwa-installed.window="isInstallReady = false; isStandalone = true">
+<body class="bg-slate-100 dark:bg-navy-900 text-slate-900 dark:text-slate-100 min-h-screen flex flex-col font-sans transition-colors duration-200">
 
-    <!-- Desktop & Tablet Navigation Bar -->
-    <header class="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-amber-100 shadow-xs transition-all">
+    <!-- TOP ENTERPRISE NAVIGATION BAR -->
+    <header class="bg-white dark:bg-navy-950 border-b border-slate-200 dark:border-navy-700 sticky top-0 z-40 shadow-sm">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="flex items-center justify-between h-16 sm:h-18">
+            <div class="flex items-center justify-between h-16">
                 
-                <!-- Logo & Brand (Renamed to What's cooking today?) -->
-                <a href="{% url 'pantry_list' %}" class="flex items-center gap-3 group shrink-0">
-                    <div class="w-10 h-10 sm:w-11 sm:h-11 rounded-2xl bg-gradient-to-tr from-amber-600 via-orange-500 to-rose-500 text-white flex items-center justify-center shadow-md shadow-orange-500/25 group-hover:scale-105 transition-transform">
-                        <span class="text-xl sm:text-2xl">🍳</span>
-                    </div>
-                    <div>
-                        <div class="flex items-center gap-2">
-                            <span class="text-lg sm:text-xl font-black tracking-tight bg-gradient-to-r from-amber-700 via-orange-600 to-rose-600 bg-clip-text text-transparent">
-                                What's cooking today?
-                            </span>
-                            <span class="hidden xs:inline-block px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-wider bg-amber-100 text-amber-900 rounded-full border border-amber-200">
-                                2 Meals/Day &bull; Zero Waste
-                            </span>
+                <!-- Left: Branding & Entity Switcher -->
+                <div class="flex items-center space-x-4">
+                    <a href="{% url 'dashboard' %}" class="flex items-center space-x-2.5">
+                        <div class="w-9 h-9 rounded-lg bg-gradient-to-br from-emerald-500 to-teal-700 flex items-center justify-center shadow-md">
+                            <span class="text-white font-extrabold text-lg">⚖</span>
                         </div>
-                        <p class="text-[11px] font-semibold text-slate-600 -mt-0.5 hidden md:block">
-                            AI Daily Meals &bull; Multi-Cuisine Rasoi
-                        </p>
-                    </div>
-                </a>
-
-                <!-- Desktop / Tablet Nav Links -->
-                <nav class="hidden md:flex items-center gap-1 lg:gap-1.5">
-                    <!-- Pantry -->
-                    <a href="{% url 'pantry_list' %}" 
-                       class="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs lg:text-sm font-bold transition-all {% if request.resolver_match.url_name == 'pantry_list' %}bg-amber-100 text-amber-950 shadow-xs ring-1 ring-amber-300{% else %}text-slate-600 hover:text-slate-900 hover:bg-slate-100{% endif %}">
-                        <span>🥫</span>
-                        <span>My Pantry</span>
-                        {% if urgent_pantry_count > 0 %}
-                        <span class="px-1.5 py-0.2 text-[11px] font-black rounded-full bg-urgent text-white shadow-xs animate-pulse">
-                            {{ urgent_pantry_count }}
-                        </span>
-                        {% endif %}
+                        <div>
+                            <div class="flex items-center space-x-1.5">
+                                <span class="font-bold text-base tracking-tight text-slate-900 dark:text-white">LexSecure India</span>
+                                <span class="bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-[10px] font-bold px-1.5 py-0.5 rounded border border-emerald-500/30">PRO</span>
+                            </div>
+                            <p class="text-[10px] text-slate-500 dark:text-slate-400 leading-none">Enterprise Statutory & Compliance Suite</p>
+                        </div>
                     </a>
 
-                    <!-- Cook Now (AI) -->
-                    <a href="{% url 'recipe_suggest' %}" 
-                       class="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs lg:text-sm font-bold transition-all {% if request.resolver_match.url_name == 'recipe_suggest' %}bg-orange-100 text-orange-950 shadow-xs ring-1 ring-orange-300{% else %}text-slate-600 hover:text-slate-900 hover:bg-slate-100{% endif %}">
-                        <span class="text-amber-500">✨</span>
-                        <span>Daily Meals (2/Day)</span>
-                        <span class="px-1.5 py-0.2 text-[9px] font-black uppercase rounded bg-orange-200 text-orange-900">AI</span>
-                    </a>
+                    <!-- Operating Entity Selector Dropdown -->
+                    <form action="{% url 'switch_entity' %}" method="POST" class="hidden md:flex items-center">
+                        {% csrf_token %}
+                        <div class="flex items-center bg-slate-100 dark:bg-navy-800 border border-slate-300 dark:border-navy-700 rounded-lg px-2.5 py-1">
+                            <span class="text-xs text-slate-400 mr-2">🏢</span>
+                            <select name="entity_id" onchange="this.form.submit()" class="bg-transparent text-xs font-semibold text-slate-800 dark:text-slate-200 focus:outline-none cursor-pointer">
+                                {% for ent in entities %}
+                                    <option value="{{ ent.id }}" {% if ent.id == current_entity_id %}selected{% endif %} class="bg-white dark:bg-navy-900 text-slate-900 dark:text-white">
+                                        {{ ent.legal_name }} ({{ ent.registered_state }})
+                                    </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </form>
+                </div>
 
-                    <!-- Meal Queue & Planner -->
-                    <a href="{% url 'planner_view' %}" 
-                       class="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs lg:text-sm font-bold transition-all {% if request.resolver_match.url_name == 'planner_view' %}bg-indigo-50 text-indigo-900 shadow-xs ring-1 ring-indigo-200{% else %}text-slate-600 hover:text-slate-900 hover:bg-slate-100{% endif %}">
-                        <span>📅</span>
-                        <span>Planner (Lunch/Dinner)</span>
-                        {% if meal_queue_count > 0 %}
-                        <span class="px-1.5 py-0.2 text-[11px] font-black rounded-full bg-indigo-100 text-indigo-800">
-                            {{ meal_queue_count }}
-                        </span>
-                        {% endif %}
+                <!-- Center: Navigation Links -->
+                <nav class="hidden lg:flex items-center space-x-1">
+                    <a href="{% url 'dashboard' %}" class="px-3 py-1.5 rounded-md text-xs font-medium {% if request.resolver_match.url_name == 'dashboard' or request.resolver_match.url_name == 'home' %}bg-slate-200 dark:bg-navy-800 text-emerald-600 dark:text-emerald-400 font-bold{% else %}text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-navy-800{% endif %}">
+                        📊 Dashboard
                     </a>
-
-                    <!-- Saved Recipes -->
-                    <a href="{% url 'recipe_saved_list' %}" 
-                       class="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs lg:text-sm font-bold transition-all {% if request.resolver_match.url_name == 'recipe_saved_list' %}bg-rose-50 text-rose-900 shadow-xs ring-1 ring-rose-200{% else %}text-slate-600 hover:text-slate-900 hover:bg-slate-100{% endif %}">
-                        <span>📖</span>
-                        <span>Cookbook</span>
+                    <a href="{% url 'contracts' %}" class="px-3 py-1.5 rounded-md text-xs font-medium {% if request.resolver_match.url_name == 'contracts' %}bg-slate-200 dark:bg-navy-800 text-emerald-600 dark:text-emerald-400 font-bold{% else %}text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-navy-800{% endif %}">
+                        📑 Contracts & Review
                     </a>
-
-                    <!-- Settings -->
-                    <a href="{% url 'household_settings' %}" 
-                       class="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs lg:text-sm font-bold transition-all {% if request.resolver_match.url_name == 'household_settings' %}bg-slate-200 text-slate-900 shadow-xs{% else %}text-slate-600 hover:text-slate-900 hover:bg-slate-100{% endif %}">
-                        <span>⚙️</span>
-                        <span>Profile</span>
+                    <a href="{% url 'regulatory' %}" class="px-3 py-1.5 rounded-md text-xs font-medium {% if request.resolver_match.url_name == 'regulatory' %}bg-slate-200 dark:bg-navy-800 text-emerald-600 dark:text-emerald-400 font-bold{% else %}text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-navy-800{% endif %}">
+                        📡 Regulatory Feed
+                    </a>
+                    <a href="{% url 'tasks' %}" class="px-3 py-1.5 rounded-md text-xs font-medium {% if request.resolver_match.url_name == 'tasks' %}bg-slate-200 dark:bg-navy-800 text-emerald-600 dark:text-emerald-400 font-bold{% else %}text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-navy-800{% endif %}">
+                        📋 Compliance Tasks
+                    </a>
+                    <a href="{% url 'calendar' %}" class="px-3 py-1.5 rounded-md text-xs font-medium {% if request.resolver_match.url_name == 'calendar' %}bg-slate-200 dark:bg-navy-800 text-emerald-600 dark:text-emerald-400 font-bold{% else %}text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-navy-800{% endif %}">
+                        📅 Statutory Calendar
+                    </a>
+                    <a href="{% url 'audit' %}" class="px-3 py-1.5 rounded-md text-xs font-medium {% if request.resolver_match.url_name == 'audit' %}bg-slate-200 dark:bg-navy-800 text-emerald-600 dark:text-emerald-400 font-bold{% else %}text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-navy-800{% endif %}">
+                        🛡️ Audit Ledger
+                    </a>
+                    <a href="{% url 'governance' %}" class="px-3 py-1.5 rounded-md text-xs font-medium {% if request.resolver_match.url_name == 'governance' %}bg-slate-200 dark:bg-navy-800 text-emerald-600 dark:text-emerald-400 font-bold{% else %}text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-navy-800{% endif %}">
+                        ⚙️ Governance
                     </a>
                 </nav>
 
-                <!-- Right Action Bar: PWA Desktop Install Button + Cook Now -->
-                <div class="flex items-center gap-2 sm:gap-3">
-                    
-                    <!-- Open on Mobile Button -->
-                    <button type="button" 
-                            @click="showMobileModal = true"
-                            class="inline-flex items-center gap-1.5 px-3 py-1.5 sm:py-2 rounded-xl bg-orange-100 hover:bg-orange-200 text-orange-950 font-extrabold text-xs transition-all hover:scale-105 active:scale-95 border border-orange-200"
-                            title="Open on Mobile / Scan QR">
-                        <span>📱</span>
-                        <span class="hidden sm:inline">Open on Phone</span>
+                <!-- Right: User Profile, Switch User & Dark/Light Toggle -->
+                <div class="flex items-center space-x-2.5">
+                    <!-- User Pill -->
+                    <div class="flex items-center bg-slate-100 dark:bg-navy-800 border border-slate-300 dark:border-navy-700 rounded-lg px-2.5 py-1 text-xs">
+                        <span class="mr-1.5">👤</span>
+                        <div class="text-left">
+                            <span class="font-semibold text-slate-800 dark:text-slate-200 block leading-tight">{{ current_user.full_name }}</span>
+                            <span class="text-[9px] text-emerald-600 dark:text-emerald-400 font-mono tracking-wider font-bold uppercase">{{ current_user.get_role_display }}</span>
+                        </div>
+                    </div>
+
+                    <!-- Switch User Button -->
+                    <button @click="switchUserModal = true" class="px-2.5 py-1 bg-slate-200 dark:bg-navy-800 hover:bg-slate-300 dark:hover:bg-navy-700 text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-navy-600 text-xs font-semibold rounded-lg transition-colors flex items-center space-x-1" title="Switch User Role">
+                        <span>🔑</span>
+                        <span class="hidden sm:inline">Switch</span>
                     </button>
 
-                    <!-- PWA Desktop / Tablet Install App Button -->
-                    <button type="button" 
-                            onclick="window.triggerPWAInstall()"
-                            x-show="!isStandalone"
-                            class="inline-flex items-center gap-1.5 px-3 sm:px-3.5 py-1.5 sm:py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-extrabold text-xs shadow-xs transition-all hover:scale-105 active:scale-95"
-                            title="Install What's cooking today? App">
-                        <span class="hidden sm:inline">💻</span>
-                        <span class="sm:hidden">Install</span>
-                        <span class="hidden sm:inline">Install App</span>
+                    <!-- Dark / Light Mode Toggle Button -->
+                    <button @click="darkMode = !darkMode; localStorage.setItem('theme', darkMode ? 'dark' : 'light')" class="p-1.5 bg-slate-200 dark:bg-navy-800 hover:bg-slate-300 dark:hover:bg-navy-700 text-amber-500 dark:text-amber-400 border border-slate-300 dark:border-navy-600 rounded-lg transition-colors text-sm" title="Toggle Dark/Light Mode">
+                        <span x-show="darkMode">☀️</span>
+                        <span x-show="!darkMode">🌙</span>
                     </button>
-
-                    <!-- Cook Now High-Impact Callout -->
-                    <a href="{% url 'recipe_suggest' %}" 
-                       class="hidden sm:inline-flex items-center gap-2 px-3.5 sm:px-4 py-2 rounded-xl bg-gradient-to-r from-amber-600 to-orange-500 hover:from-amber-700 hover:to-orange-600 text-white font-black text-xs sm:text-sm shadow-md shadow-orange-600/25 transition-all">
-                        <span>✨</span>
-                        <span>What To Cook?</span>
-                    </a>
                 </div>
-
             </div>
+        </div>
+
+        <!-- Mobile Navigation Strip -->
+        <div class="lg:hidden border-t border-slate-200 dark:border-navy-800 px-4 py-2 flex items-center space-x-2 overflow-x-auto text-xs">
+            <a href="{% url 'dashboard' %}" class="whitespace-nowrap px-2.5 py-1 rounded bg-slate-100 dark:bg-navy-800">📊 Dashboard</a>
+            <a href="{% url 'contracts' %}" class="whitespace-nowrap px-2.5 py-1 rounded bg-slate-100 dark:bg-navy-800">📑 Contracts</a>
+            <a href="{% url 'regulatory' %}" class="whitespace-nowrap px-2.5 py-1 rounded bg-slate-100 dark:bg-navy-800">📡 Regulatory</a>
+            <a href="{% url 'tasks' %}" class="whitespace-nowrap px-2.5 py-1 rounded bg-slate-100 dark:bg-navy-800">📋 Tasks</a>
+            <a href="{% url 'calendar' %}" class="whitespace-nowrap px-2.5 py-1 rounded bg-slate-100 dark:bg-navy-800">📅 Calendar</a>
+            <a href="{% url 'audit' %}" class="whitespace-nowrap px-2.5 py-1 rounded bg-slate-100 dark:bg-navy-800">🛡️ Audit</a>
+            <a href="{% url 'governance' %}" class="whitespace-nowrap px-2.5 py-1 rounded bg-slate-100 dark:bg-navy-800">⚙️ Governance</a>
         </div>
     </header>
 
-    <!-- Mobile Connect & QR Code Modal -->
-    <div x-show="showMobileModal" 
-         x-cloak
-         class="fixed inset-0 z-50 overflow-y-auto"
-         role="dialog" aria-modal="true">
-        <div class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity" @click="showMobileModal = false"></div>
-
-        <div class="flex min-h-full items-center justify-center p-4 text-center">
-            <div class="relative transform overflow-hidden rounded-3xl bg-white text-left shadow-2xl transition-all w-full max-w-md border border-amber-100 p-6 sm:p-7">
-                
-                <!-- Close Button -->
-                <button type="button" 
-                        @click="showMobileModal = false"
-                        class="absolute top-4 right-4 text-slate-400 hover:text-slate-600 p-2 rounded-full hover:bg-slate-100 transition-colors">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
-                </button>
-
-                <!-- Modal Content -->
-                <div class="text-center">
-                    <div class="w-14 h-14 mx-auto rounded-2xl bg-gradient-to-tr from-amber-500 to-orange-500 text-white flex items-center justify-center text-2xl shadow-lg shadow-orange-500/30 mb-3">
-                        📱
-                    </div>
-                    <h3 class="text-xl font-black text-slate-900 tracking-tight">
-                        Open on Your Mobile Phone
-                    </h3>
-                    <p class="text-xs font-semibold text-slate-500 mt-1">
-                        What's cooking today? &bull; Local Wi-Fi Sharing
-                    </p>
-
-                    <!-- QR Code -->
-                    <div class="my-5 p-3 bg-gradient-to-br from-amber-50 to-orange-50 rounded-2xl border-2 border-dashed border-amber-300 inline-block">
-                        <img src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data={{ mobile_share_url|urlencode }}&margin=4" 
-                             alt="Scan QR with Phone" 
-                             class="w-44 h-44 rounded-xl mx-auto shadow-xs bg-white">
-                        <p class="text-[11px] font-bold text-amber-900 mt-2 flex items-center justify-center gap-1">
-                            <span>📸</span> Point your phone's camera to scan
-                        </p>
-                    </div>
-
-                    <!-- Direct URL Box -->
-                    <div class="bg-slate-50 p-3 rounded-2xl border border-slate-200 text-left">
-                        <p class="text-[10px] font-black uppercase tracking-wider text-slate-400">Direct Mobile URL</p>
-                        <div class="flex items-center justify-between gap-2 mt-1">
-                            <code class="text-xs sm:text-sm font-mono font-bold text-orange-600 truncate select-all">{{ mobile_share_url }}</code>
-                            <button type="button" 
-                                    @click="navigator.clipboard.writeText('{{ mobile_share_url }}'); copiedMobileUrl = true; setTimeout(() => copiedMobileUrl = false, 2500)"
-                                    class="px-2.5 py-1 text-xs font-bold rounded-lg bg-orange-600 hover:bg-orange-700 text-white shrink-0 transition-colors">
-                                <span x-show="!copiedMobileUrl">Copy</span>
-                                <span x-show="copiedMobileUrl" x-cloak>✓ Copied!</span>
-                            </button>
-                        </div>
-                    </div>
-
-                    <!-- 3 Easy Steps -->
-                    <div class="mt-4 text-left space-y-2 text-xs text-slate-600 bg-amber-50/60 p-3.5 rounded-2xl border border-amber-100">
-                        <div class="flex items-start gap-2">
-                            <span class="w-5 h-5 rounded-full bg-amber-500 text-white font-black text-[11px] flex items-center justify-center shrink-0">1</span>
-                            <span>Connect phone & laptop to the <strong>same Wi-Fi network</strong>.</span>
-                        </div>
-                        <div class="flex items-start gap-2">
-                            <span class="w-5 h-5 rounded-full bg-amber-500 text-white font-black text-[11px] flex items-center justify-center shrink-0">2</span>
-                            <span>Open Google Chrome (Android) or Safari (iPhone) and scan the QR or visit the URL.</span>
-                        </div>
-                        <div class="flex items-start gap-2">
-                            <span class="w-5 h-5 rounded-full bg-amber-500 text-white font-black text-[11px] flex items-center justify-center shrink-0">3</span>
-                            <span>Tap <strong>"Install App"</strong> or <strong>"Add to Home Screen"</strong> for full-screen PWA app!</span>
-                        </div>
-                    </div>
-
-                    <!-- Force Update / Cache Clear Button -->
-                    <div class="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between">
-                        <span class="text-[11px] text-slate-500 font-medium">Seeing an older cached version?</span>
-                        <button type="button" 
-                                onclick="window.clearPWACacheAndReload()"
-                                class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition-all">
-                            <span>🔄</span>
-                            <span>Force Update App</span>
-                        </button>
-                    </div>
-                </div>
-
-            </div>
-        </div>
-    </div>
-
-    <!-- Global Messages / Toasts -->
+    <!-- TOAST MESSAGES -->
     {% if messages %}
-    <div class="max-w-4xl mx-auto px-4 mt-3 w-full" x-data="{ show: true }" x-show="show" x-transition>
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-3">
         {% for message in messages %}
-        <div class="flex items-center justify-between p-3.5 mb-2 rounded-2xl shadow-sm border 
-            {% if message.tags == 'success' %}bg-emerald-50 text-emerald-800 border-emerald-200{% elif message.tags == 'error' %}bg-rose-50 text-rose-800 border-rose-200{% else %}bg-amber-50 text-amber-800 border-amber-200{% endif %}">
-            <div class="flex items-center gap-2.5">
-                <span class="text-lg">
-                    {% if message.tags == 'success' %}🥘{% elif message.tags == 'error' %}⚠️{% else %}💡{% endif %}
-                </span>
-                <span class="text-xs sm:text-sm font-bold">{{ message }}</span>
-            </div>
-            <button @click="show = false" class="text-slate-500 hover:text-slate-800 p-1">
-                ✕
-            </button>
+        <div class="p-3 mb-2 rounded-lg text-xs font-semibold flex items-center justify-between {% if message.tags == 'error' %}bg-rose-500/10 text-rose-500 border border-rose-500/30{% elif message.tags == 'success' %}bg-emerald-500/10 text-emerald-500 border border-emerald-500/30{% else %}bg-blue-500/10 text-blue-400 border border-blue-500/30{% endif %}">
+            <span>{{ message }}</span>
+            <button onclick="this.parentElement.remove()" class="text-slate-400 hover:text-white ml-2">&times;</button>
         </div>
         {% endfor %}
     </div>
     {% endif %}
 
-    <!-- PWA Install Banner (Non-intrusive floating pill on Mobile & Desktop) -->
-    <div x-show="!isStandalone && showPWAFloat" 
-         x-transition:enter="transition ease-out duration-300"
-         x-transition:enter-start="opacity-0 translate-y-4"
-         x-transition:enter-end="opacity-100 translate-y-0"
-         class="fixed bottom-20 md:bottom-6 right-4 sm:right-6 z-50 max-w-sm w-full bg-slate-950 text-white p-3.5 sm:p-4 rounded-3xl shadow-2xl border border-slate-700 flex items-center justify-between gap-3">
-        
-        <div class="flex items-center gap-3">
-            <div class="w-10 h-10 rounded-2xl bg-gradient-to-tr from-amber-500 to-orange-500 flex items-center justify-center text-xl shrink-0">
-                🥘
-            </div>
-            <div>
-                <p class="text-xs font-black leading-tight text-white">What's cooking today?</p>
-                <p class="text-[11px] text-slate-300 mt-0.5" x-text="isIOS ? 'Tap Share ⎙ & Add to Home Screen' : 'Install for instant access & offline use!'"></p>
-            </div>
-        </div>
-
-        <div class="flex items-center gap-1.5 shrink-0">
-            <button type="button" 
-                    onclick="window.triggerPWAInstall()"
-                    class="px-3 py-1.5 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 text-slate-950 font-black text-xs rounded-xl shadow-xs transition-all active:scale-95">
-                <span x-text="isIOS ? 'How to Add' : 'Install App'"></span>
-            </button>
-            <button type="button" @click="showPWAFloat = false" class="text-slate-400 hover:text-white p-1">
-                ✕
-            </button>
-        </div>
-    </div>
-
-    <!-- Main Content Slot (Auto-adjusting responsive container across Mobile, iPad/Tablet & Desktop) -->
-    <main class="flex-1 max-w-7xl w-full mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-6 pb-28 md:pb-12">
+    <!-- MAIN PAGE CONTENT -->
+    <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
         {% block content %}{% endblock %}
     </main>
 
-    <!-- Mobile Sticky Bottom Navigation Bar (Auto-hidden on Tablets & Desktop; active on phones) -->
-    <nav class="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-lg border-t border-slate-200/90 px-2 py-1.5 shadow-2xl safe-bottom">
-        <div class="flex items-center justify-around">
-            
-            <!-- Pantry -->
-            <a href="{% url 'pantry_list' %}" 
-               class="flex flex-col items-center py-1 px-2.5 rounded-xl transition-all relative {% if request.resolver_match.url_name == 'pantry_list' %}text-orange-600 font-extrabold{% else %}text-slate-500 hover:text-slate-800{% endif %}">
-                <div class="relative">
-                    <span class="text-2xl">🥫</span>
-                    {% if urgent_pantry_count > 0 %}
-                    <span class="absolute -top-1 -right-2 px-1.5 py-0.2 text-[10px] font-black rounded-full bg-urgent text-white animate-pulse shadow-xs">
-                        {{ urgent_pantry_count }}
-                    </span>
-                    {% endif %}
-                </div>
-                <span class="text-[11px] mt-0.5">Pantry</span>
-            </a>
-
-            <!-- Cook Now (Center Highlighted Floating Action) -->
-            <a href="{% url 'recipe_suggest' %}" 
-               class="flex flex-col items-center -mt-6 group">
-                <div class="w-14 h-14 rounded-2xl bg-gradient-to-tr from-amber-600 via-orange-500 to-rose-500 text-white shadow-xl shadow-orange-500/40 group-active:scale-95 transition-transform flex items-center justify-center border-2 border-white">
-                    <span class="text-2xl animate-subtle-pulse">🥘</span>
-                </div>
-                <span class="text-[11px] font-black text-orange-700 mt-1">Cook (2/Day)</span>
-            </a>
-
-            <!-- Planner / Queue -->
-            <a href="{% url 'planner_view' %}" 
-               class="flex flex-col items-center py-1 px-2.5 rounded-xl transition-all relative {% if request.resolver_match.url_name == 'planner_view' %}text-indigo-600 font-extrabold{% else %}text-slate-500 hover:text-slate-800{% endif %}">
-                <div class="relative">
-                    <span class="text-2xl">📅</span>
-                    {% if meal_queue_count > 0 %}
-                    <span class="absolute -top-1 -right-2 px-1.5 py-0.2 text-[10px] font-black rounded-full bg-indigo-500 text-white shadow-xs">
-                        {{ meal_queue_count }}
-                    </span>
-                    {% endif %}
-                </div>
-                <span class="text-[11px] mt-0.5">Planner</span>
-            </a>
-
-            <!-- Cookbook -->
-            <a href="{% url 'recipe_saved_list' %}" 
-               class="flex flex-col items-center py-1 px-2.5 rounded-xl transition-all {% if request.resolver_match.url_name == 'recipe_saved_list' %}text-rose-600 font-extrabold{% else %}text-slate-500 hover:text-slate-800{% endif %}">
-                <span class="text-2xl">📖</span>
-                <span class="text-[11px] mt-0.5">Recipes</span>
-            </a>
-
-            <!-- Settings -->
-            <a href="{% url 'household_settings' %}" 
-               class="flex flex-col items-center py-1 px-2.5 rounded-xl transition-all {% if request.resolver_match.url_name == 'household_settings' %}text-amber-600 font-extrabold{% else %}text-slate-500 hover:text-slate-800{% endif %}">
-                <span class="text-2xl">⚙️</span>
-                <span class="text-[11px] mt-0.5">Profile</span>
-            </a>
+    <!-- FOOTER -->
+    <footer class="bg-white dark:bg-navy-950 border-t border-slate-200 dark:border-navy-700 py-4 text-center text-xs text-slate-500 dark:text-slate-400">
+        <div class="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-2">
+            <div>
+                <b>LexSecure India Pro</b> &bull; Enterprise Legal & Regulatory Intelligence Platform
+            </div>
+            <div class="text-[11px] text-slate-400">
+                Statutory Coverage: FEMA 1999 &bull; Section 27 Indian Contract Act 1872 &bull; MSMED Act 2006 &bull; 4 Labour Codes &bull; DPDP Act 2023 &bull; CERT-In
+            </div>
         </div>
-    </nav>
+    </footer>
 
-    {% block extra_scripts %}{% endblock %}
+    <!-- SWITCH USER MODAL -->
+    <div x-cloak x-show="switchUserModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+        <div @click.away="switchUserModal = false" class="bg-white dark:bg-navy-800 border border-slate-200 dark:border-navy-700 rounded-xl shadow-2xl max-w-md w-full p-6">
+            <div class="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-navy-700">
+                <h3 class="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                    <span>🔑</span> Switch Corporate User Session
+                </h3>
+                <button @click="switchUserModal = false" class="text-slate-400 hover:text-white">&times;</button>
+            </div>
+            <form action="{% url 'switch_user' %}" method="POST" class="mt-4 space-y-4">
+                {% csrf_token %}
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Select User Profile</label>
+                    <select name="user_id" class="w-full bg-slate-50 dark:bg-navy-900 border border-slate-300 dark:border-navy-600 rounded-lg p-2 text-xs font-medium text-slate-900 dark:text-white focus:ring-1 focus:ring-emerald-500">
+                        {% for u in users %}
+                            <option value="{{ u.id }}" {% if u.id == current_user_id %}selected{% endif %}>
+                                {{ u.full_name }} — {{ u.get_role_display }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Security PIN (Default: 1234)</label>
+                    <input type="password" name="pin" value="1234" class="w-full bg-slate-50 dark:bg-navy-900 border border-slate-300 dark:border-navy-600 rounded-lg p-2 text-xs font-mono text-slate-900 dark:text-white focus:ring-1 focus:ring-emerald-500" required>
+                </div>
+                <div class="flex items-center justify-end space-x-2 pt-2">
+                    <button type="button" @click="switchUserModal = false" class="px-3 py-1.5 text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-navy-700 rounded-lg">Cancel</button>
+                    <button type="submit" class="px-4 py-1.5 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg shadow">Authenticate Session</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
 </body>
 </html>

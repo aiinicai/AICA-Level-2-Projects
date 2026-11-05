@@ -1,0 +1,314 @@
+{% extends 'base.html' %}
+
+{% block title %}Contract & Document Review Workspace — LexSecure India Pro{% endblock %}
+
+{% block content %}
+<div x-data="{ activeTab: 'review', uploadModal: false, reassignModal: false, reassignDocId: null, reassignDocName: '' }" class="space-y-6">
+
+    <!-- PAGE HEADER & TOP ACTIONS -->
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+            <h1 class="text-xl sm:text-2xl font-extrabold tracking-tight text-slate-900 dark:text-white flex items-center gap-2">
+                <span>📑</span> Contract / Document Review & Storage Workspace
+            </h1>
+            <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                Active Operating Entity: <span class="font-semibold text-emerald-600 dark:text-emerald-400">{{ current_entity.legal_name }}</span>
+            </p>
+        </div>
+        <div class="flex items-center space-x-2">
+            <button @click="uploadModal = true" class="inline-flex items-center px-3.5 py-2 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg shadow-sm transition">
+                <span>📤 Upload New Contract</span>
+            </button>
+            {% if active_doc %}
+            <a href="{% url 'download_reviewed_document' active_doc.id %}" class="inline-flex items-center px-3.5 py-2 text-xs font-semibold text-slate-700 dark:text-slate-200 bg-white dark:bg-navy-800 hover:bg-slate-100 dark:hover:bg-navy-700 border border-slate-300 dark:border-navy-600 rounded-lg shadow-sm transition">
+                <span>📥 Download Highlighted Report</span>
+            </a>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- TABS NAVIGATION -->
+    <div class="border-b border-slate-200 dark:border-navy-700 flex space-x-4">
+        <button @click="activeTab = 'review'" :class="{ 'border-b-2 border-emerald-500 text-emerald-600 dark:text-emerald-400 font-bold': activeTab === 'review', 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300': activeTab !== 'review' }" class="pb-3 text-xs flex items-center gap-1.5 transition">
+            <span>🔍</span> Active Document Review & Redline
+        </button>
+        <button @click="activeTab = 'storage'" :class="{ 'border-b-2 border-emerald-500 text-emerald-600 dark:text-emerald-400 font-bold': activeTab === 'storage', 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300': activeTab !== 'storage' }" class="pb-3 text-xs flex items-center gap-1.5 transition">
+            <span>📂</span> Document Storage Repository ({{ stored_docs.count }})
+        </button>
+    </div>
+
+    <!-- ===================================================================== -->
+    <!-- TAB 1: ACTIVE DOCUMENT REVIEW (SPLIT SCREEN WORKSPACE) -->
+    <!-- ===================================================================== -->
+    <div x-show="activeTab === 'review'" class="space-y-4">
+        {% if active_doc %}
+        <!-- Top Score & Health Banner -->
+        <div class="bg-white dark:bg-navy-800 border border-slate-200 dark:border-navy-700 rounded-xl p-4 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div class="flex items-center space-x-3">
+                <div class="w-10 h-10 rounded-lg bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 flex items-center justify-center font-bold text-lg">
+                    📄
+                </div>
+                <div>
+                    <h2 class="text-sm font-bold text-slate-900 dark:text-white">{{ active_doc.original_filename }}</h2>
+                    <p class="text-[11px] text-slate-500 dark:text-slate-400">
+                        Type: <span class="font-mono text-emerald-600 dark:text-emerald-400 font-bold">{{ active_doc.doc_type }}</span> &bull; 
+                        Assigned Entity: <span class="font-semibold">{{ active_doc.entity.legal_name }}</span> &bull; 
+                        Uploaded on {{ active_doc.created_at|date:"d M Y" }}
+                    </p>
+                </div>
+            </div>
+
+            <div class="flex items-center space-x-4 bg-slate-50 dark:bg-navy-900 border border-slate-200 dark:border-navy-700/60 rounded-lg px-4 py-2">
+                <div class="text-center">
+                    <span class="text-[10px] text-slate-400 uppercase font-bold block">Legal Health</span>
+                    <span class="text-sm font-extrabold {% if active_doc.overall_health_score >= 80 %}text-emerald-500{% elif active_doc.overall_health_score >= 60 %}text-amber-500{% else %}text-rose-500{% endif %}">
+                        {{ active_doc.overall_health_score }}%
+                    </span>
+                </div>
+                <div class="h-6 w-px bg-slate-200 dark:bg-navy-700"></div>
+                <div class="text-center">
+                    <span class="text-[10px] text-slate-400 uppercase font-bold block">Liability Cap</span>
+                    <span class="text-sm font-extrabold text-amber-500">{{ active_doc.liability_score }}%</span>
+                </div>
+                <div class="h-6 w-px bg-slate-200 dark:bg-navy-700"></div>
+                <div class="text-center">
+                    <span class="text-[10px] text-slate-400 uppercase font-bold block">Statutory / MSME</span>
+                    <span class="text-sm font-extrabold text-rose-500">{{ active_doc.statutory_score }}%</span>
+                </div>
+                <div class="h-6 w-px bg-slate-200 dark:bg-navy-700"></div>
+                <div class="text-center">
+                    <span class="text-[10px] text-slate-400 uppercase font-bold block">Labour & FEMA</span>
+                    <span class="text-sm font-extrabold text-emerald-500">{{ active_doc.labour_fema_score }}%</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- SPLIT SCREEN CONTAINER -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            
+            <!-- Left Pane: Color-Coded Highlighted Contract Text -->
+            <div class="bg-white dark:bg-navy-800 border border-slate-200 dark:border-navy-700 rounded-xl p-5 shadow-sm flex flex-col h-[700px]">
+                <div class="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-navy-700 mb-3">
+                    <h3 class="text-xs font-bold uppercase tracking-wider text-slate-800 dark:text-slate-200 flex items-center gap-2">
+                        <span>📜</span> Interactive Contract Clauses & Statutory Highlights
+                    </h3>
+                    <span class="text-[10px] text-slate-400">Jurisdiction: India</span>
+                </div>
+
+                <div class="flex-1 overflow-y-auto space-y-3 pr-2 text-xs leading-relaxed">
+                    <div class="p-3 bg-slate-50 dark:bg-navy-900 border-l-4 border-emerald-500 rounded text-slate-600 dark:text-slate-300 text-[11px] mb-2">
+                        <b>Legend:</b> 
+                        <span class="text-rose-500 font-bold ml-1">🔴 High Risk / Dealbreaker</span> &bull; 
+                        <span class="text-amber-500 font-bold ml-1">🟡 Caution / Deviation</span> &bull; 
+                        <span class="text-emerald-500 font-bold ml-1">🟢 Compliant / Accepted</span>
+                    </div>
+
+                    {% for c in clauses %}
+                    <div class="p-3.5 rounded-lg border transition {% if c.is_resolved or c.risk_tier == 'COMPLIANT' %}bg-emerald-500/10 border-emerald-500/30 text-slate-900 dark:text-slate-100{% elif c.risk_tier == 'HIGH' %}bg-rose-500/10 border-rose-500/40 text-slate-900 dark:text-slate-100{% else %}bg-amber-500/10 border-amber-500/40 text-slate-900 dark:text-slate-100{% endif %}">
+                        <div class="flex items-center justify-between mb-1.5">
+                            <span class="font-bold text-[11px] {% if c.is_resolved or c.risk_tier == 'COMPLIANT' %}text-emerald-600 dark:text-emerald-400{% elif c.risk_tier == 'HIGH' %}text-rose-600 dark:text-rose-400{% else %}text-amber-600 dark:text-amber-400{% endif %}">
+                                {% if c.is_resolved %}
+                                    ✔ [COMPLIANT] {{ c.clause_type }}
+                                {% elif c.risk_tier == 'HIGH' %}
+                                    🔴 [HIGH RISK DEALBREAKER] {{ c.clause_type }}
+                                {% else %}
+                                    🟡 [CAUTION] {{ c.clause_type }}
+                                {% endif %}
+                            </span>
+                            <span class="text-[10px] text-slate-400">Page {{ c.page_number }}</span>
+                        </div>
+                        <p class="font-mono text-[11.5px] leading-relaxed text-slate-800 dark:text-slate-200">
+                            {{ c.raw_text }}
+                        </p>
+                        {% if c.suggested_redline and not c.is_resolved %}
+                        <div class="mt-2 text-[11px] text-emerald-700 dark:text-emerald-300 bg-emerald-500/10 border border-emerald-500/20 p-2 rounded">
+                            <b>Proposed Redline:</b> {{ c.suggested_redline }}
+                        </div>
+                        {% endif %}
+                    </div>
+                    {% empty %}
+                    <p class="text-xs text-slate-400 text-center py-10">No specific clauses extracted.</p>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <!-- Right Pane: Clause Breakdown & 1-Click Redline Accept HTMX List -->
+            <div class="bg-white dark:bg-navy-800 border border-slate-200 dark:border-navy-700 rounded-xl p-5 shadow-sm flex flex-col h-[700px]">
+                <div class="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-navy-700 mb-3">
+                    <h3 class="text-xs font-bold uppercase tracking-wider text-slate-800 dark:text-slate-200 flex items-center gap-2">
+                        <span>⚖️</span> Statutory Infractions & Playbook Alignment
+                    </h3>
+                    <span class="text-[10px] text-slate-400">{{ clauses.count }} Findings</span>
+                </div>
+
+                <div class="flex-1 overflow-y-auto space-y-4 pr-2">
+                    {% for clause in clauses %}
+                        {% include 'compliance/partials/clause_card.html' with clause=clause doc=active_doc %}
+                    {% empty %}
+                    <p class="text-xs text-slate-400 text-center py-10">No compliance flags detected.</p>
+                    {% endfor %}
+                </div>
+            </div>
+
+        </div>
+        {% else %}
+        <!-- Empty State -->
+        <div class="bg-white dark:bg-navy-800 border border-slate-200 dark:border-navy-700 rounded-xl p-12 text-center shadow-sm">
+            <span class="text-4xl block mb-2">📁</span>
+            <h3 class="text-sm font-bold text-slate-800 dark:text-white">No Contracts Uploaded for this Entity</h3>
+            <p class="text-xs text-slate-400 mt-1 max-w-sm mx-auto">Upload a PDF, DOCX, or TXT commercial agreement to automatically scan against Indian Statutory Playbooks.</p>
+            <button @click="uploadModal = true" class="mt-4 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-lg shadow transition">
+                📤 Upload & Review First Contract
+            </button>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- ===================================================================== -->
+    <!-- TAB 2: DOCUMENT STORAGE REPOSITORY -->
+    <!-- ===================================================================== -->
+    <div x-show="activeTab === 'storage'" class="space-y-4">
+        <div class="bg-white dark:bg-navy-800 border border-slate-200 dark:border-navy-700 rounded-xl p-5 shadow-sm">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between pb-4 border-b border-slate-200 dark:border-navy-700 mb-4 gap-2">
+                <div>
+                    <h2 class="text-xs font-bold uppercase tracking-wider text-slate-800 dark:text-slate-200 flex items-center gap-2">
+                        <span>📂</span> Stored Contract Repository for {{ current_entity.legal_name }}
+                    </h2>
+                    <p class="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">Partitioned storage repository mapped to operating entity RBAC matrix</p>
+                </div>
+                <button @click="uploadModal = true" class="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-lg transition self-start sm:self-auto">
+                    + Upload New Document
+                </button>
+            </div>
+
+            <div class="overflow-x-auto">
+                <table class="w-full text-left text-xs">
+                    <thead>
+                        <tr class="border-b border-slate-200 dark:border-navy-700 text-slate-500 dark:text-slate-400 uppercase font-semibold text-[10px]">
+                            <th class="py-2.5 px-3">Document Name</th>
+                            <th class="py-2.5 px-3">Contract Type</th>
+                            <th class="py-2.5 px-3">Assigned Entity</th>
+                            <th class="py-2.5 px-3">Upload Date</th>
+                            <th class="py-2.5 px-3">Health Score</th>
+                            <th class="py-2.5 px-3 text-right">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-100 dark:divide-navy-700/50">
+                        {% for doc in stored_docs %}
+                        <tr class="hover:bg-slate-50 dark:hover:bg-navy-900/50">
+                            <td class="py-2.5 px-3 font-semibold text-slate-900 dark:text-white flex items-center gap-2">
+                                <span>📄</span>
+                                <span>{{ doc.original_filename }}</span>
+                            </td>
+                            <td class="py-2.5 px-3 font-mono text-emerald-600 dark:text-emerald-400 font-bold text-[10px]">{{ doc.doc_type }}</td>
+                            <td class="py-2.5 px-3 text-slate-600 dark:text-slate-300 font-medium">{{ doc.entity.legal_name }}</td>
+                            <td class="py-2.5 px-3 text-slate-500 dark:text-slate-400 whitespace-nowrap">{{ doc.created_at|date:"d M Y" }}</td>
+                            <td class="py-2.5 px-3 whitespace-nowrap">
+                                <span class="px-2 py-0.5 rounded text-[10px] font-bold {% if doc.overall_health_score >= 80 %}bg-emerald-500/20 text-emerald-500 border border-emerald-500/30{% elif doc.overall_health_score >= 60 %}bg-amber-500/20 text-amber-500 border border-amber-500/30{% else %}bg-rose-500/20 text-rose-500 border border-rose-500/30{% endif %}">
+                                    {{ doc.overall_health_score }}% Health
+                                </span>
+                            </td>
+                            <td class="py-2.5 px-3 text-right space-x-1.5 whitespace-nowrap">
+                                <a href="{% url 'contracts' %}?doc_id={{ doc.id }}" class="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded text-[11px] transition">
+                                    🔍 Review
+                                </a>
+                                <button @click="reassignDocId = {{ doc.id }}; reassignDocName = '{{ doc.original_filename|escapejs }}'; reassignModal = true" class="px-2.5 py-1 bg-slate-200 dark:bg-navy-700 hover:bg-slate-300 dark:hover:bg-navy-600 text-slate-700 dark:text-slate-300 font-semibold rounded text-[11px] transition">
+                                    🏢 Re-assign
+                                </button>
+                                <a href="{% url 'download_reviewed_document' doc.id %}" class="px-2.5 py-1 bg-slate-200 dark:bg-navy-700 hover:bg-slate-300 dark:hover:bg-navy-600 text-slate-700 dark:text-slate-300 font-semibold rounded text-[11px] transition" title="Download Report">
+                                    📥 Report
+                                </a>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="6" class="text-center py-6 text-slate-400">No stored contracts found for this operating entity.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- UPLOAD CONTRACT MODAL -->
+    <div x-cloak x-show="uploadModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+        <div @click.away="uploadModal = false" class="bg-white dark:bg-navy-800 border border-slate-200 dark:border-navy-700 rounded-xl shadow-2xl max-w-lg w-full p-6">
+            <div class="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-navy-700">
+                <h3 class="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                    <span>📤</span> Upload Contract for Indian Statutory Review
+                </h3>
+                <button @click="uploadModal = false" class="text-slate-400 hover:text-white">&times;</button>
+            </div>
+            <form action="{% url 'upload_contract' %}" method="POST" enctype="multipart/form-data" class="mt-4 space-y-4">
+                {% csrf_token %}
+                
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Contract File (PDF, DOCX, TXT)</label>
+                    <input type="file" name="contract_file" accept=".pdf,.docx,.doc,.txt,.rtf" class="w-full text-xs text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-emerald-500/10 file:text-emerald-500 hover:file:bg-emerald-500/20 cursor-pointer" required>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Assign to Operating Entity</label>
+                    <select name="entity_id" class="w-full bg-slate-50 dark:bg-navy-900 border border-slate-300 dark:border-navy-600 rounded-lg p-2 text-xs font-medium text-slate-900 dark:text-white focus:ring-1 focus:ring-emerald-500">
+                        {% for ent in entities %}
+                            <option value="{{ ent.id }}" {% if ent.id == current_entity_id %}selected{% endif %}>
+                                {{ ent.legal_name }} ({{ ent.registered_state }})
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Contract Type / Playbook</label>
+                    <select name="contract_type" class="w-full bg-slate-50 dark:bg-navy-900 border border-slate-300 dark:border-navy-600 rounded-lg p-2 text-xs font-medium text-slate-900 dark:text-white focus:ring-1 focus:ring-emerald-500">
+                        {% for cval, clabel in contract_types %}
+                            <option value="{{ cval }}">{{ clabel }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="p-3 bg-slate-50 dark:bg-navy-900/60 rounded-lg border border-slate-200 dark:border-navy-700 text-[11px] text-slate-500 dark:text-slate-400">
+                    ⚡ <b>Statutory Checks Enabled:</b> Section 27 Indian Contract Act (Non-compete), Section 43B(h) / MSMED 45-day payment, FEMA cross-border ECB limits, DPDP Act 2023 liability caps.
+                </div>
+
+                <div class="flex items-center justify-end space-x-2 pt-2">
+                    <button type="button" @click="uploadModal = false" class="px-3 py-1.5 text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-navy-700 rounded-lg">Cancel</button>
+                    <button type="submit" class="px-4 py-1.5 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg shadow">Upload & Scan Document</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- REASSIGN ENTITY MODAL -->
+    <div x-cloak x-show="reassignModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+        <div @click.away="reassignModal = false" class="bg-white dark:bg-navy-800 border border-slate-200 dark:border-navy-700 rounded-xl shadow-2xl max-w-md w-full p-6">
+            <div class="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-navy-700">
+                <h3 class="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                    <span>🏢</span> Re-assign Contract to Operating Entity
+                </h3>
+                <button @click="reassignModal = false" class="text-slate-400 hover:text-white">&times;</button>
+            </div>
+            <form :action="'/contracts/' + reassignDocId + '/reassign/'" method="POST" class="mt-4 space-y-4">
+                {% csrf_token %}
+                <p class="text-xs text-slate-600 dark:text-slate-300">
+                    Re-assigning: <b x-text="reassignDocName" class="text-emerald-500"></b>
+                </p>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Target Operating Entity</label>
+                    <select name="new_entity_id" class="w-full bg-slate-50 dark:bg-navy-900 border border-slate-300 dark:border-navy-600 rounded-lg p-2 text-xs font-medium text-slate-900 dark:text-white focus:ring-1 focus:ring-emerald-500">
+                        {% for ent in entities %}
+                            <option value="{{ ent.id }}">{{ ent.legal_name }} ({{ ent.registered_state }})</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="flex items-center justify-end space-x-2 pt-2">
+                    <button type="button" @click="reassignModal = false" class="px-3 py-1.5 text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-navy-700 rounded-lg">Cancel</button>
+                    <button type="submit" class="px-4 py-1.5 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg shadow">Confirm Re-assignment</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+</div>
+{% endblock %}
