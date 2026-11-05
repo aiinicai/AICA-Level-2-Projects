@@ -1,140 +1,98 @@
 # User Guide
 
-## What this app does
+## 1. Before you start
 
-Tally Converter takes your accounting files - Excel spreadsheets, CSVs,
-PDF invoices, or photographed/scanned invoices (JPG/PNG) - and turns
-them into an XML file that TallyPrime can import as vouchers (Sales,
-Purchase, Receipt, Payment, Contra, Journal, Credit Note, Debit Note).
+- Python 3.8 or newer is installed (IDLE is enough).
+- Internet is available for the first run, so the tool can install PyQt5 and openpyxl.
+- The vendor master `Unique_Vendor_Master.xlsx` is in the working folder (`C:\Day 5` by default). If it is missing, create it with **Edit Vendor Master**.
 
-Everything happens on your computer. No file, invoice, or accounting
-figure is ever sent over the internet.
+To try the tool on the fictional demo data without touching any real folder:
 
-## The workflow
+```
+python prepare_demo.py --launch
+```
 
-### 1. Import
+## 2. Starting the tool
 
-Go to **Import**, choose your files (Excel/CSV/PDF/JPG/PNG - you can
-select several at once), and click **Upload & Process**. The app reads
-each file, runs OCR on scanned documents/images, and extracts
-transactions automatically.
+Open `Vendor_Name_Matching.py` in IDLE and press **F5**. The first run may take a minute while libraries install. Close the tool window before pressing F5 again.
 
-### 2. Review
+## 3. Checking a payment file
 
-Go to **Review**. Any transaction the app couldn't confidently read
-in full - a missing date, an unreadable amount, no party name found,
-an invalid GSTIN - is listed here with the specific reason(s) it needs
-your attention.
+1. Click **Select Payment File and Check**.
+2. Choose the payment `.xlsx` file.
+3. Read the result:
+   - The three cards show Total Rows, Matched and Not Matched.
+   - Each row is green (Matched) or red (Not Matched), with the reason in **Remarks**.
+4. The checked file is saved as `<OriginalName>_Checked_<date_time>.xlsx` in the working folder. The original is unchanged.
+5. Click **Open Output Folder** to see it, or **Reset** to clear the screen for the next file.
 
-**The app never guesses.** If it shows a field as blank, that means it
-genuinely couldn't determine the value from your document - it's not
-a bug, it's the app being honest about what it doesn't know. Fill in
-or correct the field, choose the correct voucher type from the
-dropdown if needed, and click **Save**, or **Save & Approve** once
-you're satisfied.
+### Printing the verified payment file (PDF)
 
-Every edit you make here is permanently recorded in the **Audit Log**.
+Click **Print Verified PDF** after checking a file.
 
-### 3. Mappings
+- **Every line Matched:** a PDF is created as `<OriginalName>_Verified_<date_time>.pdf` in the working folder. It holds every column and every row of the payment file as you uploaded it, exactly as uploaded, as a plain table with no heading, extra column or footer, on A4 landscape pages with the column headings repeated on each page. A **Total** row at the end sums the Amount column. If an amount is not a number, printing is refused rather than showing a wrong total. You are then asked whether to open it.
+- **Any line Not Matched:** nothing is created. A message states how many lines failed and why. Correct the payment file or the vendor master, then check again.
+- The vendor master is read again at the moment you click, so the PDF always reflects the current master. The original payment file is never changed.
+- Before a file has been checked, or after **Reset**, the button explains that a file must be checked first.
 
-Before you can export a voucher, the app needs to know which ledger in
-*your* TallyPrime company corresponds to each party name in your
-documents, and which ledger to use for roles like Sales, CGST, SGST,
-IGST, Round Off, and Bank/Cash.
+**Payment file layout.** Headers in row 1. The tool needs Beneficiary Account Name, IFSC Code and Beneficiary Account Number (written "Number" or "No."). Sr. No. and Amount are shown if present. Close the file in Excel first.
 
-Go to **Mappings**:
-- **Parties** tab: map each customer/vendor name from your documents
-  to the exact ledger name in Tally (e.g. "ABC Traders" &rarr; "ABC
-  Traders Pvt Ltd" if that's how it's spelled in Tally).
-- **Ledgers** tab: map each role (SALES, PURCHASE, CGST, SGST, IGST,
-  ROUND_OFF, BANK_CASH, SALES_RETURN, PURCHASE_RETURN) to the actual
-  ledger name in your Tally company.
-- **Items** tab: map item/product names if you're tracking inventory.
+## 4. Managing the vendor master
 
-The app will never create a ledger in Tally automatically - you always
-control what maps to what.
+Click **Edit Vendor Master**.
 
-### 4. Validation
+**First time only:** the tool asks you to set an admin passkey (at least 6 characters, entered twice). Keep it with the administrator. After that, the passkey is asked every time.
 
-Go to **Validation** and click **Run Validation**. This checks every
-transaction for:
-- required fields (date, party, invoice number, amount)
-- GST arithmetic (taxable value + tax + round-off = total)
-- possible duplicates
-- missing ledger/item mappings
-
-Anything marked **ERROR** blocks that transaction from being exported
-to XML until you fix it. **WARNING**s don't block export but are worth
-a look.
-
-### 5. Tally Export
-
-Go to **Tally Export**. Select the approved transactions you want to
-export and click **Generate XML**. You'll see:
-- a preview of the generated XML
-- a **Download XML** button (the default way to get your file)
-- a **Copy XML** button
-- any transactions that were skipped, with the reason why (e.g. a
-  missing ledger mapping)
-
-**To import into TallyPrime:** open TallyPrime, go to **Gateway of
-Tally &rarr; Import Data &rarr; Vouchers**, and select the downloaded
-XML file.
-
-**Optional - Send to Tally directly:** if TallyPrime is running on
-this same computer with its HTTP/ODBC server enabled (Gateway of Tally
-&rarr; F1 Help &rarr; Settings &rarr; Connectivity), you can click
-**SEND TO TALLY** to import directly without downloading a file first.
-This requires an extra confirmation click and always defaults to
-**off** - downloading the XML and importing manually is the default,
-safer path.
-
-## Understanding confidence scores
-
-When a document goes through OCR (scanned PDFs, JPG/PNG images), each
-extracted field gets a confidence score:
-
-| Score | Meaning |
+| Task | How |
 |---|---|
-| 90-100% | High confidence - still worth a glance, not accounting correctness |
-| 70-89% | Review recommended |
-| Below 70% | Mandatory review - the field is very likely wrong or incomplete |
+| Add a vendor | **Add Row**, then type. Or click a cell and press Ctrl+V to paste rows copied from Excel |
+| Edit a vendor | Double-click a cell |
+| Delete vendors | Select one or more rows, click **Delete Selected Row(s)**, confirm |
+| Find a vendor | Type in the search box (name, account number or IFSC) |
+| Bulk upload | **Bulk Upload**, choose the file, then **Add to Existing** or **Replace Entire Master**. Review the summary |
+| Download | **Download Master**, choose a file name |
+| Change the passkey | **Change Passkey**, enter the current one, then the new one twice |
+| Apply your changes | **Save Master**. Nothing changes in the real master until you click it |
 
-**A high OCR confidence score does not mean the accounting is
-correct** - it only means the text was read clearly. Always check the
-Validation screen too.
+### Duplicate entries
 
-## Duplicate detection
+The same **Account Number + IFSC** cannot be in the master twice, even with different spacing, upper or lower case, or a different vendor name.
 
-If the app finds a transaction that looks like a duplicate of one
-already imported (matching invoice number + party, or matching GSTIN +
-invoice number, or matching party + date + amount), it will flag it in
-Validation rather than silently skip or silently import it. You decide
-whether to ignore the warning, mark it as an intentional duplicate, or
-treat it as a genuine duplicate to exclude.
+- A warning appears as soon as a duplicate is typed or pasted.
+- The clashing rows turn red and a message appears at the bottom.
+- **Save Master** is refused until the duplicates are deleted or corrected.
 
-## Backups
+### Bulk upload rules
 
-Go to **Settings** to see where your data lives
-(`C:\ProgramData\TallyConverter\`). The database is backed up
-automatically before large imports; back up the `database` and
-`exports` folders manually before major changes if you want extra
-peace of mind.
+- Columns are found by header name, so order does not matter and extra columns are ignored.
+- Format the account number column as **Text** in Excel before uploading, so leading zeros are kept.
+- The summary shows how many vendors were added and how many rows were skipped as duplicates, name conflicts or incomplete.
 
-## Troubleshooting
+### Backups
 
-**"Ledger not found in TallyPrime"** when sending to Tally: the ledger
-name in your mapping doesn't exactly match what exists in your Tally
-company. Go to Mappings and correct the spelling, or create the ledger
-in Tally first.
+Before every save, the previous master is copied to `Master_Backups` in the working folder. The latest 20 backups are kept. To restore one, copy it over `Unique_Vendor_Master.xlsx`.
 
-**"Voucher is not balanced"**: the debit and credit amounts on a
-voucher don't add up to the same total - usually caused by a GST
-mismatch. Check the transaction in Review and re-run Validation.
+## 5. Messages you may see
 
-**"Invalid Tally date"**: check the transaction's date field in
-Review - it may have been left blank or in an unrecognized format.
+| Message | What to do |
+|---|---|
+| Master file not found | Click **Edit Vendor Master** to create it, or place the file in the working folder |
+| Master file is open in Excel | Close it in Excel and try again |
+| These columns were not found in row 1 | Compare the headers listed in the message with your file |
+| Too many incorrect attempts | Wait 60 seconds, then try again |
+| Duplicate entry is not allowed | Delete or correct the red rows |
+| Printing is not allowed. N of M lines are Not Matched | Fix the listed rows or add the vendor to the master, then check the file again |
 
-**OCR isn't finding text well**: make sure Tesseract is installed and
-detected (check Settings). Photographed invoices work best when
-well-lit, in focus, and not skewed at a steep angle.
+## 6. Manual installation of libraries
+
+If the automatic installation fails, open Command Prompt and run:
+
+```
+pip install PyQt5 openpyxl reportlab
+```
+
+## 7. Tips for administrators
+
+- Keep the passkey with the administrator only.
+- Also restrict write access to `Unique_Vendor_Master.xlsx` and `Vendor_Master_Admin.json` in Windows (Properties, Security), so that only the administrator can change them. The passkey protects the editor inside the tool, not the Excel file itself.
+- A downloaded master is an unprotected copy of bank details. Store it securely.
