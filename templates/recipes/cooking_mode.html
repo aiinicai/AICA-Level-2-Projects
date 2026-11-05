@@ -1,0 +1,291 @@
+{% extends 'base.html' %}
+
+{% block title %}Cooking: {{ recipe.title }} &bull; What's cooking today?{% endblock %}
+
+{% block content %}
+<div x-data="cookingSession({
+    totalSteps: {{ instructions|length }},
+    instructions: [
+        {% for step in instructions %}
+        {
+            stepNumber: {{ step.step_number }},
+            text: `{{ step.text|escapejs }}`,
+            icon: `{{ step.icon|default:'🍳' }}`,
+            timerMinutes: {{ step.timer_minutes|default:0 }},
+            timeLeft: {{ step.timer_minutes|default:0 }} * 60,
+            initialSeconds: {{ step.timer_minutes|default:0 }} * 60,
+            timerRunning: false,
+            timerInterval: null,
+            timerFinished: false,
+            completed: false
+        }{% if not forloop.last %},{% endif %}
+        {% endfor %}
+    ]
+})" class="max-w-4xl mx-auto space-y-6">
+
+    <!-- Top Sticky Bar -->
+    <div class="bg-white/95 backdrop-blur-md rounded-3xl p-4 sm:p-5 border border-amber-100 shadow-md flex items-center justify-between gap-4 sticky top-16 z-30">
+        <div class="flex items-center gap-3">
+            <a href="{% url 'recipe_saved_list' %}" class="p-2 rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors font-bold text-xs" title="Exit Cooking Mode">
+                ← Exit
+            </a>
+            <div>
+                <span class="text-[10px] font-black uppercase tracking-wider text-amber-800 bg-amber-100 px-2 py-0.5 rounded-full">
+                    Distraction-Free Rasoi
+                </span>
+                <h1 class="text-base sm:text-lg font-black text-slate-900 truncate max-w-[200px] sm:max-w-md">
+                    {{ recipe.title }}
+                </h1>
+            </div>
+        </div>
+
+        <!-- Progress Indicator & Finish Button -->
+        <div class="flex items-center gap-3">
+            <div class="hidden sm:flex flex-col items-end">
+                <span class="text-xs font-bold text-slate-700" x-text="`${completedCount}/${totalSteps} Steps Complete`"></span>
+                <div class="w-32 bg-slate-100 h-2 rounded-full overflow-hidden mt-1">
+                    <div class="bg-gradient-to-r from-amber-500 to-orange-500 h-full transition-all duration-300"
+                         :style="`width: ${(completedCount / totalSteps) * 100}%`"></div>
+                </div>
+            </div>
+
+            <button @click="showFinishModal = true" 
+                    type="button"
+                    class="px-4 py-2 rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-extrabold text-xs sm:text-sm shadow-md shadow-emerald-600/20 transition-all flex items-center gap-1.5 whitespace-nowrap">
+                <span>🏁</span>
+                <span>Finish Cooking</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- Visual Dish Hero Banner -->
+    <div class="relative rounded-3xl overflow-hidden h-52 sm:h-64 shadow-xl border border-slate-200">
+        <img src="{{ recipe.display_image }}" alt="{{ recipe.title }}" class="w-full h-full object-cover">
+        <div class="absolute inset-0 bg-gradient-to-t from-slate-950/90 via-slate-900/40 to-transparent"></div>
+        
+        <div class="absolute bottom-4 left-4 right-4 text-white flex flex-col sm:flex-row sm:items-end justify-between gap-3">
+            <div>
+                <div class="flex items-center gap-2 mb-1">
+                    <span class="px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-500 text-slate-950">
+                        {{ recipe.cuisine|default:"Indian Culinary" }}
+                    </span>
+                    <span class="px-2.5 py-0.5 rounded-full text-xs font-bold bg-white/20 backdrop-blur-md">
+                        {{ recipe.spice_level|default:"Medium Desi Spicy 🌶️" }}
+                    </span>
+                </div>
+                <h2 class="text-xl sm:text-2xl font-black">{{ recipe.title }}</h2>
+            </div>
+
+            <div class="flex items-center gap-2 text-xs font-bold bg-black/40 backdrop-blur-md p-2 rounded-2xl border border-white/20 self-start sm:self-auto">
+                <span>⏱️ {{ recipe.total_time_minutes }} mins</span>
+                <span>&bull;</span>
+                <span>👥 {{ recipe.servings }} Servings</span>
+                <span>&bull;</span>
+                <span>🍳 {{ recipe.appliances_used.0|default:"Kadai" }}</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Mise En Place & Ingredients Visual Drawer -->
+    <div class="bg-amber-50/80 border border-amber-200 rounded-3xl p-5" x-data="{ open: true }">
+        <div class="flex items-center justify-between cursor-pointer" @click="open = !open">
+            <div class="flex items-center gap-2">
+                <span class="text-xl">🌶️</span>
+                <h2 class="text-sm font-black text-amber-950">Mise En Place & Masala Dabba Prep</h2>
+                <span class="text-xs text-amber-800 font-bold bg-amber-200/60 px-2 py-0.5 rounded-full">
+                    {{ ingredient_status|length }} items
+                </span>
+            </div>
+            <button type="button" class="text-amber-800 text-xs font-bold hover:underline" x-text="open ? 'Hide ▲' : 'Show ▼'"></button>
+        </div>
+
+        <div x-show="open" x-transition class="mt-4 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
+            {% for ing in ingredient_status %}
+            <div class="p-2.5 rounded-xl bg-white border border-amber-100 flex items-center justify-between shadow-xs">
+                <span class="text-xs font-bold text-slate-800">{{ ing.item }}</span>
+                <span class="text-xs font-semibold text-amber-800 bg-amber-100/70 px-2 py-0.5 rounded-md">{{ ing.amount }}</span>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- Step-by-Step Instructions with Visual Action Cards & Interactive Timers -->
+    <div class="space-y-4">
+        <template x-for="(step, idx) in instructions" :key="idx">
+            <div class="rounded-3xl p-5 sm:p-6 transition-all duration-300 border"
+                 :class="step.completed ? 'bg-slate-50 border-slate-200 opacity-60' : 'bg-white border-slate-200 shadow-md shadow-slate-100 hover:border-amber-400'">
+                
+                <div class="flex items-start gap-4">
+                    <!-- Action Icon & Step Checkbox -->
+                    <button type="button" 
+                            @click="toggleStep(idx)" 
+                            class="w-10 h-10 rounded-2xl flex flex-col items-center justify-center font-bold text-sm shrink-0 mt-0.5 transition-all shadow-sm"
+                            :class="step.completed ? 'bg-emerald-500 text-white ring-2 ring-emerald-300' : 'bg-amber-100 text-amber-900 hover:bg-emerald-100 hover:text-emerald-700'">
+                        <span x-show="step.completed" class="text-base">✓</span>
+                        <span x-show="!step.completed" class="text-base" x-text="step.icon"></span>
+                    </button>
+
+                    <!-- Instruction Text -->
+                    <div class="flex-1">
+                        <div class="flex items-center gap-2 mb-1">
+                            <span class="text-xs font-black uppercase tracking-wider text-slate-600" x-text="`Step ${step.stepNumber}`"></span>
+                            <span x-show="step.completed" class="text-[11px] font-bold text-emerald-700 bg-emerald-100 px-2 py-0.2 rounded-full">Completed</span>
+                        </div>
+
+                        <p class="text-base sm:text-lg text-slate-800 font-medium leading-relaxed" 
+                           :class="step.completed ? 'line-through text-slate-500' : ''"
+                           x-text="step.text"></p>
+
+                        <!-- Alpine.js Dynamic Countdown Timer -->
+                        <div x-show="step.timerMinutes > 0" class="mt-4 p-4 rounded-2xl bg-orange-50 border border-orange-200 flex flex-wrap items-center justify-between gap-3">
+                            <div class="flex items-center gap-3">
+                                <div class="w-10 h-10 rounded-xl bg-orange-500 text-white flex items-center justify-center text-lg shadow-sm"
+                                     :class="step.timerRunning ? 'animate-bounce' : ''">
+                                    ⏱️
+                                </div>
+                                <div>
+                                    <span class="text-xs font-bold text-orange-950 block" x-text="`Kitchen Timer (${step.timerMinutes} mins)`"></span>
+                                    <span class="text-2xl font-black tracking-tight" 
+                                          :class="step.timerFinished ? 'text-rose-600 animate-pulse' : 'text-slate-900'"
+                                          x-text="formatTime(step.timeLeft)"></span>
+                                </div>
+                            </div>
+
+                            <!-- Timer Controls -->
+                            <div class="flex items-center gap-2">
+                                <button type="button" 
+                                        @click="startTimer(idx)" 
+                                        x-show="!step.timerRunning && step.timeLeft > 0"
+                                        class="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-sm transition-all flex items-center gap-1">
+                                    <span>▶</span>
+                                    <span>Start</span>
+                                </button>
+
+                                <button type="button" 
+                                        @click="pauseTimer(idx)" 
+                                        x-show="step.timerRunning"
+                                        class="px-4 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs shadow-sm transition-all flex items-center gap-1">
+                                    <span>⏸</span>
+                                    <span>Pause</span>
+                                </button>
+
+                                <button type="button" 
+                                        @click="resetTimer(idx)" 
+                                        class="px-3 py-2 rounded-xl bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold text-xs transition-all">
+                                    ↺ Reset
+                                </button>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+
+            </div>
+        </template>
+    </div>
+
+    <!-- Finish Cooking Modal -->
+    <div x-show="showFinishModal" 
+         x-cloak 
+         class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm"
+         x-transition>
+        <div @click.away="showFinishModal = false" class="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-slate-100">
+            <div class="text-center mb-4">
+                <div class="w-16 h-16 mx-auto mb-3 rounded-3xl bg-gradient-to-tr from-amber-400 to-orange-500 text-white flex items-center justify-center text-3xl shadow-lg shadow-orange-500/20">
+                    👨‍🍳
+                </div>
+                <h3 class="text-xl font-black text-slate-900">Finish & Deduct from Rasoi?</h3>
+                <p class="text-xs text-slate-600 mt-1">
+                    Congratulations on cooking <strong class="text-slate-800">{{ recipe.title }}</strong>!
+                </p>
+            </div>
+
+            <form action="{% url 'recipe_finish_cooking' recipe.id %}" method="post">
+                {% csrf_token %}
+
+                <!-- Pantry Consumption Option -->
+                <div class="p-3.5 rounded-2xl bg-emerald-50 border border-emerald-200 mb-5">
+                    <label class="flex items-start gap-3 cursor-pointer">
+                        <input type="checkbox" name="consume_pantry" checked class="mt-1 w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500">
+                        <div>
+                            <span class="text-xs font-bold text-emerald-950 block">Deduct used ingredients from Pantry</span>
+                            <span class="text-[11px] text-emerald-700">Marks fresh paneer, palak, and vegetables as consumed so inventory stays 100% accurate.</span>
+                        </div>
+                    </label>
+                </div>
+
+                <div class="flex items-center justify-end gap-2.5">
+                    <button type="button" @click="showFinishModal = false" class="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-xl">
+                        Keep Cooking
+                    </button>
+                    <button type="submit" class="px-5 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-bold text-xs sm:text-sm shadow-md shadow-emerald-600/20">
+                        🎉 Complete & Return to Pantry
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    function cookingSession(config) {
+        return {
+            totalSteps: config.totalSteps,
+            instructions: config.instructions,
+            showFinishModal: false,
+
+            get completedCount() {
+                return this.instructions.filter(s => s.completed).length;
+            },
+
+            toggleStep(idx) {
+                this.instructions[idx].completed = !this.instructions[idx].completed;
+            },
+
+            formatTime(seconds) {
+                if (seconds <= 0) return "00:00 - Done!";
+                const mins = Math.floor(seconds / 60);
+                const secs = seconds % 60;
+                return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+            },
+
+            startTimer(idx) {
+                const step = this.instructions[idx];
+                if (step.timerRunning || step.timeLeft <= 0) return;
+
+                step.timerRunning = true;
+                step.timerInterval = setInterval(() => {
+                    if (step.timeLeft > 0) {
+                        step.timeLeft--;
+                    } else {
+                        clearInterval(step.timerInterval);
+                        step.timerRunning = false;
+                        step.timerFinished = true;
+                        if (window.playKitchenTimerBeep) {
+                            window.playKitchenTimerBeep();
+                        }
+                    }
+                }, 1000);
+            },
+
+            pauseTimer(idx) {
+                const step = this.instructions[idx];
+                if (step.timerInterval) {
+                    clearInterval(step.timerInterval);
+                    step.timerRunning = false;
+                }
+            },
+
+            resetTimer(idx) {
+                const step = this.instructions[idx];
+                this.pauseTimer(idx);
+                step.timeLeft = step.initialSeconds;
+                step.timerFinished = false;
+            }
+        };
+    }
+</script>
+{% endblock %}

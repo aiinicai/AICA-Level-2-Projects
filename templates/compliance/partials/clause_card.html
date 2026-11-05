@@ -1,0 +1,63 @@
+<div id="clause-card-{{ clause.id }}" class="border rounded-xl p-4 transition-all duration-200 {% if clause.is_resolved or clause.risk_tier == 'COMPLIANT' %}bg-emerald-500/5 border-emerald-500/30 text-emerald-800 dark:text-emerald-300{% elif clause.risk_tier == 'HIGH' %}bg-rose-500/5 border-rose-500/30 text-rose-900 dark:text-rose-200{% else %}bg-amber-500/5 border-amber-500/30 text-amber-900 dark:text-amber-200{% endif %}">
+    
+    <!-- Top Risk & Type Header -->
+    <div class="flex items-center justify-between pb-2 border-b border-slate-200 dark:border-navy-700/60 mb-2.5">
+        <div class="flex items-center space-x-2">
+            <span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider {% if clause.is_resolved or clause.risk_tier == 'COMPLIANT' %}bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30{% elif clause.risk_tier == 'HIGH' %}bg-rose-500/20 text-rose-600 dark:text-rose-400 border border-rose-500/30{% else %}bg-amber-500/20 text-amber-600 dark:text-amber-400 border border-amber-500/30{% endif %}">
+                {% if clause.is_resolved %}
+                    ✔ REDLINE ACCEPTED
+                {% else %}
+                    {{ clause.risk_tier }} RISK
+                {% endif %}
+            </span>
+            <span class="text-xs font-bold text-slate-800 dark:text-slate-100 font-mono">{{ clause.clause_type }}</span>
+        </div>
+        <span class="text-[10px] text-slate-400">Page {{ clause.page_number }}</span>
+    </div>
+
+    <!-- Statutory Law Violation Citation -->
+    <div class="mb-2">
+        <p class="text-[11px] font-semibold text-slate-500 dark:text-slate-400">Indian Statutory Violation / Case Law Citation:</p>
+        <p class="text-xs font-bold {% if clause.risk_tier == 'HIGH' %}text-rose-600 dark:text-rose-400{% elif clause.risk_tier == 'CAUTION' %}text-amber-600 dark:text-amber-400{% else %}text-emerald-600 dark:text-emerald-400{% endif %} mt-0.5">
+            {{ clause.indian_law_violation|default:"No statutory violations detected. Fully aligned with Indian Jurisprudence." }}
+        </p>
+    </div>
+
+    <!-- Contract Provision Raw Text -->
+    <div class="mb-3">
+        <p class="text-[11px] font-semibold text-slate-500 dark:text-slate-400">Contract Text Extract:</p>
+        <blockquote class="text-xs text-slate-700 dark:text-slate-300 bg-white/50 dark:bg-navy-950/50 p-2.5 rounded-lg border border-slate-200 dark:border-navy-700 mt-0.5 font-mono text-[11px] leading-relaxed">
+            "{{ clause.raw_text }}"
+        </blockquote>
+    </div>
+
+    <!-- Suggested Playbook Redline -->
+    {% if clause.suggested_redline %}
+    <div class="mb-3">
+        <p class="text-[11px] font-semibold text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
+            <span>✨</span> Recommended Indian Playbook Redline:
+        </p>
+        <div class="text-xs text-slate-800 dark:text-slate-200 bg-emerald-500/10 border border-emerald-500/30 p-2.5 rounded-lg mt-0.5 font-medium leading-relaxed">
+            {{ clause.suggested_redline }}
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- 1-Click Action Buttons -->
+    <div class="flex items-center justify-between pt-2 border-t border-slate-200 dark:border-navy-700/60 text-xs">
+        {% if not clause.is_resolved and clause.risk_tier != 'COMPLIANT' %}
+            <button hx-post="{% url 'resolve_clause' clause.id %}" 
+                    hx-target="#clause-card-{{ clause.id }}" 
+                    hx-swap="outerHTML" 
+                    class="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg shadow-sm transition flex items-center gap-1.5">
+                <span>✔</span> Accept Playbook Redline
+            </button>
+        {% else %}
+            <span class="text-xs text-emerald-600 dark:text-emerald-400 font-bold flex items-center gap-1">
+                <span>✅</span> Aligned with Indian Law
+            </span>
+        {% endif %}
+        <span class="text-[10px] text-slate-400">Clause #{{ clause.id }}</span>
+    </div>
+
+</div>

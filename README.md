@@ -1,268 +1,140 @@
-# Upload Your Project Folder to the AICA Level 2 Projects Repository
-
-**Target repository:** [aiinicai/AICA-Level-2-Projects](https://github.com/aiinicai/AICA-Level-2-Projects)
-
-This guide explains how to contribute your complete project folder to the **AICA-Level-2-Projects** repository using GitHub’s **Fork + Pull Request** workflow.
-
-Two methods are covered:
-
-1. **Website-only method** — no software installation required.
-2. **Git command-line method** — recommended for complete project folders and projects containing many files.
+# LexSecure India Pro ⚖️
+### Enterprise Legal & Regulatory Intelligence Web Application for Indian Business Entities
+**A Capstone Project in Applied Legal-Tech, Regulatory Intelligence & Full-Stack Engineering**
 
 ---
 
-## Fork + Pull Request Workflow
+## 📌 Executive Summary
 
-1. **Fork:** Create a personal copy of `aiinicai/AICA-Level-2-Projects` under your GitHub account.
-2. **Add your folder:** Upload or copy your project folder into your fork.
-3. **Commit:** Save the changes in your fork with a clear commit message.
-4. **Open a Pull Request:** Request the `aiinicai` account to merge your changes into the original repository.
-5. **Merge:** The repository owner reviews and accepts your Pull Request. After it is merged, your project folder will appear in the official repository.
+**LexSecure India Pro** is an enterprise-grade Legal & Regulatory Intelligence Web Application engineered for ANY Indian operating business entity (startups, MSMEs, manufacturing plants, tech corporations, and large conglomerates). 
+
+It bridges the critical compliance gap between rapidly shifting statutory frameworks (FEMA 1999, the 4 Labour Codes, DPDP Act 2023, MSMED Act 2006, Section 43B(h), and CERT-In) and corporate execution.
 
 ---
 
-# Method 1: Website Only
+## 🚀 Quick Launch (Web Application)
 
-Use this method if:
+Double-click `launch_web.bat` or run from terminal:
 
-- You do not want to install Git.
-- Your project contains relatively few files.
-- You do not need to preserve the project’s earlier commit history.
+```powershell
+cd C:\Users\Sameeha\.gemini\antigravity\scratch\LexSecure_India_Pro
+.\launch_web.bat
+```
 
-> [!NOTE]
-> GitHub’s web uploader generally allows up to 100 files in a single upload. If your project contains more files, upload them in batches or use the Git command-line method.
+Or run directly with Python:
+```powershell
+python run_web.py
+```
+*(Or `python manage.py runserver 127.0.0.1:8055`)*
 
-## Step 1: Fork the Repository
+Then navigate to: **`http://127.0.0.1:8055/`** *(Dedicated collision-free port)*
 
-1. Log in to your GitHub account.
-2. Open the [AICA-Level-2-Projects repository](https://github.com/aiinicai/AICA-Level-2-Projects).
-3. Click **Fork** in the upper-right corner of the page.
-4. On the **Create a new fork** page, keep the default settings.
-5. Click **Create fork**.
+---
 
-You will be redirected to your personal copy of the repository:
+## 🏛️ Built-In Indian Statutory & Regulatory Coverage
+
+1. **Foreign Exchange Management Act (FEMA 1999 & RBI Regulations):**
+   - FDI inflows/reporting (FC-GPR), overseas transfer of shares (FC-TRS), External Commercial Borrowings (ECB) limits (SOFR + 550 bps), cross-border vendor payments (Form 15CA/15CB), compounding risks under Section 15.
+2. **Comprehensive Labour & Employment Laws:**
+   - **The 4 Labour Codes:** Code on Wages 2019 (50% basic wage allowance ceiling harmonization, overtime, bonus), Industrial Relations Code 2020, Code on Social Security 2020, and OSH Code 2020.
+   - **Ongoing Acts:** EPF & MP Act 1952 (12% contribution rules), ESI Act, Payment of Gratuity Act 1972 (5-year continuous rule), Contract Labour (Regulation & Abolition) Act, and PoSH Act 2013 (Internal Complaints Committee & Jan 31 Annual Report filing).
+   - **Indian Contract Act 1872 (Section 27):** Statutory voidness of post-employment non-compete clauses in India (*Percept D'Mark v. Zaheer Khan*).
+3. **Corporate, Tax & MSME Governance:**
+   - **Companies Act 2013:** Annual filings (AOC-4, MGT-7), DIR-3 KYC, Board resolutions, Demat mandate, CSR mandates under Section 135.
+   - **MSMED Act 2006 & Section 43B(h) Income Tax:** Mandatory payment to micro/small vendors within 15/45 days to prevent tax deduction disallowance and penal compound interest at 3x RBI bank rate.
+4. **Digital Privacy & Cybersecurity:**
+   - **DPDP Act 2023:** Data fiduciary vs data processor agreements, explicit consent mechanisms in 22 Schedule VIII languages, child data safeguards, penalty exposure up to ₹250 Crores.
+   - **CERT-In Cybersecurity Directives:** Mandatory 6-hour incident reporting window, system log retention for 180 days within Indian jurisdiction.
+
+---
+
+## 🌟 Core Modules & Web Workspaces
+
+### 1. 📊 Executive Command Center (`/dashboard/`)
+- Top Operating Entity Switcher (toggle between subsidiaries like Tech Pvt Ltd, Manufacturing Ltd).
+- 4 Executive KPI Metric Cards:
+  - Enterprise Legal Health Score (0–100%)
+  - Dealbreakers & Uncapped Liability Flags (🔴 High Risk)
+  - Overdue & Approaching Statutory Deadlines
+  - Labour Codes & FEMA Compliance Index
+- Department Accountability Heatmap (visual completion rates for Legal, HR/Labour, Finance/Tax, InfoSec/Tech, Operations).
+- Live Indian Regulatory Watchlist with severity indicators (Critical / High / Advisory).
+- Upcoming Statutory Deadlines countdown table with statutory penalties.
+
+### 2. 📑 Pillar 1: Contract / Document Review & Storage Workspace (`/contracts/`)
+- **Drag-and-Drop / Ingestion:** Upload commercial agreements in PDF, DOCX, or TXT format.
+- **Entity Assignment:** Map contracts to specific operating entities for strict RBAC segregation.
+- **Split-Screen Interactive Review:**
+  - **Left Pane:** Full contract text rendered with color-coded risk callouts (🔴 High Risk dealbreakers, 🟡 Caution deviations, 🟢 Compliant redlines).
+  - **Right Pane:** Clause breakdown with citations (*Section 27 Contract Act, Section 15 MSMED Act, FEMA ECB caps, DPDP Act 2023*) and a **1-Click "Accept Redline" HTMX button** that updates the score and applies compliance immediately.
+- **📂 Document Storage Repository:** Filter documents entity-wise, inspect scores, re-assign documents between entities, and reload any contract back into review.
+- **📥 1-Click Download Reviewed Report:** Export a publication-grade HTML audit report with colored highlights and statutory compliance schedule.
+
+### 3. 📡 Pillar 2: Indian Statutory Gazette & Regulatory Tracker (`/regulatory/`)
+- Ingests circulars from MCA, RBI (FEMA), Labour Ministry, SEBI, DPDPB, CERT-In, and GSTN.
+- **⚡ Generate AI Impact Assessment:** Modal running Gemini / Statutory Heuristic engine to extract executive summaries, affected departments, and statutory deadlines.
+- **Approve & Dispatch:** Automatically dispatches compliance tasks to department queues with a full cryptographic audit trail.
+
+### 4. 📋 Pillar 3: Department Tasks & Evidence Hub (`/tasks/`)
+- Tasks organized by department and status.
+- **Interactive 1-Click Status Cycle:** `Pending` ➔ `In Progress` ➔ `Completed` via HTMX.
+- **Upload Evidence Modal:** Attach proof dockets (PDF, DOCX, ZIP, screenshots) and verification notes.
+
+### 5. 📅 Pillar 4: Statutory Compliance Calendar (`/calendar/`)
+- Real-time countdowns for MCA Form AOC-4, PoSH Annual Report (Jan 31), FEMA FLA Return, PF/ESI Monthly ECR, GSTR-3B, CERT-In Log Review.
+- Statutory Penalty Calculator detailing fines, compounding exposures, and director disqualification risks.
+
+### 6. 🛡️ Pillar 5: Cryptographic Tamper-Evident Audit Ledger (`/audit/`)
+- Chained SHA-256 ledger linking `prev_hash` to `current_hash` on every event.
+- Live mathematical verification showing "✅ SHA-256 Audit Chain Verified: 100% Mathematically Intact".
+- **📥 Generate Court-Admissible Defense Dossier:** 1-Click export to formal PDF / report certified under Section 65B of the Indian Evidence Act.
+
+### 7. ⚙️ Operating Entity & User Corporate Governance (`/governance/`)
+- **Operating Entities Management:** Add, edit, and delete operating entities. Automatically provisions the 5 compliance departments (`LEGAL`, `HR_LABOUR`, `FINANCE_TAX`, `INFOSEC_TECH`, `OPERATIONS`).
+- **Corporate Users & RBAC:** Add, edit, and delete user profiles, assign roles (`GENERAL_COUNSEL`, `COMPLIANCE_OFFICER`, `DEPT_LEAD`, `AUDITOR`), and set security PINs (default `1234`).
+- **Granular RBAC Matrix:** Full matrix table detailing permissions (Create, Read, Update, Delete, Legal Sign-off) across all 5 protected resources.
+
+### 8. ☀️ / 🌙 Professional Dark & Light Mode Toggle
+- Instant theme toggle in the top navigation bar supporting the Deep Slate/Navy palette and the high-contrast Enterprise Light theme, persisted in local storage.
+
+---
+
+## 📂 Project Architecture
 
 ```text
-https://github.com/YOUR-USERNAME/AICA-Level-2-Projects
+LexSecure_India_Pro/
+├── compliance/                   # Django Compliance App
+│   ├── management/commands/      # Database seeding scripts
+│   ├── migrations/               # Database migration files
+│   ├── models.py                 # 15 Core Enterprise Legal & Regulatory Models
+│   ├── urls.py                   # Compliance routing
+│   └── views.py                  # Web views & HTMX endpoints
+├── connectors/                   # Statutory Connector Framework (MCA, RBI, Gazette)
+├── data/                         # Sample commercial contracts & dockets
+├── database/                     # DB engine & SQLite schema utilities
+├── lexsecure_core/               # Django root project configuration (settings, urls, wsgi)
+├── models/                       # Entity definitions
+├── services/                     # Business logic services
+│   ├── audit_service.py          # SHA-256 verification & PDF Defense Dossier generator
+│   ├── document_parser.py        # Multi-engine PDF/DOCX/TXT extraction
+│   └── legal_ai_service.py       # Dual engine: Gemini Flash + Statutory Fallback
+├── templates/                    # Web frontend templates
+│   ├── base.html                 # Master layout (Tailwind, Alpine.js, HTMX, Theme Toggle)
+│   └── compliance/               # Workspaces (Dashboard, Contracts, Regulatory, Tasks, etc.)
+├── ui/                           # Optional Desktop PyQt6 client views & styles
+├── launch_web.bat                # 1-Click Windows Web Launcher (Port 8055)
+├── run_web.py                    # Python Web Server & Auto-browser opener
+├── manage.py                     # Django CLI
+├── requirements.txt              # Production Python dependencies
+└── README.md                     # Comprehensive documentation
 ```
-
-Replace `YOUR-USERNAME` with your GitHub username.
-
-## Step 2: Upload Your Project Folder
-
-GitHub provides two ways to add a folder through the website.
-
-### Option A: Drag and Drop the Complete Folder
-
-1. Open your fork of the repository.
-2. Click **Add file** → **Upload files**.
-3. Open the parent location of your project folder in File Explorer.
-4. Drag the **complete project folder**—not only the files inside it—into GitHub’s upload area.
-5. Wait until all the files appear in the upload list.
-
-Modern browsers such as Google Chrome and Microsoft Edge generally preserve the folder structure during upload.
-
-### Option B: Create the Folder Using a File Path
-
-1. Open your fork of the repository.
-2. Click **Add file** → **Create new file**.
-3. In the filename box, enter:
-
-   ```text
-   MyProjectName/README.md
-   ```
-
-   Typing `/` in the filename automatically creates the folder.
-
-4. Add a short description of your project to the new `README.md` file.
-5. Click **Commit changes**.
-6. Open the newly created folder.
-7. Click **Add file** → **Upload files** and upload the remaining project files.
-
-Replace `MyProjectName` with the name of your project.
-
-## Step 3: Commit the Upload
-
-1. Scroll down to the **Commit changes** section.
-2. Enter a clear commit message, for example:
-
-   ```text
-   Add <Your Name> - <Project Name> project folder
-   ```
-
-3. Keep **Commit directly to the main branch** selected.
-4. Click **Commit changes**.
-
-Because this is your personal fork, committing directly to its `main` branch is acceptable for this submission workflow.
-
-## Step 4: Open a Pull Request
-
-1. Return to the main page of your fork.
-2. GitHub may display a banner stating:
-
-   ```text
-   This branch is X commits ahead of aiinicai:main
-   ```
-
-3. Click **Contribute** → **Open pull request**.
-
-Alternatively:
-
-1. Open the **Pull requests** tab.
-2. Click **New pull request**.
-
-Before creating the Pull Request, confirm the following direction:
-
-| Setting | Selection |
-| --- | --- |
-| Base repository | `aiinicai/AICA-Level-2-Projects` |
-| Base branch | `main` |
-| Head repository | `YOUR-USERNAME/AICA-Level-2-Projects` |
-| Compare branch | `main` |
-
-Then:
-
-1. Enter a clear Pull Request title, for example:
-
-   ```text
-   Add AICA Level 2 Project - <Your Name>
-   ```
-
-2. In the description, briefly explain:
-   - The purpose of your project.
-   - Its main features.
-   - Any setup or usage instructions.
-3. Click **Create pull request**.
-
-## Step 5: Wait for Review and Merge
-
-The owner of the `aiinicai/AICA-Level-2-Projects` repository will receive your Pull Request.
-
-The repository owner may:
-
-- Review your project.
-- Ask questions.
-- Suggest changes.
-- Approve and merge the Pull Request.
-
-If changes are requested, update the files in your fork and commit them. Your existing Pull Request will update automatically.
-
-After the Pull Request is merged, your project folder will become part of the official repository.
 
 ---
 
-# Method 2: Git Command Line
-
-This method is recommended when:
-
-- Your project contains many files.
-- You want to upload the complete folder structure reliably.
-- You are comfortable using Git commands.
-
-## Prerequisites
-
-Before beginning:
-
-- Install [Git](https://git-scm.com/downloads).
-- Create or log in to your GitHub account.
-- Fork the [AICA-Level-2-Projects repository](https://github.com/aiinicai/AICA-Level-2-Projects) as explained in Method 1.
-
-## Step 1: Clone Your Fork
-
-Open Terminal, Command Prompt, PowerShell, or Git Bash and run:
-
-```bash
-git clone https://github.com/YOUR-USERNAME/AICA-Level-2-Projects.git
-```
-
-Then open the cloned repository:
-
-```bash
-cd AICA-Level-2-Projects
-```
-
-Replace `YOUR-USERNAME` with your GitHub username.
-
-## Step 2: Copy Your Project Folder
-
-Copy your complete project folder into the cloned `AICA-Level-2-Projects` directory.
-
-Recommended folder naming format:
-
-```text
-YourName-ProjectName/
-```
-
-Example:
-
-```text
-Rahul-Sharma-AI-Invoice-Analyzer/
-```
-
-## Step 3: Review the Changes
-
-Run:
-
-```bash
-git status
-```
-
-Confirm that Git lists only the files and folders you intend to submit.
-
-## Step 4: Stage and Commit the Project
-
-Stage your project folder:
-
-```bash
-git add YourName-ProjectName/
-```
-
-Commit the changes:
-
-```bash
-git commit -m "Add <Your Name> - <Project Name> project folder"
-```
-
-## Step 5: Push the Changes to Your Fork
-
-Run:
-
-```bash
-git push origin main
-```
-
-Your project folder will now appear in your fork on GitHub.
-
-## Step 6: Open a Pull Request
-
-1. Open your fork on GitHub.
-2. Click **Contribute** → **Open pull request**.
-3. Confirm the base and compare repositories:
-
-| Setting | Selection |
-| --- | --- |
-| Base repository | `aiinicai/AICA-Level-2-Projects` |
-| Base branch | `main` |
-| Head repository | `YOUR-USERNAME/AICA-Level-2-Projects` |
-| Compare branch | `main` |
-
-4. Add a clear title and project description.
-5. Click **Create pull request**.
-
----
-
-## Before Submitting
-
-Please verify the following:
-
-- Your complete project is inside one clearly named folder.
-- Your folder includes a `README.md` explaining the project.
-- The project does not contain passwords, API keys, access tokens, or other confidential information.
-- Unnecessary generated files and dependency folders are excluded where applicable.
-- The project opens or runs using the instructions included in its `README.md`.
-- Your Pull Request targets `aiinicai/AICA-Level-2-Projects` on the `main` branch.
-
-## Need to Update Your Submission?
-
-If your Pull Request is still open, make the required changes in the same fork and branch, then commit and push them. GitHub will automatically add the new commits to the existing Pull Request.
-
+## 🛠️ Technology Stack
+- **Backend:** Python 3.11+, Django 5.x / 6.x
+- **Database:** SQLite (production-ready migrations for PostgreSQL)
+- **Frontend:** Tailwind CSS (via CDN), Alpine.js 3.x, HTMX 1.9+
+- **Document Processing:** PyMuPDF, pypdf, python-docx
+- **AI Engine:** Google Gemini Flash with extensive Indian Statutory Heuristic Fallback Engine
+- **Cryptography:** Python standard `hashlib` SHA-256 chained event ledger

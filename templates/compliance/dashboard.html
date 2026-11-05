@@ -1,0 +1,238 @@
+{% extends 'base.html' %}
+
+{% block title %}Dashboard — LexSecure India Pro{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+
+    <!-- PAGE HEADER -->
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+            <h1 class="text-xl sm:text-2xl font-extrabold tracking-tight text-slate-900 dark:text-white flex items-center gap-2">
+                <span>🛡️</span> Executive Legal & Regulatory Command Center
+            </h1>
+            <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                Active Operating Entity: <span class="font-semibold text-emerald-600 dark:text-emerald-400">{{ current_entity.legal_name }}</span> ({{ current_entity.registered_state }})
+            </p>
+        </div>
+        <div class="flex items-center space-x-2">
+            <a href="{% url 'contracts' %}" class="inline-flex items-center px-3.5 py-2 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg shadow-sm transition">
+                <span>📤 Upload & Review Contract</span>
+            </a>
+            <a href="{% url 'audit' %}" class="inline-flex items-center px-3.5 py-2 text-xs font-semibold text-slate-700 dark:text-slate-200 bg-white dark:bg-navy-800 hover:bg-slate-100 dark:hover:bg-navy-700 border border-slate-300 dark:border-navy-600 rounded-lg shadow-sm transition">
+                <span>🛡️ Cryptographic Ledger</span>
+            </a>
+        </div>
+    </div>
+
+    <!-- 4 EXECUTIVE KPI CARDS -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        
+        <!-- KPI 1: Legal Health Score -->
+        <div class="bg-white dark:bg-navy-800 border border-slate-200 dark:border-navy-700 rounded-xl p-4 shadow-sm flex items-center justify-between">
+            <div>
+                <p class="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Enterprise Legal Health</p>
+                <div class="flex items-baseline space-x-2 mt-1">
+                    <span class="text-2xl font-black {% if health_score >= 80 %}text-emerald-500{% elif health_score >= 60 %}text-amber-500{% else %}text-rose-500{% endif %}">
+                        {{ health_score }}%
+                    </span>
+                    <span class="text-[10px] text-slate-400 font-medium">Statutory Benchmark</span>
+                </div>
+                <p class="text-[10px] text-slate-400 mt-1">Weighted across contracts & playbooks</p>
+            </div>
+            <div class="w-12 h-12 rounded-xl flex items-center justify-center {% if health_score >= 80 %}bg-emerald-500/10 text-emerald-500 border border-emerald-500/20{% else %}bg-rose-500/10 text-rose-500 border border-rose-500/20{% endif %}">
+                <span class="text-xl">⚖</span>
+            </div>
+        </div>
+
+        <!-- KPI 2: Dealbreakers & Uncapped Liability -->
+        <div class="bg-white dark:bg-navy-800 border border-slate-200 dark:border-navy-700 rounded-xl p-4 shadow-sm flex items-center justify-between">
+            <div>
+                <p class="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Dealbreakers & Uncapped Flags</p>
+                <div class="flex items-baseline space-x-2 mt-1">
+                    <span class="text-2xl font-black {% if dealbreakers > 0 %}text-rose-500{% else %}text-emerald-500{% endif %}">
+                        {{ dealbreakers }}
+                    </span>
+                    <span class="text-[10px] text-rose-400 font-medium">Critical Breaches</span>
+                </div>
+                <p class="text-[10px] text-slate-400 mt-1">Sec 27 non-compete, MSME &gt; 45d</p>
+            </div>
+            <div class="w-12 h-12 rounded-xl flex items-center justify-center bg-rose-500/10 text-rose-500 border border-rose-500/20">
+                <span class="text-xl">⚠️</span>
+            </div>
+        </div>
+
+        <!-- KPI 3: Overdue / Approaching Deadlines -->
+        <div class="bg-white dark:bg-navy-800 border border-slate-200 dark:border-navy-700 rounded-xl p-4 shadow-sm flex items-center justify-between">
+            <div>
+                <p class="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Statutory Deadlines</p>
+                <div class="flex items-baseline space-x-2 mt-1">
+                    <span class="text-2xl font-black {% if overdue_count > 0 %}text-rose-500{% else %}text-amber-500{% endif %}">
+                        {{ overdue_count }}
+                    </span>
+                    <span class="text-[10px] text-amber-500 font-medium">Overdue ({{ approaching_count }} within 30d)</span>
+                </div>
+                <p class="text-[10px] text-slate-400 mt-1">MCA, PoSH, FEMA, PF/ESI, GST</p>
+            </div>
+            <div class="w-12 h-12 rounded-xl flex items-center justify-center bg-amber-500/10 text-amber-500 border border-amber-500/20">
+                <span class="text-xl">📅</span>
+            </div>
+        </div>
+
+        <!-- KPI 4: Labour & FEMA Index -->
+        <div class="bg-white dark:bg-navy-800 border border-slate-200 dark:border-navy-700 rounded-xl p-4 shadow-sm flex items-center justify-between">
+            <div>
+                <p class="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Labour & FEMA Compliance</p>
+                <div class="flex items-baseline space-x-2 mt-1">
+                    <span class="text-2xl font-black text-emerald-500">
+                        {{ fema_labour_index }}%
+                    </span>
+                    <span class="text-[10px] text-emerald-400 font-medium">Statutory Rating</span>
+                </div>
+                <p class="text-[10px] text-slate-400 mt-1">4 Labour Codes, EPF, PoSH & ECB</p>
+            </div>
+            <div class="w-12 h-12 rounded-xl flex items-center justify-center bg-emerald-500/10 text-emerald-500 border border-emerald-500/20">
+                <span class="text-xl">🏛</span>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- 2-COLUMN SECTION: DEPARTMENT ACCOUNTABILITY HEATMAP & REGULATORY WATCHLIST -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+        <!-- Department Accountability Heatmap (2 cols) -->
+        <div class="lg:col-span-2 bg-white dark:bg-navy-800 border border-slate-200 dark:border-navy-700 rounded-xl p-5 shadow-sm">
+            <div class="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-navy-700 mb-4">
+                <h2 class="text-xs font-bold uppercase tracking-wider text-slate-800 dark:text-slate-200 flex items-center gap-2">
+                    <span>🏢</span> Department Accountability & Action Heatmap
+                </h2>
+                <a href="{% url 'tasks' %}" class="text-xs font-semibold text-emerald-600 dark:text-emerald-400 hover:underline">
+                    View Task Board &rarr;
+                </a>
+            </div>
+
+            <div class="space-y-3.5">
+                {% for dept in dept_heatmap %}
+                <div class="bg-slate-50 dark:bg-navy-900 border border-slate-200 dark:border-navy-700/60 rounded-lg p-3">
+                    <div class="flex items-center justify-between text-xs mb-1.5">
+                        <span class="font-bold text-slate-800 dark:text-slate-200">{{ dept.name }}</span>
+                        <div class="flex items-center space-x-2">
+                            <span class="text-[11px] text-slate-500 dark:text-slate-400">{{ dept.completed_tasks }} / {{ dept.total_tasks }} Complied</span>
+                            <span class="font-bold {% if dept.completion_rate >= 80 %}text-emerald-500{% elif dept.completion_rate >= 50 %}text-amber-500{% else %}text-rose-500{% endif %}">
+                                {{ dept.completion_rate }}%
+                            </span>
+                        </div>
+                    </div>
+                    <!-- Progress Bar -->
+                    <div class="w-full bg-slate-200 dark:bg-navy-950 rounded-full h-2 overflow-hidden">
+                        <div class="h-2 rounded-full {% if dept.completion_rate >= 80 %}bg-emerald-500{% elif dept.completion_rate >= 50 %}bg-amber-500{% else %}bg-rose-500{% endif %}" style="width: {{ dept.completion_rate }}%"></div>
+                    </div>
+                </div>
+                {% empty %}
+                <p class="text-xs text-slate-400 text-center py-4">No department accountability data found.</p>
+                {% endfor %}
+            </div>
+        </div>
+
+        <!-- Live Indian Regulatory Watchlist (1 col) -->
+        <div class="bg-white dark:bg-navy-800 border border-slate-200 dark:border-navy-700 rounded-xl p-5 shadow-sm flex flex-col justify-between">
+            <div>
+                <div class="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-navy-700 mb-4">
+                    <h2 class="text-xs font-bold uppercase tracking-wider text-slate-800 dark:text-slate-200 flex items-center gap-2">
+                        <span>📡</span> Live Indian Gazette Watch
+                    </h2>
+                    <a href="{% url 'regulatory' %}" class="text-xs font-semibold text-emerald-600 dark:text-emerald-400 hover:underline">
+                        All Feeds &rarr;
+                    </a>
+                </div>
+
+                <div class="space-y-3">
+                    {% for circ in recent_circulars %}
+                    <div class="p-2.5 rounded-lg border border-slate-200 dark:border-navy-700/60 bg-slate-50 dark:bg-navy-900 text-xs">
+                        <div class="flex items-center justify-between mb-1">
+                            <span class="font-mono text-[10px] font-bold text-slate-500 dark:text-slate-400">{{ circ.statutory_body }}</span>
+                            <span class="px-1.5 py-0.5 rounded text-[9px] font-bold {% if circ.severity == 'CRITICAL' %}bg-rose-500/20 text-rose-500 border border-rose-500/30{% elif circ.severity == 'HIGH' %}bg-amber-500/20 text-amber-500 border border-amber-500/30{% else %}bg-blue-500/20 text-blue-400 border border-blue-500/30{% endif %}">
+                                {{ circ.severity }}
+                            </span>
+                        </div>
+                        <a href="{% url 'regulatory' %}" class="font-semibold text-slate-900 dark:text-slate-100 hover:text-emerald-500 line-clamp-2 leading-tight">
+                            {{ circ.title }}
+                        </a>
+                        <span class="text-[10px] text-slate-400 block mt-1">{{ circ.official_date|date:"d M Y" }} &bull; {{ circ.circular_number }}</span>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <a href="{% url 'regulatory' %}" class="mt-4 block text-center py-2 bg-slate-100 dark:bg-navy-900 hover:bg-slate-200 dark:hover:bg-navy-700 text-slate-700 dark:text-slate-300 text-xs font-semibold rounded-lg border border-slate-200 dark:border-navy-700 transition">
+                ⚡ Generate AI Circular Assessment
+            </a>
+        </div>
+
+    </div>
+
+    <!-- UPCOMING STATUTORY DEADLINES TIMELINE -->
+    <div class="bg-white dark:bg-navy-800 border border-slate-200 dark:border-navy-700 rounded-xl p-5 shadow-sm">
+        <div class="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-navy-700 mb-4">
+            <div>
+                <h2 class="text-xs font-bold uppercase tracking-wider text-slate-800 dark:text-slate-200 flex items-center gap-2">
+                    <span>📅</span> Indian Statutory Filings & Mandatory Penalty Surveillance
+                </h2>
+                <p class="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">Automated surveillance across Companies Act, PoSH, FEMA, EPF/ESI, CGST, and CERT-In</p>
+            </div>
+            <a href="{% url 'calendar' %}" class="text-xs font-semibold text-emerald-600 dark:text-emerald-400 hover:underline">
+                Full Statutory Calendar &rarr;
+            </a>
+        </div>
+
+        <div class="overflow-x-auto">
+            <table class="w-full text-left text-xs">
+                <thead>
+                    <tr class="border-b border-slate-200 dark:border-navy-700 text-slate-500 dark:text-slate-400 uppercase font-semibold text-[10px]">
+                        <th class="py-2.5 px-3">Statutory Body</th>
+                        <th class="py-2.5 px-3">Compliance Requirement</th>
+                        <th class="py-2.5 px-3">Frequency</th>
+                        <th class="py-2.5 px-3">Due Date</th>
+                        <th class="py-2.5 px-3">Countdown</th>
+                        <th class="py-2.5 px-3">Statutory Penalty Clause</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100 dark:divide-navy-700/50">
+                    {% for item in upcoming_events %}
+                    <tr class="hover:bg-slate-50 dark:hover:bg-navy-900/50">
+                        <td class="py-2.5 px-3 font-bold font-mono text-emerald-600 dark:text-emerald-400">{{ item.event.statutory_body }}</td>
+                        <td class="py-2.5 px-3 font-semibold text-slate-900 dark:text-white">{{ item.event.compliance_name }}</td>
+                        <td class="py-2.5 px-3 text-slate-500 dark:text-slate-400 font-mono text-[10px]">{{ item.event.recurring_freq }}</td>
+                        <td class="py-2.5 px-3 font-semibold text-slate-800 dark:text-slate-200 whitespace-nowrap">{{ item.event.due_date|date:"d M Y" }}</td>
+                        <td class="py-2.5 px-3 whitespace-nowrap">
+                            {% if item.is_overdue %}
+                                <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-rose-500/20 text-rose-500 border border-rose-500/30">
+                                    🔴 OVERDUE ({{ item.days_left|stringformat:"+d" }}d)
+                                </span>
+                            {% elif item.is_urgent %}
+                                <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/20 text-amber-500 border border-amber-500/30">
+                                    🟡 {{ item.days_left }} Days Left
+                                </span>
+                            {% else %}
+                                <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/20 text-emerald-500 border border-emerald-500/30">
+                                    🟢 {{ item.days_left }} Days Left
+                                </span>
+                            {% endif %}
+                        </td>
+                        <td class="py-2.5 px-3 text-slate-500 dark:text-slate-400 text-[11px] max-w-xs truncate" title="{{ item.event.penalty_clause }}">
+                            {{ item.event.penalty_clause }}
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="6" class="text-center py-4 text-slate-400">No scheduled statutory events found.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+</div>
+{% endblock %}

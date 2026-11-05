@@ -1,0 +1,110 @@
+{% extends 'base.html' %}
+
+{% block title %}Cryptographic Audit Trail & Defense Dossier — LexSecure India Pro{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+
+    <!-- PAGE HEADER -->
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+            <h1 class="text-xl sm:text-2xl font-extrabold tracking-tight text-slate-900 dark:text-white flex items-center gap-2">
+                <span>🛡️</span> Cryptographic Tamper-Evident Audit Ledger
+            </h1>
+            <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                SHA-256 Chained Event Immutability & Court-Admissible Defense Dossier Generator
+            </p>
+        </div>
+        <div>
+            <a href="{% url 'download_audit_dossier' %}" class="inline-flex items-center px-4 py-2 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg shadow-sm transition gap-2">
+                <span>📥</span> Generate Defense Dossier (PDF)
+            </a>
+        </div>
+    </div>
+
+    <!-- CRYPTOGRAPHIC INTEGRITY CERTIFICATE BANNER -->
+    <div class="bg-white dark:bg-navy-800 border {% if is_intact %}border-emerald-500/40 bg-emerald-500/5{% else %}border-rose-500/40 bg-rose-500/5{% endif %} rounded-xl p-5 shadow-sm">
+        <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div class="flex items-center space-x-3.5">
+                <div class="w-12 h-12 rounded-xl flex items-center justify-center font-bold text-2xl {% if is_intact %}bg-emerald-500/20 text-emerald-500 border border-emerald-500/30{% else %}bg-rose-500/20 text-rose-500 border border-rose-500/30{% endif %}">
+                    {% if is_intact %}✔{% else %}✖{% endif %}
+                </div>
+                <div>
+                    <div class="flex items-center space-x-2">
+                        <h2 class="text-sm font-extrabold text-slate-900 dark:text-white">
+                            {% if is_intact %}
+                                SHA-256 Audit Chain Verified: 100% Mathematically Intact
+                            {% else %}
+                                ⚠️ Tampering Detected at Block #{{ broken_id }}
+                            {% endif %}
+                        </h2>
+                        <span class="px-2 py-0.5 rounded text-[10px] font-bold {% if is_intact %}bg-emerald-500/20 text-emerald-500{% else %}bg-rose-500/20 text-rose-500{% endif %}">
+                            Section 65B Indian Evidence Act Compliant
+                        </span>
+                    </div>
+                    <p class="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
+                        All {{ total_logs }} regulatory events are cryptographically hashed and sequenced. Zero unauthorized backdated alterations.
+                    </p>
+                </div>
+            </div>
+
+            <!-- Head Hash Display -->
+            <div class="bg-slate-50 dark:bg-navy-950 p-2.5 rounded-lg border border-slate-200 dark:border-navy-700 text-right">
+                <span class="text-[10px] text-slate-400 uppercase font-bold block">Current Ledger Head Hash:</span>
+                <span class="font-mono text-[11px] text-emerald-600 dark:text-emerald-400 font-bold block max-w-xs truncate" title="{{ latest_hash }}">
+                    {{ latest_hash }}
+                </span>
+            </div>
+        </div>
+    </div>
+
+    <!-- AUDIT TRAIL TABLE -->
+    <div class="bg-white dark:bg-navy-800 border border-slate-200 dark:border-navy-700 rounded-xl p-5 shadow-sm">
+        <div class="overflow-x-auto">
+            <table class="w-full text-left text-xs">
+                <thead>
+                    <tr class="border-b border-slate-200 dark:border-navy-700 text-slate-500 dark:text-slate-400 uppercase font-semibold text-[10px]">
+                        <th class="py-2.5 px-3">Timestamp</th>
+                        <th class="py-2.5 px-3">Actor / Authority</th>
+                        <th class="py-2.5 px-3">Event Action</th>
+                        <th class="py-2.5 px-3">Target Model & ID</th>
+                        <th class="py-2.5 px-3">Details</th>
+                        <th class="py-2.5 px-3">Chained SHA-256 Hash</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100 dark:divide-navy-700/50">
+                    {% for log in logs %}
+                    <tr class="hover:bg-slate-50 dark:hover:bg-navy-900/50 transition">
+                        <td class="py-3 px-3 font-mono text-slate-500 dark:text-slate-400 text-[11px] whitespace-nowrap">
+                            {{ log.timestamp|date:"d M Y, H:i:s" }}
+                        </td>
+                        <td class="py-3 px-3 font-semibold text-slate-900 dark:text-white whitespace-nowrap">
+                            {{ log.actor_name }}
+                        </td>
+                        <td class="py-3 px-3 whitespace-nowrap">
+                            <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 dark:bg-navy-900 border border-slate-300 dark:border-navy-600 font-mono text-emerald-600 dark:text-emerald-400">
+                                {{ log.event_type }}
+                            </span>
+                        </td>
+                        <td class="py-3 px-3 text-slate-600 dark:text-slate-300 font-mono text-[11px] whitespace-nowrap">
+                            {{ log.target_model }} #{{ log.target_id }}
+                        </td>
+                        <td class="py-3 px-3 text-slate-500 dark:text-slate-400 text-[11px] max-w-xs truncate" title="{{ log.details_json }}">
+                            {{ log.details_json }}
+                        </td>
+                        <td class="py-3 px-3 font-mono text-[10px] text-slate-400 whitespace-nowrap">
+                            <span class="text-emerald-500" title="{{ log.current_hash }}">{{ log.current_hash|slice:":16" }}...</span>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="6" class="text-center py-8 text-slate-400">No cryptographic audit records found.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+</div>
+{% endblock %}

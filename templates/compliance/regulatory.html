@@ -1,0 +1,115 @@
+{% extends 'base.html' %}
+
+{% block title %}Regulatory Gazette & Impact Assessment — LexSecure India Pro{% endblock %}
+
+{% block content %}
+<div x-data="{ impactModal: false }" class="space-y-6">
+
+    <!-- PAGE HEADER -->
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+            <h1 class="text-xl sm:text-2xl font-extrabold tracking-tight text-slate-900 dark:text-white flex items-center gap-2">
+                <span>📡</span> Indian Statutory Gazette & Regulatory Tracker
+            </h1>
+            <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                Real-time regulatory ingestion from MCA, RBI (FEMA), Labour Ministry, SEBI, DPDPB, CERT-In & GSTN
+            </p>
+        </div>
+    </div>
+
+    <!-- FILTER BAR -->
+    <div class="bg-white dark:bg-navy-800 border border-slate-200 dark:border-navy-700 rounded-xl p-4 shadow-sm flex flex-wrap items-center justify-between gap-3">
+        <form method="GET" class="flex flex-wrap items-center gap-2">
+            <!-- Statutory Body Filter -->
+            <select name="body" onchange="this.form.submit()" class="bg-slate-50 dark:bg-navy-900 border border-slate-300 dark:border-navy-600 rounded-lg px-3 py-1.5 text-xs font-semibold text-slate-800 dark:text-slate-200 focus:outline-none">
+                <option value="">All Statutory Bodies</option>
+                {% for bval, blabel in bodies %}
+                    <option value="{{ bval }}" {% if selected_body == bval %}selected{% endif %}>{{ blabel }}</option>
+                {% endfor %}
+            </select>
+
+            <!-- Severity Filter -->
+            <select name="severity" onchange="this.form.submit()" class="bg-slate-50 dark:bg-navy-900 border border-slate-300 dark:border-navy-600 rounded-lg px-3 py-1.5 text-xs font-semibold text-slate-800 dark:text-slate-200 focus:outline-none">
+                <option value="">All Severities</option>
+                {% for sval, slabel in severities %}
+                    <option value="{{ sval }}" {% if selected_severity == sval %}selected{% endif %}>{{ slabel }}</option>
+                {% endfor %}
+            </select>
+
+            {% if selected_body or selected_severity %}
+            <a href="{% url 'regulatory' %}" class="text-xs text-rose-500 hover:underline px-2 py-1 font-semibold">
+                Clear Filters
+            </a>
+            {% endif %}
+        </form>
+
+        <span class="text-xs text-slate-400 font-medium">{{ circulars.count }} Circulars Ingested</span>
+    </div>
+
+    <!-- CIRCULARS LIST -->
+    <div class="space-y-4">
+        {% for circ in circulars %}
+        <div class="bg-white dark:bg-navy-800 border border-slate-200 dark:border-navy-700 rounded-xl p-5 shadow-sm transition hover:border-slate-300 dark:hover:border-navy-600">
+            <div class="flex flex-col md:flex-row md:items-start justify-between gap-3 pb-3 border-b border-slate-100 dark:border-navy-700/60 mb-3">
+                <div class="flex items-start space-x-3">
+                    <div class="w-10 h-10 rounded-lg bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 flex items-center justify-center font-bold text-sm shrink-0">
+                        {{ circ.statutory_body|slice:":3" }}
+                    </div>
+                    <div>
+                        <div class="flex flex-wrap items-center gap-2 mb-1">
+                            <span class="px-2 py-0.5 rounded text-[10px] font-bold {% if circ.severity == 'CRITICAL' %}bg-rose-500/20 text-rose-500 border border-rose-500/30{% elif circ.severity == 'HIGH' %}bg-amber-500/20 text-amber-500 border border-amber-500/30{% else %}bg-blue-500/20 text-blue-400 border border-blue-500/30{% endif %}">
+                                {{ circ.severity }}
+                            </span>
+                            <span class="font-mono text-[10px] font-bold text-emerald-600 dark:text-emerald-400">{{ circ.statutory_body }}</span>
+                            <span class="text-[10px] text-slate-400">&bull; Circular #{{ circ.circular_number }}</span>
+                            <span class="text-[10px] text-slate-400">&bull; {{ circ.official_date|date:"d M Y" }}</span>
+                        </div>
+                        <h2 class="text-sm font-bold text-slate-900 dark:text-white leading-tight">
+                            {{ circ.title }}
+                        </h2>
+                    </div>
+                </div>
+
+                <div class="flex items-center space-x-2 shrink-0">
+                    <button hx-get="{% url 'generate_impact_assessment' circ.id %}" 
+                            hx-target="#impact-modal-body" 
+                            @click="impactModal = true" 
+                            class="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-lg shadow-sm transition flex items-center gap-1.5">
+                        <span>⚡</span> Generate AI Impact Assessment
+                    </button>
+                    {% if circ.source_url %}
+                    <a href="{{ circ.source_url }}" target="_blank" rel="noopener noreferrer" class="px-3 py-1.5 bg-slate-100 dark:bg-navy-700 hover:bg-slate-200 dark:hover:bg-navy-600 text-slate-700 dark:text-slate-300 font-semibold text-xs rounded-lg transition" title="Open Official Gazette URL">
+                        ↗ Source
+                    </a>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Circular Raw Text Extract -->
+            <p class="text-xs text-slate-600 dark:text-slate-300 leading-relaxed bg-slate-50 dark:bg-navy-900/60 p-3 rounded-lg border border-slate-200 dark:border-navy-700/60 font-sans">
+                {{ circ.raw_text }}
+            </p>
+        </div>
+        {% empty %}
+        <div class="bg-white dark:bg-navy-800 border border-slate-200 dark:border-navy-700 rounded-xl p-12 text-center shadow-sm">
+            <span class="text-4xl block mb-2">📡</span>
+            <h3 class="text-sm font-bold text-slate-800 dark:text-white">No Circulars Match Selected Filters</h3>
+            <p class="text-xs text-slate-400 mt-1">Try resetting the statutory body or severity filter.</p>
+        </div>
+        {% endfor %}
+    </div>
+
+    <!-- AI IMPACT ASSESSMENT & TASK DISPATCH MODAL -->
+    <div x-cloak x-show="impactModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+        <div @click.away="impactModal = false" class="bg-white dark:bg-navy-800 border border-slate-200 dark:border-navy-700 rounded-xl shadow-2xl max-w-2xl w-full p-6">
+            <div id="impact-modal-body">
+                <div class="flex items-center justify-center py-12 space-x-2">
+                    <span class="animate-spin text-xl">⏳</span>
+                    <span class="text-xs font-semibold text-slate-400">Synthesizing Indian Statutory Analysis & Task Matrix...</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+</div>
+{% endblock %}
