@@ -1,0 +1,325 @@
+{% extends 'base.html' %}
+
+{% block title %}2 Meals/Day Planner &bull; What's cooking today?{% endblock %}
+
+{% block content %}
+<div class="space-y-8" x-data="{ showAddRecipeModal: false, targetPlan: 'TONIGHT', targetSlot: 'LUNCH' }">
+
+    <!-- Header -->
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+            <div class="flex items-center gap-2">
+                <h1 class="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">2 Meals Per Day Planner</h1>
+                <span class="px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-100 text-amber-900 border border-amber-200">
+                    Indian &bull; Pan-Asian &bull; Continental
+                </span>
+            </div>
+            <p class="text-sm text-slate-600 mt-1">
+                Plan 2 delicious dishes daily (Lunch & Dinner) across Desi homestyle, Asian wok, and Continental flavors.
+            </p>
+        </div>
+
+        <a href="{% url 'recipe_suggest' %}" 
+           class="inline-flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-700 text-white font-extrabold text-xs sm:text-sm shadow-md shadow-orange-600/25 transition-all">
+            <span>✨</span>
+            <span>Generate New Meals</span>
+        </a>
+    </div>
+
+    <!-- Section 1: Rolling 3-Day Meal Queue (2 Meals per Day: Lunch & Dinner) -->
+    <div>
+        <div class="flex items-center justify-between mb-4">
+            <div class="flex items-center gap-2">
+                <span class="text-xl">📅</span>
+                <h2 class="text-lg font-black text-slate-900">3-Day Daily Meal Schedule (2 Recipes / Day)</h2>
+            </div>
+            <span class="text-xs text-slate-500 font-medium">☀️ Lunch & 🌙 Dinner slots</span>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-5">
+            {% for day in day_plans %}
+            <div class="bg-gradient-to-b {{ day.bg_gradient }} to-transparent rounded-3xl p-4 sm:p-5 border-2 {{ day.border_color }} shadow-sm flex flex-col space-y-4">
+                
+                <!-- Day Column Header -->
+                <div class="flex items-center justify-between pb-2 border-b border-slate-200/60">
+                    <div class="flex items-center gap-2">
+                        <span class="w-3 h-3 rounded-full {{ day.dot_color }}"></span>
+                        <h3 class="text-sm font-black text-slate-900 uppercase tracking-wider">{{ day.title }}</h3>
+                    </div>
+                    <span class="text-xs font-bold text-slate-600 bg-white/80 px-2 py-0.5 rounded-full shadow-2xs">
+                        {{ day.badge }}
+                    </span>
+                </div>
+
+                <!-- SLOT 1: ☀️ LUNCH -->
+                <div class="space-y-2">
+                    <div class="flex items-center justify-between">
+                        <span class="text-xs font-black uppercase tracking-wider text-amber-900 flex items-center gap-1.5">
+                            <span>☀️</span>
+                            <span>Lunch (दोपहर का भोजन)</span>
+                        </span>
+                        <button type="button" 
+                                @click="showAddRecipeModal = true; targetPlan = '{{ day.key }}'; targetSlot = 'LUNCH'"
+                                class="text-[11px] font-bold text-amber-700 hover:underline">
+                            + Add
+                        </button>
+                    </div>
+
+                    {% for item in day.lunch_items %}
+                    <div class="bg-white rounded-2xl p-3 border border-amber-200 shadow-sm hover:shadow-md transition-all">
+                        <div class="flex items-start justify-between gap-2.5">
+                            <div class="flex items-center gap-2.5">
+                                <img src="{{ item.recipe.display_image }}" alt="{{ item.recipe.title }}" class="w-12 h-12 rounded-xl object-cover shrink-0 shadow-sm">
+                                <div>
+                                    <span class="text-[10px] font-bold text-amber-800 bg-amber-50 px-1.5 py-0.2 rounded uppercase">
+                                        {{ item.recipe.cuisine|default:"Indian" }} &bull; ⏱️{{ item.recipe.total_time_minutes }}m
+                                    </span>
+                                    <h4 class="font-black text-slate-900 text-xs sm:text-sm mt-0.5 leading-snug line-clamp-1">{{ item.recipe.title }}</h4>
+                                </div>
+                            </div>
+
+                            <form action="{% url 'planner_delete_queue' item.id %}" method="post">
+                                {% csrf_token %}
+                                <button type="submit" class="text-slate-400 hover:text-rose-500 p-1 rounded-lg">✕</button>
+                            </form>
+                        </div>
+
+                        <div class="mt-2.5 pt-2 border-t border-slate-100 flex items-center justify-between gap-2">
+                            <a href="{% url 'recipe_cook' item.recipe.id %}" class="flex-1 text-center py-1.5 px-3 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-extrabold text-xs shadow-xs transition-all">
+                                🍳 Cook Lunch
+                            </a>
+
+                            <form action="{% url 'planner_move_queue' item.id %}" method="post">
+                                {% csrf_token %}
+                                <select name="meal_slot" onchange="this.form.submit()" class="text-[10px] font-semibold text-slate-600 bg-slate-100 rounded-lg px-2 py-1 border-0">
+                                    <option value="LUNCH" selected>☀️ Lunch</option>
+                                    <option value="DINNER">🌙 Dinner</option>
+                                </select>
+                            </form>
+                        </div>
+                    </div>
+                    {% empty %}
+                    <div class="text-center py-4 px-2 border border-dashed border-amber-300/80 rounded-2xl bg-white/60">
+                        <p class="text-xs text-amber-800 font-medium">Lunch not planned yet</p>
+                        <button @click="showAddRecipeModal = true; targetPlan = '{{ day.key }}'; targetSlot = 'LUNCH'" class="mt-1 text-xs font-bold text-amber-700 hover:underline">
+                            + Plan Lunch Recipe
+                        </button>
+                    </div>
+                    {% endfor %}
+                </div>
+
+                <!-- SLOT 2: 🌙 DINNER -->
+                <div class="space-y-2 pt-2 border-t border-slate-200/50">
+                    <div class="flex items-center justify-between">
+                        <span class="text-xs font-black uppercase tracking-wider text-indigo-900 flex items-center gap-1.5">
+                            <span>🌙</span>
+                            <span>Dinner (रात का खाना)</span>
+                        </span>
+                        <button type="button" 
+                                @click="showAddRecipeModal = true; targetPlan = '{{ day.key }}'; targetSlot = 'DINNER'"
+                                class="text-[11px] font-bold text-indigo-700 hover:underline">
+                            + Add
+                        </button>
+                    </div>
+
+                    {% for item in day.dinner_items %}
+                    <div class="bg-white rounded-2xl p-3 border border-indigo-200 shadow-sm hover:shadow-md transition-all">
+                        <div class="flex items-start justify-between gap-2.5">
+                            <div class="flex items-center gap-2.5">
+                                <img src="{{ item.recipe.display_image }}" alt="{{ item.recipe.title }}" class="w-12 h-12 rounded-xl object-cover shrink-0 shadow-sm">
+                                <div>
+                                    <span class="text-[10px] font-bold text-indigo-800 bg-indigo-50 px-1.5 py-0.2 rounded uppercase">
+                                        {{ item.recipe.cuisine|default:"Continental / Pan-Asian" }} &bull; ⏱️{{ item.recipe.total_time_minutes }}m
+                                    </span>
+                                    <h4 class="font-black text-slate-900 text-xs sm:text-sm mt-0.5 leading-snug line-clamp-1">{{ item.recipe.title }}</h4>
+                                </div>
+                            </div>
+
+                            <form action="{% url 'planner_delete_queue' item.id %}" method="post">
+                                {% csrf_token %}
+                                <button type="submit" class="text-slate-400 hover:text-rose-500 p-1 rounded-lg">✕</button>
+                            </form>
+                        </div>
+
+                        <div class="mt-2.5 pt-2 border-t border-slate-100 flex items-center justify-between gap-2">
+                            <a href="{% url 'recipe_cook' item.recipe.id %}" class="flex-1 text-center py-1.5 px-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold text-xs shadow-xs transition-all">
+                                🍳 Cook Dinner
+                            </a>
+
+                            <form action="{% url 'planner_move_queue' item.id %}" method="post">
+                                {% csrf_token %}
+                                <select name="meal_slot" onchange="this.form.submit()" class="text-[10px] font-semibold text-slate-600 bg-slate-100 rounded-lg px-2 py-1 border-0">
+                                    <option value="LUNCH">☀️ Lunch</option>
+                                    <option value="DINNER" selected>🌙 Dinner</option>
+                                </select>
+                            </form>
+                        </div>
+                    </div>
+                    {% empty %}
+                    <div class="text-center py-4 px-2 border border-dashed border-indigo-300/80 rounded-2xl bg-white/60">
+                        <p class="text-xs text-indigo-800 font-medium">Dinner not planned yet</p>
+                        <button @click="showAddRecipeModal = true; targetPlan = '{{ day.key }}'; targetSlot = 'DINNER'" class="mt-1 text-xs font-bold text-indigo-700 hover:underline">
+                            + Plan Dinner Recipe
+                        </button>
+                    </div>
+                    {% endfor %}
+                </div>
+
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- Section 2: Smart Shopping List Grouped by Supermarket Aisle -->
+    <div class="bg-white rounded-3xl p-5 sm:p-7 border border-slate-200 shadow-md">
+        
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-5 border-b border-slate-100">
+            <div>
+                <div class="flex items-center gap-2">
+                    <span class="text-2xl">🛒</span>
+                    <h2 class="text-xl font-black text-slate-900">Smart Shopping List</h2>
+                    <span class="px-2.5 py-0.5 rounded-full text-xs font-bold bg-slate-100 text-slate-700">
+                        {{ shopping_items.count }} items
+                    </span>
+                </div>
+                <p class="text-xs text-slate-600 mt-1">
+                    Sorted by grocery aisle. Checked items can be instantly transferred to your live pantry!
+                </p>
+            </div>
+
+            <!-- "Move Bought Items to In-Stock Pantry" Button -->
+            <form action="{% url 'shopping_move_bought_to_pantry' %}" method="post">
+                {% csrf_token %}
+                <button type="submit" 
+                        class="inline-flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-extrabold text-xs sm:text-sm shadow-md shadow-emerald-600/25 transition-all">
+                    <span>📥 Move Bought to Pantry</span>
+                    {% if bought_count > 0 %}
+                    <span class="px-1.5 py-0.2 rounded-full bg-white text-emerald-800 text-xs font-black">
+                        {{ bought_count }} ready
+                    </span>
+                    {% endif %}
+                </button>
+            </form>
+        </div>
+
+        <!-- Add Shopping Item Bar -->
+        <form action="{% url 'shopping_add' %}" method="post" class="py-4 border-b border-slate-100">
+            {% csrf_token %}
+            <div class="grid grid-cols-1 sm:grid-cols-12 gap-2.5">
+                <div class="sm:col-span-5">
+                    <input type="text" 
+                           name="name" 
+                           required 
+                           placeholder="Add grocery item (e.g. Kasuri Methi, Kaju, Soy Sauce, Penne Pasta)..."
+                           class="w-full px-3.5 py-2 text-xs sm:text-sm rounded-xl border border-slate-200 bg-slate-50/50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500 font-medium">
+                </div>
+                <div class="sm:col-span-3">
+                    <select name="category" class="w-full px-3 py-2 text-xs sm:text-sm rounded-xl border border-slate-200 bg-slate-50/50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500 font-medium text-slate-700">
+                        {% for c_key, c_label in shopping_categories %}
+                        <option value="{{ c_key }}">{{ c_label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="sm:col-span-3">
+                    <input type="text" 
+                           name="quantity_note" 
+                           placeholder="Qty / note (e.g. 100g, 1 bottle)..."
+                           class="w-full px-3.5 py-2 text-xs sm:text-sm rounded-xl border border-slate-200 bg-slate-50/50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500 font-medium">
+                </div>
+                <div class="sm:col-span-1">
+                    <button type="submit" class="w-full h-full py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition-colors">
+                        + Add
+                    </button>
+                </div>
+            </div>
+        </form>
+
+        <!-- Aisle-Grouped Shopping Items List -->
+        <div class="pt-5 space-y-6">
+            {% for aisle_name, items in shopping_by_category.items %}
+            <div class="space-y-2">
+                <div class="flex items-center gap-2">
+                    <span class="text-xs font-black uppercase tracking-wider text-slate-600 bg-slate-100 px-2.5 py-1 rounded-lg">
+                        📍 {{ aisle_name }}
+                    </span>
+                    <span class="text-[11px] text-slate-600 font-medium">({{ items.count }} items)</span>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
+                    {% for item in items %}
+                    {% include 'planner/partials/shopping_item_row.html' with item=item %}
+                    {% endfor %}
+                </div>
+            </div>
+            {% empty %}
+            <div class="text-center py-12 text-slate-600">
+                <span class="text-3xl block mb-2">🎉</span>
+                <p class="font-bold text-sm text-slate-800">Your shopping list is all cleared!</p>
+                <p class="text-xs text-slate-600 mt-0.5">Missing ingredients from recipe suggestions will appear here.</p>
+            </div>
+            {% endfor %}
+        </div>
+
+    </div>
+
+    <!-- Add Recipe to Queue Modal (Supporting Lunch or Dinner Selection) -->
+    <div x-show="showAddRecipeModal" 
+         x-cloak 
+         class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm"
+         x-transition>
+        <div @click.away="showAddRecipeModal = false" class="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-slate-100">
+            <div class="flex items-center justify-between mb-4">
+                <div>
+                    <h3 class="text-lg font-black text-slate-900" x-text="`Queue Recipe for ${targetPlan}`"></h3>
+                    <span class="text-xs font-bold text-amber-700" x-text="`Meal Slot: ${targetSlot}`"></span>
+                </div>
+                <button @click="showAddRecipeModal = false" class="text-slate-400 hover:text-slate-600">✕</button>
+            </div>
+
+            {% if all_recipes %}
+            <form action="{% url 'planner_add_to_queue' %}" method="post" class="space-y-4">
+                {% csrf_token %}
+                <input type="hidden" name="planned_for" :value="targetPlan">
+
+                <!-- Meal Slot Selector -->
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 mb-1">Meal Slot:</label>
+                    <div class="grid grid-cols-2 gap-2">
+                        <label class="flex items-center gap-2 p-2.5 rounded-xl border border-slate-200 cursor-pointer">
+                            <input type="radio" name="meal_slot" value="LUNCH" :checked="targetSlot === 'LUNCH'" class="text-amber-600">
+                            <span class="text-xs font-bold">☀️ Lunch</span>
+                        </label>
+                        <label class="flex items-center gap-2 p-2.5 rounded-xl border border-slate-200 cursor-pointer">
+                            <input type="radio" name="meal_slot" value="DINNER" :checked="targetSlot === 'DINNER'" class="text-indigo-600">
+                            <span class="text-xs font-bold">🌙 Dinner</span>
+                        </label>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 mb-1">Select from your Cookbook:</label>
+                    <select name="recipe_id" class="w-full p-3 rounded-xl border border-slate-200 text-xs sm:text-sm font-semibold">
+                        {% for r in all_recipes %}
+                        <option value="{{ r.id }}">
+                            {{ r.cuisine|default:"Indian" }} &bull; {{ r.title }} (⏱️ {{ r.total_time_minutes }}m)
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="flex justify-end gap-2 pt-2">
+                    <button type="button" @click="showAddRecipeModal = false" class="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-xl">Cancel</button>
+                    <button type="submit" class="px-5 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs sm:text-sm shadow-sm">
+                        + Add to Schedule
+                    </button>
+                </div>
+            </form>
+            {% else %}
+            <p class="text-xs text-slate-600 mb-4">You have no saved recipes yet. Generate some first!</p>
+            <a href="{% url 'recipe_suggest' %}" class="block text-center py-2 px-4 bg-amber-600 text-white text-xs font-bold rounded-xl">Generate Meals Now</a>
+            {% endif %}
+        </div>
+    </div>
+
+</div>
+{% endblock %}

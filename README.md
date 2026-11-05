@@ -1,268 +1,137 @@
-# Upload Your Project Folder to the AICA Level 2 Projects Repository
+# 🍳 What's cooking today?
+### *AI-Powered Multi-Cuisine Zero-Waste Meal Planner & Progressive Web App (PWA)*
 
-**Target repository:** [aiinicai/AICA-Level-2-Projects](https://github.com/aiinicai/AICA-Level-2-Projects)
+[![Python Version](https://img.shields.io/badge/Python-3.11%2B-blue.svg?logo=python&logoColor=white)](https://python.org)
+[![Django Version](https://img.shields.io/badge/Django-5.x%20%7C%206.x-092E20.svg?logo=django&logoColor=white)](https://djangoproject.com)
+[![HTMX](https://img.shields.io/badge/HTMX-1.9%2B-336699.svg?logo=htmx&logoColor=white)](https://htmx.org)
+[![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-3.x-38B2AC.svg?logo=tailwind-css&logoColor=white)](https://tailwindcss.com)
+[![Alpine.js](https://img.shields.io/badge/Alpine.js-3.x-8BC0D0.svg?logo=alpine.js&logoColor=white)](https://alpinejs.dev)
+[![PWA Ready](https://img.shields.io/badge/PWA-100%25%20Installable-ea580c.svg?logo=pwa&logoColor=white)](https://web.dev/progressive-web-apps/)
+[![Test Suite](https://img.shields.io/badge/Tests-15%20Passing-success.svg?logo=pytest&logoColor=white)](#-automated-testing)
+[![License](https://img.shields.io/badge/License-MIT-purple.svg)](LICENSE)
 
-This guide explains how to contribute your complete project folder to the **AICA-Level-2-Projects** repository using GitHub’s **Fork + Pull Request** workflow.
+A lively, mobile-responsive, and production-grade Progressive Web Application that tackles daily household food waste and solves the universal question: **"What's cooking today?"**. 
 
-Two methods are covered:
-
-1. **Website-only method** — no software installation required.
-2. **Git command-line method** — recommended for complete project folders and projects containing many files.
-
----
-
-## Fork + Pull Request Workflow
-
-1. **Fork:** Create a personal copy of `aiinicai/AICA-Level-2-Projects` under your GitHub account.
-2. **Add your folder:** Upload or copy your project folder into your fork.
-3. **Commit:** Save the changes in your fork with a clear commit message.
-4. **Open a Pull Request:** Request the `aiinicai` account to merge your changes into the original repository.
-5. **Merge:** The repository owner reviews and accepts your Pull Request. After it is merged, your project folder will appear in the official repository.
+Featuring an intelligent **2 Meals Per Day Engine (☀️ Lunch & 🌙 Dinner)**, multi-cuisine culinary generation (**Desi Rasoi 🇮🇳**, **Pan-Asian Wok 🥢**, and **Continental Bistro 🍝**), dynamic shelf-life inventory tracking, and distraction-free cooking timers with audio synthesis.
 
 ---
 
-# Method 1: Website Only
+## 📸 Core Features & Highlights
 
-Use this method if:
+- 🍱 **Dual Meal Planner (2/Day):** Plan Lunch & Dinner across 3 rolling days with 1-click scheduling.
+- 🚨 **Urgent Shelf-Life Pantry:** Highlighting perishable ingredients in animated Red/Amber alert badges before they spoil.
+- 🤖 **Hybrid AI Recipe Engine:** Powered by Google Gemini 1.5 Flash with a robust zero-latency offline heuristic fallback.
+- 📷 **Computer Vision Receipt Scanner:** Upload supermarket receipts or paste grocery lists for instant AI ingestion.
+- 👨‍🍳 **Distraction-Free Cooking Mode:** Step-by-step visual cards, culinary action icons (`🔪`, `🍳`, `🍲`), and interactive countdown timers with Web Audio API chime alerts.
+- 🛒 **Smart Aisle-Grouped Shopping List:** 1-click "Move Bought Items to Pantry" batch inventory conversion.
+- 📱 **Full Progressive Web App (PWA):** Installs natively on Android, iPhone (iOS Safari), Windows, and macOS without an app store middleman.
 
-- You do not want to install Git.
-- Your project contains relatively few files.
-- You do not need to preserve the project’s earlier commit history.
+---
 
-> [!NOTE]
-> GitHub’s web uploader generally allows up to 100 files in a single upload. If your project contains more files, upload them in batches or use the Git command-line method.
+## 🏗️ System Architecture
 
-## Step 1: Fork the Repository
+```
+┌────────────────────────────────────────────────────────┐
+│                      CLIENT UI                         │
+│   Tailwind CSS (CDN) + HTMX 1.9+ + Alpine.js 3.x       │
+│   PWA Service Worker + Web Audio API Chimes            │
+└───────────────────────────┬────────────────────────────┘
+                            │ Dynamic DOM Swaps / REST
+                            ▼
+┌────────────────────────────────────────────────────────┐
+│                   DJANGO APPLICATION                   │
+│   pantryzero_core (Settings, URLs, WSGI)               │
+│   pantry (Models, Views, Context Processors, Tests)    │
+└─────────────┬────────────────────────────┬─────────────┘
+              │                            │
+              ▼                            ▼
+┌──────────────────────────┐  ┌──────────────────────────┐
+│      SERVICES LAYER      │  │     PERSISTENCE (DB)     │
+│   services/ai_service.py │  │   SQLite (Zero Config)   │
+│   - Google Gemini Flash  │  │   - HouseholdProfile     │
+│   - Offline Fallback     │  │   - PantryItem           │
+│   - Vision OCR Parser    │  │   - Recipe               │
+└──────────────────────────┘  │   - MealQueueItem        │
+                              │   - ShoppingItem         │
+                              └──────────────────────────┘
+```
 
-1. Log in to your GitHub account.
-2. Open the [AICA-Level-2-Projects repository](https://github.com/aiinicai/AICA-Level-2-Projects).
-3. Click **Fork** in the upper-right corner of the page.
-4. On the **Create a new fork** page, keep the default settings.
-5. Click **Create fork**.
+---
 
-You will be redirected to your personal copy of the repository:
+## ⚡ Quickstart & Local Installation
 
+### Prerequisites
+- Python 3.11 or higher
+- Git (optional)
+
+### 1. Clone or Extract the Project
+```bash
+git clone https://github.com/<YOUR_USERNAME>/khane-mein-kya-hain.git
+cd khane-mein-kya-hain
+```
+
+### 2. Set Up Virtual Environment (Recommended)
+```bash
+python -m venv venv
+# On Windows:
+venv\Scripts\activate
+# On macOS / Linux:
+source venv/bin/activate
+```
+
+### 3. Install Dependencies
+```bash
+pip install -r requirements.txt
+```
+
+### 4. Run Migrations & Seed Default Data
+```bash
+python manage.py migrate
+python manage.py seed_kitchen
+```
+
+### 5. Launch the Server
+```bash
+python manage.py runserver 0.0.0.0:8000
+```
+Open **[http://127.0.0.1:8000/](http://127.0.0.1:8000/)** on your computer, or access it from your mobile phone via your local Wi-Fi network!
+
+---
+
+## 🧪 Automated Testing
+
+The project includes 15 automated unit tests verifying data models, shelf-life categorization, AI fallback generation, and HTMX endpoints:
+
+```bash
+python manage.py test
+```
 ```text
-https://github.com/YOUR-USERNAME/AICA-Level-2-Projects
+Creating test database for alias 'default'...
+...............
+----------------------------------------------------------------------
+Ran 15 tests in 0.603s
+
+OK
 ```
-
-Replace `YOUR-USERNAME` with your GitHub username.
-
-## Step 2: Upload Your Project Folder
-
-GitHub provides two ways to add a folder through the website.
-
-### Option A: Drag and Drop the Complete Folder
-
-1. Open your fork of the repository.
-2. Click **Add file** → **Upload files**.
-3. Open the parent location of your project folder in File Explorer.
-4. Drag the **complete project folder**—not only the files inside it—into GitHub’s upload area.
-5. Wait until all the files appear in the upload list.
-
-Modern browsers such as Google Chrome and Microsoft Edge generally preserve the folder structure during upload.
-
-### Option B: Create the Folder Using a File Path
-
-1. Open your fork of the repository.
-2. Click **Add file** → **Create new file**.
-3. In the filename box, enter:
-
-   ```text
-   MyProjectName/README.md
-   ```
-
-   Typing `/` in the filename automatically creates the folder.
-
-4. Add a short description of your project to the new `README.md` file.
-5. Click **Commit changes**.
-6. Open the newly created folder.
-7. Click **Add file** → **Upload files** and upload the remaining project files.
-
-Replace `MyProjectName` with the name of your project.
-
-## Step 3: Commit the Upload
-
-1. Scroll down to the **Commit changes** section.
-2. Enter a clear commit message, for example:
-
-   ```text
-   Add <Your Name> - <Project Name> project folder
-   ```
-
-3. Keep **Commit directly to the main branch** selected.
-4. Click **Commit changes**.
-
-Because this is your personal fork, committing directly to its `main` branch is acceptable for this submission workflow.
-
-## Step 4: Open a Pull Request
-
-1. Return to the main page of your fork.
-2. GitHub may display a banner stating:
-
-   ```text
-   This branch is X commits ahead of aiinicai:main
-   ```
-
-3. Click **Contribute** → **Open pull request**.
-
-Alternatively:
-
-1. Open the **Pull requests** tab.
-2. Click **New pull request**.
-
-Before creating the Pull Request, confirm the following direction:
-
-| Setting | Selection |
-| --- | --- |
-| Base repository | `aiinicai/AICA-Level-2-Projects` |
-| Base branch | `main` |
-| Head repository | `YOUR-USERNAME/AICA-Level-2-Projects` |
-| Compare branch | `main` |
-
-Then:
-
-1. Enter a clear Pull Request title, for example:
-
-   ```text
-   Add AICA Level 2 Project - <Your Name>
-   ```
-
-2. In the description, briefly explain:
-   - The purpose of your project.
-   - Its main features.
-   - Any setup or usage instructions.
-3. Click **Create pull request**.
-
-## Step 5: Wait for Review and Merge
-
-The owner of the `aiinicai/AICA-Level-2-Projects` repository will receive your Pull Request.
-
-The repository owner may:
-
-- Review your project.
-- Ask questions.
-- Suggest changes.
-- Approve and merge the Pull Request.
-
-If changes are requested, update the files in your fork and commit them. Your existing Pull Request will update automatically.
-
-After the Pull Request is merged, your project folder will become part of the official repository.
 
 ---
 
-# Method 2: Git Command Line
+## 📱 Progressive Web App (PWA) Installation
 
-This method is recommended when:
-
-- Your project contains many files.
-- You want to upload the complete folder structure reliably.
-- You are comfortable using Git commands.
-
-## Prerequisites
-
-Before beginning:
-
-- Install [Git](https://git-scm.com/downloads).
-- Create or log in to your GitHub account.
-- Fork the [AICA-Level-2-Projects repository](https://github.com/aiinicai/AICA-Level-2-Projects) as explained in Method 1.
-
-## Step 1: Clone Your Fork
-
-Open Terminal, Command Prompt, PowerShell, or Git Bash and run:
-
-```bash
-git clone https://github.com/YOUR-USERNAME/AICA-Level-2-Projects.git
-```
-
-Then open the cloned repository:
-
-```bash
-cd AICA-Level-2-Projects
-```
-
-Replace `YOUR-USERNAME` with your GitHub username.
-
-## Step 2: Copy Your Project Folder
-
-Copy your complete project folder into the cloned `AICA-Level-2-Projects` directory.
-
-Recommended folder naming format:
-
-```text
-YourName-ProjectName/
-```
-
-Example:
-
-```text
-Rahul-Sharma-AI-Invoice-Analyzer/
-```
-
-## Step 3: Review the Changes
-
-Run:
-
-```bash
-git status
-```
-
-Confirm that Git lists only the files and folders you intend to submit.
-
-## Step 4: Stage and Commit the Project
-
-Stage your project folder:
-
-```bash
-git add YourName-ProjectName/
-```
-
-Commit the changes:
-
-```bash
-git commit -m "Add <Your Name> - <Project Name> project folder"
-```
-
-## Step 5: Push the Changes to Your Fork
-
-Run:
-
-```bash
-git push origin main
-```
-
-Your project folder will now appear in your fork on GitHub.
-
-## Step 6: Open a Pull Request
-
-1. Open your fork on GitHub.
-2. Click **Contribute** → **Open pull request**.
-3. Confirm the base and compare repositories:
-
-| Setting | Selection |
-| --- | --- |
-| Base repository | `aiinicai/AICA-Level-2-Projects` |
-| Base branch | `main` |
-| Head repository | `YOUR-USERNAME/AICA-Level-2-Projects` |
-| Compare branch | `main` |
-
-4. Add a clear title and project description.
-5. Click **Create pull request**.
+| Device Platform | Installation Mechanism | Standalone Experience |
+| :--- | :--- | :--- |
+| **Android (Chrome)** | Tap "Install App" or "Add to Home Screen" | Full screen, native splash screen & icon |
+| **iPhone / iPad (Safari)** | Tap Share (`⬆️`) $\rightarrow$ "Add to Home Screen" (`+`) | Standalone window with iOS status bar |
+| **Desktop (Chrome/Edge)** | Click `⊕ Install` icon in the address bar | Dedicated desktop window & taskbar icon |
 
 ---
 
-## Before Submitting
+## 🎓 Capstone Submission Deliverables
 
-Please verify the following:
+- **Full Capstone Project Report:** [`CAPSTONE_REPORT.md`](CAPSTONE_REPORT.md)
+- **Automated Packaging Tool:** Run `python package_capstone.py` to generate a fresh submission archive (`Whats_Cooking_Today_Capstone.zip`) for Google Drive or academic portals.
 
-- Your complete project is inside one clearly named folder.
-- Your folder includes a `README.md` explaining the project.
-- The project does not contain passwords, API keys, access tokens, or other confidential information.
-- Unnecessary generated files and dependency folders are excluded where applicable.
-- The project opens or runs using the instructions included in its `README.md`.
-- Your Pull Request targets `aiinicai/AICA-Level-2-Projects` on the `main` branch.
+---
 
-## Need to Update Your Submission?
-
-If your Pull Request is still open, make the required changes in the same fork and branch, then commit and push them. GitHub will automatically add the new commits to the existing Pull Request.
-
+## 📄 License
+This project is open-source and available under the [MIT License](LICENSE).

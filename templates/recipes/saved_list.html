@@ -1,0 +1,125 @@
+{% extends 'base.html' %}
+
+{% block title %}Cookbook &bull; What's cooking today?{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+
+    <!-- Header -->
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+            <div class="flex items-center gap-2">
+                <h1 class="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">Desi Rasoi Cookbook</h1>
+                <span class="px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-100 text-amber-900 border border-amber-200">
+                    {{ recipes.count }} recipes
+                </span>
+            </div>
+            <p class="text-sm text-slate-600 mt-1">
+                Your visual cookbook of authentic zero-waste Indian dishes ready to cook anytime.
+            </p>
+        </div>
+
+        <a href="{% url 'recipe_suggest' %}" 
+           class="inline-flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-700 text-white font-extrabold text-xs sm:text-sm shadow-md shadow-orange-600/25 transition-all">
+            <span>✨</span>
+            <span>Generate New Recipes</span>
+        </a>
+    </div>
+
+    <!-- Recipe Cards Grid (Visual with Photography) -->
+    {% if recipes %}
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {% for recipe in recipes %}
+        <div class="bg-white rounded-3xl border border-slate-200 shadow-md hover:shadow-xl hover:border-amber-400 transition-all duration-300 flex flex-col overflow-hidden group">
+            
+            <!-- Visual Dish Photo -->
+            <div class="relative h-44 w-full overflow-hidden bg-slate-900">
+                <img src="{{ recipe.display_image }}" alt="{{ recipe.title }}" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500">
+                <div class="absolute inset-0 bg-gradient-to-t from-slate-950/70 via-transparent to-transparent"></div>
+
+                <div class="absolute top-3 left-3 right-3 flex items-center justify-between">
+                    <span class="text-xs font-bold bg-black/50 backdrop-blur-md text-white px-2.5 py-1 rounded-xl flex items-center gap-1">
+                        <span>⏱️</span>
+                        <span>{{ recipe.total_time_minutes }} mins</span>
+                    </span>
+
+                    <button hx-post="{% url 'recipe_toggle_favorite' recipe.id %}"
+                            hx-swap="outerHTML"
+                            class="p-1.5 rounded-xl bg-black/40 backdrop-blur-md hover:bg-black/60 text-base transition-transform active:scale-125"
+                            title="Toggle favorite">
+                        {% if recipe.is_favorite %}❤️{% else %}🤍{% endif %}
+                    </button>
+                </div>
+
+                <div class="absolute bottom-2.5 left-3 right-3 flex items-center justify-between text-white text-[11px] font-bold">
+                    <span class="bg-amber-600 px-2 py-0.5 rounded-md shadow-sm">{{ recipe.cuisine|default:"Indian" }}</span>
+                    <span>{{ recipe.spice_level|default:"Medium Spicy 🌶️" }}</span>
+                </div>
+            </div>
+
+            <!-- Card Body -->
+            <div class="p-5 flex-1 flex flex-col">
+                <h3 class="text-lg font-black text-slate-900 group-hover:text-amber-600 transition-colors leading-snug">
+                    {{ recipe.title }}
+                </h3>
+
+                <p class="text-xs text-slate-600 mt-2 line-clamp-2 leading-relaxed">
+                    {{ recipe.description }}
+                </p>
+
+                <!-- Appliances & Ingredients tags -->
+                <div class="mt-4 pt-3 border-t border-slate-100 flex flex-wrap gap-1">
+                    {% for app in recipe.appliances_used %}
+                    <span class="px-2 py-0.5 rounded-md text-[10px] font-bold bg-slate-100 text-slate-700">
+                        🍳 {{ app }}
+                    </span>
+                    {% endfor %}
+                    <span class="px-2 py-0.5 rounded-md text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-200">
+                        👥 {{ recipe.servings }} Servings
+                    </span>
+                </div>
+            </div>
+
+            <!-- Card Bottom Bar -->
+            <div class="p-4 bg-slate-50/70 border-t border-slate-100 flex items-center gap-2">
+                <!-- Cooking Mode Button -->
+                <a href="{% url 'recipe_cook' recipe.id %}" 
+                   class="flex-1 inline-flex items-center justify-center gap-1.5 px-3.5 py-2.5 rounded-xl bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-700 text-white font-extrabold text-xs shadow-sm transition-all">
+                    <span>🍳</span>
+                    <span>Start Cooking</span>
+                </a>
+
+                <!-- Add to Queue Form -->
+                <form action="{% url 'planner_add_to_queue' %}" method="post">
+                    {% csrf_token %}
+                    <input type="hidden" name="recipe_id" value="{{ recipe.id }}">
+                    <input type="hidden" name="planned_for" value="TONIGHT">
+                    <button type="submit" 
+                            title="Queue for Tonight"
+                            class="px-3 py-2.5 rounded-xl border border-slate-200 bg-white hover:bg-amber-50 hover:text-amber-800 text-slate-700 font-bold text-xs shadow-xs transition-all flex items-center gap-1">
+                        <span>📅</span>
+                        <span>Tonight</span>
+                    </button>
+                </form>
+            </div>
+
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="text-center py-20 px-4 bg-white rounded-3xl border border-dashed border-slate-200">
+        <div class="w-16 h-16 mx-auto mb-3 rounded-3xl bg-amber-100 text-amber-800 flex items-center justify-center text-3xl">
+            📖
+        </div>
+        <h3 class="text-lg font-bold text-slate-800">No saved recipes yet</h3>
+        <p class="text-xs text-slate-600 mt-1 max-w-sm mx-auto">
+            Click "Generate New Recipes" to let our Desi AI design authentic dishes around your fresh pantry inventory.
+        </p>
+        <a href="{% url 'recipe_suggest' %}" class="inline-flex items-center gap-2 px-4 py-2 mt-4 rounded-xl bg-amber-600 text-white font-bold text-xs shadow-sm">
+            ✨ Generate Desi Meals Now
+        </a>
+    </div>
+    {% endif %}
+
+</div>
+{% endblock %}

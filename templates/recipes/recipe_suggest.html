@@ -1,0 +1,279 @@
+{% extends 'base.html' %}
+
+{% block title %}Daily Meals Generator &bull; Indian, Pan-Asian & Continental &bull; PantryZero{% endblock %}
+
+{% block content %}
+<div class="space-y-6" x-data="{ cuisineFilter: 'ALL' }">
+
+    <!-- Hero Header with AI Status & Regeneration -->
+    <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-gradient-to-r from-amber-600 via-orange-600 to-rose-600 rounded-3xl p-6 text-white shadow-xl shadow-orange-900/15">
+        <div>
+            <div class="flex items-center gap-2 mb-1">
+                <span class="px-2.5 py-0.5 rounded-full text-[11px] font-black uppercase tracking-wider bg-white/20 backdrop-blur-md text-amber-200">
+                    ✨ Daily Meal Engine &bull; 2 Recipes/Day
+                </span>
+                <span class="text-xs text-white/90 font-medium">Kitchen: {{ profile.name }}</span>
+            </div>
+            <h1 class="text-2xl sm:text-3xl font-black tracking-tight">Smart Daily Recipes (Indian &bull; Pan-Asian &bull; Continental)</h1>
+            <p class="text-xs sm:text-sm text-amber-50 mt-1 max-w-2xl">
+                Choose 2 recipes per day for <strong class="text-amber-200">Lunch & Dinner</strong>.
+                Zero-waste recipes synthesized from your in-stock pantry items and spices!
+            </p>
+        </div>
+
+        <!-- Regenerate Button -->
+        <div class="flex items-center gap-3">
+            <a href="{% url 'recipe_suggest' %}?refresh=1" 
+               class="inline-flex items-center gap-2 px-5 py-3 rounded-2xl bg-white text-orange-900 font-extrabold text-xs sm:text-sm shadow-lg shadow-black/10 hover:bg-orange-50 hover:scale-105 transition-all">
+                <span class="text-base">🔄</span>
+                <span>Regenerate Fresh Menu</span>
+            </a>
+        </div>
+    </div>
+
+    <!-- Cuisine Filter Tabs -->
+    <div class="flex items-center justify-between gap-3 flex-wrap">
+        <div class="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
+            <button type="button" 
+                    @click="cuisineFilter = 'ALL'"
+                    :class="cuisineFilter === 'ALL' ? 'bg-slate-900 text-white shadow-sm' : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200'"
+                    class="px-4 py-2 rounded-2xl text-xs font-bold transition-all whitespace-nowrap">
+                🍽️ All Options ({{ recipes|length }})
+            </button>
+            <button type="button" 
+                    @click="cuisineFilter = 'INDIAN'"
+                    :class="cuisineFilter === 'INDIAN' ? 'bg-amber-600 text-white shadow-sm' : 'bg-white text-amber-800 hover:bg-amber-50 border border-amber-200'"
+                    class="px-4 py-2 rounded-2xl text-xs font-bold transition-all whitespace-nowrap flex items-center gap-1.5">
+                <span>🇮🇳</span>
+                <span>Indian Desi Rasoi</span>
+            </button>
+            <button type="button" 
+                    @click="cuisineFilter = 'PAN_ASIAN'"
+                    :class="cuisineFilter === 'PAN_ASIAN' ? 'bg-rose-600 text-white shadow-sm' : 'bg-white text-rose-800 hover:bg-rose-50 border border-rose-200'"
+                    class="px-4 py-2 rounded-2xl text-xs font-bold transition-all whitespace-nowrap flex items-center gap-1.5">
+                <span>🥢</span>
+                <span>Pan-Asian & Wok</span>
+            </button>
+            <button type="button" 
+                    @click="cuisineFilter = 'CONTINENTAL'"
+                    :class="cuisineFilter === 'CONTINENTAL' ? 'bg-teal-700 text-white shadow-sm' : 'bg-white text-teal-800 hover:bg-teal-50 border border-teal-200'"
+                    class="px-4 py-2 rounded-2xl text-xs font-bold transition-all whitespace-nowrap flex items-center gap-1.5">
+                <span>🍝</span>
+                <span>Continental & Bistro</span>
+            </button>
+        </div>
+
+        <span class="text-xs text-slate-500 font-semibold hidden sm:inline">
+            💡 Pair 1 Indian for Lunch + 1 Asian/Continental for Dinner!
+        </span>
+    </div>
+
+    <!-- Generated Recipe Cards Grid (Highly Visual) -->
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
+        {% for recipe in recipes %}
+        <div x-show="cuisineFilter === 'ALL' || cuisineFilter === '{{ recipe.cuisine_category|default:'INDIAN' }}'"
+             x-transition
+             class="flex flex-col bg-white rounded-3xl overflow-hidden border transition-all duration-300 hover:shadow-2xl hover:-translate-y-1 group
+             {% if recipe.cuisine_category == 'INDIAN' %}
+                 border-amber-200 shadow-md shadow-amber-500/10 hover:border-amber-400
+             {% elif recipe.cuisine_category == 'PAN_ASIAN' %}
+                 border-rose-200 shadow-md shadow-rose-500/10 hover:border-rose-400
+             {% else %}
+                 border-teal-200 shadow-md shadow-teal-500/10 hover:border-teal-400
+             {% endif %}">
+            
+            <!-- Visual Dish Photo Banner -->
+            <div class="relative h-44 w-full overflow-hidden bg-slate-900">
+                <img src="{{ recipe.image_url|default:'https://images.unsplash.com/photo-1631452180519-c014fe946bc7?auto=format&fit=crop&w=800&q=80' }}" 
+                     alt="{{ recipe.title }}"
+                     class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500">
+                <div class="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-slate-900/30 to-transparent"></div>
+
+                <!-- Top Floating Badges -->
+                <div class="absolute top-2.5 left-2.5 right-2.5 flex items-center justify-between">
+                    <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black text-white shadow-md
+                        {% if recipe.cuisine_category == 'INDIAN' %}bg-amber-600/90
+                        {% elif recipe.cuisine_category == 'PAN_ASIAN' %}bg-rose-600/90
+                        {% else %}bg-teal-600/90{% endif %}">
+                        {% if recipe.cuisine_category == 'INDIAN' %}🇮🇳 Indian
+                        {% elif recipe.cuisine_category == 'PAN_ASIAN' %}🥢 Pan-Asian
+                        {% else %}🍝 Continental{% endif %}
+                    </span>
+
+                    <!-- Total Time -->
+                    <span class="px-2 py-0.5 rounded-full text-[11px] font-black bg-white/90 backdrop-blur-md text-slate-800 shadow-sm flex items-center gap-1">
+                        <span>⏱️</span>
+                        <span>{{ recipe.prep_time_minutes|add:recipe.cook_time_minutes }}m</span>
+                    </span>
+                </div>
+
+                <!-- Bottom Floating Labels over Photo -->
+                <div class="absolute bottom-2.5 left-2.5 right-2.5 flex items-center justify-between text-white text-[11px]">
+                    <span class="font-bold bg-black/40 backdrop-blur-md px-2 py-0.5 rounded-md border border-white/20">
+                        {{ recipe.cuisine|default:"Homestyle" }}
+                    </span>
+                    <span class="font-bold bg-black/40 backdrop-blur-md px-2 py-0.5 rounded-md border border-white/20">
+                        {{ recipe.spice_level|default:"Medium 🌶️" }}
+                    </span>
+                </div>
+            </div>
+
+            <!-- Card Body -->
+            <div class="p-4 flex-1 flex flex-col space-y-3">
+                <div>
+                    <h2 class="text-base font-black text-slate-900 leading-snug group-hover:text-amber-600 transition-colors line-clamp-2">
+                        {{ recipe.title }}
+                    </h2>
+                    
+                    <p class="text-[11px] text-slate-600 mt-1 leading-relaxed line-clamp-2">
+                        {{ recipe.description }}
+                    </p>
+                </div>
+
+                <!-- Recipe Quick Stats Bar -->
+                <div class="py-1.5 px-2.5 rounded-xl bg-slate-50 border border-slate-200/60 flex items-center justify-between text-[11px] font-bold text-slate-700">
+                    <div>👥 {{ recipe.servings }} Servings</div>
+                    <div>🔥 {{ recipe.cook_time_minutes }}m cook</div>
+                    <div class="truncate max-w-[80px]">🍳 {{ recipe.appliances_used.0|default:"Wok" }}</div>
+                </div>
+
+                <!-- Ingredients breakdown -->
+                <div>
+                    <h3 class="text-[10px] font-black uppercase tracking-wider text-slate-500 mb-1.5 flex items-center justify-between">
+                        <span>Pantry Ingredients</span>
+                        <span class="text-emerald-600 font-bold">✓ Ready</span>
+                    </h3>
+                    <div class="flex flex-wrap gap-1">
+                        {% for ing in recipe.ingredients|slice:":4" %}
+                        {% if ing.in_pantry or ing.is_staple %}
+                        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-medium bg-emerald-50 text-emerald-800 border border-emerald-200">
+                            <span>{{ ing.item }}</span>
+                        </span>
+                        {% endif %}
+                        {% endfor %}
+                        {% if recipe.ingredients|length > 4 %}
+                        <span class="text-[10px] font-bold text-slate-400 self-center">+{{ recipe.ingredients|length|add:"-4" }} more</span>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <!-- Missing Ingredients (For elevated card) -->
+                {% if recipe.missing_ingredients %}
+                <div class="p-2.5 rounded-xl bg-orange-50 border border-orange-200 space-y-1.5">
+                    <span class="text-[10px] font-black uppercase tracking-wider text-orange-900 flex items-center gap-1">
+                        <span>🛒</span>
+                        <span>Missing {{ recipe.missing_ingredients|length }} items</span>
+                    </span>
+
+                    <div class="flex flex-wrap gap-1">
+                        {% for missing in recipe.missing_ingredients %}
+                        <span class="px-1.5 py-0.5 rounded bg-orange-100 text-orange-950 text-[10px] font-bold">
+                            + {{ missing }}
+                        </span>
+                        {% endfor %}
+                    </div>
+
+                    <div id="missing-btn-container-{{ forloop.counter }}" class="pt-0.5">
+                        <form hx-post="{% url 'recipe_add_missing_to_shopping_raw' %}"
+                              hx-target="#missing-btn-container-{{ forloop.counter }}"
+                              hx-swap="innerHTML">
+                            {% csrf_token %}
+                            <input type="hidden" name="missing_json" value="{{ recipe.missing_ingredients|safe }}">
+                            <button type="submit" 
+                                    class="w-full py-1 rounded-lg bg-orange-500 hover:bg-orange-600 text-white text-[10px] font-bold shadow-xs">
+                                + Add to Grocery List
+                            </button>
+                        </form>
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+
+            <!-- Card Bottom Actions Footer: Choose Lunch or Dinner -->
+            <div class="p-3.5 pt-0 mt-auto border-t border-slate-100 flex flex-col gap-1.5">
+                
+                <div class="grid grid-cols-2 gap-1.5">
+                    <!-- Cook for Lunch Button -->
+                    <form action="{% url 'recipe_save' %}" method="post">
+                        {% csrf_token %}
+                        <input type="hidden" name="title" value="{{ recipe.title }}">
+                        <input type="hidden" name="description" value="{{ recipe.description }}">
+                        <input type="hidden" name="prep_time_minutes" value="{{ recipe.prep_time_minutes }}">
+                        <input type="hidden" name="cook_time_minutes" value="{{ recipe.cook_time_minutes }}">
+                        <input type="hidden" name="servings" value="{{ recipe.servings }}">
+                        <input type="hidden" name="image_url" value="{{ recipe.image_url }}">
+                        <input type="hidden" name="cuisine" value="{{ recipe.cuisine }}">
+                        <input type="hidden" name="cuisine_category" value="{{ recipe.cuisine_category|default:'INDIAN' }}">
+                        <input type="hidden" name="spice_level" value="{{ recipe.spice_level }}">
+                        <input type="hidden" name="appliances_used" value="{{ recipe.appliances_used|safe }}">
+                        <input type="hidden" name="ingredients" value="{{ recipe.ingredients|safe }}">
+                        <input type="hidden" name="instructions" value="{{ recipe.instructions|safe }}">
+                        <input type="hidden" name="missing_ingredients" value="{{ recipe.missing_ingredients|safe }}">
+                        <input type="hidden" name="action" value="cook_lunch">
+
+                        <button type="submit" 
+                                title="Queue for Today's Lunch and start cooking"
+                                class="w-full py-2 px-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-black text-xs shadow-xs flex items-center justify-center gap-1 transition-all">
+                            <span>☀️</span>
+                            <span>Lunch</span>
+                        </button>
+                    </form>
+
+                    <!-- Cook for Dinner Button -->
+                    <form action="{% url 'recipe_save' %}" method="post">
+                        {% csrf_token %}
+                        <input type="hidden" name="title" value="{{ recipe.title }}">
+                        <input type="hidden" name="description" value="{{ recipe.description }}">
+                        <input type="hidden" name="prep_time_minutes" value="{{ recipe.prep_time_minutes }}">
+                        <input type="hidden" name="cook_time_minutes" value="{{ recipe.cook_time_minutes }}">
+                        <input type="hidden" name="servings" value="{{ recipe.servings }}">
+                        <input type="hidden" name="image_url" value="{{ recipe.image_url }}">
+                        <input type="hidden" name="cuisine" value="{{ recipe.cuisine }}">
+                        <input type="hidden" name="cuisine_category" value="{{ recipe.cuisine_category|default:'INDIAN' }}">
+                        <input type="hidden" name="spice_level" value="{{ recipe.spice_level }}">
+                        <input type="hidden" name="appliances_used" value="{{ recipe.appliances_used|safe }}">
+                        <input type="hidden" name="ingredients" value="{{ recipe.ingredients|safe }}">
+                        <input type="hidden" name="instructions" value="{{ recipe.instructions|safe }}">
+                        <input type="hidden" name="missing_ingredients" value="{{ recipe.missing_ingredients|safe }}">
+                        <input type="hidden" name="action" value="cook_dinner">
+
+                        <button type="submit" 
+                                title="Queue for Today's Dinner and start cooking"
+                                class="w-full py-2 px-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-black text-xs shadow-xs flex items-center justify-center gap-1 transition-all">
+                            <span>🌙</span>
+                            <span>Dinner</span>
+                        </button>
+                    </form>
+                </div>
+
+                <!-- Save to Cookbook Button -->
+                <form action="{% url 'recipe_save' %}" method="post">
+                    {% csrf_token %}
+                    <input type="hidden" name="title" value="{{ recipe.title }}">
+                    <input type="hidden" name="description" value="{{ recipe.description }}">
+                    <input type="hidden" name="prep_time_minutes" value="{{ recipe.prep_time_minutes }}">
+                    <input type="hidden" name="cook_time_minutes" value="{{ recipe.cook_time_minutes }}">
+                    <input type="hidden" name="servings" value="{{ recipe.servings }}">
+                    <input type="hidden" name="image_url" value="{{ recipe.image_url }}">
+                    <input type="hidden" name="cuisine" value="{{ recipe.cuisine }}">
+                    <input type="hidden" name="cuisine_category" value="{{ recipe.cuisine_category|default:'INDIAN' }}">
+                    <input type="hidden" name="spice_level" value="{{ recipe.spice_level }}">
+                    <input type="hidden" name="appliances_used" value="{{ recipe.appliances_used|safe }}">
+                    <input type="hidden" name="ingredients" value="{{ recipe.ingredients|safe }}">
+                    <input type="hidden" name="instructions" value="{{ recipe.instructions|safe }}">
+                    <input type="hidden" name="missing_ingredients" value="{{ recipe.missing_ingredients|safe }}">
+                    <input type="hidden" name="action" value="save">
+
+                    <button type="submit" 
+                            class="w-full py-1.5 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-bold transition-all text-center">
+                        📖 Save to My Cookbook
+                    </button>
+                </form>
+            </div>
+
+        </div>
+        {% endfor %}
+    </div>
+
+</div>
+{% endblock %}

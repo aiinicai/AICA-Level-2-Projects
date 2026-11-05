@@ -1,0 +1,344 @@
+{% extends 'base.html' %}
+
+{% block title %}My In-Stock Pantry &bull; What's cooking today?{% endblock %}
+
+{% block content %}
+<div x-data="{ 
+    showScanModal: false, 
+    activeModalTab: 'text',
+    newTier: 'THIS_WEEK',
+    receiptFileName: ''
+}">
+
+    <!-- Top Dashboard Header & Urgent Alerts Banner -->
+    <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+        <div>
+            <div class="flex items-center gap-2">
+                <h1 class="text-xl sm:text-2xl md:text-3xl font-black text-slate-900 tracking-tight">Kitchen Inventory (रसोई सामग्री)</h1>
+                <span class="px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-100 text-amber-900 border border-amber-200">
+                    Live Rasoi
+                </span>
+            </div>
+            <p class="text-xs sm:text-sm text-slate-600 mt-1">
+                Track expiration windows, eliminate food waste, and turn raw ingredients into delicious daily meals.
+            </p>
+        </div>
+
+        <!-- Action Buttons: Scan Receipt / Bulk Import + Cook Now -->
+        <div class="flex items-center gap-2.5">
+            <button @click="showScanModal = true" 
+                    type="button"
+                    class="inline-flex items-center gap-2 px-3.5 sm:px-4 py-2 sm:py-2.5 rounded-2xl bg-white hover:bg-slate-50 border border-slate-200 font-bold text-xs sm:text-sm text-slate-700 shadow-sm hover:shadow transition-all">
+                <span class="text-base">📸</span>
+                <span>Scan Receipt / Bulk Add</span>
+            </button>
+            <a href="{% url 'recipe_suggest' %}" 
+               class="inline-flex items-center gap-2 px-4 py-2 sm:py-2.5 rounded-2xl bg-gradient-to-r from-amber-600 via-orange-500 to-rose-500 hover:from-amber-700 hover:to-rose-600 text-white font-black text-xs sm:text-sm shadow-md shadow-orange-500/25 transition-all">
+                <span>🍳</span>
+                <span>What's cooking today?</span>
+            </a>
+        </div>
+    </div>
+
+    <!-- Urgent Expiration Alert Callout Banner (if urgent items exist) -->
+    {% if urgent_pantry_count > 0 %}
+    <div class="mb-6 p-4 rounded-3xl bg-gradient-to-r from-rose-500/10 via-amber-500/10 to-orange-500/10 border border-rose-200/80 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div class="flex items-center gap-3.5">
+            <div class="w-11 h-11 rounded-2xl bg-rose-500 text-white flex items-center justify-center text-xl shadow-md shadow-rose-500/30 animate-pulse">
+                ⏰
+            </div>
+            <div>
+                <div class="flex items-center gap-2">
+                    <span class="text-sm font-extrabold text-rose-800 tracking-wide uppercase">Urgent Rescue Needed</span>
+                    <span class="px-2 py-0.5 rounded-full text-xs font-black bg-rose-500 text-white">{{ urgent_pantry_count }} items expiring</span>
+                </div>
+                <p class="text-xs sm:text-sm text-slate-600 mt-0.5">
+                    Items like <strong class="text-rose-700">{% for item in urgent_items|slice:":3" %}{{ item.name }}{% if not forloop.last %}, {% endif %}{% endfor %}</strong> will spoil soon if not used today!
+                </p>
+            </div>
+        </div>
+        <a href="{% url 'recipe_suggest' %}" class="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold shadow-sm hover:shadow transition-all whitespace-nowrap">
+            <span>Rescue in a Meal</span>
+            <span>&rarr;</span>
+        </a>
+    </div>
+    {% endif %}
+
+    <!-- Inventory Stats Cards -->
+    <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 mb-6">
+        <!-- Total Items -->
+        <div class="bg-white p-3.5 rounded-2xl border border-slate-200/80 shadow-sm flex items-center gap-3">
+            <div class="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center text-xl font-bold">
+                🥫
+            </div>
+            <div>
+                <p class="text-[11px] font-semibold uppercase tracking-wider text-slate-600">Total Pantry</p>
+                <p class="text-lg font-black text-slate-900" id="pantry-total-count">{{ total_pantry_count }} items</p>
+            </div>
+        </div>
+
+        <!-- Urgent Items -->
+        <a href="?tier=URGENT" class="bg-white p-3.5 rounded-2xl border border-rose-200 shadow-sm flex items-center gap-3 hover:border-rose-400 transition-all group">
+            <div class="w-10 h-10 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center text-xl font-bold group-hover:scale-105 transition-transform">
+                🚨
+            </div>
+            <div>
+                <p class="text-[11px] font-semibold uppercase tracking-wider text-rose-600">Urgent (ASAP)</p>
+                <p class="text-lg font-black text-rose-600" id="pantry-urgent-count">{{ urgent_items.count }} items</p>
+            </div>
+        </a>
+
+        <!-- Fresh This Week -->
+        <a href="?tier=THIS_WEEK" class="bg-white p-3.5 rounded-2xl border border-amber-200 shadow-sm flex items-center gap-3 hover:border-amber-400 transition-all group">
+            <div class="w-10 h-10 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center text-xl font-bold group-hover:scale-105 transition-transform">
+                🥑
+            </div>
+            <div>
+                <p class="text-[11px] font-semibold uppercase tracking-wider text-amber-700">Fresh (This Week)</p>
+                <p class="text-lg font-black text-amber-700">{{ this_week_items.count }} items</p>
+            </div>
+        </a>
+
+        <!-- Long Shelf-Life Staples -->
+        <a href="?tier=STAPLE" class="bg-white p-3.5 rounded-2xl border border-slate-200/80 shadow-sm flex items-center gap-3 hover:border-emerald-300 transition-all group">
+            <div class="w-10 h-10 rounded-xl bg-teal-50 text-teal-600 flex items-center justify-center text-xl font-bold group-hover:scale-105 transition-transform">
+                🌾
+            </div>
+            <div>
+                <p class="text-[11px] font-semibold uppercase tracking-wider text-teal-700">Pantry Staples</p>
+                <p class="text-lg font-black text-teal-800">{{ staple_items.count }} items</p>
+            </div>
+        </a>
+    </div>
+
+    <!-- Instant Add Bar (HTMX Instant Append) -->
+    <div class="bg-white p-4 sm:p-5 rounded-3xl border border-emerald-100 shadow-md shadow-emerald-900/5 mb-6"
+         x-data="{ tier: 'THIS_WEEK', category: 'PRODUCE' }">
+        <div class="flex items-center justify-between mb-3">
+            <div class="flex items-center gap-2">
+                <span class="text-lg">⚡</span>
+                <h2 class="text-sm font-extrabold text-slate-800 tracking-tight">Quick Add Ingredient</h2>
+            </div>
+            <span class="text-[11px] font-medium text-slate-600">Instant HTMX append to pantry</span>
+        </div>
+
+        <form hx-post="{% url 'pantry_add' %}"
+              hx-target="#pantry-container"
+              hx-swap="innerHTML"
+              hx-indicator="#add-spinner"
+              @htmx:after-request="if($event.detail.successful) { $el.reset(); tier='THIS_WEEK'; }"
+              class="space-y-3">
+            
+            <input type="hidden" name="shelf_life_tier" :value="tier">
+
+            <div class="grid grid-cols-1 sm:grid-cols-12 gap-2.5">
+                <!-- Name Input -->
+                <div class="sm:col-span-5">
+                    <input type="text" 
+                           name="name" 
+                           required 
+                           placeholder="Ingredient name (e.g. Fresh Paneer, Palak, Toor Dal, Atta, Tamatar)..."
+                           class="w-full px-3.5 py-2.5 text-sm rounded-xl border border-slate-200 bg-slate-50/50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all font-medium">
+                </div>
+
+                <!-- Category Dropdown -->
+                <div class="sm:col-span-3">
+                    <select name="category" 
+                            x-model="category"
+                            class="w-full px-3 py-2.5 text-xs sm:text-sm rounded-xl border border-slate-200 bg-slate-50/50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all font-medium text-slate-700">
+                        {% for cat_val, cat_label in categories %}
+                        <option value="{{ cat_val }}">{{ cat_label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <!-- Quantity Note -->
+                <div class="sm:col-span-4">
+                    <input type="text" 
+                           name="quantity_note" 
+                           placeholder="Quantity note (e.g. 200g, 1 bunch, 1 kg)..."
+                           class="w-full px-3.5 py-2.5 text-sm rounded-xl border border-slate-200 bg-slate-50/50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all font-medium">
+                </div>
+            </div>
+
+            <!-- Tier Selector Buttons & Submit Action -->
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-1">
+                <!-- Urgency Tier Toggle Buttons -->
+                <div class="flex items-center gap-1.5 flex-wrap">
+                    <span class="text-xs font-bold text-slate-600 mr-1">Shelf-Life:</span>
+                    
+                    <!-- Urgent -->
+                    <button type="button" 
+                            @click="tier = 'URGENT'"
+                            :class="tier === 'URGENT' ? 'bg-rose-500 text-white shadow-sm shadow-rose-500/30 ring-2 ring-rose-400' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'"
+                            class="px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5">
+                        <span class="w-2 h-2 rounded-full bg-rose-400" :class="tier === 'URGENT' ? 'bg-white animate-pulse' : ''"></span>
+                        <span>🚨 Urgent (Use ASAP)</span>
+                    </button>
+
+                    <!-- This Week -->
+                    <button type="button" 
+                            @click="tier = 'THIS_WEEK'"
+                            :class="tier === 'THIS_WEEK' ? 'bg-amber-500 text-white shadow-sm shadow-amber-500/30 ring-2 ring-amber-400' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'"
+                            class="px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5">
+                        <span class="w-2 h-2 rounded-full bg-amber-400" :class="tier === 'THIS_WEEK' ? 'bg-white' : ''"></span>
+                        <span>🥑 Fresh (This Week)</span>
+                    </button>
+
+                    <!-- Staple -->
+                    <button type="button" 
+                            @click="tier = 'STAPLE'"
+                            :class="tier === 'STAPLE' ? 'bg-emerald-600 text-white shadow-sm shadow-emerald-500/30 ring-2 ring-emerald-400' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'"
+                            class="px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5">
+                        <span class="w-2 h-2 rounded-full bg-emerald-400" :class="tier === 'STAPLE' ? 'bg-white' : ''"></span>
+                        <span>🌾 Long Staple</span>
+                    </button>
+                </div>
+
+                <!-- Submit Button -->
+                <button type="submit" 
+                        class="inline-flex items-center justify-center gap-2 px-5 py-2 rounded-xl bg-brand-600 hover:bg-brand-700 text-white font-extrabold text-xs sm:text-sm shadow-md shadow-brand-600/25 transition-all">
+                    <span>+ Add to Pantry</span>
+                    <span id="add-spinner" class="htmx-indicator animate-spin text-white">⚙️</span>
+                </button>
+            </div>
+        </form>
+    </div>
+
+    <!-- Filter & Search Bar -->
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5">
+        <!-- Tier Filter Tabs -->
+        <div class="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0 scrollbar-none">
+            <a href="{% url 'pantry_list' %}" 
+               class="px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap {% if current_tier == 'ALL' and not current_category or current_tier == 'ALL' and current_category == 'ALL' %}bg-slate-900 text-white shadow-sm{% else %}bg-white text-slate-600 hover:bg-slate-100 border border-slate-200{% endif %}">
+                All Items ({{ items.count }})
+            </a>
+            <a href="?tier=URGENT" 
+               class="px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap flex items-center gap-1 {% if current_tier == 'URGENT' %}bg-rose-600 text-white shadow-sm shadow-rose-600/25{% else %}bg-white text-rose-600 hover:bg-rose-50 border border-rose-200{% endif %}">
+                <span>🚨 Urgent</span>
+                <span class="px-1.5 py-0.2 rounded-full bg-rose-100 text-rose-700 text-[10px]">{{ urgent_items.count }}</span>
+            </a>
+            <a href="?tier=THIS_WEEK" 
+               class="px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap flex items-center gap-1 {% if current_tier == 'THIS_WEEK' %}bg-amber-600 text-white shadow-sm shadow-amber-600/25{% else %}bg-white text-amber-700 hover:bg-amber-50 border border-amber-200{% endif %}">
+                <span>🥑 Fresh This Week</span>
+                <span class="px-1.5 py-0.2 rounded-full bg-amber-100 text-amber-800 text-[10px]">{{ this_week_items.count }}</span>
+            </a>
+            <a href="?tier=STAPLE" 
+               class="px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap flex items-center gap-1 {% if current_tier == 'STAPLE' %}bg-teal-700 text-white shadow-sm shadow-teal-700/25{% else %}bg-white text-teal-700 hover:bg-teal-50 border border-slate-200{% endif %}">
+                <span>🌾 Staples</span>
+                <span class="px-1.5 py-0.2 rounded-full bg-teal-100 text-teal-800 text-[10px]">{{ staple_items.count }}</span>
+            </a>
+        </div>
+
+        <!-- Search Form -->
+        <form method="get" class="relative min-w-[200px]">
+            {% if current_tier != 'ALL' %}<input type="hidden" name="tier" value="{{ current_tier }}">{% endif %}
+            <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-slate-400">
+                🔍
+            </span>
+            <input type="text" 
+                   name="q" 
+                   value="{{ search_query }}"
+                   placeholder="Search pantry..." 
+                   class="w-full pl-9 pr-3.5 py-1.5 text-xs rounded-xl border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500 font-medium">
+        </form>
+    </div>
+
+    <!-- Items Grid Container (Dynamic HTMX target) -->
+    <div id="pantry-container" class="transition-all duration-300">
+        {% include 'pantry/partials/item_list_grid.html' %}
+    </div>
+
+    <!-- Alpine.js Bulk Add / Receipt Scan Modal -->
+    <div x-show="showScanModal" 
+         x-cloak 
+         class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm"
+         x-transition:enter="transition ease-out duration-200"
+         x-transition:enter-start="opacity-0"
+         x-transition:enter-end="opacity-100"
+         x-transition:leave="transition ease-in duration-150"
+         x-transition:leave-start="opacity-100"
+         x-transition:leave-end="opacity-0">
+        
+        <div @click.away="showScanModal = false"
+             class="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl border border-slate-100 overflow-hidden relative"
+             x-transition:enter="transition ease-out duration-300 transform"
+             x-transition:enter-start="opacity-0 scale-95"
+             x-transition:enter-end="opacity-100 scale-100">
+            
+            <!-- Close Button -->
+            <button @click="showScanModal = false" class="absolute top-4 right-4 p-2 text-slate-400 hover:text-slate-600 rounded-full hover:bg-slate-100">
+                ✕
+            </button>
+
+            <!-- Header -->
+            <div class="flex items-center gap-3 mb-4">
+                <div class="w-12 h-12 rounded-2xl bg-gradient-to-tr from-brand-500 to-teal-400 text-white flex items-center justify-center text-2xl shadow-md shadow-brand-500/20">
+                    🧾
+                </div>
+                <div>
+                    <h2 class="text-xl font-black text-slate-900">AI Receipt & Bulk Add</h2>
+                    <p class="text-xs text-slate-600">Scan photo receipts or paste grocery texts into your pantry</p>
+                </div>
+            </div>
+
+            <!-- Tab Switcher -->
+            <div class="flex rounded-xl bg-slate-100 p-1 mb-5">
+                <button type="button" 
+                        @click="activeModalTab = 'text'" 
+                        :class="activeModalTab === 'text' ? 'bg-white shadow text-slate-900 font-bold' : 'text-slate-600 font-medium'"
+                        class="flex-1 py-1.5 text-xs rounded-lg transition-all text-center">
+                    📝 Paste Grocery Text
+                </button>
+                <button type="button" 
+                        @click="activeModalTab = 'receipt'" 
+                        :class="activeModalTab === 'receipt' ? 'bg-white shadow text-slate-900 font-bold' : 'text-slate-600 font-medium'"
+                        class="flex-1 py-1.5 text-xs rounded-lg transition-all text-center">
+                    📸 Receipt Photo Scan
+                </button>
+            </div>
+
+            <!-- Bulk Form -->
+            <form action="{% url 'pantry_bulk_add' %}" method="post" enctype="multipart/form-data">
+                {% csrf_token %}
+
+                <!-- Tab 1: Paste Text -->
+                <div x-show="activeModalTab === 'text'" class="space-y-3">
+                    <label class="block text-xs font-bold text-slate-700">Paste Grocery List / Lines</label>
+                    <textarea name="grocery_text" 
+                              rows="6" 
+                              placeholder="e.g.&#10;Fresh Malai Paneer 200g&#10;Desi Palak 1 bunch&#10;Desi Tamatar 1kg&#10;Toor Dal 1kg&#10;Aged Basmati Rice 5kg&#10;Pure Desi Ghee 500ml&#10;Green Chillies & Ginger"
+                              class="w-full p-3 text-sm rounded-xl border border-slate-200 bg-slate-50/50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500 font-mono"></textarea>
+                    <p class="text-[11px] text-slate-600">
+                        Our AI categorizes items and classifies perishable produce as urgent automatically.
+                    </p>
+                </div>
+
+                <!-- Tab 2: Upload Receipt Photo -->
+                <div x-show="activeModalTab === 'receipt'" class="space-y-3">
+                    <label class="block text-xs font-bold text-slate-700">Upload Receipt Photo (JPG/PNG)</label>
+                    <div class="border-2 border-dashed border-emerald-200 hover:border-emerald-400 bg-emerald-50/30 rounded-2xl p-6 text-center transition-colors relative cursor-pointer">
+                        <input type="file" 
+                               name="receipt_image" 
+                               accept="image/*"
+                               @change="receiptFileName = $event.target.files[0] ? $event.target.files[0].name : ''"
+                               class="absolute inset-0 w-full h-full opacity-0 cursor-pointer">
+                        <div class="text-3xl mb-2">📸</div>
+                        <p class="text-xs font-bold text-slate-700" x-text="receiptFileName || 'Drop receipt image here or click to browse'"></p>
+                        <p class="text-[10px] text-slate-600 mt-1">Processed with Pillow & Google Gemini Vision</p>
+                    </div>
+                </div>
+
+                <div class="flex items-center justify-end gap-2.5 mt-6 pt-4 border-t border-slate-100">
+                    <button type="button" @click="showScanModal = false" class="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100">
+                        Cancel
+                    </button>
+                    <button type="submit" class="px-5 py-2.5 rounded-xl bg-brand-600 hover:bg-brand-700 text-white font-bold text-xs sm:text-sm shadow-md shadow-brand-600/25 transition-all">
+                        ✨ Parse & Add to Pantry
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

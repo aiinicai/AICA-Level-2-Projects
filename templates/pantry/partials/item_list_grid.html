@@ -1,0 +1,75 @@
+{% if items %}
+<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4" id="pantry-grid">
+    {% for item in items %}
+    <div id="pantry-card-{{ item.id }}" 
+         class="group relative rounded-2xl p-4 transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5 border
+         {% if item.shelf_life_tier == 'URGENT' %}
+             bg-gradient-to-br from-rose-50/90 via-white to-red-50/50 border-rose-200 shadow-sm shadow-rose-500/10 hover:border-rose-300
+         {% elif item.shelf_life_tier == 'THIS_WEEK' %}
+             bg-gradient-to-br from-amber-50/70 via-white to-orange-50/40 border-amber-200 shadow-sm shadow-amber-500/10 hover:border-amber-300
+         {% else %}
+             bg-white border-slate-200 shadow-sm hover:border-emerald-200 hover:bg-emerald-50/20
+         {% endif %}">
+        
+        <div class="flex items-start justify-between gap-3">
+            <!-- Left Info -->
+            <div class="flex items-start gap-3">
+                <div class="w-11 h-11 rounded-2xl flex items-center justify-center text-2xl shadow-inner
+                    {% if item.shelf_life_tier == 'URGENT' %}bg-rose-100/90 text-rose-600
+                    {% elif item.shelf_life_tier == 'THIS_WEEK' %}bg-amber-100/90 text-amber-600
+                    {% else %}bg-emerald-100/80 text-emerald-600{% endif %}">
+                    {{ item.category_icon }}
+                </div>
+                <div>
+                    <h3 class="font-bold text-slate-800 text-base leading-snug group-hover:text-emerald-700 transition-colors">
+                        {{ item.name }}
+                    </h3>
+                    
+                    {% if item.quantity_note %}
+                    <p class="text-xs text-slate-600 font-medium mt-0.5 flex items-center gap-1">
+                        <span class="w-1.5 h-1.5 rounded-full bg-slate-300"></span>
+                        <span>{{ item.quantity_note }}</span>
+                    </p>
+                    {% endif %}
+
+                    <!-- Category Pill -->
+                    <span class="inline-block mt-1.5 px-2 py-0.5 text-[10px] font-semibold tracking-wide rounded-md bg-slate-100 text-slate-600">
+                        {{ item.get_category_display }}
+                    </span>
+                </div>
+            </div>
+
+            <!-- Right Actions & Tier Badge -->
+            <div class="flex flex-col items-end gap-2">
+                <!-- Shelf-life badge -->
+                <span class="inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-[11px] font-bold tracking-tight {{ item.badge_colors.badge }}">
+                    <span class="w-2 h-2 rounded-full {{ item.badge_colors.dot }}"></span>
+                    <span>{{ item.badge_colors.label }}</span>
+                </span>
+
+                <!-- 1-Click Delete / Consumed Button -->
+                <button hx-post="{% url 'pantry_delete' item.id %}"
+                        hx-target="#pantry-card-{{ item.id }}"
+                        hx-swap="outerHTML swap:300ms"
+                        title="Mark consumed or delete"
+                        class="opacity-70 group-hover:opacity-100 text-slate-400 hover:text-rose-600 hover:bg-rose-50 p-1.5 rounded-xl transition-all">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                    </svg>
+                </button>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% else %}
+<div class="text-center py-16 px-4 bg-white/70 backdrop-blur-sm rounded-3xl border border-dashed border-slate-200">
+    <div class="w-16 h-16 mx-auto mb-3 rounded-3xl bg-amber-100 text-amber-700 flex items-center justify-center text-3xl shadow-sm">
+        🧺
+    </div>
+    <h3 class="text-lg font-bold text-slate-800">Your pantry is clear!</h3>
+    <p class="text-sm text-slate-600 max-w-sm mx-auto mt-1">
+        Add ingredients below or scan a receipt to unlock delicious zero-waste recipes.
+    </p>
+</div>
+{% endif %}
