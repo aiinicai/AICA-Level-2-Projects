@@ -265,4 +265,3 @@ Please verify the following:
 ## Need to Update Your Submission?
 
 If your Pull Request is still open, make the required changes in the same fork and branch, then commit and push them. GitHub will automatically add the new commits to the existing Pull Request.
-
