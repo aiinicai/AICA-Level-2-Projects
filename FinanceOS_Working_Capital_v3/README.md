@@ -29,3 +29,10 @@ In Collection Letters, select an as-of date in Aging Analysis, review the 180-da
 bash build_mac.sh
 ```
 Output: `dist/FinanceOS Working Capital.app`. For distribution to other Macs, Apple signing and notarization may be required.
+## Project Presentation & Video Demonstration
+
+A recorded walkthrough explaining how FinanceOS Working Capital Intelligence V3 was developed using natural-language prompts in ChatGPT and Python.
+
+The demonstration covers debtor and creditor turnover ratios, DSO/DPO calculations, industry peer benchmarking using online financial data, overdue invoice identification, and automated collection reminder letters.
+
+🎥 [Click here to watch the FinanceOS project presentation](https://drive.google.com/file/d/1VVMaIs0sDH2X2avwfEziF3L_-JqN12l5/view?usp=sharing)
