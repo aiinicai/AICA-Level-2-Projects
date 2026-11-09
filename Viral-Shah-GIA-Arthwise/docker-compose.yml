@@ -1,0 +1,45 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: giaarthwise_loan_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: giaarthwise_user
+      POSTGRES_PASSWORD: giaarthwise_secure_pass
+      POSTGRES_DB: giaarthwise_loan_db
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    container_name: giaarthwise_loan_backend
+    restart: unless-stopped
+    depends_on:
+      - postgres
+    environment:
+      - DATABASE_URL=postgresql://giaarthwise_user:giaarthwise_secure_pass@postgres:5432/giaarthwise_loan_db
+      - SECRET_KEY=replace-with-a-random-64-char-hex-secret-key-in-production
+      - ENVIRONMENT=production
+      - DEBUG=false
+    volumes:
+      - ./uploads:/app/uploads
+    ports:
+      - "8000:8000"
+
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+    container_name: giaarthwise_loan_frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "80:80"
+
+volumes:
+  postgres_data:
