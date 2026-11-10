@@ -1,0 +1,184 @@
+name: CI
+
+# The authoring environment for this project has no Flutter or Android SDK and
+# cannot reach pub.dev, so this workflow is the project's compiler. It is
+# ordered to fail fast and cheap: analyse and test before attempting a build,
+# so that a mistake surfaces as readable analyser output rather than as a build
+# crash. See docs/decisions-and-risks.md, decision D-001.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  quality:
+    name: Analyse and test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Pinned for reproducibility. 3.47.9 is the version the first run
+      # resolved from the stable channel and the one this project is verified
+      # against. Raise it deliberately, not implicitly.
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: 3.47.9
+          cache: true
+
+      - name: Report toolchain versions
+        run: |
+          flutter --version
+          dart --version
+
+      # Safety net: if the bundled libsodium is not available to the Dart VM
+      # during `flutter test`, a system copy lets the security tests run
+      # against the real primitives rather than not run at all.
+      - name: Install libsodium for host tests
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y libsodium-dev
+
+      - name: Resolve dependencies
+        run: flutter pub get
+
+      - name: Check formatting
+        run: dart format --output=none --set-exit-if-changed .
+
+      # The authoring environment has no Dart SDK, so it cannot run the
+      # formatter. When the check above fails, print the exact change the
+      # formatter wants so it can be applied verbatim rather than guessed at.
+      - name: Show required formatting
+        if: failure()
+        run: |
+          dart format .
+          echo "::group::Formatter diff"
+          git --no-pager diff
+          echo "::endgroup::"
+
+      - name: Analyse
+        run: flutter analyze
+
+      - name: Run tests
+        run: flutter test --coverage --reporter expanded
+
+      - name: Upload coverage
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage
+          path: coverage/lcov.info
+          if-no-files-found: ignore
+          retention-days: 14
+
+  android:
+    name: Build Android APK
+    needs: quality
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: 3.47.9
+          cache: true
+
+      - name: Generate platform projects if absent
+        run: bash tool/bootstrap_platforms.sh
+
+      - name: Resolve dependencies
+        run: flutter pub get
+
+      # A universal APK rather than per-ABI splits: one file is far easier for
+      # a non-technical family member to install, at the cost of size.
+      # The release APK is signed with Flutter's debug key until a release
+      # keystore exists; see decision D-006 and docs/known-limitations.md.
+      - name: Build release APK
+        run: flutter build apk --release
+
+      - name: Report APK size
+        run: ls -lh build/app/outputs/flutter-apk/
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: family-vault-android-apk
+          path: build/app/outputs/flutter-apk/app-release.apk
+          if-no-files-found: error
+          retention-days: 30
+
+  windows:
+    name: Build Windows application
+    needs: quality
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: 3.47.9
+          cache: true
+
+      - name: Generate platform projects if absent
+        shell: bash
+        run: bash tool/bootstrap_platforms.sh
+
+      - name: Resolve dependencies
+        run: flutter pub get
+
+      - name: Build release application
+        run: flutter build windows --release
+
+      # Flutter has moved this output path between versions, so both known
+      # locations are checked rather than assuming one.
+      - name: Locate build output
+        id: locate
+        shell: pwsh
+        run: |
+          $candidates = @(
+            "build/windows/x64/runner/Release",
+            "build/windows/runner/Release"
+          )
+          $found = $null
+          foreach ($c in $candidates) {
+            if (Test-Path $c) { $found = $c; break }
+          }
+          if (-not $found) {
+            Write-Error "No Windows build output found in: $($candidates -join ', ')"
+            exit 1
+          }
+          Write-Host "Found build output at $found"
+          Get-ChildItem $found | Select-Object Name, Length
+          "dir=$found" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+
+      - name: Package application
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path dist | Out-Null
+          Compress-Archive -Path "${{ steps.locate.outputs.dir }}/*" `
+            -DestinationPath "dist/family-vault-windows.zip" -Force
+
+      - name: Upload Windows package
+        uses: actions/upload-artifact@v4
+        with:
+          name: family-vault-windows
+          path: dist/family-vault-windows.zip
+          if-no-files-found: error
+          retention-days: 30

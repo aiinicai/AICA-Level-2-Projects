@@ -1,0 +1,97 @@
+name: Web demonstration
+
+# Publishes the public demonstration build used for capstone assessment.
+#
+# This build is compiled with FAMILY_VAULT_DEMO=true, which is a compile-time
+# constant. It is seeded with synthetic data, labels itself as a demonstration
+# in the interface, and physically cannot open a real vault file.
+# See docs/decisions-and-risks.md, decision D-007.
+#
+# Requires the repository's Pages source to be set to "GitHub Actions"
+# (Settings -> Pages). Until then this workflow still produces a downloadable
+# artifact, so the demo is never blocked on that setting.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+jobs:
+  build:
+    name: Build demonstration
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: 3.47.9
+          cache: true
+
+      - name: Generate platform projects if absent
+        run: bash tool/bootstrap_platforms.sh
+
+      - name: Resolve dependencies
+        run: flutter pub get
+
+      # base-href must match the repository name so that assets resolve under
+      # https://<user>.github.io/family-vault/
+      - name: Build web demonstration
+        run: |
+          flutter build web --release \
+            --base-href "/${{ github.event.repository.name }}/" \
+            --dart-define=FAMILY_VAULT_DEMO=true
+
+      - name: Upload downloadable copy
+        uses: actions/upload-artifact@v4
+        with:
+          name: family-vault-web-demo
+          path: build/web
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Package for Pages
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: build/web
+
+  deploy:
+    name: Deploy to GitHub Pages
+    needs: build
+    runs-on: ubuntu-latest
+    # Deployment is allowed to fail without failing the build: Pages may not be
+    # enabled on the repository yet, and the downloadable artifact above still
+    # delivers the demo. A failure here is reported, never hidden.
+    continue-on-error: true
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy
+        id: deployment
+        continue-on-error: true
+        uses: actions/deploy-pages@v4
+
+      # A 404 from the deployment above means Pages is not switched on for this
+      # repository, which is a repository setting and not something the build
+      # can fix. Say that plainly instead of leaving a bare HTTP error in the
+      # log, and point at the one place it is changed.
+      - name: Explain a failed deployment
+        if: steps.deployment.outcome == 'failure'
+        run: |
+          echo "::warning title=GitHub Pages is not enabled::The demonstration \
+          built successfully but could not be published. Enable it at \
+          Settings -> Pages, with Source set to 'GitHub Actions', then re-run \
+          this workflow. Until then the demo is still available as the \
+          'family-vault-web-demo' artifact on this run."
+          exit 1
