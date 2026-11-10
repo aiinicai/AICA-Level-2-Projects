@@ -3,6 +3,8 @@
 A Windows Django demonstration for vendor registration, Finance approval, invoice/PO submission, local text extraction and Finance-reviewed CSV export. Prepared as a sanitized source submission for ICAI AICA Level 2 using the supplied repository upload guide.
 
 Author: **Sanjeev Panwar**
+Batch: AICA-L2B119
+Location: Nairobi, Kenya
 
 GitHub username: **Sanjeev-Panwar899** This is a localhost demonstration, not a production deployment.
 
