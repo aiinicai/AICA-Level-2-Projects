@@ -1,0 +1,127 @@
+name: File picking probe
+
+# Temporary, manually triggered. Removed once the backup and restore screens
+# are built.
+#
+# Backup and restore need a file open dialog and a file save dialog on both
+# Windows and Android. Both candidate packages have changed their APIs across
+# major versions - file_selector moved from getSavePath to getSaveLocation, and
+# share_plus moved from Share.shareXFiles to SharePlus.instance.share - so
+# writing against a remembered API would cost several CI runs.
+#
+# This answers three questions in one run: which versions resolve, what the
+# real API is, and whether an APK and a Windows application still build with
+# them. Android's file APIs are the uncertain part: file_selector supports
+# opening a file everywhere, but a save dialog is not available on Android, so
+# the probe also checks what share_plus offers instead.
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    name: Resolve and print the real API
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: 3.47.9
+          cache: true
+
+      - name: Add the candidates
+        run: |
+          flutter pub add file_selector share_plus
+          echo "::group::resolved versions"
+          sed -n '/^dependencies:/,/^dev_dependencies:/p' pubspec.yaml
+          flutter pub deps --no-dev --style=compact \
+            | grep -iE "file_selector|share_plus|cross_file" || true
+          echo "::endgroup::"
+
+      - name: Print the public API
+        run: |
+          CACHE="${PUB_CACHE:-$HOME/.pub-cache}/hosted/pub.dev"
+          show() {
+            if [ -f "$1" ]; then
+              echo "::group::FILE $(echo "$1" | sed "s|$CACHE/||")"
+              cat "$1"
+              echo "::endgroup::"
+            else
+              echo "MISSING: $1"
+            fi
+          }
+
+          FS=$(find "$CACHE" -maxdepth 1 -type d -name "file_selector-*" | head -1)
+          SP=$(find "$CACHE" -maxdepth 1 -type d -name "share_plus-*" | head -1)
+          echo "file_selector: $FS"
+          echo "share_plus:    $SP"
+
+          show "$FS/lib/file_selector.dart"
+          for f in $(find "$FS/lib" -name "*.dart" 2>/dev/null | head -6); do
+            show "$f"
+          done
+
+          # share_plus: the entry point and whatever declares the parameters.
+          show "$SP/lib/share_plus.dart"
+          for f in $(grep -rl "class ShareParams\|class SharePlus" \
+                      "$SP/lib" 2>/dev/null | head -3); do
+            show "$f"
+          done
+
+      - name: Which platforms implement a save dialog?
+        run: |
+          CACHE="${PUB_CACHE:-$HOME/.pub-cache}/hosted/pub.dev"
+          echo "::group::file_selector platform packages present"
+          find "$CACHE" -maxdepth 1 -type d -name "file_selector_*" \
+            | sed "s|$CACHE/||" | sort
+          echo "::endgroup::"
+          echo "::group::does the Android implementation offer a save dialog?"
+          ANDROID=$(find "$CACHE" -maxdepth 1 -type d \
+                     -name "file_selector_android-*" | head -1)
+          if [ -n "$ANDROID" ]; then
+            grep -rn "getSaveLocation\|getSavePath\|getDirectoryPath\|UnimplementedError\|unsupported" \
+              "$ANDROID/lib" | head -20
+          else
+            echo "no file_selector_android in the cache"
+          fi
+          echo "::endgroup::"
+
+  build-android:
+    name: APK with the file packages
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: 3.47.9
+          cache: true
+      - run: flutter pub add file_selector share_plus
+      - run: flutter build apk --release
+      - run: ls -lh build/app/outputs/flutter-apk/
+
+  build-windows:
+    name: Windows with the file packages
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: 3.47.9
+          cache: true
+      - run: flutter pub add file_selector share_plus
+      - run: flutter build windows --release
+      - shell: pwsh
+        run: |
+          $dir = "build/windows/x64/runner/Release"
+          if (-not (Test-Path $dir)) { $dir = "build/windows/runner/Release" }
+          Get-ChildItem $dir -Include *.dll,*.exe | Select-Object Name, Length

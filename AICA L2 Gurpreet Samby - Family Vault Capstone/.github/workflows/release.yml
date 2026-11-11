@@ -1,0 +1,214 @@
+name: Release
+
+# Publishes installable builds to a GitHub Release so that family members and
+# capstone assessors can download them from one page.
+#
+# Triggered by pushing a tag such as v0.1.0, or manually.
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag to publish (for example v0.1.0)"
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  android:
+    name: Android APK
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: 3.47.9
+          cache: true
+      - run: bash tool/bootstrap_platforms.sh
+      - run: flutter pub get
+      - run: flutter test
+      - run: flutter build apk --release
+      - name: Name the file for humans
+        run: |
+          mkdir -p dist
+          cp build/app/outputs/flutter-apk/app-release.apk \
+             dist/FamilyVault-Android.apk
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-android
+          path: dist/FamilyVault-Android.apk
+          if-no-files-found: error
+
+  windows:
+    name: Windows application
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: 3.47.9
+          cache: true
+      - shell: bash
+        run: bash tool/bootstrap_platforms.sh
+      - run: flutter pub get
+      - run: flutter test
+      - run: flutter build windows --release
+      - name: Package application
+        shell: pwsh
+        run: |
+          $candidates = @(
+            "build/windows/x64/runner/Release",
+            "build/windows/runner/Release"
+          )
+          $found = $null
+          foreach ($c in $candidates) {
+            if (Test-Path $c) { $found = $c; break }
+          }
+          if (-not $found) {
+            Write-Error "No Windows build output found."
+            exit 1
+          }
+          New-Item -ItemType Directory -Force -Path dist | Out-Null
+          Compress-Archive -Path "$found/*" `
+            -DestinationPath "dist/FamilyVault-Windows.zip" -Force
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-windows
+          path: dist/FamilyVault-Windows.zip
+          if-no-files-found: error
+
+  publish:
+    name: Publish release
+    needs: [android, windows]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Collect files
+        run: |
+          mkdir -p dist
+          find artifacts -type f \( -name '*.apk' -o -name '*.zip' \) \
+            -exec cp {} dist/ \;
+          ls -lh dist/
+
+      - name: Resolve tag
+        id: tag
+        run: |
+          if [ -n "${{ github.event.inputs.tag }}" ]; then
+            echo "name=${{ github.event.inputs.tag }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "name=${GITHUB_REF#refs/tags/}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Write release notes
+        run: |
+          cat > notes.md <<'NOTES'
+          ## Family Vault
+
+          A secure, offline-first password manager for Android and Windows.
+          Your vault is encrypted on your own device with a key made from your
+          master password. Nothing is sent anywhere, and no server of ours can
+          read it.
+
+          ### What works in this version
+
+          Create a vault, save logins, secure notes, payment cards and
+          identities, organise them in folders, search, generate strong
+          passwords and passphrases, get live six-digit authenticator codes for
+          your other accounts, see which of your passwords need attention, and
+          lock the vault by hand, on a timer, or when the app leaves the screen.
+
+          **Backup and restore.** Open **Backup & Transfer** to write an
+          encrypted copy of your vault - safe to keep on a cloud drive or a USB
+          stick, because it is useless without its password. A replaced phone
+          can be set up straight from a backup: the first screen offers
+          "Restore from a backup file instead".
+
+          **New: keep two devices in step through a shared folder.** Point both
+          devices at the same folder - your Google Drive, OneDrive or Dropbox
+          folder on the device, a network share, even a USB stick - and press
+          **Sync now**. There is no account and no sign-in: this app never
+          talks to the cloud service. Whatever already keeps that folder in
+          step does the moving, and only ever sees encrypted files.
+
+          Vaults are merged entry by entry: whichever side changed an entry
+          more recently wins, entries you deleted stay deleted, and nothing you
+          still have on a device can be lost by syncing. Syncing twice changes
+          nothing the second time.
+
+          Setting it up takes one manual step, and it is not optional: make a
+          backup on the device that already holds your passwords, import it on
+          the other device, then choose the shared folder on both. The key that
+          protects the shared files lives inside your encrypted vault, so the
+          only way to get it to the second device is to get your vault there.
+          `docs/user-guide.md` walks through it.
+
+          ### Not in this version
+
+          Sync runs when you press the button. Nothing watches the folder and
+          nothing runs on a schedule. Also missing: autofill on Android,
+          importing from another password manager, and a printable recovery
+          sheet. See `docs/known-limitations.md`.
+
+          ### Downloads
+
+          | File | For |
+          |---|---|
+          | `FamilyVault-Android.apk` | Android phones and tablets |
+          | `FamilyVault-Windows.zip` | Windows 10 and 11 |
+
+          Step-by-step installation: `docs/installing.md`.
+          How to use it: `docs/user-guide.md`.
+
+          ### Installing on Android
+
+          Android will warn that the app is from an unknown developer, because
+          this build is signed with a development key rather than a store key.
+          Allow the install from your browser or file manager when prompted.
+
+          ### Installing on Windows
+
+          Unzip the folder anywhere and run `family_vault.exe`. Keep the whole
+          folder together; the program needs the files beside it.
+
+          ### Please read this part
+
+          **Your master password cannot be recovered.** If you forget it, the
+          vault cannot be opened by anyone, including us. There is no reset.
+          Write it down and keep it somewhere safe.
+
+          **Take a backup.** Each device keeps its own vault file, and the app
+          cannot get it back from a device you no longer have. A backup file is
+          the only thing standing between a broken phone and a lost vault - and
+          its password cannot be recovered either, so keep that somewhere other
+          than inside the vault.
+
+          This project has not had an independent security audit.
+          NOTES
+
+      - name: Create or update the release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="${{ steps.tag.outputs.name }}"
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" dist/* --clobber
+          else
+            gh release create "$TAG" dist/* \
+              --title "Family Vault $TAG" \
+              --notes-file notes.md
+          fi
