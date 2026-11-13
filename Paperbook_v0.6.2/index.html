@@ -1,0 +1,408 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Paperbook — Professional v0.6.2</title>
+  <link rel="stylesheet" href="app/styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <div>
+      <h1>Paperbook</h1>
+      <p>Indirect Tax · Litigation Paper-book Utility</p>
+    </div>
+    <span class="badge">Professional v0.6.2</span>
+  </header>
+
+  <main class="shell">
+    <details class="notice compact-notice">
+      <summary><strong>Private and offline</strong> <span>Files stay in this browser.</span></summary>
+      <p>PDFs and images are processed on this computer. Nothing is uploaded by the application.</p>
+    </details>
+
+    <nav class="steps" aria-label="Workflow">
+      <button class="step active" data-panel="casePanel">1. Case</button>
+      <button class="step" data-panel="documentsPanel">2. Documents</button>
+      <button class="step" data-panel="annexurePanel">3. Annexure & Pagination</button>
+      <button class="step" data-panel="stampPanel">4. Stamp & Signature</button>
+      <button class="step" data-panel="outputPanel">5. Preview & Generate</button>
+    </nav>
+
+    <section id="casePanel" class="panel active">
+      <h2>Case and cover details</h2>
+      <div class="grid two">
+        <label>Cover main heading <input id="coverHeading" value="Paperbook"></label>
+        <label>Cover organisation line <input id="coverSubheading" value="Indirect Tax"></label>
+        <label>Project name <input id="projectName" value="GSTAT Appeal Paper Book"></label>
+        <label>Appeal type
+          <select id="appealType">
+            <option>GSTAT Appeal</option>
+            <option>First Appeal</option>
+            <option>Writ Petition Paper Book</option>
+            <option>Department Submission</option>
+            <option>Reply / Written Submission</option>
+            <option>Paper Book</option>
+            <option>Case-Law Compilation</option>
+            <option value="custom">Custom…</option>
+            <option value="">None / Blank</option>
+          </select>
+        </label>
+        <label id="customAppealTypeWrap" class="hidden">Custom document type <input id="customAppealType" placeholder="Type document heading"></label>
+        <label>Appellant <input id="appellant" value="X Ltd"></label>
+        <label>Respondent <input id="respondent" placeholder="Commissioner / Department"></label>
+        <label>Bench <input id="bench" placeholder="GSTAT Kolkata Bench"></label>
+        <label>GSTIN <input id="gstin" placeholder="Enter GSTIN"></label>
+        <label>Financial year <input id="financialYear" placeholder="e.g. 2019-20"></label>
+        <label>Impugned order no. <input id="orderNumber" placeholder="Order number"></label>
+        <label>Order date <input id="orderDate" type="date"><small>Printed as DD-MMM-YYYY, for example 06-Aug-2026.</small></label>
+        <label>Prepared by <input id="preparedBy" value="Indirect Tax Team"><small>Printed only when selected below.</small></label>
+        <label>First-page text size
+          <select id="coverTextSize"><option value="small">Small</option><option value="normal" selected>Normal</option><option value="large">Large</option></select>
+        </label>
+      </div>
+      <label class="wide">Case title / subject
+        <textarea id="caseTitle" rows="3" placeholder="Brief title or subject of the appeal"></textarea>
+      </label>
+      <div class="checks">
+        <label><input id="showCoverHeading" type="checkbox" checked> Show cover heading block</label>
+        <label><input id="showDocumentType" type="checkbox" checked> Show document type on cover</label>
+        <label><input id="showPreparedBy" type="checkbox"> Show “Prepared by” on first page</label>
+        <label><input id="showCaseTitleOnIndex" type="checkbox" checked> Show case title/bench line on index</label>
+      </div>
+      <div class="actions right">
+        <button type="button" class="primary" data-next="documentsPanel">Continue to Documents</button>
+      </div>
+    </section>
+
+    <section id="documentsPanel" class="panel">
+      <div class="panel-head">
+        <div>
+          <h2>Documents</h2>
+          <p>Add PDF, JPG or PNG files. Drag the ☰ handle or use the arrows to arrange the exact filing sequence.</p>
+        </div>
+        <div class="inline-buttons">
+          <button id="toggleMoreDetails" type="button" class="secondary">More details</button>
+          <label class="file-button">Add files
+            <input id="fileInput" type="file" accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png" multiple hidden>
+          </label>
+        </div>
+      </div>
+
+      <section id="moreDetailsPanel" class="optional-panel hidden">
+        <div class="panel-head"><div><h3>Optional document details</h3><p>Add only what is useful. Blank details will not stop generation. Date example: 26-Nov-2024 (DD-MMM-YYYY). Issue tags may contain more than one issue.</p></div><button id="closeMoreDetails" type="button" class="icon-btn">Close</button></div>
+        <div class="checks compact">
+          <label><input class="optionalColumn" type="checkbox" value="documentDate"> Date</label>
+          <label><input class="optionalColumn" type="checkbox" value="documentType"> Type</label>
+          <label><input class="optionalColumn" type="checkbox" value="referenceNumber"> Reference No.</label>
+          <label><input class="optionalColumn" type="checkbox" value="issuedBy"> Issued by</label>
+          <label><input class="optionalColumn" type="checkbox" value="financialYear"> Financial year</label>
+          <label><input class="optionalColumn" type="checkbox" value="taxPeriod"> Tax period</label>
+          <label><input class="optionalColumn" type="checkbox" value="issues"> Issue</label>
+          <label><input class="optionalColumn" type="checkbox" value="remarks"> Remarks</label>
+        </div>
+        <div class="inline-buttons wrap">
+          <button id="addDocumentColumn" type="button" class="secondary">Add your own column</button>
+          <button id="createChronology" type="button" class="secondary">Create chronology</button>
+          <button id="downloadIssueList" type="button" class="secondary">Download issue-wise list</button>
+          <button id="openReferenceChecker" type="button" class="secondary">Check appeal references</button>
+        </div>
+        <div id="customColumnsList" class="inline-buttons wrap"></div>
+      </section>
+
+      <div id="dropZone" class="drop-zone" tabindex="0">
+        Drop files here, or click “Add files”
+      </div>
+
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr id="documentsHeaderRow">
+              <th>#</th>
+              <th>Annexure</th>
+              <th>Particulars</th>
+              <th>File</th>
+              <th>Pages</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="documentsBody">
+            <tr id="emptyRow"><td colspan="6" class="empty">No files added.</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <section id="chronologyPanel" class="optional-panel hidden">
+        <div class="panel-head"><div><h3>Chronology</h3><p>Dates are shown as DD-MMM-YYYY. Everything below is editable.</p></div><button id="closeChronology" type="button" class="icon-btn">Close</button></div>
+        <div class="inline-buttons wrap">
+          <button id="addChronologyRow" type="button" class="secondary">Add row</button>
+          <button id="addChronologyColumn" type="button" class="secondary">Add column</button>
+          <button id="sortChronology" type="button" class="secondary">Sort by date</button>
+          <button id="refreshChronology" type="button" class="secondary">Refresh from documents</button>
+          <button id="downloadChronologyCsv" type="button" class="secondary">Download Excel-ready CSV</button>
+        </div>
+        <label class="toggle-line"><input id="includeChronology" type="checkbox"> Add chronology to paper book</label>
+        <div class="table-wrap"><table id="chronologyTable"><thead><tr id="chronologyHeader"></tr></thead><tbody id="chronologyBody"></tbody></table></div>
+      </section>
+
+      <section id="referencePanel" class="optional-panel hidden">
+        <div class="panel-head"><div><h3>Check annexures mentioned in appeal</h3><p>The check is optional and never blocks generation. DOCX, searchable PDF and TXT are supported.</p></div><button id="closeReferenceChecker" type="button" class="icon-btn">Close</button></div>
+        <label>Appeal draft <input id="appealDraftFile" type="file" accept=".docx,.pdf,.txt,application/pdf,text/plain,application/vnd.openxmlformats-officedocument.wordprocessingml.document"></label>
+        <div class="inline-buttons"><button id="runReferenceCheck" type="button" class="secondary">Check references</button><button id="downloadReferenceReport" type="button" class="secondary" disabled>Download report</button></div>
+        <p id="referenceStatus" class="muted">Upload a draft to begin.</p>
+        <div id="referenceResults" class="table-wrap hidden"><table><thead><tr><th>Reference found</th><th>Result</th><th>Context</th><th>Suggested correction</th></tr></thead><tbody id="referenceResultsBody"></tbody></table></div>
+      </section>
+
+      <div class="actions split">
+        <button type="button" class="secondary" data-next="casePanel">Back</button>
+        <button type="button" class="primary" data-next="annexurePanel">Continue to Annexure & Pagination</button>
+      </div>
+    </section>
+
+    <section id="annexurePanel" class="panel">
+      <h2>Annexure numbering and pagination</h2>
+      <div class="grid two">
+        <label>Numbering pattern
+          <select id="annexureMode">
+            <option value="main_then_annexure" selected>1, 2, 3 then A1, A2, A3…</option>
+            <option value="single">Use one series for every document</option>
+          </select>
+        </label>
+        <label id="mainDocumentCountWrap">Main documents before A-series
+          <input id="mainDocumentCount" type="number" min="0" value="3" placeholder="Example: 3">
+          <small>Example: 3 means the first three documents are 1, 2 and 3; the next document is A1.</small>
+        </label>
+        <label class="single-series-control">Annexure prefix
+          <select id="annexurePrefix">
+            <option value="A/">A/</option><option value="A-">A-</option>
+            <option value="Annexure A-">Annexure A-</option><option value="Annexure-">Annexure-</option>
+            <option value="Exhibit-">Exhibit-</option><option value="Document-">Document-</option>
+            <option value="custom">Custom…</option><option value="">No prefix</option>
+          </select>
+        </label>
+        <label id="customAnnexurePrefixWrap" class="single-series-control hidden">Custom prefix <input id="customAnnexurePrefix" placeholder="e.g. P/"></label>
+        <label class="single-series-control">Numbering series
+          <select id="annexureSeries">
+            <option value="arabic">1, 2, 3…</option><option value="upper_alpha">A, B, C…</option>
+            <option value="lower_alpha">a, b, c…</option><option value="upper_roman">I, II, III…</option>
+            <option value="lower_roman">i, ii, iii…</option>
+          </select>
+        </label>
+        <label>Starting number <input id="annexureStart" type="number" min="1" value="1"></label>
+        <label>Page numbering scope
+          <select id="paginationScope">
+            <option value="all">Cover, index and documents</option>
+            <option value="exclude_cover">Exclude cover pages</option>
+            <option value="documents_only">Documents only (exclude cover and index)</option>
+            <option value="physical_start">Start from selected physical page</option>
+          </select>
+        </label>
+        <label>Physical page to start numbering <input id="paginationStartPhysical" type="number" min="1" value="1"></label>
+        <label>First displayed number <input id="startNumber" type="number" min="1" value="1"></label>
+      </div>
+      <div class="checks">
+        <label><input id="autoRenumber" type="checkbox" checked> Auto-renumber after reordering</label>
+        <label><input id="showFirstNumber" type="checkbox" checked> Show number on first numbered page</label>
+      </div>
+      <div class="actions split">
+        <button type="button" class="secondary" data-next="documentsPanel">Back</button>
+        <button id="applyAnnexureNumbering" type="button" class="secondary">Apply annexure numbering</button>
+        <button type="button" class="primary" data-next="stampPanel">Continue to Stamp & Signature</button>
+      </div>
+    </section>
+
+    <section id="stampPanel" class="panel">
+      <h2>Stamp, signature and page labels</h2>
+      <p class="muted">Optional visible image placement only. This does not create or preserve a cryptographic DSC.</p>
+      <div class="grid two">
+        <label>Signature / stamp image
+          <input id="stampFile" type="file" accept=".png,.jpg,.jpeg,image/png,image/jpeg">
+        </label>
+        <label>Apply to
+          <select id="stampScope">
+            <option value="none">Do not apply</option><option value="first_document_page">First page of every document</option>
+            <option value="all_document_pages">All document pages</option><option value="last_document_page">Last page of every document</option>
+            <option value="custom_pages">Custom physical pages</option>
+          </select>
+        </label>
+        <label>Custom physical pages <input id="stampPages" placeholder="e.g. 5, 8-12, 20"></label>
+        <label>Position
+          <select id="stampPosition"><option value="bottom_left">Bottom Left</option><option value="bottom_center">Bottom Centre</option><option value="bottom_right" selected>Bottom Right</option><option value="top_left">Top Left</option><option value="top_center">Top Centre</option><option value="top_right">Top Right</option></select>
+        </label>
+        <label>Width (points) <input id="stampWidth" type="number" min="20" max="300" value="90"></label>
+        <label>Opacity <input id="stampOpacity" type="number" min="0.1" max="1" step="0.1" value="0.9"></label>
+        <label>Optional text stamp <input id="textStamp" placeholder="e.g. TRUE COPY / UNDER PROTEST"></label>
+      </div>
+      <div class="actions split"><button type="button" class="secondary" data-next="annexurePanel">Back</button><button type="button" class="primary" data-next="outputPanel">Continue to Preview & Generate</button></div>
+    </section>
+
+    <section id="outputPanel" class="panel">
+      <h2>Preview and generate paper book</h2>
+      <div class="grid two">
+        <label>Maximum pages per volume
+          <input id="maxPages" type="number" min="10" max="300" value="300" placeholder="Portal guidance: up to 300">
+        </label>
+        <label>Page number display
+          <select id="pageNumberFormat">
+            <option value="page_x_of_y">Page 1 of 100</option>
+            <option value="x_of_y">1 of 100</option>
+            <option value="page_x">Page 1</option>
+            <option value="x">1</option>
+          </select>
+        </label>
+        <label>Footer text
+          <input id="footerText" value="Indirect Tax">
+        </label>
+        <label>PDF accent colour
+          <select id="accentColor">
+            <option value="red">Airtel Red</option><option value="navy">Navy Blue</option>
+            <option value="blue">Royal Blue</option><option value="black">Black / Grey</option>
+            <option value="maroon">Maroon</option><option value="green">Green</option>
+          </select>
+        </label>
+        <label>Layout style
+          <select id="layoutStyle"><option value="formal">Formal Tribunal</option><option value="corporate">Corporate</option><option value="minimal">Minimal Black-and-White</option></select>
+        </label>
+        <label>File name prefix
+          <input id="filePrefix" value="Appeal_PaperBook">
+        </label>
+        <label>Return to Index + Annexure position
+          <select id="returnPosition">
+            <option value="top_left">Top Left</option>
+            <option value="top_center">Top Centre</option>
+            <option value="top_right" selected>Top Right</option>
+          </select>
+        </label>
+        <label>Return / Annexure size
+          <select id="returnSize">
+            <option value="small">Small</option>
+            <option value="normal" selected>Normal</option>
+            <option value="large">Large</option>
+          </select>
+        </label>
+        <label>Page / serial number position
+          <select id="pageNumberPosition">
+            <option value="top_left">Top Left</option>
+            <option value="top_center">Top Centre</option>
+            <option value="top_right">Top Right</option>
+            <option value="bottom_left">Bottom Left</option>
+            <option value="bottom_center">Bottom Centre</option>
+            <option value="bottom_right" selected>Bottom Right</option>
+          </select>
+        </label>
+        <label>Page-number size
+          <select id="pageNumberSize">
+            <option value="small">Small</option>
+            <option value="normal" selected>Normal</option>
+            <option value="large">Large</option>
+          </select>
+        </label>
+      </div>
+
+      <details class="optional-panel compact-drawer">
+        <summary>Optional filing and size checks</summary>
+        <div class="grid two drawer-grid">
+          <label>Output stage
+            <select id="outputMode">
+              <option value="final" selected>Final filing set</option>
+              <option value="draft">Draft review set</option>
+            </select>
+            <small>Draft mode adds a visible DRAFT mark. It does not lock the file.</small>
+          </label>
+          <label>Target size per PDF (MB)
+            <input id="maxFileSizeMB" type="number" min="1" max="500" step="1" value="20" placeholder="Current portal guidance: 20">
+            <small>Advisory check only. Confirm the limit shown by the portal at the time of filing.</small>
+          </label>
+        </div>
+        <div class="checks compact filing-checks">
+          <label><input class="filingCheck" type="checkbox"> Appeal and grounds reviewed</label>
+          <label><input class="filingCheck" type="checkbox"> Order and annexures included</label>
+          <label><input class="filingCheck" type="checkbox"> Page numbers and index checked</label>
+          <label><input class="filingCheck" type="checkbox"> Signed originals kept separately</label>
+          <label><input class="filingCheck" type="checkbox"> Scans checked: grayscale, 300 DPI</label>
+          <label><input class="filingCheck" type="checkbox"> Online and physical sets match</label>
+        </div>
+        <p class="muted">These reminders are optional. Unticked boxes never block preview or generation.</p>
+      </details>
+
+      <div class="checks">
+        <label><input id="addCover" type="checkbox" checked> Add cover page</label>
+        <label><input id="addIndex" type="checkbox" checked> Add index</label>
+        <label><input id="addMasterIndex" type="checkbox" checked> Full master index in every volume</label>
+        <label><input id="addLinks" type="checkbox" checked> Clickable index links</label>
+        <label><input id="addReturn" type="checkbox" checked> Return-to-index link</label>
+        <label><input id="addBookmarks" type="checkbox" checked> PDF bookmarks</label>
+        <label><input id="addPagination" type="checkbox" checked> Continuous page numbering</label>
+      </div>
+
+      <section class="validation" id="validationBox">
+        <h3>Pre-generation check</h3>
+        <ul id="validationList"></ul>
+      </section>
+
+      <div class="actions split">
+        <button type="button" class="secondary" data-next="stampPanel">Back</button>
+        <div class="inline-buttons">
+          <button id="previewButton" type="button" class="secondary">Create exact preview</button>
+          <button id="generateButton" type="button" class="primary">Generate Final ZIP</button>
+        </div>
+      </div>
+
+      <section id="previewPanel" class="optional-panel hidden">
+        <div class="panel-head"><div><h3>Exact paper-book preview</h3><p>The preview uses the same PDF bytes that will be placed in the final ZIP.</p></div><span id="previewStatus" class="status-pill">Not created</span></div>
+        <div class="preview-controls">
+          <label>Volume <select id="previewVolume"></select></label>
+          <label>Jump to annexure <select id="previewJump"><option value="">Choose annexure…</option></select></label>
+          <button id="refreshPreview" type="button" class="secondary">Refresh preview</button>
+          <a id="openPreviewNew" class="button-link hidden" target="_blank" rel="noopener">Open in new window</a>
+        </div>
+        <iframe id="previewFrame" title="Paper book preview"></iframe>
+        <p class="muted">Scroll inside the preview. Use the PDF viewer controls for page number, zoom, fit width and download.</p>
+      </section>
+
+      <div id="progressPanel" class="progress-panel hidden" aria-live="polite">
+        <div class="progress-track"><div id="progressBar"></div></div>
+        <p id="progressText">Preparing…</p>
+      </div>
+
+      <div id="resultPanel" class="result hidden" aria-live="polite"></div>
+    </section>
+  </main>
+
+  <footer>
+    <span>Professional v0.6.2 · Compact, optional litigation tools with exact preview</span>
+    <span>Use Adobe Acrobat Reader to verify links and bookmarks.</span>
+  </footer>
+
+  <div id="pageEditorModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="pageEditorTitle">
+    <div class="modal-card">
+      <div class="panel-head"><div><h2 id="pageEditorTitle">Edit pages</h2><p>Original file remains unchanged. “Remove” only excludes a page from the paper book.</p></div><button id="closePageEditor" type="button" class="icon-btn">Close</button></div>
+      <div id="pageEditorWarning" class="notice hidden"></div>
+      <details class="editor-tools">
+        <summary>Select or change many pages</summary>
+        <div class="inline-buttons wrap editor-toolbar">
+          <label>Pages <input id="editorPageRange" placeholder="Example: 1-5, 8, 12-15"></label>
+          <button id="selectPageRange" type="button" class="secondary">Select pages</button>
+          <button id="selectAllPages" type="button" class="secondary">Select all</button>
+          <button id="clearPageSelection" type="button" class="secondary">Clear selection</button>
+          <span id="editorSelectionStatus" class="status-pill">No pages selected</span>
+          <button id="bulkRestorePages" type="button" class="secondary">Include selected</button>
+          <button id="bulkRemovePages" type="button" class="secondary danger">Exclude selected</button>
+          <button id="bulkRotateLeft" type="button" class="secondary">Rotate left</button>
+          <button id="bulkRotateRight" type="button" class="secondary">Rotate right</button>
+          <button id="bulkMovePagesUp" type="button" class="secondary">Move before</button>
+          <button id="bulkMovePagesDown" type="button" class="secondary">Move after</button>
+          <button id="bulkMovePagesStart" type="button" class="secondary">Move to start</button>
+          <button id="bulkMovePagesEnd" type="button" class="secondary">Move to end</button>
+        </div>
+      </details>
+      <div class="inline-buttons wrap"><button id="undoPageEdit" type="button" class="secondary">Undo</button><button id="resetPageEdit" type="button" class="secondary">Reset document</button><button id="applyPageEdit" type="button" class="primary">Apply changes</button></div>
+      <div id="pageTiles" class="page-tiles"></div>
+    </div>
+  </div>
+  <script src="app/vendor/pdf-lib.min.js"></script>
+  <script src="app/vendor/jszip.min.js"></script>
+  <script src="app/vendor/pdf.min.js"></script>
+  <script src="app/main.js"></script>
+</body>
+</html>
