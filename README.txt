@@ -1,24 +1,19 @@
-FD Treasury Management System
-ICAI Level 3 Capstone Prototype
+DUNE COUNT - Physical stock count app
 
-RUN:
-1. Extract the ZIP.
-2. Double-click index.html.
-3. It runs entirely in the browser; no server or installation is required.
+1) Install libraries (optional - run.py also installs them automatically). Paste into cmd:
+   pip install flask openpyxl
 
-FEATURES:
-- Dashboard KPIs and charts
-- FD register with create/edit/delete
-- Interest accrual calculation
-- Bank master and exposure limits
-- FD placement comparison tool
-- Maturity management
-- Suggested accounting entries
-- Print-ready reports
-- JSON backup/export and import
-- LocalStorage persistence
+2) Start:   python run.py
+   Count Admin   -> http://localhost:5000/admin/
+   Count Persons -> http://localhost:5000/counter/
 
-IMPORTANT:
-This is an educational capstone prototype. Tax rates, accounting treatment, TDS rules,
-bank exposure policies and journal mappings should be configured/reviewed for the actual
-organisation and current applicable law before production use.
+Flow
+ - First person to sign up on the Admin portal becomes Admin.
+ - Admin adds employees (name + email). Employees sign up once with that email, then sign in.
+ - Admin: Counts & Completion -> choose location (SHW1/SHW2/SHW3/WHS4) -> upload book Excel
+   (Row 1 header, column "Barcode", optional "Description", one row per unit). Template is downloadable there.
+ - Counters: pick location, type last 4 digits, choose barcode from dropdown, enter sticker number, Record unit.
+ - Counter presses Confirm completion -> Admin confirms completion -> enters stickers used.
+   Must equal units counted or submission is blocked. Then the variance report (0 / -1 / +1) is generated.
+ - Exports: Count table CSV, Results CSV, Audit CSV, Excel (barcode, sticker no, book qty, counted, difference).
+Data is stored in dune_count.db (SQLite) in this folder.
