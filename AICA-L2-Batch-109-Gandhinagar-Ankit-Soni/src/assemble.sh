@@ -1,0 +1,2 @@
+#!/bin/sh
+cd /home/claude/py && cat part1_boot.py part2_engine.py part3_docx.py part3b_recon.py part3d_reader.py part3c_reports.py part4_store.py part5_ui_a.py part6_ui_b.py part7_ui_c.py part8_ui_d.py part9_ui_e.py part9b_ui_recon.py part10_ui_f.py > /home/claude/balance_confirmation_generator.py && python -c "import ast;ast.parse(open('/home/claude/balance_confirmation_generator.py').read());print('AST OK')"
