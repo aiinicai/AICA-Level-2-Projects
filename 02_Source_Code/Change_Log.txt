@@ -1,0 +1,41 @@
+Miles2Collect - change log (this version)
+
+Certificate check
+- Wrong / out-of-sequence / future-dated certificate now stops the stepper at "Certificate read" (red); AI cross-check shows Blocked, later steps Locked.
+- Schedule comparison uses the next pending milestone; new "vs Schedule" column; future completion date is rejected.
+- Remove certificate / Replace architect PDF; same file can be re-selected; next-milestone certificate can be uploaded after demands are prepared.
+- Submit for Manager approval requires an accepted certificate; stepper shows "Awaiting Manager" while approval is pending.
+- Certificate limit 3 MB with a clear message; warning if browser storage is full (use Backup).
+
+Dashboard
+- GST wording corrected: 5% without ITC (CGST 2.5% + SGST 2.5%; IGST 5% inter-State).
+- Demand card reconciles stages achieved vs demanded; Outstanding card split into overdue / demanded-not-yet-due / demand yet to raise / future stages.
+- Collection efficiency formula and RERA data sources shown; Project P&L card removed from dashboard.
+- Interest: standard 12% p.a. simple (Project Info key "Interest Rate % p.a."); SBI MCLR wording removed.
+
+Demand letter
+- New layout: Tax Invoice-cum-Demand (invoice and supply details, bill-to, agreement and architect certificate, CGST/SGST or IGST columns, amount in words, account position, bank details, terms, signature). Used for the on-screen preview and the PDF.
+
+
+AI narration matching: n8n workflow Miles2Collect - Narration Matcher (originally Gemini, token-checked; now rebuilt on Claude in the new n8n account, see below); app buttons AI suggest / Accept / Ignore on unmatched receipts; roles Accountant only; demo file 09 added.
+
+Manager approval hand-off fix: files stored under a separate key; submit confirms save; Manager approval inbox + refresh button.
+
+
+n8n migration - Narration Matcher (05-Nov-2026)
+- Rebuilt in the new n8n account (hjsaccts.app.n8n.cloud) as "Miles2Collect - Bank Receipt AI Matching"; webhook path /webhook/slab2cash-narration-ai; published.
+- Model changed from Gemini to Claude Sonnet 5 (structured JSON output); the AI may only return a flat from the list the app sends.
+- Token is read from the request body field "token" (as the app sends it); an x-api-key header is also accepted. Wrong or missing token returns HTTP 401 "Unauthorized" and the AI is not called.
+- Input validation: missing narration or flat list returns matched=false with a reason instead of an error.
+- Server-side guard: a flat not in the supplied list is discarded; matched=true only at confidence 0.60 or more. The app still shows no Accept button below 70%.
+- Response: matched, flat, confidence, reason, plus a new optional field "suggestion" (ignored by the app).
+- App: narration webhook URL now pre-filled in defaults. Token is NOT stored in this ZIP; enter it in the connection settings.
+- Tested (5 narrations incl. initials-only, same-surname ambiguity and unrelated payer): correct match, correct refusal; about 2-3 seconds per call.
+- NOT yet migrated: Certificate AI reader and Demand Letters / reminders workflows (still the old account / Gemini).
+
+- Certificate AI Reader rebuilt on Claude (path /webhook/slab2cash-certificate-ai), published. Same input as before (token, project, schedule, text) and same output fields. A sample/DEMO marked document in certificate format is still read as a certificate, with the marking flagged in notes; the app's own schedule checks decide acceptance. Output is sanitised (numbers, YYYY-MM-DD dates, confidence 0-1).
+- Demand Letters Automation rebuilt (path /webhook/slab2cash-demand-letters): token check, immediate response {ok, batchId, received, queued, skipped}, test-inbox safety filter (kotharid123 / dmkothari06 @gmail.com and + aliases), PDF attachment, Gmail send. Published with a Gmail credential; a live demand e-mail with PDF attachment was sent to an approved test inbox and received (05-Nov-2026).
+- App defaults now pre-fill all three n8n webhook URLs (token still entered by the user).
+
+- App fix (05-Nov-2026): the n8n connection settings (three webhook URLs, token, Dry run, Test connection) are now also shown at the top of the Demand Workflow page, so the AI certificate cross-check can be configured before the milestone is confirmed. Previously they appeared only after the AI check had passed.
+- App fix: blank or old-account (dkothari) webhook URLs saved in the browser are replaced with the new-account URLs on load, and the retired S2C- token is cleared. Your own new token is kept.
