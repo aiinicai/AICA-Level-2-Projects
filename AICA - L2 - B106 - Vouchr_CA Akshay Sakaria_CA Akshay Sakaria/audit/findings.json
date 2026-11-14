@@ -1,0 +1,1520 @@
+{
+  "date": "2026-11-03",
+  "root": "C:/Users/Geeta/Desktop/Expense Tracker tool",
+  "severityCounts": {
+    "Critical": 4,
+    "High": 33,
+    "Medium": 11
+  },
+  "findings": [
+    {
+      "id": "A01",
+      "severity": "Critical",
+      "area": "Architecture",
+      "title": "Live configuration still runs demo identity and browser-only financial state",
+      "confidence": "Confirmed by code trace",
+      "problem": "backend.ts creates a Supabase client, but StoreProvider always loads DEMO_USERS, DEMO_CLIENTS and localStorage. Login always presents role buttons. Financial actions call setS rather than Supabase reads/RPCs. main.tsx only prevents startup when configuration is missing; adding configuration passes that guard without adding real authentication or persistence.",
+      "impact": "A deployment can look connected while bills, payments, approvals, consents and audit history remain device-local and identities are freely selectable. Some document/AI/push calls independently use Supabase, creating a split system. This is a development prototype, not a production multi-tenant accounting service.",
+      "fix": "Implement a real Auth/session/profile bootstrap and a server-backed repository. Route every financial mutation through explicit commands/RPCs. Keep the demo store behind a separate build entry and conspicuous synthetic-data banner. Do not treat provisioning credentials as completion of the backend work.",
+      "acceptance": "In a production build, no role picker or demo rows exist; create a bill on device A, reload and read it on device B; revoke the user and prove writes fail; simulate persistence failure and show an unsaved state.",
+      "refs": [
+        {
+          "file": "src/lib/backend.ts",
+          "line": 8,
+          "excerpt": "export const supabase: SupabaseClient | null = url && key ? createClient(url, key) : null;"
+        },
+        {
+          "file": "src/data/store.tsx",
+          "line": 214,
+          "excerpt": "const [s, setS] = useState<State>(load);"
+        },
+        {
+          "file": "src/pages/Login.tsx",
+          "line": 68,
+          "excerpt": "{s.users.filter((u) => u.active !== false).map((u) => {"
+        },
+        {
+          "file": "src/main.tsx",
+          "line": 19,
+          "excerpt": "if (misconfigured) {"
+        }
+      ]
+    },
+    {
+      "id": "A02",
+      "severity": "Critical",
+      "area": "Security",
+      "title": "Financial and document views bypass tenant RLS",
+      "confidence": "Reproduced in isolated PostgreSQL",
+      "problem": "expense_register, payment_register, orphan_documents and tds_liability are created without security_invoker. Under the representative authenticated grants used by the project tests, Tenant A sees zero Tenant B expense rows directly but reads Vendor B and its ₹1,000 bill through expense_register. Actual deployed grants were not available for inspection.",
+      "impact": "The intended tenant boundary can fail through a view even while table-level tests appear secure. orphan_documents additionally exposes Drive identifiers and paths. This is a release blocker wherever these views are exposed with owner privileges.",
+      "fix": "Use security_invoker=true on user-facing views, or keep administrative views in a private schema with grants revoked from anon/authenticated. Explicitly manage view grants in migrations. Test all views and RPCs for every role and tenant.",
+      "acceptance": "With two clients, queries through every exposed view return only permitted rows. Anonymous callers and inactive users receive no rows. Verify deployed PostgREST exposure and grants as well as SQL behavior.",
+      "refs": [
+        {
+          "file": "supabase/migrations/0005_drive_sheets_costcentres.sql",
+          "line": 60,
+          "excerpt": "create or replace view expense_register as"
+        },
+        {
+          "file": "supabase/migrations/0010_atomic_tds_advance_retention.sql",
+          "line": 212,
+          "excerpt": "create or replace view orphan_documents as"
+        },
+        {
+          "file": "supabase/migrations/0011_alerts_push_email.sql",
+          "line": 9,
+          "excerpt": "create or replace view tds_liability as"
+        }
+      ]
+    },
+    {
+      "id": "A03",
+      "severity": "Critical",
+      "area": "Security",
+      "title": "Disabled users bypass RPC tenant checks through SQL NULL",
+      "confidence": "Reproduced in isolated PostgreSQL",
+      "problem": "app_role()/app_client() return NULL for an inactive profile. can_see_client() then returns NULL. record_payment uses IF NOT can_see_client(...) rather than rejecting anything other than TRUE. In PL/pgSQL, IF NULL does not enter the rejection branch. An inactive Tenant A user successfully created a payment in Tenant B. save_bill_document and apply_advance have the same fail-open pattern.",
+      "impact": "Deactivation does not reliably revoke financial write access. The service/NULL conflation in several guards also treats absent application roles as trusted service activity.",
+      "fix": "Require a non-null authenticated UID and an active profile at every public RPC entry. Use can_see_client(...) IS NOT TRUE to reject. Identify privileged service calls from a trusted database/JWT role, never COALESCE(app_role(), service). Centralize and test authorization.",
+      "acceptance": "Inactive, missing-profile, expired-session and cross-client calls fail before any write or external action. Preserve a test specifically for NULL authorization results.",
+      "refs": [
+        {
+          "file": "supabase/migrations/0001_core.sql",
+          "line": 35,
+          "excerpt": "create or replace function app_role() returns text"
+        },
+        {
+          "file": "supabase/migrations/0010_atomic_tds_advance_retention.sql",
+          "line": 113,
+          "excerpt": "if not can_see_client(p_client) then raise exception 'Not allowed for this client'; end if;"
+        },
+        {
+          "file": "supabase/migrations/0010_atomic_tds_advance_retention.sql",
+          "line": 147,
+          "excerpt": "if not found or not can_see_client(v_pay.client_id) then raise exception 'Payment not found'; end if;"
+        }
+      ]
+    },
+    {
+      "id": "A04",
+      "severity": "Critical",
+      "area": "Security",
+      "title": "Privileged Drive reads trust user-editable file identifiers",
+      "confidence": "Confirmed code path; external exploit not executed",
+      "problem": "documents has a tenant-wide FOR ALL policy. Expense drive_file_id/document_id can be supplied through ordinary writes, and save_bill_document accepts a supplied Drive ID. ai-assist checks access to the expense row, then downloads that row’s Drive ID using the firm’s Google credentials. It does not prove that the file belongs to that expense/client or came from a trusted upload.",
+      "impact": "A caller who knows another firm-accessible Drive file ID can potentially make the service read/process it under an accessible expense. The cross-client document-reference test succeeded. No real Google file was fetched during this audit.",
+      "fix": "Make document creation/finalization server-owned. Bind each uploaded object to immutable client, uploader, content hash and authorized folder IDs. Accept a document UUID, resolve its tenant server-side, and verify ownership before privileged reads. Revoke broad document metadata writes.",
+      "acceptance": "A known foreign Drive ID and foreign document UUID are rejected on save, attachment, preview and AI analysis; authorized uploads continue to work.",
+      "refs": [
+        {
+          "file": "supabase/migrations/0005_drive_sheets_costcentres.sql",
+          "line": 19,
+          "excerpt": "create policy documents_rw on documents for all using (can_see_client(client_id)) with check (can_see_client(client_id));"
+        },
+        {
+          "file": "supabase/migrations/0010_atomic_tds_advance_retention.sql",
+          "line": 173,
+          "excerpt": "create or replace function save_bill_document(p_doc jsonb, p_bill jsonb)"
+        },
+        {
+          "file": "supabase/functions/ai-assist/index.ts",
+          "line": 74,
+          "excerpt": "if (!e?.drive_file_id) return json({ error: 'Bill file not found' }, 404);"
+        }
+      ]
+    },
+    {
+      "id": "A05",
+      "severity": "High",
+      "area": "Security",
+      "title": "Drive folder authorization and names do not isolate clients",
+      "confidence": "Collision reproduced; authorization confirmed by source",
+      "problem": "drive-upload verifies access to clientId but accepts any folder beginning Vouchr/ without ..; it does not bind the folder to that client. Folder identity elsewhere is a sanitized display name truncated to 40 characters. Distinct Hindi names both become file, and punctuation/truncation can collide. drive-share grants access to the same name-based folder.",
+      "impact": "Client documents may be filed into another client’s shared tree, or two clients can unintentionally share a folder. A rename can create a new tree and strand earlier records. This risk exists independently of database RLS.",
+      "fix": "Use immutable client UUIDs and stored Drive folder IDs. Derive the destination entirely on the server from clientId, validated FY and document kind. Add a unique mapping and an explicit rename operation that changes labels while preserving identity.",
+      "acceptance": "Two identical/Unicode client names produce different folder IDs; forged folder paths cannot redirect uploads; renaming preserves access to historical files.",
+      "refs": [
+        {
+          "file": "supabase/functions/drive-upload/index.ts",
+          "line": 27,
+          "excerpt": "if (!folder.startsWith('Vouchr/') || folder.includes('..')) return json({ error: 'Bad folder' }, 400);"
+        },
+        {
+          "file": "src/lib/storage.ts",
+          "line": 13,
+          "excerpt": "const safe = (s: string) => s.normalize('NFKD').replace(/[^\\w\\- ]+/g, '').trim().replace(/\\s+/g, '-').slice(0, 40) || 'file';"
+        },
+        {
+          "file": "supabase/functions/drive-share/index.ts",
+          "line": 30,
+          "excerpt": "folder = await ensureFolderPath(`Vouchr/${safe(c.name)}`);"
+        }
+      ]
+    },
+    {
+      "id": "A06",
+      "severity": "High",
+      "area": "Security",
+      "title": "CA-only tax decisions and challans are writable by client roles",
+      "confidence": "Reproduced in isolated PostgreSQL",
+      "problem": "guard_review protects changes of status, not changes to tax fields on a submitted bill. A client admin changed tds_amount to ₹900, ITC to true and RCM tax to ₹999 without a CA decision. The broad tenant policies also let staff insert a ₹999,999 challan. The screen hides many controls, but the database permits these writes.",
+      "impact": "Users can alter tax exposure or make liabilities appear deposited through direct API calls. In the current demo, PayDrawer also exposes advance TDS sections to staff despite the documented simple staff workflow.",
+      "fix": "Define a field-level role matrix and implement submit_bill, review_bill and record_challan commands with explicit permitted fields. Restrict tax decisions to authorized CA reviewers and challans to the intended finance roles. Require evidence/approval for deposit confirmation.",
+      "acceptance": "Staff and client admins cannot change reviewed tax fields or fabricate compliance settlement through raw table/RPC calls. Normal capture/payment workflows remain usable.",
+      "refs": [
+        {
+          "file": "supabase/migrations/0001_core.sql",
+          "line": 349,
+          "excerpt": "create or replace function guard_review() returns trigger"
+        },
+        {
+          "file": "supabase/migrations/0006_audit_hardening.sql",
+          "line": 52,
+          "excerpt": "foreach t in array array['vendors','expenses','payments','tds_challans','gstr2b_lines','fiscal_years'] loop"
+        },
+        {
+          "file": "src/pages/PayDrawer.tsx",
+          "line": 160,
+          "excerpt": "<b>{tr('Deduct TDS on this advance')}</b>"
+        }
+      ]
+    },
+    {
+      "id": "A07",
+      "severity": "High",
+      "area": "Security",
+      "title": "Foreign keys do not enforce matching client ownership",
+      "confidence": "Reproduced in isolated PostgreSQL",
+      "problem": "Tenant A could insert a bill referencing Tenant B’s vendor, create a payment using Tenant B’s bank account, and attach Tenant B’s document. Foreign keys check that UUIDs exist, but not that their client_id matches the parent. Similar checks are missing for cost centres, linked bank sources, linked notes and reversal references.",
+      "impact": "Financial relationships can cross client boundaries, misroute accounting and undermine authorization checks that assume connected records belong to the same tenant. UUID unpredictability is not an ownership control.",
+      "fix": "Use composite unique keys/FKs such as (client_id, vendor_id), plus tenant checks in command functions. Treat client_id on existing financial records as immutable. Verify linked bill, payment, vendor, source, document and cost centre together.",
+      "acceptance": "Every cross-client relationship fails even when all foreign UUIDs are known. Include same-vendor-ID and NULL-vendor edge cases in allocation tests.",
+      "refs": [
+        {
+          "file": "supabase/migrations/0001_core.sql",
+          "line": 138,
+          "excerpt": "vendor_id      uuid references vendors(id),"
+        },
+        {
+          "file": "supabase/migrations/0004_payments_v3.sql",
+          "line": 33,
+          "excerpt": "add column account_id uuid references bank_accounts(id),"
+        },
+        {
+          "file": "supabase/migrations/0010_atomic_tds_advance_retention.sql",
+          "line": 200,
+          "excerpt": "create or replace function attach_document() returns trigger language plpgsql security definer set search_path = public as $$"
+        }
+      ]
+    },
+    {
+      "id": "A08",
+      "severity": "High",
+      "area": "Financial integrity",
+      "title": "Approval validates a status transition rather than a valid financial record",
+      "confidence": "Reproduced in isolated PostgreSQL",
+      "problem": "A bill with taxable value ₹1,200 and CGST/SGST of −₹100 each was approved because its sum equals ₹1,000. A CA inserted an already-approved bill with a missing head and an unbalanced total. After a valid approval, the CA changed the total from ₹1,000 to ₹9,000 without revalidation because guard_approval_balance runs only when entering approved.",
+      "impact": "Approved does not imply numerically valid, balanced, supported or immutable. Erroneous approved values feed payables, tax reports and Tally. A trusted reviewer still needs protection against accidental invalid data.",
+      "fix": "Add invariant constraints for non-negative finite amounts, valid rate ranges, GST-component exclusivity, FY/date consistency and supported evidence. Run full validation on every approval and every material approved-record change. Correct posted records using reversals.",
+      "acceptance": "All three reproduced cases fail. Include excessive/negative TDS, mixed IGST and CGST, invalid rates, arbitrary FY labels and approval via INSERT in acceptance tests.",
+      "refs": [
+        {
+          "file": "supabase/migrations/0010_atomic_tds_advance_retention.sql",
+          "line": 17,
+          "excerpt": "create or replace function guard_approval_balance() returns trigger"
+        },
+        {
+          "file": "supabase/migrations/0014_review_controls_drive_share.sql",
+          "line": 8,
+          "excerpt": "create or replace function guard_new_bill_status() returns trigger language plpgsql as $$"
+        },
+        {
+          "file": "src/data/store.tsx",
+          "line": 607,
+          "excerpt": "const reviewExpense = useCallback((id: string, patch: Partial<Expense>, status: 'approved' | 'rejected') => {"
+        }
+      ]
+    },
+    {
+      "id": "A09",
+      "severity": "High",
+      "area": "Financial integrity",
+      "title": "Month locks and fiscal close can be bypassed",
+      "confidence": "Reproduced in isolated PostgreSQL",
+      "problem": "The expense trigger checks the new month only. A submitted October bill was moved into November after October was locked. An admin deleted a payment from a locked month. Vendor-note cancellation explicitly bypasses its locked-month check. A client admin inserted a fiscal_years row already marked closed because the close guard covers UPDATE only.",
+      "impact": "A locked period can change without an unlock/reopen trail. Closed-year indicators can be forged, and financial close totals cannot be trusted as a stable snapshot.",
+      "fix": "Validate both old and new periods for every material update/delete. Enforce locks on payment voids, note cancellations and allocations that rewrite history. Implement one server close/reopen transaction; restrict fiscal-year writes and canonicalize month dates to the first day.",
+      "acceptance": "Moving, deleting, cancelling and changing references in a locked period fail for all roles unless a separately authorized reopen is recorded. Test INSERT-based fiscal-close bypass.",
+      "refs": [
+        {
+          "file": "supabase/migrations/0006_audit_hardening.sql",
+          "line": 12,
+          "excerpt": "if exists (select 1 from month_locks where client_id = new.client_id and month = date_trunc('month', new.invoice_date)::date) then"
+        },
+        {
+          "file": "supabase/migrations/0004_payments_v3.sql",
+          "line": 90,
+          "excerpt": "create policy payments_void on payments for delete"
+        },
+        {
+          "file": "supabase/migrations/0012_vendor_notes.sql",
+          "line": 85,
+          "excerpt": "if exists (select 1 from month_locks where client_id = new.client_id and month = date_trunc('month', new.note_date)::date) and (tg_op = 'INSERT' or new.status = old.status) then"
+        },
+        {
+          "file": "supabase/migrations/0014_review_controls_drive_share.sql",
+          "line": 85,
+          "excerpt": "create trigger fiscal_years_close_guard before update on fiscal_years for each row execute function guard_fy_close();"
+        }
+      ]
+    },
+    {
+      "id": "A10",
+      "severity": "High",
+      "area": "Financial integrity",
+      "title": "Posted state can be cleared to allow deletion",
+      "confidence": "Reproduced in isolated PostgreSQL",
+      "problem": "guard_payment_update permits changes to posted_at. An admin set a payment posted, cleared posted_at and deleted it through payments_void. The vendor-note guard similarly excludes posted_at from its immutable comparison. Store markPosted has no internal role/tenant/status checks, and the SQL expense status guard conflicts with the UI’s client-admin import confirmation.",
+      "impact": "The local system can diverge from Tally after a record was posted. A posting timestamp is acting as both display state and authorization switch.",
+      "fix": "Introduce export batches and immutable per-record posting acknowledgements. Prevent unposting through ordinary updates. Permit corrections only through an audited reversal/reconciliation workflow with the required role and external reference.",
+      "acceptance": "A posted payment/note cannot be made deletable by clearing a timestamp. Test client-admin confirmation against the actual server role model and confirm a partial import per voucher.",
+      "refs": [
+        {
+          "file": "supabase/migrations/0010_atomic_tds_advance_retention.sql",
+          "line": 97,
+          "excerpt": "and (to_jsonb(new) - 'posted_at') is distinct from (to_jsonb(old) - 'posted_at') then"
+        },
+        {
+          "file": "supabase/migrations/0012_vendor_notes.sql",
+          "line": 80,
+          "excerpt": "if tg_op = 'UPDATE' and old.posted_at is not null and (to_jsonb(new) - 'posted_at') is distinct from (to_jsonb(old) - 'posted_at') then"
+        },
+        {
+          "file": "src/data/store.tsx",
+          "line": 645,
+          "excerpt": "const markPosted = useCallback((expenseIds: string[], paymentIds: string[], noteIds: string[] = []) => {"
+        },
+        {
+          "file": "src/pages/Tally.tsx",
+          "line": 69,
+          "excerpt": "<button className=\"btn ok\" onClick={() => { markPosted(pending.e, pending.p, pending.n); setPending(undefined); toast(tr('Marked as posted')); }}><Icon name=\"check\" size={16} /> {tr('Import succeeded — mark posted')}</button>"
+        }
+      ]
+    },
+    {
+      "id": "A11",
+      "severity": "High",
+      "area": "Documents",
+      "title": "Cleanup classifies attached credit-note evidence as an orphan",
+      "confidence": "Reproduced classification; Drive trash operation not executed",
+      "problem": "Only expenses and tds_challans have attach_document triggers. orphan_documents excludes only those two tables. A vendor note referencing a two-day-old staged document still appeared in orphan_documents. drive-cleanup trashes the Google file before deleting metadata, ignores the delete result, and increments the success count. A note FK can block metadata deletion after the real file was already trashed.",
+      "impact": "Valid credit/debit-note evidence can be moved to trash. Cleanup also has a race between selecting an orphan and a user attaching it, and failed metadata writes can produce untracked duplicate uploads.",
+      "fix": "Use a document_links table for every supported record type and transactional finalization. Claim/recheck a cleanup candidate before trashing; record the external result and never report success after a failed database mutation. Make duplicate upload handling return the canonical existing object.",
+      "acceptance": "Documents attached to notes never appear as cleanup candidates. Concurrent attach/cleanup preserves the file, and duplicate/retried uploads leave no untracked objects.",
+      "refs": [
+        {
+          "file": "supabase/migrations/0010_atomic_tds_advance_retention.sql",
+          "line": 212,
+          "excerpt": "create or replace view orphan_documents as"
+        },
+        {
+          "file": "supabase/migrations/0012_vendor_notes.sql",
+          "line": 24,
+          "excerpt": "document_id   uuid references documents(id),"
+        },
+        {
+          "file": "supabase/functions/drive-cleanup/index.ts",
+          "line": 20,
+          "excerpt": "method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ trashed: true })"
+        },
+        {
+          "file": "supabase/functions/drive-upload/index.ts",
+          "line": 39,
+          "excerpt": "drive_path: `${folder}/${file.name}`, web_view_link: up.webViewLink, sha256: sha, staged: kind === 'Bills' || kind === 'TDS Challans' }, { onConflict: 'client_id,sha256', ignoreDuplicates: true });"
+        }
+      ]
+    },
+    {
+      "id": "A12",
+      "severity": "High",
+      "area": "Integrations",
+      "title": "WhatsApp can acknowledge success when the bill insert failed",
+      "confidence": "Confirmed code path",
+      "problem": "The webhook ignores the error returned by expenses.insert(...).select().single(), logs draft_created with exp?.id and replies Bill received. Locked periods, a future AI date, constraints or service failures can produce no bill while the sender receives success. Vendor name, non-GST charges and ECO fields read by AI are not persisted in the draft. There is no document staging record for the upload.",
+      "impact": "Bills can be lost silently, misread on completion, or leave untracked Drive files. Because a log row exists and the handler returns 200, a retry may never repair the failed operation.",
+      "fix": "Check every database and HTTP result. Persist a durable received/processing/saved/failed state, include essential extracted facts, and acknowledge saved only after the draft/document commit. Queue processing outside the webhook request and expose failed messages for recovery.",
+      "acceptance": "Force a bill-insert failure and verify no success reply is produced; a retry can complete the same message once; the final draft retains the seller and aggregator fields.",
+      "refs": [
+        {
+          "file": "supabase/functions/whatsapp-webhook/index.ts",
+          "line": 161,
+          "excerpt": "const { data: exp } = await db.from('expenses').insert({"
+        },
+        {
+          "file": "supabase/functions/whatsapp-webhook/index.ts",
+          "line": 167,
+          "excerpt": "await reply(phoneNumberId, from, t.saved);"
+        },
+        {
+          "file": "supabase/functions/whatsapp-webhook/index.ts",
+          "line": 152,
+          "excerpt": "const date = (sure('invoice_date') as string | undefined) ?? today;"
+        }
+      ]
+    },
+    {
+      "id": "A13",
+      "severity": "High",
+      "area": "Integrations",
+      "title": "External writes and message retries have no durable idempotency boundary",
+      "confidence": "Confirmed code paths; concurrency not load-tested",
+      "problem": "WhatsApp checks whether wamid exists before processing but inserts that ID only after upload/bill creation. Parallel deliveries can both pass. Payment commands generate fresh IDs on retry and accept no request key. Google folder creation is list-then-create; gfetch retries all 5xx/429 calls, including non-idempotent creates whose response may have been lost.",
+      "impact": "Network retries can create duplicate bills, payments, folders, shares or documents. Existing duplicate checks cover selected attributes, not the business command itself.",
+      "fix": "Reserve a unique inbox/command key before processing. Store request hashes and outcomes. Use an outbox/saga for Google/Meta effects, reconcile ambiguous responses, and return the prior result for a repeated successful request. Standardize lock order and add bounded deadlock retries.",
+      "acceptance": "Twenty concurrent retries of one message/payment produce one business result; a lost HTTP response does not create a second object; same key with a different payload is rejected.",
+      "refs": [
+        {
+          "file": "supabase/functions/whatsapp-webhook/index.ts",
+          "line": 92,
+          "excerpt": "if (seen) continue;"
+        },
+        {
+          "file": "supabase/migrations/0010_atomic_tds_advance_retention.sql",
+          "line": 108,
+          "excerpt": "returns uuid[] language plpgsql security definer set search_path = public as $$"
+        },
+        {
+          "file": "supabase/functions/_shared/google.ts",
+          "line": 54,
+          "excerpt": "for (let attempt = 0; attempt < 4; attempt++) {"
+        }
+      ]
+    },
+    {
+      "id": "A14",
+      "severity": "High",
+      "area": "Payments",
+      "title": "React batch validation uses stale payment balances",
+      "confidence": "Reproduced with store hook harness",
+      "problem": "recordPayment validates against the render’s s.payments and appends inside a later functional updater. Two calls in the same event each see the original outstanding amount. The bank import loops this API. Two ₹700 allocations against a ₹1,000 bill both succeeded, leaving −₹400. Duplicate allocations for the same bill inside one payment also passed individual checks.",
+      "impact": "The currently runnable app can over-allocate bills during ordinary batch import. The database protects some allocation paths, but the UI does not invoke those RPCs yet.",
+      "fix": "Execute payment batches as one validated state transition and one server transaction. Validate against evolving balances, aggregate repeated expense IDs, and reject duplicate allocations. Keep any browser preview advisory.",
+      "acceptance": "Import multiple debits for one bill and verify aggregate allocation never exceeds the balance; include duplicate allocations, partial failure and concurrent requests.",
+      "refs": [
+        {
+          "file": "src/data/store.tsx",
+          "line": 431,
+          "excerpt": "const recordPayment = useCallback((input: RecordPaymentInput): Payment => {"
+        },
+        {
+          "file": "src/data/store.tsx",
+          "line": 449,
+          "excerpt": "const due = outstanding(e, s.payments);"
+        },
+        {
+          "file": "src/pages/Bank.tsx",
+          "line": 96,
+          "excerpt": "matches.forEach((m, i) => {"
+        }
+      ]
+    },
+    {
+      "id": "A15",
+      "severity": "High",
+      "area": "Payments",
+      "title": "Split payments are not atomic in the active app",
+      "confidence": "Reproduced with store hook harness",
+      "problem": "PayDrawer saves each payment line by calling recordPayment separately. A valid first line is queued before a later invalid line throws. The UI keeps the drawer open and shows an error, but the first line remains saved. The SQL record_payment RPC is atomic; it is not used by this flow.",
+      "impact": "A user retry can duplicate the successful portion, and the apparent failure does not describe what was actually committed. Bank import has the same partial-success communication problem.",
+      "fix": "Submit the whole user action through one batch command. Either roll back everything or return explicit per-row outcomes with a durable import batch ID. Show the result before permitting retry.",
+      "acceptance": "With a valid first line and a future-dated second line, zero payments are saved. A partial-import design must instead show exactly which rows committed and prevent duplicate retry.",
+      "refs": [
+        {
+          "file": "src/pages/PayDrawer.tsx",
+          "line": 80,
+          "excerpt": "pl.forEach((l, i) => {"
+        },
+        {
+          "file": "src/data/store.tsx",
+          "line": 464,
+          "excerpt": "const next = { ...st, payments: [made, ...st.payments] };"
+        },
+        {
+          "file": "supabase/migrations/0010_atomic_tds_advance_retention.sql",
+          "line": 138,
+          "excerpt": "return v_ids;  -- any error above rolls back every line: no half-saved payment"
+        }
+      ]
+    },
+    {
+      "id": "A16",
+      "severity": "High",
+      "area": "Payments",
+      "title": "Advance allocation and tax review disagree about the true balance",
+      "confidence": "Reproduced in TypeScript and PostgreSQL",
+      "problem": "previewApply/maxApplicable omit noteAdjust even though outstanding and the SQL allocation trigger include notes. Applying a ₹1,000 advance to a bill reduced by a ₹200 credit note produced a −₹200 balance in the store. Separately, SQL approval of a fully paid ₹1,000 bill with ₹100 TDS left −₹100; the browser has excess-to-advance logic that SQL lacks.",
+      "impact": "The same workflow gives different balances depending on execution path. Browser review also trims cash allocations without proportionally recomputing carried advance-TDS credits, creating further risk of stale credits.",
+      "fix": "Define one settlement equation and one server adjustment command for cash, notes and advance TDS. Preserve tax-credit provenance and record released amounts explicitly. Share calculation contracts with the browser preview.",
+      "acceptance": "Run identical note/advance/review scenarios against browser preview and database; balances, unused cash and unused TDS must agree to the paise.",
+      "refs": [
+        {
+          "file": "src/lib/tdsAdvance.ts",
+          "line": 26,
+          "excerpt": "return { credit: round2(credit), after: round2(e.totalAmount - paid - creditAll - Math.max(0, e.tdsAmount - creditAll)) };"
+        },
+        {
+          "file": "src/lib/alerts.ts",
+          "line": 19,
+          "excerpt": "return round2(e.totalAmount + (e.noteAdjust ?? 0) - paidAmount(e.id, payments) - credit - Math.max(0, e.tdsAmount - credit));"
+        },
+        {
+          "file": "src/data/store.tsx",
+          "line": 623,
+          "excerpt": "const limit = status === 'rejected' ? 0 : round2(merged.totalAmount - merged.tdsAmount);"
+        },
+        {
+          "file": "supabase/migrations/0006_audit_hardening.sql",
+          "line": 112,
+          "excerpt": "create or replace function release_allocations_on_reject() returns trigger language plpgsql security definer set search_path = public as $$"
+        }
+      ]
+    },
+    {
+      "id": "A17",
+      "severity": "High",
+      "area": "Accounting",
+      "title": "Financial close records today’s balances instead of year-end balances",
+      "confidence": "Reproduced; also disclosed in current UI",
+      "problem": "carryForward selects bills and advances dated before FY end but computes them using all current payments/allocations and current noteAdjust. A March ₹1,000 bill paid in April disappears from the March close. Vendor-level balance also sums notes beyond the cutoff. The UI calls these balances today, but then stores them as carry-forward totals in a year close.",
+      "impact": "Closing the same year on different dates can produce different opening balances. Reopening month locks does not invalidate or version the fiscal-close record. The checklist omits unposted notes and does not reconcile bank, GST or export batches.",
+      "fix": "Define an as-of ledger projection using dated settlement/allocation events and note dates. Save an immutable close snapshot with source watermark, reconciliation evidence and reopen/version workflow. Keep current operational balances separate.",
+      "acceptance": "A payment after 31 March does not reduce the 31 March liability; later notes/allocations do not rewrite an old close; reopening creates a new auditable close version.",
+      "refs": [
+        {
+          "file": "src/lib/fyClose.ts",
+          "line": 49,
+          "excerpt": "const bal = outstanding(e, d.payments);"
+        },
+        {
+          "file": "src/lib/fyClose.ts",
+          "line": 62,
+          "excerpt": "out.push({ kind: 'vendor_note', vendor: n.vendorName, ref: 'notes not linked to a bill', date: n.noteDate, amount: vendorLevelBalance(n.vendorId, d.vendorNotes) });"
+        },
+        {
+          "file": "src/data/store.tsx",
+          "line": 676,
+          "excerpt": "const closeFy = useCallback((fy: string, acknowledged: string[]) => {"
+        }
+      ]
+    },
+    {
+      "id": "A18",
+      "severity": "High",
+      "area": "Tax engine",
+      "title": "TDS thresholds aggregate the wrong economic events",
+      "confidence": "Confirmed code trace; future-FY case reproduced",
+      "problem": "prepare aggregates all non-rejected bills for a vendor, including drafts, later invoices and other TDS categories. It does not include advances in the bill calculation or group related vendor registrations by PAN. suggestAdvanceTds includes only payments already carrying TDS, counts their full original bases even after allocation, and has no upper FY cutoff. A 2027-28 advance triggered a 2026-27 threshold in the reproduction.",
+      "impact": "Deductions can be understated, overstated or triggered in the wrong period. Rent is represented by a single-invoice threshold even though its own master note says monthly. Threshold catch-up can be allocated to one later bill without an auditable adjustment to the earlier liability.",
+      "fix": "Model tax events by payee/PAN, provision, effective rule and relevant period. Exclude drafts and future events, avoid counting advances twice after billing, include untaxed advances, and support monthly/per-transaction/annual threshold bases. Obtain CA-approved statutory test vectors.",
+      "acceptance": "Test two GSTINs under one PAN, two rent invoices in one month, backdated entry after later bills, mixed categories, drafts, and advances crossing FY. Compare with independently calculated CA examples.",
+      "refs": [
+        {
+          "file": "src/data/store.tsx",
+          "line": 311,
+          "excerpt": "const ytd = fyOthers.reduce((sum, e) => sum + e.taxableValue, 0);"
+        },
+        {
+          "file": "src/lib/tdsAdvance.ts",
+          "line": 51,
+          "excerpt": "const fyAdvances = round2(payments.filter((p) => p.vendorId === vendor.id && p.tdsOnAdvance && p.paidOn >= `${fy.slice(0, 4)}-04-01`)"
+        },
+        {
+          "file": "src/data/masters.ts",
+          "line": 14,
+          "excerpt": "{ code: 'RENT_LB', description: 'Rent — land, building, furniture', ratePct: 10, thresholdSingle: 50000, noPanRatePct: 20, effectiveFrom: '2026-04-01', verified: false, sourceNote: SRC + ' (threshold is per month; sources differ)' },"
+        }
+      ]
+    },
+    {
+      "id": "A19",
+      "severity": "High",
+      "area": "Tax engine",
+      "title": "Effective-dated rates cannot be versioned reliably",
+      "confidence": "Reproduced fallback; schema and UI confirmed",
+      "problem": "tds_rates uses code as its sole primary key, and updateTdsRate replaces an entry by code. This cannot retain multiple dated versions of one provision. suggestTds and suggestAdvanceTds fall back to any code match if no rate is valid on the date. An expired rate still produced tax in the reproduction. ReviewDrawer recomputation omits the invoice date entirely.",
+      "impact": "Historical bills can use a later/expired rate, and a rate edit can change the interpretation of old records without a reproducible rule version.",
+      "fix": "Use immutable rate versions with effective ranges and non-overlap constraints. Store the applied version and calculation facts on each tax event. Remove fallback to an out-of-period rate and require review if no valid rule exists. Pass the economic event date everywhere.",
+      "acceptance": "Adjacent rate versions select correctly at boundaries; gaps fail visibly; old bills retain their original version; review and advance flows agree with submission.",
+      "refs": [
+        {
+          "file": "supabase/migrations/0001_core.sql",
+          "line": 100,
+          "excerpt": "code        text primary key,                    -- e.g. 'CONTRACT_IND'"
+        },
+        {
+          "file": "src/lib/rules.ts",
+          "line": 74,
+          "excerpt": ".sort((a, b) => b.effectiveFrom.localeCompare(a.effectiveFrom))[0] ?? rates.find((x) => x.code === code);"
+        },
+        {
+          "file": "src/pages/Review.tsx",
+          "line": 134,
+          "excerpt": "const ts = suggestTds(head, vendor, f.taxableValue, ytd, s.tdsRates, ytdUntaxed);"
+        },
+        {
+          "file": "src/data/store.tsx",
+          "line": 887,
+          "excerpt": "const updateTdsRate = useCallback((r: TdsRate) => {"
+        }
+      ]
+    },
+    {
+      "id": "A20",
+      "severity": "High",
+      "area": "Tax engine",
+      "title": "Review controls can silently remove higher-rate and threshold treatment",
+      "confidence": "Confirmed code path",
+      "problem": "ReviewDrawer.setTdsCode takes ratePct directly from the selected master and applies it only to the current taxable value. It does not use the missing/inoperative-PAN rate, effective date or threshold catch-up. Editing taxable value does not recompute existing TDS/RCM amounts. Choosing a head can turn RCM on for an ECO bill; the browser approval path lacks the SQL ECO/RCM conflict check.",
+      "impact": "A seemingly harmless reviewer selection can lower tax or leave stale calculations. The approved state does not record an override rationale or validate consistency among code, rate, base and amount.",
+      "fix": "Recompute derived tax through one reviewed server calculation whenever its inputs change. Separate a suggested calculation from an explicit override; require reason and authority for overrides and preserve the original calculation.",
+      "acceptance": "Changing head/section/base never silently removes required higher-rate treatment or catch-up. ECO/RCM conflicts and inconsistent code/rate/base/amount require resolution.",
+      "refs": [
+        {
+          "file": "src/pages/Review.tsx",
+          "line": 148,
+          "excerpt": "function setTdsCode(code: string) {"
+        },
+        {
+          "file": "src/pages/Review.tsx",
+          "line": 139,
+          "excerpt": "function setHead(id: string) {"
+        },
+        {
+          "file": "src/data/store.tsx",
+          "line": 613,
+          "excerpt": "if (status === 'approved') {"
+        }
+      ]
+    },
+    {
+      "id": "A21",
+      "severity": "High",
+      "area": "Tax governance",
+      "title": "Most masters are hard-coded and unverified values remain operational",
+      "confidence": "Confirmed by source and UI implementation",
+      "problem": "RCM_RULES, BLOCKED_RULES, GST slab lists and expense-head logic are imported constants. Masters displays heads/RCM/blocked credit read-only; only TDS has an edit form, and its verification is a checkbox without mandatory source/effective-date evidence. RCM SQL lacks several application rule fields. Unverified rules still drive suggestions, payment advice, approval and exports.",
+      "impact": "A shared rule mistake can affect every client. The documented promise of editable, CA-signed masters is only partly implemented. Recipient conditions, forward-charge elections, ITC exceptions and taxpayer-specific applicability are not sufficiently represented.",
+      "fix": "Create versioned rule packages with verified sources, reviewer, effective period and applicability conditions. Add publish/rollback controls and prohibit unsupported statutory calculations from being treated as final. Preserve human review and allow documented exceptions.",
+      "acceptance": "Change an RCM rule through the approved interface, audit who verified it, replay historical bills using old versions, and prevent publishing incomplete/unverified rule packages.",
+      "refs": [
+        {
+          "file": "src/data/masters.ts",
+          "line": 21,
+          "excerpt": "export const RCM_RULES: RcmRule[] = ["
+        },
+        {
+          "file": "src/pages/Masters.tsx",
+          "line": 35,
+          "excerpt": "{tab === 'rcm' && ("
+        },
+        {
+          "file": "src/lib/rules.ts",
+          "line": 104,
+          "excerpt": "export function suggestRcm(head: ExpenseHead | undefined, vendor: Pick<Vendor, 'gstRegistered' | 'pan'> | undefined, rules: RcmRule[]): RcmSuggestion {"
+        },
+        {
+          "file": "supabase/migrations/0001_core.sql",
+          "line": 116,
+          "excerpt": "create table rcm_rules ("
+        }
+      ]
+    },
+    {
+      "id": "A22",
+      "severity": "High",
+      "area": "GST reconciliation",
+      "title": "Selecting book months from portal rows hides genuinely missing invoices",
+      "confidence": "Confirmed code path",
+      "problem": "Reco builds the book universe from the invoice-date months present in run.lines. If an October return file contains only a late September invoice, October books are omitted. A completely absent month cannot generate missing-in-2B rows. Empty files are rejected instead of being reconcilable as a zero-activity return.",
+      "impact": "The screen can show reassuring reconciliation counts while excluding the bills whose absence matters most. Return period and invoice date are different dimensions.",
+      "fix": "Persist return-period coverage and reconcile an explicit book population independent of portal line presence. Support late filings, amendments, carried unmatched items and zero-activity returns. Keep runs/version history rather than replacing a period silently.",
+      "acceptance": "A return containing only old invoices still flags relevant current-period missing bills; an empty valid return flags all in-scope book invoices; prior unmatched items persist until resolved.",
+      "refs": [
+        {
+          "file": "src/pages/Reco.tsx",
+          "line": 36,
+          "excerpt": "const months = new Set(run.lines.map((l) => l.invoiceDate?.slice(0, 7)).filter(Boolean));"
+        },
+        {
+          "file": "src/pages/Reco.tsx",
+          "line": 37,
+          "excerpt": "const books = scoped.expenses.filter((e) => months.has(e.invoiceDate.slice(0, 7)));"
+        },
+        {
+          "file": "src/pages/Reco.tsx",
+          "line": 60,
+          "excerpt": "if (!parsed.lines.length) { toast(tr('No B2B invoices found in this file'), true); return; }"
+        },
+        {
+          "file": "src/data/store.tsx",
+          "line": 913,
+          "excerpt": "const saveRecoRun = useCallback((run: Omit<RecoRun, 'id' | 'clientId' | 'createdAt'>) => {"
+        }
+      ]
+    },
+    {
+      "id": "A23",
+      "severity": "High",
+      "area": "GST reconciliation",
+      "title": "Matching omits important tax differences and includes drafts",
+      "confidence": "Draft matching reproduced; comparison gaps confirmed",
+      "problem": "reconcile excludes rejected records but not drafts. It compares combined tax and an IGST boolean, not each component or cess. reconcileNotes compares combined GST and dates but not taxable value, component type or portal ITC availability. Its invoice-number normalization collapses structural separators, unlike the improved bill duplicate normalizer.",
+      "impact": "A draft may be counted as booked, component mismatches can be called matched, and note-related ITC issues may be missed. Multiple similar invoice numbers can be paired incorrectly. The parser explicitly says it is not based on an official validated GSTN schema.",
+      "fix": "Use typed official/sample-validated adapters, exclude drafts, compare all tax components/base/value/eligibility, and retain match evidence and confidence. Use conservative normalized keys with FY/date/type disambiguation and manual resolution.",
+      "acceptance": "Test draft exclusion, cess-only differences, uneven CGST/SGST, equal-total wrong components, unavailable ITC on debit notes, structural invoice-number collisions and amended portal downloads.",
+      "refs": [
+        {
+          "file": "src/lib/reco.ts",
+          "line": 87,
+          "excerpt": "const books = expenses.filter((e) => e.status !== 'rejected' && e.cgst + e.sgst + e.igst > 0);"
+        },
+        {
+          "file": "src/lib/reco.ts",
+          "line": 100,
+          "excerpt": "const ptax = round2(l.igst + l.cgst + l.sgst);"
+        },
+        {
+          "file": "src/lib/vendorNotes.ts",
+          "line": 93,
+          "excerpt": "const notes2: string[] = [];"
+        },
+        {
+          "file": "src/lib/reco.ts",
+          "line": 69,
+          "excerpt": "export const normInv = (s: string) => s.toUpperCase().replace(/[\\s/\\\\\\-_.]/g, '').replace(/^0+/, '');"
+        }
+      ]
+    },
+    {
+      "id": "A24",
+      "severity": "High",
+      "area": "Accounting model",
+      "title": "Invoice-level single-rate representation loses tax and accounting detail",
+      "confidence": "Confirmed schema and workflow gap",
+      "problem": "Expense contains one head, one HSN, one taxable total, one tax treatment and no line items or cess field, although the database and portal parser contain cess. Capture derives tax from one selected/default rate; unknown registered-vendor bills default to 18%. Multi-rate invoices, different heads/ITC treatment, exempt components and goods/assets/services cannot be represented faithfully.",
+      "impact": "The system can preserve a correct grand total while materially misclassifying GST, ITC, expense capitalisation and reporting. A tax-invoice photograph is not a substitute for structured line-level accounting facts.",
+      "fix": "Add invoice lines with head/asset classification, tax code/rate/base/components/cess and ITC treatment; retain invoice-level round-off. Store place of supply, supplier/buyer GSTIN and document type. Allow staff to confirm the total while CA review resolves line details.",
+      "acceptance": "Golden samples with mixed 5%/18%, blocked and eligible lines, cess, round-off, exempt items and capital assets reproduce the printed bill and balanced accounting output.",
+      "refs": [
+        {
+          "file": "src/data/types.ts",
+          "line": 157,
+          "excerpt": "export interface Expense {"
+        },
+        {
+          "file": "src/pages/Capture.tsx",
+          "line": 115,
+          "excerpt": "const effectiveRate = rate ?? (gstinCheck?.ok || knownVendor?.gstRegistered ? 18 : 0);"
+        },
+        {
+          "file": "src/lib/tallyXml.ts",
+          "line": 49,
+          "excerpt": "const gst = round2(e.cgst + e.sgst + e.igst);"
+        },
+        {
+          "file": "supabase/migrations/0001_core.sql",
+          "line": 152,
+          "excerpt": "cess           numeric(14,2) not null default 0,"
+        }
+      ]
+    },
+    {
+      "id": "A25",
+      "severity": "High",
+      "area": "GST registers",
+      "title": "ITC reversal period and proportional basis need correction",
+      "confidence": "Source comparison and calculation review",
+      "problem": "itcRegister assigns reverseMonth to the month day 180 falls in; the existing test explicitly expects September for a 28 September expiry. CBIC Rule 37 describes the immediately following tax period. The formula divides unpaid cash by total minus TDS rather than a consistently defined invoice consideration base. For ₹11,800/₹1,800 GST, ₹1,000 TDS and ₹5,400 cash, it returns ₹900 instead of about ₹823.73 if TDS counts as settlement. The app also equates eligible with actually claimed and does not track note timing.",
+      "impact": "The register can propose reversal in the wrong return and calculate an incorrect amount. Reclaim records are cumulative fields rather than a dated event ledger, and UI/server writes do not enforce actual entitlement, locks or an upper limit tied to the computed exposure.",
+      "fix": "Have the CA confirm the current Rule 37 timing and settlement policy against the official text. Track ITC actually availed, deemed payments, tax adjustments and reversal/reclaim events. Correct period assignment and the denominator, and test dated note/advance interactions.",
+      "acceptance": "Use independently approved partial-payment/TDS/credit-note examples and following-period cases. The register, alerts and returns must agree; no reversal is proposed for credit never claimed.",
+      "refs": [
+        {
+          "file": "src/lib/gstRegisters.ts",
+          "line": 58,
+          "excerpt": "const reverseAmount = base > 0 ? round2((itc * unpaidAt180) / base) : 0;"
+        },
+        {
+          "file": "src/lib/gstRegisters.ts",
+          "line": 69,
+          "excerpt": "reverseMonth: day180.slice(0, 7), status, record, reclaimable });"
+        },
+        {
+          "file": "src/lib/gst-registers.test.ts",
+          "line": 35,
+          "excerpt": "it('unpaid at day 180 → reverse all of it in the month the 180 days end', () => {"
+        },
+        {
+          "file": "src/data/store.tsx",
+          "line": 574,
+          "excerpt": "const recordItcReclaim = useCallback((id: string, amount: number, month: string) => {"
+        }
+      ]
+    },
+    {
+      "id": "A26",
+      "severity": "High",
+      "area": "Reports",
+      "title": "Dashboards and exports do not reconcile to the same financial basis",
+      "confidence": "Confirmed code trace",
+      "problem": "MIS TDS sums invoice tdsAmount and omits advance TDS; TDS register uses tdsEntries. MIS spend excludes non-GST charges, irrecoverable GST and notes; ITC available includes eligible submitted invoices without actual-claim/2B/reversal state. Vendor statement ignores all notes and advance TDS, and exports all years under the selected-FY filename. Ask-data queries omit notes/advance TDS and payments_total ignores head/centre filters. FirmOverview builds alerts without challans or client credit terms.",
+      "impact": "Different screens can report different answers to the same question. Labels such as available, deducted and spend overstate the accounting meaning of draft suggestions and taxable-value aggregates.",
+      "fix": "Define a metric catalogue and common server projections: posted/provisional, gross/net spend, cash flow, liability, eligible/matched/claimed ITC and tax deduction events. Apply date/filter semantics consistently and reconcile every report to underlying events.",
+      "acceptance": "For one synthetic client with notes, advances, TDS and two FYs, totals agree across MIS, statement, CSV, Ask and Sheets; ignored filters are disabled or explained.",
+      "refs": [
+        {
+          "file": "src/pages/Mis.tsx",
+          "line": 50,
+          "excerpt": "tds: round2(ex.reduce((x, e) => x + e.tdsAmount, 0)),"
+        },
+        {
+          "file": "src/pages/Reports.tsx",
+          "line": 42,
+          "excerpt": "function vendorStatement() {"
+        },
+        {
+          "file": "src/lib/askData.ts",
+          "line": 30,
+          "excerpt": "case 'payments_total': {"
+        },
+        {
+          "file": "src/pages/FirmOverview.tsx",
+          "line": 28,
+          "excerpt": "alerts: buildAlerts(ex, pays, today).length"
+        }
+      ]
+    },
+    {
+      "id": "A27",
+      "severity": "High",
+      "area": "Tally",
+      "title": "Export has no durable batch identity or per-voucher acknowledgement",
+      "confidence": "Confirmed export design; real Tally import not tested",
+      "problem": "Every voucher uses ACTION=Create without a durable external voucher identity or stored export payload/version. Pending confirmation exists only in component state. The user marks the whole file imported; a partial success/retry cannot be reconciled per voucher. Ledger lines balance, but there are no bill-wise settlement allocations, supplier tax details or statutory tax metadata in the XML.",
+      "impact": "Repeated/partial imports can duplicate entries or leave app and Tally states inconsistent. Passing XML string/arithmetic tests does not establish usable GST/TDS registers or vendor ageing inside Tally.",
+      "fix": "Create immutable export batches and per-voucher IDs, payload hashes and acknowledgements. Define whether export is GL-only or statutory/bill-wise accounting; generate supported bill/tax fields if promised. Snapshot vendor/ledger mappings and implement a reconciliation report.",
+      "acceptance": "Import a golden batch into a copy of a real Tally company, retry it, simulate one failing voucher and reconcile voucher counts, GL, bill-wise balances and tax registers before approval.",
+      "refs": [
+        {
+          "file": "src/lib/tallyXml.ts",
+          "line": 95,
+          "excerpt": "return `<TALLYMESSAGE xmlns:UDF=\"TallyUDF\"><VOUCHER VCHTYPE=\"${type}\" ACTION=\"Create\"><DATE>${date.replace(/-/g, '')}</DATE><VOUCHERTYPENAME>${type}</VOUCHERTYPENAME><REFERENCE>${esc(ref)}</REFERENCE><NARRATION>${esc(narration)}</NARRATION>${lines.map(lineXml).join('')}</VOUCHER></TALLYMESSAGE>`;"
+        },
+        {
+          "file": "src/pages/Tally.tsx",
+          "line": 19,
+          "excerpt": "const [pending, setPending] = useState<{ e: string[]; p: string[]; n: string[]; file: string }>();"
+        },
+        {
+          "file": "src/lib/tallyXml.ts",
+          "line": 73,
+          "excerpt": "function lineXml(l: Line): string {"
+        },
+        {
+          "file": "src/data/store.tsx",
+          "line": 645,
+          "excerpt": "const markPosted = useCallback((expenseIds: string[], paymentIds: string[], noteIds: string[] = []) => {"
+        }
+      ]
+    },
+    {
+      "id": "A28",
+      "severity": "High",
+      "area": "AI and privacy",
+      "title": "AI authorization is not consistently tied to the documents being processed",
+      "confidence": "Confirmed source paths",
+      "problem": "For super admins, ai-assist takes clientId from ctx, but read_bill/voice_entry/notice_summary callers omit it. Company AI restrictions and caps are then skipped. A supplied clientId is not checked against every fetched expense’s client_id. Company consent checks omit expiry/version; absent company consent is allowed. The client’s aiAllowed only blocks active AI-off consent and returns true for withdrawn/expired company consent when used directly.",
+      "impact": "Documents can be processed without the correct client’s current authorization or cost attribution. Role access to a bill does not automatically authorize external AI processing of that client’s data.",
+      "fix": "Derive tenant identity from each document/command and reject mixed/unspecified clients where client data is involved. Centralize user/company consent, version, expiry and engagement checks. Require explicit platform scope for non-client tasks.",
+      "acceptance": "A CA cannot evade an AI-off/expired client by omitting/changing ctx.clientId; every billed call and persisted result has the correct tenant and authorized purpose.",
+      "refs": [
+        {
+          "file": "supabase/functions/ai-assist/index.ts",
+          "line": 42,
+          "excerpt": "const clientId = me?.role === 'super_admin' ? (ctx.clientId as string | undefined) : me?.client_id;"
+        },
+        {
+          "file": "supabase/functions/ai-assist/index.ts",
+          "line": 49,
+          "excerpt": "const { data: cc } = await admin.from('consents').select('purposes, withdrawn_at').eq('scope', 'client').eq('client_id', clientId).order('accepted_at', { ascending: false }).limit(1).maybeSingle();"
+        },
+        {
+          "file": "src/ui/CaptureAi.tsx",
+          "line": 56,
+          "excerpt": "const r = await runAi<BillRead>('read_bill', me!.role, { buyerGstin }, { files: [file] });"
+        },
+        {
+          "file": "src/lib/consent.ts",
+          "line": 32,
+          "excerpt": "export function aiAllowed(consents: Consent[], userId: string, clientId: string | undefined, today: string): { ok: boolean; reason?: string } {"
+        }
+      ]
+    },
+    {
+      "id": "A29",
+      "severity": "High",
+      "area": "Security",
+      "title": "Core consent and engagement restrictions are browser gates only",
+      "confidence": "Confirmed source paths",
+      "problem": "App blocks some company/user states in React, while can_see_client, payment/bill RPCs and drive-upload do not enforce engagement or consent at all. A missing company acceptance is permitted for staff. Client admins can change engagement_ends_on and state_code through SQL despite CONTROL_FIELDS restricting them in the demo. The consent update guard omits age_confirmed and identity fields such as row ID.",
+      "impact": "Direct callers can continue processing after the screen blocks use. Contractual restrictions and revocation are not enforceable service boundaries, and consent evidence is not fully immutable.",
+      "fix": "Define which processing requires which legal/contractual authorization; enforce that policy server-side rather than universally assuming consent is the only basis. Restrict engagement fields to the firm and make acceptance records immutable except a constrained withdrawal command.",
+      "acceptance": "Expired/withdrawn engagements reject prohibited writes/uploads/AI even through raw APIs; permitted access/rights workflows remain available; client admins cannot extend their own engagement.",
+      "refs": [
+        {
+          "file": "src/App.tsx",
+          "line": 54,
+          "excerpt": "if (cc.state === 'withdrawn') return <ConsentBlocked reason=\"withdrawn\" />;"
+        },
+        {
+          "file": "supabase/functions/drive-upload/index.ts",
+          "line": 25,
+          "excerpt": "const { data: client } = await user.from('clients').select('id, name').eq('id', clientId).maybeSingle();"
+        },
+        {
+          "file": "supabase/migrations/0014_review_controls_drive_share.sql",
+          "line": 33,
+          "excerpt": "create or replace function guard_client_update() returns trigger language plpgsql as $$"
+        },
+        {
+          "file": "supabase/migrations/0008_dpdp_consent.sql",
+          "line": 54,
+          "excerpt": "create or replace function guard_consent_update() returns trigger language plpgsql as $$"
+        }
+      ]
+    },
+    {
+      "id": "A30",
+      "severity": "High",
+      "area": "Alerts",
+      "title": "Dispatch flags cause repeated notifications or suppress retries",
+      "confidence": "Confirmed control-flow defect",
+      "problem": "alerts-dispatch selects alerts where either channel is unsent, but does not fetch or inspect each channel’s sent timestamp inside the loop. If only push is configured, email remains NULL and push is resent on later runs. Both timestamps are marked handled even after delivery failures or with no recipients. Once-only notification content is not refreshed when a liability changes or is settled.",
+      "impact": "Users can receive repeated alerts, miss failed alerts, or be reminded about already-paid liabilities. There is no per-recipient delivery ledger, durable claim, or retry state.",
+      "fix": "Queue per-recipient/channel delivery records with pending/sent/failed/obsolete states, claim them atomically and retry only failures. Check current liability before sending. Track actual subscription/email preferences and success for each recipient.",
+      "acceptance": "With only one channel enabled, an alert is delivered once. A failed recipient retries while successful recipients do not. Settled liabilities stop pending messages; concurrent dispatches do not duplicate them.",
+      "refs": [
+        {
+          "file": "supabase/functions/alerts-dispatch/index.ts",
+          "line": 31,
+          "excerpt": ".or('push_sent_at.is.null,email_sent_at.is.null').gte('created_at', since).not('ref', 'is', null).limit(500);"
+        },
+        {
+          "file": "supabase/functions/alerts-dispatch/index.ts",
+          "line": 36,
+          "excerpt": "if (pushOn && ids.length) {"
+        },
+        {
+          "file": "supabase/functions/alerts-dispatch/index.ts",
+          "line": 60,
+          "excerpt": "// marked as handled for each channel that is set up, so an alert is not sent again tomorrow"
+        },
+        {
+          "file": "supabase/migrations/0011_alerts_push_email.sql",
+          "line": 48,
+          "excerpt": "on conflict (client_id, ref) where ref is not null do nothing;"
+        }
+      ]
+    },
+    {
+      "id": "A31",
+      "severity": "High",
+      "area": "Integrations",
+      "title": "Sheets mirror can silently publish incomplete or empty registers",
+      "confidence": "Confirmed source; live API limits not measured",
+      "problem": "The mirror does unpaginated reads for FYs, expenses, payments and vendors. API row caps can truncate a growing client. It clears tabs before writing and ignores most database and Google non-success responses. TDS/Ageing tabs are created but never populated. A FY containing only payments/advances is missed because FYs are discovered only from expenses.",
+      "impact": "A successful-looking job can overwrite a complete mirror with a partial/empty dataset. Notes, advance TDS, reversals and reconciliation state are not mirrored, so it is not an equivalent audit/MIS export.",
+      "fix": "Paginate every dataset explicitly, derive FY coverage from all relevant events, check every response, and publish a versioned snapshot only after all tabs validate. Use batched writes/incremental projections and record row-count/checksum reconciliation.",
+      "acceptance": "A client with over the configured API row limit mirrors every row; an API failure leaves the previous published snapshot available; payment-only FYs and advertised tabs are populated.",
+      "refs": [
+        {
+          "file": "supabase/functions/sheets-mirror/index.ts",
+          "line": 50,
+          "excerpt": "const { data: fys } = await db.from('expenses').select('fy_label').eq('client_id', c.id);"
+        },
+        {
+          "file": "supabase/functions/sheets-mirror/index.ts",
+          "line": 32,
+          "excerpt": "async function writeTab(sheetId: string, tab: string, rows: Row[]) {"
+        },
+        {
+          "file": "supabase/functions/sheets-mirror/index.ts",
+          "line": 25,
+          "excerpt": "...['Payments', 'Vendors', 'TDS', 'Ageing'].map((t) => ({ addSheet: { properties: { title: t } } }))"
+        },
+        {
+          "file": "supabase/functions/sheets-mirror/index.ts",
+          "line": 61,
+          "excerpt": "await writeTab(sheetId, 'Vendors', table(ven));"
+        }
+      ]
+    },
+    {
+      "id": "A32",
+      "severity": "High",
+      "area": "Operations",
+      "title": "No demonstrated backup, recovery or production operating envelope",
+      "confidence": "Repository gap; hosted controls not inspected",
+      "problem": "There is no application backup/restore runbook, tested point-in-time recovery, document inventory restore, tenant export/import, environment segregation or release rollback procedure. Browser storage and Drive sharing are not backups. Operational docs primarily describe setup, not recovery from database loss, a Google-token outage or an accidental destructive migration.",
+      "impact": "The business cannot establish how much data could be lost or how quickly service could be recovered. One Google credential set and shared AI/cron secrets create firm-wide outage and compromise domains.",
+      "fix": "Set RPO/RTO and retention/backup policies; back up database plus document manifests/permissions, and test a full tenant restore. Separate dev/staging/prod, add least-privilege secret rotation and Google connectivity health checks, and establish incident ownership.",
+      "acceptance": "Restore a representative client including bills, allocations, notes, files, tax history and export batches into a clean environment and reconcile counts/totals within the agreed RTO.",
+      "refs": [
+        {
+          "file": "SUPABASE-SETUP.md",
+          "line": 73,
+          "excerpt": "## 6. Before real clients"
+        },
+        {
+          "file": "BREACH-PROCEDURE.md",
+          "line": 16,
+          "excerpt": "## Steps"
+        },
+        {
+          "file": "src/lib/storage.ts",
+          "line": 36,
+          "excerpt": "const DB = 'vouchr-docs', STORE = 'files';"
+        }
+      ]
+    },
+    {
+      "id": "A33",
+      "severity": "High",
+      "area": "Dependencies",
+      "title": "Dependency tree contains known advisories requiring exposure-based remediation",
+      "confidence": "Registry audit and primary advisory verification",
+      "problem": "npm audit reported 28 vulnerable package entries: 3 critical, 7 high, 14 moderate and 4 low. Omitting dev dependencies still reported 12 entries: 1 critical, 6 high, 3 moderate and 2 low. Examples include Vitest 2.1.8, Vite 5.4.11, router packages and the pdfjs optional canvas/tar chain. These counts are dependency entries, not 28 independent exploitable application vulnerabilities.",
+      "impact": "The confirmed Vitest advisory requires the API/UI server to be listening; npm test uses run mode. The verified Windows Vite advisory requires network exposure. A static browser deployment does not execute optional Node canvas/tar. These conditions must be distinguished from genuine runtime reachability.",
+      "fix": "Upgrade supported direct packages and regenerate the lockfile with reviewed transitive updates. Inventory browser, build, optional and Deno-only dependencies separately. Re-run functional/security tests and document any unreachable residual advisory rather than blindly using audit fix --force.",
+      "acceptance": "Deliver a reviewed dependency/SBOM report with affected paths, exposure, patched target, test results and remaining accepted risks. Keep development servers private.",
+      "refs": [
+        {
+          "file": "package.json",
+          "line": 37,
+          "excerpt": "\"vite\": \"5.4.11\","
+        },
+        {
+          "file": "package.json",
+          "line": 40,
+          "excerpt": "\"vitest\": \"2.1.8\""
+        },
+        {
+          "file": "package.json",
+          "line": 23,
+          "excerpt": "\"pdfjs-dist\": \"4.4.168\","
+        }
+      ]
+    },
+    {
+      "id": "A34",
+      "severity": "Medium",
+      "area": "Offline",
+      "title": "Offline queue persists files, not durable financial commands",
+      "confidence": "Confirmed implementation gap",
+      "problem": "OutboxItem contains clientId/folder/blob but no owner, bill payload, command key or transaction result. flush calls resolved to update React state, then deletes the queued file without waiting for durable financial metadata persistence. It runs only while Shell is open/online; there is no registered background-sync command workflow despite older audit wording.",
+      "impact": "A file may reach Drive while the bill exists only in localStorage or its link is lost. Sign-out/user changes do not scope pending uploads to an account, and a revoked user may leave a permanently failing queue. The offline banner promises automatic entry sync that does not exist.",
+      "fix": "Use an owner/tenant-scoped IndexedDB transaction outbox containing the complete command and attachment references. Acknowledge only after server and local metadata are durable. Expose retry, permanent failure, storage pressure and sign-out behavior; describe foreground/background limits accurately.",
+      "acceptance": "Capture offline, close/reopen, reconnect under the same user and another user, interrupt after upload, and simulate quota/permission failures. Exactly one bill and durable attachment link result.",
+      "refs": [
+        {
+          "file": "src/lib/outbox.ts",
+          "line": 6,
+          "excerpt": "export interface OutboxItem { id: string; clientId: string; folder: string; name: string; blob: Blob; queuedAt: string; tries: number; lastError?: string }"
+        },
+        {
+          "file": "src/lib/outbox.ts",
+          "line": 57,
+          "excerpt": "resolved(it.id, fileId);"
+        },
+        {
+          "file": "src/ui/Shell.tsx",
+          "line": 80,
+          "excerpt": "const id = window.setInterval(go, 120_000);"
+        },
+        {
+          "file": "src/i18n.ts",
+          "line": 46,
+          "excerpt": "offline: 'You are offline — entries will sync automatically',"
+        }
+      ]
+    },
+    {
+      "id": "A35",
+      "severity": "High",
+      "area": "Persistence",
+      "title": "Silent localStorage failure and replacement can discard financial history",
+      "confidence": "Confirmed source behavior",
+      "problem": "Store serialization errors are swallowed. The UI reports success even when storage is full or unavailable. Parsing errors or a seed-version mismatch replace saved state with initial demo data. Each tab has an independent snapshot with no storage-event synchronization, so later saves can overwrite another tab’s work. Logout leaves all tenants, records, consents and thumbnails in the same browser key.",
+      "impact": "Even a pilot using the current app can lose work, expose another role’s cached records or lose its audit history. Keeping originals in IndexedDB does not protect metadata stored separately.",
+      "fix": "Keep demo data synthetic and disposable. For any retained work, use versioned migrations, durable transactions, cross-tab coordination and explicit storage-failure UI. Separate user/tenant caches and clear or lock them according to an agreed sign-out policy.",
+      "acceptance": "Quota exhaustion never reports durable success; schema upgrades migrate or export existing data; two tabs cannot lose each other’s updates; a different user cannot inspect the prior user’s cached business records.",
+      "refs": [
+        {
+          "file": "src/data/store.tsx",
+          "line": 78,
+          "excerpt": "if (saved.seedVersion === SEED_VERSION) return { ...initial(), ...saved, providers: DEMO_PROVIDERS.map((d) => saved.providers?.find((x) => x.code === d.code) ?? d) };"
+        },
+        {
+          "file": "src/data/store.tsx",
+          "line": 217,
+          "excerpt": "try { localStorage.setItem(STORE_KEY, JSON.stringify(s)); } catch { /* quota or private mode */ }"
+        },
+        {
+          "file": "src/data/store.tsx",
+          "line": 1162,
+          "excerpt": "const logout = () => setS((st) => ({ ...st, currentUserId: undefined }));"
+        },
+        {
+          "file": "src/data/store.tsx",
+          "line": 225,
+          "excerpt": "[{ ...a, id: uid(), at: nowIso(), actor: st.currentUserId ?? 'system' }, ...st.audit].slice(0, 500);"
+        }
+      ]
+    },
+    {
+      "id": "A36",
+      "severity": "Medium",
+      "area": "Data model",
+      "title": "UI and SQL contracts contain additional go-live incompatibilities",
+      "confidence": "Reproduced source enum failure; other gaps confirmed",
+      "problem": "Payments imported from Excel use source=excel_import but SQL permits only manual/bank_import. Vendor, payment-source and cost-centre screens still generate short Math.random IDs despite UUID columns. Application description, QR signature, statement-column mapping and firm IRP/WhatsApp settings have no complete matching persistence contract; blocked175 is a code in TS but a boolean in expense_heads. The live data layer cannot be a trivial property mapper.",
+      "impact": "Wiring Supabase without a domain mapping plan will reject valid actions or silently lose important fields. Earlier documentation says weak IDs were fixed, but several creation screens retain them.",
+      "fix": "Generate database types, define versioned DTOs and enumerate every field mapping/default/null semantic. Use UUIDs consistently and add migrations for genuinely required fields. Contract-test manual, import, WhatsApp and review paths against the same schema.",
+      "acceptance": "Every UI creation path persists and reloads all fields through SQL, including Excel payments and editable masters. No synthetic IDs appear in production requests.",
+      "refs": [
+        {
+          "file": "supabase/migrations/0004_payments_v3.sql",
+          "line": 35,
+          "excerpt": "add column source text not null default 'manual' check (source in ('manual','bank_import'));"
+        },
+        {
+          "file": "src/data/store.tsx",
+          "line": 834,
+          "excerpt": "const p = makePayment(work, { vendorId: vendor.id, mode, accountId: account?.id, ref: txt(r.ref), paidOn, amount, allocations, source: 'excel_import' },"
+        },
+        {
+          "file": "src/pages/Vendors.tsx",
+          "line": 15,
+          "excerpt": "const blank = (clientId: string): Vendor => ({ id: Math.random().toString(36).slice(2, 10), clientId, name: '', gstRegistered: false, panStatus: 'Unverified' });"
+        },
+        {
+          "file": "src/pages/Settings.tsx",
+          "line": 185,
+          "excerpt": "id: Math.random().toString(36).slice(2, 8), kind, name: tr(KIND_LABEL[kind]), linkedBankId: kind === 'upi' ? banks[0]?.id : undefined,"
+        },
+        {
+          "file": "src/data/types.ts",
+          "line": 63,
+          "excerpt": "irpPublicKeyPem?: string /* e-invoice portal public key, saved by the CA — used to check signed QR codes */ }"
+        }
+      ]
+    },
+    {
+      "id": "A37",
+      "severity": "High",
+      "area": "Deployment",
+      "title": "Documented cron authentication is incompatible with default gateway verification",
+      "confidence": "Official docs compared with repository",
+      "problem": "SUPABASE-SETUP says scheduled jobs send only x-cron-secret and mentions --no-verify-jwt only for WhatsApp. There is no supabase/config.toml defining cron function gateway behavior. Supabase Edge Functions require a valid Authorization JWT by default. Older SQL schedule comments send only Authorization, while current handlers require x-cron-secret. Auto-approval/FY-close server commands and master seed/provisioning are also not delivered.",
+      "impact": "Following the setup instructions can produce schedules rejected before the handler or by the handler itself. Code existing in the repository does not establish deployed/scheduled/healthy functionality.",
+      "fix": "Version infrastructure and per-function auth configuration. Use a documented service-to-service authentication scheme consistent at gateway and handler, with secrets managed outside SQL examples. Add deployment smoke tests, master seeding and Auth/profile provisioning.",
+      "acceptance": "Deploy to staging from a clean checkout; invoke every schedule using its exact production headers and verify successful job rows. Unauthorized invocations fail, and no feature is labelled connected without a real health check.",
+      "refs": [
+        {
+          "file": "SUPABASE-SETUP.md",
+          "line": 62,
+          "excerpt": "Each job sends the header `x-cron-secret: <CRON_SECRET>`. Without it the functions return 403."
+        },
+        {
+          "file": "SUPABASE-SETUP.md",
+          "line": 59,
+          "excerpt": "`whatsapp-webhook` is called by Meta, so deploy it with `--no-verify-jwt`. It checks Meta's signature itself."
+        },
+        {
+          "file": "supabase/migrations/0005_drive_sheets_costcentres.sql",
+          "line": 75,
+          "excerpt": "--   headers := jsonb_build_object('Authorization','Bearer <service_role_key>')) $$);   -- 03:00 IST"
+        },
+        {
+          "file": "supabase/functions/compliance-watch/index.ts",
+          "line": 27,
+          "excerpt": "if (!Deno.env.get('CRON_SECRET') || req.headers.get('x-cron-secret') !== Deno.env.get('CRON_SECRET')) return new Response('forbidden', { status: 403 });"
+        }
+      ]
+    },
+    {
+      "id": "A38",
+      "severity": "Medium",
+      "area": "Migrations",
+      "title": "Migration tests prove fresh install, not safe upgrades",
+      "confidence": "Confirmed migration and test design",
+      "problem": "0004 drops payments.expense_id CASCADE, then adds a NOT NULL vendor_id without a data backfill. This works on an empty schema but can fail or destroy relationships on a database containing v0.1 payments. Later CREATE OR REPLACE guards repeatedly change shared behavior. The PGlite test applies all migrations to a fresh in-memory database.",
+      "impact": "A future upgrade may break existing records even though the fresh-install test passes. Migration ordering, rollback and populated-data conversion remain unverified.",
+      "fix": "Add populated prior-version fixtures and explicit transactional backfills, expand/contract migration discipline, compatibility windows and rollback/restore instructions. Use forward-only corrective migrations for deployed environments.",
+      "acceptance": "Upgrade a seeded prior version with real-shaped bills/payments without losing amount, vendor or settlement links; compare pre/post invariants and exercise an interrupted rollout.",
+      "refs": [
+        {
+          "file": "supabase/migrations/0004_payments_v3.sql",
+          "line": 30,
+          "excerpt": "alter table payments drop column expense_id cascade;"
+        },
+        {
+          "file": "supabase/migrations/0004_payments_v3.sql",
+          "line": 32,
+          "excerpt": "add column vendor_id uuid not null references vendors(id),"
+        },
+        {
+          "file": "supabase/tests/db-check.mjs",
+          "line": 11,
+          "excerpt": "const db = new PGlite();"
+        }
+      ]
+    },
+    {
+      "id": "A39",
+      "severity": "Medium",
+      "area": "Imports",
+      "title": "Invalid dates, silent truncation and weak statement provenance",
+      "confidence": "Confirmed source behavior",
+      "problem": "parseDate accepts ISO-shaped strings without calendar validation and permits numeric dates such as 31 February. mapGrid silently slices to 2,000 rows. Bank mapping silently skips invalid dates/Dr-Cr markers and turns malformed numeric cells into zero. Bank alreadyIn ignores the selected account despite its comment, and matching can auto-select a vendor from one shared name token plus amount. Statement rows and reconciliation decisions are not retained as first-class records.",
+      "impact": "Imported totals can be incomplete without a visible exception count, valid transactions from two accounts can be skipped as duplicates, and the user cannot audit back to the original statement line.",
+      "fix": "Validate real calendar dates and finite amounts; reject or explicitly report every skipped/truncated row. Persist import batch, account, source hash, raw row and stable bank transaction key. Separate match proposals from reconciled decisions and use account-aware deduplication.",
+      "acceptance": "A 2,001-row file warns before import; invalid dates/amounts show row errors; identical amounts on two accounts remain distinct; an ambiguous vendor match is not automatically selected.",
+      "refs": [
+        {
+          "file": "src/lib/extract.ts",
+          "line": 17,
+          "excerpt": "if (m) return `${m[1]}-${m[2]}-${m[3]}`;"
+        },
+        {
+          "file": "src/lib/importer.ts",
+          "line": 218,
+          "excerpt": "grid.slice(headIdx + 1, headIdx + 1 + 2000).forEach((r, i) => {"
+        },
+        {
+          "file": "src/lib/bank.ts",
+          "line": 93,
+          "excerpt": "if (!date) continue; // totals / footer lines"
+        },
+        {
+          "file": "src/pages/Bank.tsx",
+          "line": 53,
+          "excerpt": "const alreadyIn = (m: BankMatch) => scoped.payments.some((p) => p.paidOn === m.row.date && Math.abs(p.amount - m.row.debit) < 0.01 && (p.ref && m.row.ref ? p.ref === m.row.ref : true));"
+        }
+      ]
+    },
+    {
+      "id": "A40",
+      "severity": "Medium",
+      "area": "Documents",
+      "title": "Accepted upload types and failure states are inconsistent",
+      "confidence": "Confirmed source paths",
+      "problem": "Settings accepts SVG logos but drive-upload rejects image/svg+xml. Bank accepts XLSX statements but the upload MIME allowlist rejects XLSX. Inbox has no per-file size guard before processing, logs upload failure but still creates a draft with a filename/thumbnail, and reports it added. Evidence constraints accept an attachment name or non-null reason without proving an archived file exists.",
+      "impact": "Users can believe evidence is safely filed when only a local thumbnail/name remains. Memory pressure and repeated orphan uploads are possible on large batches. Capture, Inbox and server limits differ.",
+      "fix": "Define one upload contract with size/type/content validation and supported-kind rules. Track selected/local/queued/uploaded/attached/failed states per file. Require an explicit missing-evidence exception when finalizing without a durable attachment.",
+      "acceptance": "SVG/XLSX are either supported end-to-end or rejected before selection with a clear reason; failed originals remain recoverable and visibly unsaved; large batches have bounded resource use.",
+      "refs": [
+        {
+          "file": "src/pages/Settings.tsx",
+          "line": 50,
+          "excerpt": "<label className=\"btn\"><Icon name=\"upload\" size={16} /> {tr('Upload logo')}<input type=\"file\" accept=\"image/png,image/svg+xml,image/jpeg\" hidden onChange={(e) => onLogo(e.target.files?.[0])} /></label>"
+        },
+        {
+          "file": "supabase/functions/drive-upload/index.ts",
+          "line": 8,
+          "excerpt": "const ALLOWED = /^(image\\/(jpeg|png|webp|heic)|application\\/pdf|application\\/json|text\\/csv|text\\/plain)$/;"
+        },
+        {
+          "file": "src/pages/Inbox.tsx",
+          "line": 20,
+          "excerpt": "const MAX_FILES = 50;"
+        },
+        {
+          "file": "src/pages/Inbox.tsx",
+          "line": 93,
+          "excerpt": "const r = st.addDrafts(items);"
+        },
+        {
+          "file": "supabase/migrations/0003_audit_fixes.sql",
+          "line": 10,
+          "excerpt": "add constraint expenses_evidence check (drive_file_id is not null or attachment_name is not null or no_image_reason is not null),"
+        }
+      ]
+    },
+    {
+      "id": "A41",
+      "severity": "Medium",
+      "area": "Capture UX",
+      "title": "Form state can carry GST and attachment facts from a different bill/vendor",
+      "confidence": "Confirmed source behavior",
+      "problem": "The known-vendor effect fills GSTIN only if vendorGstin is empty and runs when vendor ID changes. Switching from one known vendor to another retains the first GSTIN while the second vendor’s GSTIN field may be hidden. Removing/replacing a file does not clear all IRN/signature/derived data. fillFrom claims never to overwrite user input but updates date/rate/discount/taxKind unconditionally; async reads can complete after the form changes.",
+      "impact": "A user can save a new bill with stale supplier tax state, tax type or QR provenance. Slow reading/AI can overwrite a correction, especially when switching clients on the same route without remounting.",
+      "fix": "Track field provenance and dirty state per bill, reset dependent values on vendor/file/client changes, and cancel/ignore stale async results using a request ID. Show a proposed diff before applying AI values.",
+      "acceptance": "Switch between two known vendors and two files while reading; every field reflects the current selection and manual edits remain intact. Client switching cannot carry a pending command to another tenant.",
+      "refs": [
+        {
+          "file": "src/pages/Capture.tsx",
+          "line": 110,
+          "excerpt": "if (knownVendor?.gstin && !vendorGstin) setVendorGstin(knownVendor.gstin);"
+        },
+        {
+          "file": "src/pages/Capture.tsx",
+          "line": 136,
+          "excerpt": "function fillFrom(r: Partial<InvoiceFields> & { description?: string }) {"
+        },
+        {
+          "file": "src/pages/Capture.tsx",
+          "line": 323,
+          "excerpt": "setSaved(undefined); setPhoto(undefined); setFileName(undefined); setImageHash(undefined); setNotice(undefined); setIrn(undefined);"
+        },
+        {
+          "file": "src/ui/Shell.tsx",
+          "line": 170,
+          "excerpt": "<div key={pathname} className=\"route-anim\">{children}</div>"
+        }
+      ]
+    },
+    {
+      "id": "A42",
+      "severity": "Medium",
+      "area": "OCR and QR",
+      "title": "Reader lifecycle and QR business validation are incomplete",
+      "confidence": "QR document-type parsing reproduced; lifecycle confirmed",
+      "problem": "photoText starts its cancel/timeout race after createWorker finishes, so a stalled worker/model startup is not bounded. pdfQr’s race does not cancel rendering or destroy document/worker resources; pdfText reads only the first three pages by default. A scanned PDF has no OCR fallback. parseEInvoiceQr discards DocTyp and Capture does not compare BuyerGstin to the selected client; a credit-note-shaped QR is accepted as invoice data. Bulk QR intake also loses signature/IRN provenance.",
+      "impact": "Large/slow documents can consume resources or omit totals, and the wrong buyer/document type can enter the expense workflow despite a readable or even valid signature.",
+      "fix": "Bound startup and processing, terminate/destroy resources on cancel/unmount, validate page/dimension limits and provide controlled scanned-PDF OCR. Persist signed payload, type, buyer and verification provenance; route credit/debit notes separately.",
+      "acceptance": "Cancellation works during initial model download; large/multi-page samples release resources; wrong-buyer/CRN/DBN QR documents are routed or blocked appropriately rather than treated as ordinary expenses.",
+      "refs": [
+        {
+          "file": "src/lib/docread.ts",
+          "line": 88,
+          "excerpt": "const worker = await createWorker('eng', 1, {"
+        },
+        {
+          "file": "src/lib/docread.ts",
+          "line": 39,
+          "excerpt": "return Promise.race([pdfQrScan(file), new Promise<null>((res) => setTimeout(() => res(null), timeoutMs))]);"
+        },
+        {
+          "file": "src/lib/einvoiceQr.ts",
+          "line": 35,
+          "excerpt": "return {"
+        },
+        {
+          "file": "src/pages/Capture.tsx",
+          "line": 169,
+          "excerpt": "fillFrom({ vendorGstin: qr.sellerGstin, invoiceNo: qr.docNo, invoiceDate: qr.docDate, totalAmount: qr.totalValue, hsnSac: qr.mainHsn });"
+        }
+      ]
+    },
+    {
+      "id": "A43",
+      "severity": "Medium",
+      "area": "Accessibility and language",
+      "title": "Accessibility and full-Hindi claims exceed the implemented/tested coverage",
+      "confidence": "Source-based; visual/screen-reader testing incomplete",
+      "problem": "Clickable table rows in Entries, Review, Vendors and FirmOverview have no keyboard equivalent. Several form labels lack htmlFor/IDs; tablists omit complete keyboard/panel relationships. Drawer focus handling does not make the background inert and can include hidden or disabled-select controls. Review includes hard-coded English explanations and labels. The Hindi test finds literal tr calls; it cannot prove all rendered/dynamic text is translated.",
+      "impact": "Keyboard and screen-reader users can be blocked from core review/edit flows. A translation-completeness pass is not a linguistic or accessibility audit. User-selected brand colours can also require contrast validation.",
+      "fix": "Use actual links/buttons inside rows, complete labels and dialog/tab patterns, and add localized templates for engine/dynamic messages. Validate themes/branding with measured contrast. Run NVDA/TalkBack plus keyboard and real-device checks.",
+      "acceptance": "Every financial action works keyboard-only; labels announce correctly; focus stays within the active modal and returns reliably; EN/HI mobile and desktop flows pass human review.",
+      "refs": [
+        {
+          "file": "src/pages/Entries.tsx",
+          "line": 64,
+          "excerpt": "<tr key={e.id} className=\"click\" onClick={() => setOpen(e)}>"
+        },
+        {
+          "file": "src/pages/Review.tsx",
+          "line": 243,
+          "excerpt": "<span className=\"hint\">Engine: {ts.reason}{ts.amount ? ` → ${fmtInr(ts.amount)}` : ''}</span>"
+        },
+        {
+          "file": "src/ui/common.tsx",
+          "line": 59,
+          "excerpt": "const f = [...el.querySelectorAll<HTMLElement>('a[href], button:not([disabled]), input:not([disabled]), select, textarea, [tabindex]:not([tabindex=\"-1\"])')];"
+        },
+        {
+          "file": "src/i18n.ts",
+          "line": 188,
+          "excerpt": "let out = lang === 'hi' ? HI[en] ?? en : en;"
+        }
+      ]
+    },
+    {
+      "id": "A44",
+      "severity": "Medium",
+      "area": "Observability",
+      "title": "Health and support messages can give false reassurance",
+      "confidence": "Confirmed source behavior",
+      "problem": "Audit renders green health when a component has no events and red forever when any historical error remains; it has no last-success freshness or real dependency probe. FirmOverview counts all errors despite a recent/24-hour variable name. ErrorBoundary says the problem was reported to support but writes only localStorage, outside store state. The next state serialization can overwrite that error. Event handlers and rejected async operations are not covered by React error boundaries.",
+      "impact": "Operators cannot distinguish healthy, disconnected, stale and unknown. Users may believe support received a report or data is safe when no durable save/telemetry occurred.",
+      "fix": "Use explicit unknown/degraded/healthy states derived from recent probes and job heartbeats. Report client errors through a redacted durable channel with correlation IDs. Make UI messages describe only verified persistence/delivery.",
+      "acceptance": "Disconnect Google/cron and observe a stale/unhealthy signal; a client crash creates a real support event; offline/storage failure messages never assert unverified safety.",
+      "refs": [
+        {
+          "file": "src/pages/Audit.tsx",
+          "line": 40,
+          "excerpt": "const worst = ev.some((e) => e.level === 'error') ? 'error' : ev.some((e) => e.level === 'warn') ? 'warn' : 'ok';"
+        },
+        {
+          "file": "src/pages/FirmOverview.tsx",
+          "line": 17,
+          "excerpt": "const errors24h = s.events.filter((e) => e.level === 'error').length;"
+        },
+        {
+          "file": "src/ui/ErrorBoundary.tsx",
+          "line": 32,
+          "excerpt": "<p className=\"muted\">{hi ? 'आपकी सेव की गई एंट्री सुरक्षित हैं। समस्या की जानकारी सपोर्ट को भेज दी गई है।' : 'Your saved entries are safe. The problem has been reported to support.'}</p>"
+        },
+        {
+          "file": "src/ui/ErrorBoundary.tsx",
+          "line": 19,
+          "excerpt": "localStorage.setItem(STORE_KEY, JSON.stringify(s));"
+        }
+      ]
+    },
+    {
+      "id": "A45",
+      "severity": "High",
+      "area": "Auditability",
+      "title": "Audit coverage and actor attribution are incomplete",
+      "confidence": "Actor spoofing reproduced; trigger coverage inspected",
+      "problem": "Staff supplied created_by of the CA on a bill insert successfully. Several tables/actions lack audit triggers: profiles, client controls, month locks, challans, consent/rights changes, assignments and allocations are not comprehensively captured. The browser logs summaries and truncates at 500; SQL captures before/after for selected tables. system_events permits authenticated client_app inserts without binding client_id or limiting content.",
+      "impact": "The platform cannot reconstruct all significant financial/security decisions. Default auth.uid is not enough if the caller may override the field. Sensitive PAN/financial values can also persist in full audit snapshots without a scoped access/retention design.",
+      "fix": "Set actor/timestamps server-side and make them immutable. Audit every material command with request ID, actor, tenant, reason, before/after or event payload, rule version and external reference. Separate immutable business audit from noisy telemetry, and redact/minimize sensitive fields.",
+      "acceptance": "Users cannot impersonate creator/reviewer; every lock/unlock, challan, permission, consent, allocation and export action is reconstructable and access-controlled; log ingestion cannot spoof another client.",
+      "refs": [
+        {
+          "file": "supabase/migrations/0001_core.sql",
+          "line": 171,
+          "excerpt": "created_by     uuid not null references profiles(id) default auth.uid(),"
+        },
+        {
+          "file": "supabase/migrations/0001_core.sql",
+          "line": 269,
+          "excerpt": "create trigger audit_expenses after insert or update or delete on expenses for each row execute function audit_trigger();"
+        },
+        {
+          "file": "supabase/migrations/0002_platform_ops.sql",
+          "line": 122,
+          "excerpt": "create policy system_events_client_insert on system_events for insert"
+        },
+        {
+          "file": "src/data/store.tsx",
+          "line": 225,
+          "excerpt": "[{ ...a, id: uid(), at: nowIso(), actor: st.currentUserId ?? 'system' }, ...st.audit].slice(0, 500);"
+        }
+      ]
+    },
+    {
+      "id": "A46",
+      "severity": "Medium",
+      "area": "Performance",
+      "title": "Whole-state persistence and quadratic checks will not scale to accounting volumes",
+      "confidence": "Confirmed complexity; throughput benchmark pending",
+      "problem": "One context holds every client/table and serializes it after every update. Review/alerts repeatedly scan payments per bill, risk checks perform nested vendor/window scans, and LookAlikes compares all bill pairs before slicing to 30. Its image hashes are recomputed on data changes. Tables render full datasets without pagination; global MutationObservers revisit tables/radio groups. These costs are largely invisible on the small seed.",
+      "impact": "Thousands of bills, thumbnails and payment allocations can block inexpensive phones, exceed localStorage and make month-end review slow. Route splitting helps download size but not this runtime complexity.",
+      "fix": "Use paginated server projections, normalized/query caches, incremental indexes for balances and duplicate keys, stored perceptual hashes and bounded candidate windows. Move heavy readers/comparisons off the main thread and virtualize long lists.",
+      "acceptance": "Benchmark 10k bills/50k allocations per client and a multi-client firm, measuring p95 list, review, save and reconciliation latency plus memory on a low-end Android device. Set budgets before claiming scale.",
+      "refs": [
+        {
+          "file": "src/data/store.tsx",
+          "line": 216,
+          "excerpt": "useEffect(() => {"
+        },
+        {
+          "file": "src/ui/LookAlikes.tsx",
+          "line": 41,
+          "excerpt": "for (let i = 0; i < live.length; i++) for (let j = i + 1; j < live.length; j++) {"
+        },
+        {
+          "file": "src/lib/anomaly.ts",
+          "line": 137,
+          "excerpt": "const win = small.filter((x) => x.invoiceDate <= e.invoiceDate && daysBetween(x.invoiceDate, e.invoiceDate) <= 6);"
+        },
+        {
+          "file": "src/ui/tableCards.ts",
+          "line": 18,
+          "excerpt": "const run = () => { queued = false; root.querySelectorAll<HTMLTableElement>('table.cards-sm').forEach(label); };"
+        }
+      ]
+    },
+    {
+      "id": "A47",
+      "severity": "High",
+      "area": "Quality assurance",
+      "title": "Passing tests do not cover the production trust boundaries",
+      "confidence": "Confirmed test-suite scope",
+      "problem": "All 188 original tests pass, and all 14 migrations plus 33 database behavior checks pass. Most DB scenarios run as the database owner with a simulated auth.uid; only a small part switches to authenticated. There is one client, no inactive user and no view-isolation test. There are no committed browser E2E, deployed Edge Function, restore, concurrent-payment or real accounting-system acceptance suites. One GST test encodes the reversal-period mistake.",
+      "impact": "Test count is being used as evidence of broader correctness than the suite establishes. This audit reproduced additional defects without breaking the original tests.",
+      "fix": "Build a risk-based suite with real role/grant matrices, multi-tenant adversarial cases, command contract tests, financial golden cases, browser workflows and staging integrations. Validate tests against independent requirements, not only the implementation. Add CI gates and a supported runtime matrix.",
+      "acceptance": "Each critical/high finding has a regression asserting the intended behavior. Original tests, authorization tests, financial invariants and staging smoke tests must all pass before pilot.",
+      "refs": [
+        {
+          "file": "supabase/tests/db-check.mjs",
+          "line": 29,
+          "excerpt": "const CA = '00000000-0000-4000-8000-000000000001', ADM = '00000000-0000-4000-8000-000000000002', C1 = '00000000-0000-4000-8000-0000000000c1';"
+        },
+        {
+          "file": "supabase/tests/db-check.mjs",
+          "line": 70,
+          "excerpt": "await db.exec(`set role authenticated`);"
+        },
+        {
+          "file": "src/lib/gst-registers.test.ts",
+          "line": 35,
+          "excerpt": "it('unpaid at day 180 → reverse all of it in the month the 180 days end', () => {"
+        },
+        {
+          "file": "package.json",
+          "line": 6,
+          "excerpt": "\"scripts\": {"
+        }
+      ]
+    },
+    {
+      "id": "A48",
+      "severity": "Medium",
+      "area": "Privacy and retention",
+      "title": "Privacy processes are recorded as requests, not executed as data lifecycle controls",
+      "confidence": "Confirmed repository scope; legal policy requires review",
+      "problem": "The app can mark a rights request resolved after entering text but has no implemented erasure/legal-hold/retention execution across database, Drive, Sheets, local caches, logs and backups. Download-my-data is a partial summary, not a complete tenant portability/restore export. Security-log retention triggers do not establish retention of Auth, hosting, Google or provider logs. Documents claim readiness while several controls remain only templates.",
+      "impact": "The firm may promise deletion, data access or retention behavior it cannot demonstrate. The official DPDP Rules use phased commencement; as of 3 November 2026, future duties should be distinguished from current contractual/product promises, and counsel must decide applicable bases and periods.",
+      "fix": "Create a data inventory and executable retention/rights workflow with approvals, legal holds, identity checks, processor handling, deletion evidence and backup policy. Align notices with implemented behavior and official commencement/corrigendum documents.",
+      "acceptance": "Run a synthetic access/erasure request through all stores, demonstrate protected statutory records and deletion evidence, and verify notices accurately state present and planned controls.",
+      "refs": [
+        {
+          "file": "src/pages/Privacy.tsx",
+          "line": 126,
+          "excerpt": "function downloadMyData() {"
+        },
+        {
+          "file": "src/data/store.tsx",
+          "line": 1141,
+          "excerpt": "const resolvePrivacyRequest = useCallback((id: string, resolution: string) => {"
+        },
+        {
+          "file": "PRIVACY-DPDP.md",
+          "line": 10,
+          "excerpt": "Vouchr is ready ahead of time."
+        },
+        {
+          "file": "src/data/privacyNotice.ts",
+          "line": 40,
+          "excerpt": "'Security logs are kept for at least one year, as the DPDP Rules require.'"
+        }
+      ]
+    }
+  ]
+}
