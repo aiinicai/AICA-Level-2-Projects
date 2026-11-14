@@ -1,0 +1,230 @@
+// =====================================================================
+//  AUTO-ATTACH STAMPED COPIES  (Books Documents folder -> Sales Invoices)
+//  Paste into the schedule "Stamped copies - test" (replace old code).
+//  Only reads files in folder: STAMPED COPIES - SALE INVOICES
+// =====================================================================
+orgId = organization.get("organization_id");
+base = "https://www.zohoapis.com/books/v3";
+stampFolderName = "STAMPED COPIES - SALE INVOICES";
+cfStatusId = "";
+// customfield_id of "Stamped Copy Status" (leave "" to skip)
+cfStatusValue = "Received";
+notifyEmail = "PASTE_YOUR_EMAIL";
+attached = list();
+skipped = list();
+unmatched = list();
+failed = list();
+// ---------- 1. Collect documents in the stamped folder ----------
+stampDocs = list();
+pageNos = {1,2,3,4,5};
+hasMore = true;
+for each  p in pageNos
+{
+	if(hasMore)
+	{
+		resp = invokeurl
+		[
+			url :base + "/documents?organization_id=" + orgId + "&per_page=200&page=" + p
+			type :GET
+			connection:"books_conn"
+		];
+		for each  d in ifnull(resp.get("documents"),list())
+		{
+			if(ifnull(d.get("folder_name"),"").trim() == stampFolderName)
+			{
+				stampDocs.add(d);
+			}
+		}
+		pc = resp.get("page_context");
+		hasMore = pc != null && pc.get("has_more_page") == true;
+	}
+}
+info "Files in stamped folder: " + stampDocs.size();
+// ---------- 2. Process each file ----------
+for each  doc in stampDocs
+{
+	docId = doc.get("document_id");
+	fileName = ifnull(doc.get("file_name"),"");
+	status = "";
+	invNo = "";
+	try 
+	{
+		// 2a. Already linked to an invoice? -> skip
+		linked = false;
+		for each  t in ifnull(doc.get("transactions"),list())
+		{
+			if(t.get("entity") == "invoice")
+			{
+				linked = true;
+			}
+		}
+		// 2b. Invoice number = file name before the extension and before any "_" or space
+		//     "INV-OCT-B-000003.pdf" -> "INV-OCT-B-000003"
+		//     "INV-000363_stamped.pdf" -> "INV-000363"
+		baseName = fileName.toUpperCase().trim();
+		if(baseName.contains("."))
+		{
+			baseName = baseName.subString(0,baseName.lastIndexOf("."));
+		}
+		baseName = baseName.replaceAll(" ","_");
+		if(baseName.contains("_"))
+		{
+			baseName = baseName.getPrefix("_");
+		}
+		if(baseName.startsWith("INV-"))
+		{
+			invNo = baseName;
+		}
+		if(linked)
+		{
+			status = "ALREADY_LINKED";
+		}
+		else if(invNo == "")
+		{
+			status = "NO_INVOICE_NUMBER";
+		}
+		else
+		{
+			// 2c. Find the sales invoice
+			invoiceId = "";
+			sr = invokeurl
+			[
+				url :base + "/invoices?organization_id=" + orgId + "&invoice_number=" + encodeUrl(invNo)
+				type :GET
+				connection:"books_conn"
+			];
+			for each  inv in ifnull(sr.get("invoices"),list())
+			{
+				if(inv.get("invoice_number").toUpperCase().replaceAll(" ","") == invNo)
+				{
+					invoiceId = inv.get("invoice_id");
+				}
+			}
+			if(invoiceId == "")
+			{
+				status = "INVOICE_NOT_FOUND";
+			}
+			else
+			{
+				// 2d. Same file name already attached to the invoice? -> skip
+				det = invokeurl
+				[
+					url :base + "/invoices/" + invoiceId + "?organization_id=" + orgId
+					type :GET
+					connection:"books_conn"
+				];
+				already = false;
+				for each  a in ifnull(det.get("invoice").get("documents"),list())
+				{
+					if(a.get("file_name") == fileName)
+					{
+						already = true;
+					}
+				}
+				if(already)
+				{
+					status = "ALREADY_ATTACHED";
+				}
+				else
+				{
+					// 2e. Download file from Documents
+					fileObj = invokeurl
+					[
+						url :base + "/documents/" + docId + "?organization_id=" + orgId + "&inline=true"
+						type :GET
+						connection:"books_conn"
+					];
+					if(fileObj == null || !fileObj.isFile())
+					{
+						status = "DOWNLOAD_FAILED: " + fileObj;
+					}
+					else
+					{
+						fileObj.setParamName("attachment");
+						fileObj.setFileName(fileName);
+						// 2f. Attach to invoice
+						ar = invokeurl
+						[
+							url :base + "/invoices/" + invoiceId + "/attachment?organization_id=" + orgId + "&can_send_in_email=false"
+							type :POST
+							files:fileObj
+							connection:"books_conn"
+						];
+						if(ar.get("code") == 0)
+						{
+							status = "ATTACHED";
+						}
+						else
+						{
+							status = "ATTACH_FAILED: " + ar;
+						}
+					}
+				}
+				// 2g. Status field + comment
+				if(status == "ATTACHED")
+				{
+					if(cfStatusId != "")
+					{
+						cf = list();
+						cf.add({"customfield_id":cfStatusId,"value":cfStatusValue});
+						invokeurl
+						[
+							url :base + "/invoices/" + invoiceId + "/customfields?organization_id=" + orgId
+							type :PUT
+							parameters:cf.toString()
+							headers:{"Content-Type":"application/json"}
+							connection:"books_conn"
+						]
+					}
+					cm = {"description":"Stamped copy auto-attached from Documents: " + fileName,"show_comment_to_clients":false};
+					invokeurl
+					[
+						url :base + "/invoices/" + invoiceId + "/comments?organization_id=" + orgId
+						type :POST
+						parameters:cm.toString()
+						headers:{"Content-Type":"application/json"}
+						connection:"books_conn"
+					]
+				}
+			}
+		}
+	}
+	catch (e)
+	{
+		status = "ERROR: " + e;
+	}
+	line = fileName + " -> " + invNo + " -> " + status;
+	info line;
+	if(status == "ATTACHED")
+	{
+		attached.add(line);
+	}
+	else if(status.startsWith("ALREADY"))
+	{
+		skipped.add(line);
+	}
+	else if(status == "NO_INVOICE_NUMBER" || status == "INVOICE_NOT_FOUND")
+	{
+		unmatched.add(line);
+	}
+	else
+	{
+		failed.add(line);
+	}
+}
+// ---------- 3. Summary email (only if something new) ----------
+info "Attached " + attached.size() + " | Skipped " + skipped.size() + " | Unmatched " + unmatched.size() + " | Failed " + failed.size();
+if(notifyEmail != "PASTE_YOUR_EMAIL" && attached.size() + unmatched.size() + failed.size() > 0)
+{
+	msg = "<b>Stamped copies run - " + zoho.currenttime.toString("dd-MMM-yyyy HH:mm") + "</b><br><br>";
+	msg = msg + "<b>Attached (" + attached.size() + ")</b><br>" + attached.toString("<br>") + "<br><br>";
+	msg = msg + "<b>Unmatched - check file name (" + unmatched.size() + ")</b><br>" + unmatched.toString("<br>") + "<br><br>";
+	msg = msg + "<b>Failed (" + failed.size() + ")</b><br>" + failed.toString("<br>");
+	sendmail
+	[
+		from :zoho.adminuserid
+		to :notifyEmail
+		subject :"Stamped copies: " + attached.size() + " attached, " + unmatched.size() + " unmatched, " + failed.size() + " failed"
+		message :msg
+	]
+}
