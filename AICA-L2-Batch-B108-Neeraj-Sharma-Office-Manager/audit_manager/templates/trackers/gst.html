@@ -1,0 +1,28 @@
+{% extends "base.html" %}{% from "_macros.html" import badge, csrf %}{% block title %}GST Returns{% endblock %}{% block content %}
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3"><h1 class="page mb-0">GST Returns</h1>{% if current_user.is_manager_or_above %}<a class="btn btn-sm btn-outline-success" href="{{ url_for('trackers.import_filings', kind='gst') }}"><i class="bi bi-file-earmark-excel me-1"></i>Import from Excel</a>{% endif %}</div>
+<div class="row g-3 mb-3"><div class="col-lg-7"><form method="post" action="{{ url_for('trackers.gst_add') }}" class="card-box p-3 row g-2 mx-0">{{ csrf() }}<h2 class="h6 fw-bold col-12">Track one return</h2>
+<div class="col-md-4"><select name="client_id" class="form-select form-select-sm" required><option value="">Client…</option>{% for c in clients %}<option value="{{ c.id }}">{{ c.name }}</option>{% endfor %}</select></div>
+<div class="col-md-3"><select name="return_type_id" class="form-select form-select-sm">{% for t in types %}<option value="{{ t.id }}">{{ t.name }} ({{ t.frequency }})</option>{% endfor %}</select></div>
+<div class="col-md-3"><input name="period" class="form-control form-control-sm" placeholder="2026-10 or 2026-Q3" required></div>
+<div class="col-md-2"><button class="btn btn-sm btn-primary w-100">Add</button></div></form></div>
+{% if current_user.is_manager_or_above %}<div class="col-lg-5"><form method="post" action="{{ url_for('trackers.gst_bulk') }}" class="card-box p-3 row g-2 mx-0">{{ csrf() }}<h2 class="h6 fw-bold col-12"><i class="bi bi-lightning-charge me-1"></i>Bulk: create for all GST clients</h2>
+<div class="col-5"><select name="return_type_id" class="form-select form-select-sm">{% for t in types %}<option value="{{ t.id }}">{{ t.name }}</option>{% endfor %}</select></div>
+<div class="col-4"><input name="period" class="form-control form-control-sm" placeholder="2026-10" required></div><div class="col-3"><button class="btn btn-sm btn-success w-100">Create</button></div>
+<div class="col-12 small text-muted">Skips clients that already have it. Due dates are filled in automatically.</div></form></div>{% endif %}</div>
+{% if current_user.is_manager_or_above %}<form method="post" action="{{ url_for('trackers.extend_due', kind='gst') }}" class="card-box p-3 mb-3 row g-2 mx-0 align-items-end" id="extend">{{ csrf() }}<div class="col-12"><h2 class="h6 fw-bold mb-0"><i class="bi bi-calendar-plus me-1"></i>Due date extended by the department?</h2><div class="small text-muted">Changes the due date of every return below that is not yet filed. Filed returns are left alone.</div></div>
+<div class="col-md-3"><label class="form-label small mb-1">Return</label><select name="return_type_id" class="form-select form-select-sm">{% for t in types %}<option value="{{ t.id }}">{{ t.name }}</option>{% endfor %}</select></div>
+<div class="col-md-3"><label class="form-label small mb-1">Period</label><input name="period" class="form-control form-control-sm" placeholder="2026-10 or 2026-Q3" required></div>
+<div class="col-md-3"><label class="form-label small mb-1">New due date</label><input type="date" name="new_date" class="form-control form-control-sm" required></div>
+<div class="col-md-2"><button class="btn btn-sm btn-outline-primary w-100">Extend</button></div></form>{% endif %}
+{% include "trackers/_filter.html" %}
+<div class="card-box table-responsive"><table class="table table-hover mb-0"><thead><tr><th>Client</th><th>Return</th><th>Period</th><th>Due</th><th>Due date, status and details</th>{% if current_user.is_manager_or_above %}<th></th>{% endif %}</tr></thead><tbody>
+{% for r in rows %}<tr><td>{{ r.client.name }}</td><td>{{ r.return_type.name }}</td><td>{{ r.period }}</td><td class="{{ 'text-danger fw-semibold' if r.status != 'filed' and r.due_date and r.due_date < today }}">{{ r.due_date|dmy }}</td>
+<td><form method="post" action="{{ url_for('trackers.gst_update', rid=r.id) }}" class="d-flex gap-1 flex-wrap">{{ csrf() }}
+<input type="date" name="due_date" value="{{ r.due_date or '' }}" class="form-control form-control-sm" style="width:140px" title="Due date - change it here if it was extended for this client">
+<select name="status" class="form-select form-select-sm" style="width:140px">{% for k, v in statuses.items() %}<option value="{{ k }}" {{ 'selected' if r.status == k }}>{{ v }}</option>{% endfor %}</select>
+<input type="date" name="filed_date" value="{{ r.filed_date or '' }}" class="form-control form-control-sm" style="width:140px" title="Filed on">
+<input name="arn" value="{{ r.arn or '' }}" class="form-control form-control-sm" style="width:130px" placeholder="ARN">
+<select name="assigned_to_id" class="form-select form-select-sm" style="width:130px"><option value="">—</option>{% for u in staff %}<option value="{{ u.id }}" {{ 'selected' if r.assigned_to_id == u.id }}>{{ u.name }}</option>{% endfor %}</select>
+<button class="btn btn-sm btn-outline-primary">Save</button></form></td>
+{% if current_user.is_manager_or_above %}<td><form method="post" action="{{ url_for('trackers.tracker_delete', kind='gst', rid=r.id) }}" onsubmit="return confirm('Delete this row?')">{{ csrf() }}<button class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button></form></td>{% endif %}</tr>
+{% else %}<tr><td colspan="6" class="text-center text-muted py-4">No GST returns tracked yet.</td></tr>{% endfor %}</tbody></table></div>{% endblock %}

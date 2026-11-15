@@ -1,0 +1,32 @@
+{% extends "base.html" %}{% from "_macros.html" import csrf %}{% block title %}New invoice{% endblock %}{% block content %}
+<h1 class="page mb-3">New invoice</h1>
+<form method="post" class="card-box p-3">{{ csrf() }}<div class="row g-2 mb-3">
+<div class="col-md-4"><label class="form-label small fw-semibold">Client *</label><select name="client_id" class="form-select form-select-sm" required><option value="">Choose…</option>{% for c in clients %}<option value="{{ c.id }}" {{ 'selected' if preselect == c.id }}>{{ c.name }}</option>{% endfor %}</select></div>
+<div class="col-md-2"><label class="form-label small fw-semibold">Invoice date</label><input type="date" name="invoice_date" value="{{ today }}" class="form-control form-control-sm"></div>
+<div class="col-md-2"><label class="form-label small fw-semibold">Due date</label><input type="date" name="due_date" class="form-control form-control-sm"></div>
+<div class="col-md-4"><label class="form-label small fw-semibold">GST treatment</label><select name="tax_mode" id="taxMode" class="form-select form-select-sm">{% for k, v in tax_modes.items() %}<option value="{{ k }}">{{ v }}</option>{% endfor %}</select></div></div>
+<datalist id="svcList">{% for x in services %}<option value="{{ x.name }}">{% endfor %}</datalist>
+<div class="small text-muted mb-1">Start typing in Service to pick from the <a href="{{ url_for('billing.services') }}">services master</a>; the SAC code and usual fee fill in. You can still type anything.</div>
+<table class="table table-sm" id="items" data-nocount="1"><thead><tr><th>Service</th><th style="width:110px">SAC</th><th style="width:80px">Qty</th><th style="width:120px">Rate</th><th style="width:120px" class="text-end">Amount</th><th style="width:40px"></th></tr></thead><tbody></tbody></table>
+<button type="button" class="btn btn-sm btn-outline-secondary mb-3" id="addRow"><i class="bi bi-plus"></i> Add line</button>
+<div class="row g-2"><div class="col-md-6"><label class="form-label small fw-semibold">Notes</label><textarea name="notes" rows="3" class="form-control form-control-sm"></textarea></div>
+<div class="col-md-3 offset-md-3 small"><label class="form-label small fw-semibold">Discount (₹)</label><input name="discount_amount" id="disc" value="0" class="form-control form-control-sm mb-2">
+<div class="d-flex justify-content-between"><span>Subtotal</span><span id="sub">0.00</span></div><div class="d-flex justify-content-between"><span>Tax</span><span id="tax">0.00</span></div><div class="d-flex justify-content-between fw-bold border-top mt-1 pt-1"><span>Total</span><span id="tot">0.00</span></div></div></div>
+<div class="mt-3"><button class="btn btn-primary">Create invoice</button> <a class="btn btn-outline-secondary" href="{{ url_for('billing.index') }}">Cancel</a></div></form>{% endblock %}
+{% block scripts %}<script>
+const RATES = {{ rates|tojson }};
+const body = document.querySelector('#items tbody');
+function row(){ const tr=document.createElement('tr'); tr.innerHTML='<td><input name="description" list="svcList" class="form-control form-control-sm" autocomplete="off"></td><td><input name="sac_code" value="998221" class="form-control form-control-sm"></td><td><input name="quantity" value="1" class="form-control form-control-sm"></td><td><input name="rate" value="0" class="form-control form-control-sm"></td><td class="text-end amt">0.00</td><td><button type="button" class="btn btn-sm btn-outline-danger rm">&times;</button></td>'; body.appendChild(tr); recalc(); }
+function recalc(){ let sub=0; body.querySelectorAll('tr').forEach(tr=>{ const q=parseFloat(tr.querySelector('[name=quantity]').value)||0, r=parseFloat(tr.querySelector('[name=rate]').value)||0; const a=q*r; tr.querySelector('.amt').textContent=a.toFixed(2); sub+=a; });
+  const disc=Math.min(parseFloat(document.getElementById('disc').value)||0, sub), taxable=sub-disc, mode=document.getElementById('taxMode').value;
+  const tax = mode==='cgst_sgst' ? taxable*(RATES.cgst+RATES.sgst)/100 : mode==='igst' ? taxable*RATES.igst/100 : 0;
+  document.getElementById('sub').textContent=sub.toFixed(2); document.getElementById('tax').textContent=tax.toFixed(2); document.getElementById('tot').textContent=(taxable+tax).toFixed(2); }
+document.getElementById('addRow').onclick=row; document.addEventListener('input', recalc); document.getElementById('taxMode').onchange=recalc;
+body.addEventListener('click', e=>{ if(e.target.classList.contains('rm') && body.children.length>1){ e.target.closest('tr').remove(); recalc(); }});
+const SERVICES = {{ services|tojson }};
+body.addEventListener('change', e => { if (e.target.name !== 'description') return;
+  const hit = SERVICES.find(x => x.name.toLowerCase() === e.target.value.trim().toLowerCase()); if (!hit) return;
+  const tr = e.target.closest('tr'); if (hit.sac) tr.querySelector('[name=sac_code]').value = hit.sac;
+  const r = tr.querySelector('[name=rate]'); if (hit.rate && !(parseFloat(r.value) > 0)) r.value = hit.rate; recalc(); });
+row();
+</script>{% endblock %}

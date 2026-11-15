@@ -1,0 +1,17 @@
+{% extends "base.html" %}{% from "_macros.html" import csrf %}{% block title %}Services master{% endblock %}{% block content %}
+<h1 class="page mb-3">Services master</h1>
+<div class="row g-3"><div class="col-lg-8"><div class="card-box table-responsive"><table class="table align-middle mb-0"><thead><tr><th>Service</th><th>SAC</th><th>Usual fee (Rs.)</th><th>Use</th><th></th><th></th></tr></thead><tbody>
+{% for x in rows %}<tr><form method="post" id="f{{ x.id }}">{{ csrf() }}<input type="hidden" name="id" value="{{ x.id }}"></form>
+<td><input form="f{{ x.id }}" name="name" value="{{ x.name }}" class="form-control form-control-sm" required></td>
+<td style="width:110px"><input form="f{{ x.id }}" name="sac_code" value="{{ x.sac_code or '' }}" class="form-control form-control-sm"></td>
+<td style="width:130px"><input form="f{{ x.id }}" name="default_rate" value="{{ '%.2f'|format(x.default_rate or 0) }}" class="form-control form-control-sm text-end"></td>
+<td style="width:105px"><select form="f{{ x.id }}" name="active" class="form-select form-select-sm"><option value="1" {{ 'selected' if x.active }}>Yes</option><option value="0" {{ 'selected' if not x.active }}>Hidden</option></select></td>
+<td><button form="f{{ x.id }}" class="btn btn-sm btn-outline-primary">Save</button></td>
+<td><form method="post" action="{{ url_for('billing.service_delete', sid=x.id) }}" onsubmit="return confirm('Delete this service?')">{{ csrf() }}<button class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button></form></td></tr>
+{% else %}<tr><td colspan="6" class="text-center text-muted py-4">No services yet.</td></tr>{% endfor %}</tbody></table></div></div>
+<div class="col-lg-4"><form method="post" class="card-box p-3">{{ csrf() }}<h2 class="h6 fw-bold">Add a service</h2>
+<input name="name" class="form-control form-control-sm mb-2" placeholder="Service name, e.g. GST Return Filing" required>
+<input name="sac_code" class="form-control form-control-sm mb-2" placeholder="SAC code" value="998221">
+<input name="default_rate" class="form-control form-control-sm mb-2" placeholder="Usual fee (optional)">
+<button class="btn btn-sm btn-primary w-100">Add service</button>
+<div class="small text-muted mt-2">These appear as suggestions on the Service line of a new invoice. Leave the fee at 0 if it varies by client.</div></form></div></div>{% endblock %}

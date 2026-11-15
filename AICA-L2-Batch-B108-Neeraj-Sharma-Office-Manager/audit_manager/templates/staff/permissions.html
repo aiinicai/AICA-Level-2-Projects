@@ -1,0 +1,10 @@
+{% extends "base.html" %}{% from "_macros.html" import csrf %}{% block title %}User permissions{% endblock %}{% block content %}
+<h1 class="page mb-2">User permissions</h1>
+<p class="small text-muted">Tick the parts of Office Manager each person may open. Unticked parts disappear from their menu and cannot be opened. Each role starts with a standard set; a <span class="badge badge-info">changed</span> mark shows where you have altered it. Employees still see only their own clients.</p>
+<form method="post">{{ csrf() }}<div class="card-box table-responsive"><table class="table align-middle mb-0 text-center"><thead><tr><th class="text-start">Person</th>{% for k, v in modules.items() %}<th>{{ v }}</th>{% endfor %}<th></th></tr></thead><tbody>
+{% for m in members %}{% set locked = m.role == 'super_admin' or m.id == current_user.id %}
+<tr class="{{ 'text-muted' if not m.is_active_user }}"><td class="text-start"><div class="fw-semibold">{{ m.name }}</div><div class="small">{{ m.role_label }}{% if not m.is_active_user %} (off){% endif %}{% if current[m.id] != defaults[m.id] %} <span class="badge badge-info">changed</span>{% endif %}</div></td>
+{% for k in modules %}<td><input type="checkbox" class="form-check-input" name="perm_{{ m.id }}" value="{{ k }}" {{ 'checked' if k in current[m.id] }} {{ 'disabled' if locked }}></td>{% endfor %}
+<td>{% if not locked and current[m.id] != defaults[m.id] %}<button class="btn btn-sm btn-outline-secondary" form="reset{{ m.id }}">Standard</button>{% elif m.role == 'super_admin' %}<span class="small">Always full</span>{% elif locked %}<span class="small">You</span>{% endif %}</td></tr>{% endfor %}</tbody></table></div>
+<button class="btn btn-primary mt-3">Save permissions</button> <a class="btn btn-outline-secondary mt-3" href="{{ url_for('staff.index') }}">Cancel</a></form>
+{% for m in members %}<form method="post" id="reset{{ m.id }}" action="{{ url_for('staff.permissions_reset', uid=m.id) }}">{{ csrf() }}</form>{% endfor %}{% endblock %}

@@ -1,0 +1,33 @@
+{% extends "base.html" %}{% from "_macros.html" import csrf %}{% block title %}WhatsApp - ready to send{% endblock %}{% block content %}
+<h1 class="page mb-2">WhatsApp &amp; Email</h1>{% include "whatsapp/_tabs.html" %}
+<div class="card-box p-3 mb-3 d-flex flex-wrap align-items-center gap-3"><div class="small fw-semibold">Open WhatsApp using:</div>
+<div class="btn-group btn-group-sm"><input type="radio" class="btn-check" name="mode" id="m-web" value="web" checked><label class="btn btn-outline-success" for="m-web">WhatsApp Web (browser)</label><input type="radio" class="btn-check" name="mode" id="m-desktop" value="desktop"><label class="btn btn-outline-success" for="m-desktop">WhatsApp Desktop app</label></div>
+<div class="small text-muted">WhatsApp must be signed in on this PC. After the chat opens, press Send in WhatsApp. We cannot see whether it was sent, so we only record that it was opened.</div>
+<div class="small w-100" id="picHelp" style="display:none"><i class="bi bi-image me-1"></i><strong>Messages with a picture:</strong> when you press Open chat the picture is copied for you. In the WhatsApp chat press <kbd>Ctrl</kbd>+<kbd>V</kbd> to paste it, then Send. The typed message can be sent before or after it. <span id="picStatus" class="fw-semibold"></span></div></div>
+<div class="card-box table-responsive"><table class="table align-middle mb-0"><thead><tr><th>To</th><th>Message</th><th class="text-end">Action</th></tr></thead><tbody>
+{% for m, l in rows %}<tr id="row{{ m.id }}"><td class="text-nowrap"><div class="fw-semibold">{{ m.recipient_name }}</div><div class="small text-muted">+{{ m.phone }}</div></td>
+<td class="small" style="max-width:520px">{% if m.image %}<div class="float-end ms-2 text-center"><img class="wa-pic" src="{{ url_for('whatsapp.picture', name=m.image) }}" alt="" style="max-height:74px;max-width:120px;border-radius:.3rem;display:block">
+<button type="button" class="btn btn-sm btn-outline-success py-0 mt-1 copy-pic" data-src="{{ url_for('whatsapp.picture', name=m.image) }}">Copy picture</button></div>{% endif %}<span style="white-space:pre-line">{{ m.body }}</span></td>
+<td class="text-end text-nowrap"><a class="btn btn-sm btn-success open" data-id="{{ m.id }}" data-pic="{{ url_for('whatsapp.picture', name=m.image) if m.image else '' }}" data-web="{{ l.web }}" data-desktop="{{ l.desktop }}" href="{{ l.web }}" target="_blank" rel="noopener"><i class="bi bi-whatsapp me-1"></i>Open chat</a>
+<form method="post" action="{{ url_for('whatsapp.skip', mid=m.id) }}" class="d-inline">{{ csrf() }}<button class="btn btn-sm btn-outline-secondary">Skip</button></form></td></tr>
+{% else %}<tr><td colspan="3" class="text-center text-muted py-4">Nothing waiting. Prepare messages from Compose or Auto reminders.</td></tr>{% endfor %}</tbody></table></div>{% endblock %}
+{% block scripts %}<script>
+const token={{ csrf_token|tojson }};
+// pictures are turned into PNG once, so that copying is instant when the button is pressed
+const pics = {};
+function pngOf(src){ if(!pics[src]) pics[src]=new Promise((ok,bad)=>{ const im=new Image(); im.onload=()=>{ const c=document.createElement('canvas'); c.width=im.naturalWidth; c.height=im.naturalHeight; c.getContext('2d').drawImage(im,0,0); c.toBlob(b=>b?ok(b):bad(new Error('no blob')),'image/png'); }; im.onerror=bad; im.src=src; }); return pics[src]; }
+const status=document.getElementById('picStatus');
+function copyPic(src){ if(!src) return;
+  if(!(navigator.clipboard && window.ClipboardItem)){ status.textContent='This computer cannot copy pictures automatically: right-click the picture, choose Copy image, then paste it in WhatsApp.'; return; }
+  navigator.clipboard.write([new ClipboardItem({'image/png': pngOf(src)})]).then(()=>{ status.textContent='Picture copied - press Ctrl+V in the chat.'; })
+    .catch(()=>{ status.textContent='Could not copy the picture: right-click it, choose Copy image, then paste it in WhatsApp.'; }); }
+const srcs=new Set(Array.from(document.querySelectorAll('.copy-pic')).map(b=>b.dataset.src)); srcs.forEach(pngOf);
+if(srcs.size) document.getElementById('picHelp').style.display='';
+document.querySelectorAll('.copy-pic').forEach(b=>b.addEventListener('click',()=>copyPic(b.dataset.src)));
+document.querySelectorAll('a.open').forEach(a=>a.addEventListener('click',e=>{
+  const mode=document.querySelector('input[name=mode]:checked').value; a.href=a.dataset[mode];
+  if(mode==='desktop') a.removeAttribute('target');
+  copyPic(a.dataset.pic);
+  fetch('/whatsapp/'+a.dataset.id+'/opened',{method:'POST',headers:{'X-CSRF-Token':token}}).then(()=>{const r=document.getElementById('row'+a.dataset.id);r.style.opacity='.45';a.textContent='Opened';});
+}));
+</script>{% endblock %}

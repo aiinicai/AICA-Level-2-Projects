@@ -1,0 +1,27 @@
+{% extends "base.html" %}{% block title %}{{ inv.invoice_number }}{% endblock %}{% block content %}
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3 no-print"><h1 class="page mb-0">Invoice preview</h1>
+<div class="d-flex gap-2"><button class="btn btn-sm btn-primary" onclick="window.print()"><i class="bi bi-printer me-1"></i>Print</button>
+<a class="btn btn-sm btn-outline-danger" href="{{ url_for('billing.pdf', invoice_id=inv.id) }}" data-download="1"><i class="bi bi-file-earmark-pdf me-1"></i>Download PDF</a>
+<a class="btn btn-sm btn-outline-secondary" href="{{ url_for('billing.show', invoice_id=inv.id) }}">Back to invoice</a></div></div>
+<div class="invoice-sheet">
+<div class="d-flex align-items-center gap-3 pb-2" style="border-bottom:2px solid #1e3a5f">{% if firm.logo %}<img src="{{ firm.logo }}" alt="Logo" style="max-height:70px;max-width:130px">{% endif %}
+<div class="flex-grow-1"><div class="fs-4 fw-bold" style="color:#1e3a5f">{{ firm.name }}</div>{% if firm.tagline %}<div class="small">{{ firm.tagline }}</div>{% endif %}
+{% if firm.address %}<div class="small">{{ firm.address|e|replace('\n', '<br>'|safe) }}</div>{% endif %}{% if contact %}<div class="small">{{ contact }}</div>{% endif %}{% if ids %}<div class="small">{{ ids }}</div>{% endif %}</div>
+<div class="text-end"><div class="fs-5 fw-bold" style="color:#0d9488">TAX INVOICE</div><div class="small">No. <strong>{{ inv.invoice_number }}</strong></div><div class="small">Date: {{ inv.invoice_date|dmy }}</div>{% if inv.due_date %}<div class="small">Due: {{ inv.due_date|dmy }}</div>{% endif %}</div></div>
+<div class="row mt-3 mb-3 small"><div class="col-7"><div class="text-uppercase fw-bold" style="color:#64748b;font-size:.7rem">Billed to</div><div class="fw-bold fs-6">{{ inv.client.name }}</div>
+<div>{{ [inv.client.address, inv.client.city, inv.client.state, inv.client.pincode]|select|join(', ') }}</div><div>PAN: {{ inv.client.pan or '-' }} &nbsp; GSTIN: {{ inv.client.gstin or 'Unregistered' }}</div></div>
+<div class="col-5 text-end"><div class="text-uppercase fw-bold" style="color:#64748b;font-size:.7rem">Supply</div><div>{{ tax_modes.get(inv.tax_mode, inv.tax_mode) }}</div>{% if inv.client.state %}<div>Place of supply: {{ inv.client.state }}</div>{% endif %}</div></div>
+<table class="table table-sm table-bordered mb-3" data-nocount="1"><thead><tr><th style="width:36px">#</th><th>Description of service</th><th>SAC</th><th class="text-end">Qty / Hours</th><th class="text-end">Rate</th><th class="text-end">Amount</th></tr></thead><tbody>
+{% for it in inv.items %}<tr><td>{{ loop.index }}</td><td>{{ it.description }}</td><td>{{ it.sac_code or '' }}</td><td class="text-end">{{ '%g'|format(it.quantity) }}</td><td class="text-end">{{ it.rate|inr }}</td><td class="text-end">{{ it.amount|inr }}</td></tr>{% endfor %}</tbody></table>
+<div class="row"><div class="col-6 small">{% if inv.notes %}<div class="fw-bold">Notes</div><div style="white-space:pre-line">{{ inv.notes }}</div>{% endif %}</div>
+<div class="col-6"><table class="table table-sm mb-0" data-nocount="1"><tbody>
+<tr><td>Subtotal</td><td class="text-end">{{ inv.subtotal|inr }}</td></tr>
+{% if inv.discount_amount %}<tr><td>Discount</td><td class="text-end">- {{ inv.discount_amount|inr }}</td></tr>{% endif %}
+<tr><td>Taxable value</td><td class="text-end">{{ inv.taxable_amount|inr }}</td></tr>
+{% if inv.cgst_amount %}<tr><td>CGST @ {{ '%g'|format(inv.cgst_rate) }}%</td><td class="text-end">{{ inv.cgst_amount|inr }}</td></tr>{% endif %}
+{% if inv.sgst_amount %}<tr><td>SGST @ {{ '%g'|format(inv.sgst_rate) }}%</td><td class="text-end">{{ inv.sgst_amount|inr }}</td></tr>{% endif %}
+{% if inv.igst_amount %}<tr><td>IGST @ {{ '%g'|format(inv.igst_rate) }}%</td><td class="text-end">{{ inv.igst_amount|inr }}</td></tr>{% endif %}
+<tr class="fw-bold" style="font-size:1.05rem"><td>Total</td><td class="text-end">{{ inv.total_amount|inr }}</td></tr>
+{% if inv.paid_amount %}<tr><td>Received</td><td class="text-end">{{ inv.paid_amount|inr }}</td></tr><tr class="fw-bold"><td>Balance payable</td><td class="text-end">{{ inv.balance|inr }}</td></tr>{% endif %}</tbody></table></div></div>
+<div class="text-end mt-5 small"><div>For <strong>{{ firm.name }}</strong></div><div style="height:46px"></div><div>{{ signatory or 'Authorised Signatory' }}</div><div class="text-muted">{{ profession.title }}</div></div>
+</div>{% endblock %}

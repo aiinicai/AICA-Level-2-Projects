@@ -1,0 +1,43 @@
+{% extends "base.html" %}{% from "_macros.html" import badge, csrf %}{% block title %}Tasks{% endblock %}{% block content %}
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3"><h1 class="page mb-0">Tasks &amp; Workflow</h1>
+<div class="d-flex gap-2"><div class="btn-group btn-group-sm"><a class="btn btn-outline-secondary {{ 'active' if view == 'kanban' }}" href="{{ url_for('tasks.index', view='kanban', mine=1 if mine else None) }}">Board</a><a class="btn btn-outline-secondary {{ 'active' if view == 'table' }}" href="{{ url_for('tasks.index', view='table', mine=1 if mine else None) }}">Table</a></div>
+<a class="btn btn-sm {{ 'btn-secondary' if mine else 'btn-outline-secondary' }}" href="{{ url_for('tasks.index', view=view, mine=None if mine else 1) }}">My tasks</a>
+<button class="btn btn-sm btn-primary" data-bs-toggle="collapse" data-bs-target="#newTask"><i class="bi bi-plus-lg me-1"></i>New task</button></div></div>
+<form id="newTask" method="post" action="{{ url_for('tasks.add') }}" class="collapse card-box p-3 mb-3">{{ csrf() }}<div class="row g-2">
+<div class="col-md-5"><input name="title" class="form-control form-control-sm" placeholder="Task title" required></div>
+<div class="col-md-3"><select name="client_id" class="form-select form-select-sm"><option value="">No client</option>{% for c in clients %}<option value="{{ c.id }}">{{ c.name }}</option>{% endfor %}</select></div>
+{% if current_user.is_manager_or_above %}<div class="col-md-2"><select name="assigned_to_id" class="form-select form-select-sm"><option value="">Assign to…</option>{% for u in staff %}<option value="{{ u.id }}">{{ u.name }}</option>{% endfor %}</select></div>{% endif %}
+<div class="col-md-2"><input type="date" name="due_date" class="form-control form-control-sm"></div>
+<div class="col-md-2"><select name="priority" class="form-select form-select-sm">{% for k, v in priorities.items() %}<option value="{{ k }}" {{ 'selected' if k == 'medium' }}>{{ v }}</option>{% endfor %}</select></div>
+<div class="col-md-2"><select name="category" class="form-select form-select-sm">{% for k, v in categories.items() %}<option value="{{ k }}">{{ v }}</option>{% endfor %}</select></div>
+<div class="col-md-6"><input name="description" class="form-control form-control-sm" placeholder="Details (optional)"></div>
+<div class="col-md-2"><button class="btn btn-sm btn-primary w-100">Create</button></div></div></form>
+{% if view == 'kanban' %}
+<div class="row g-3">{% for key, label in statuses.items() %}<div class="col-md-3"><div class="fw-semibold small mb-1">{{ label }} <span class="badge badge-soft">{{ tasks|selectattr('status', 'equalto', key)|list|length }}</span></div>
+<div class="kanban-col" data-status="{{ key }}">{% for t in tasks if t.status == key %}<div class="kanban-card" draggable="true" data-id="{{ t.id }}">
+<a class="fw-semibold text-decoration-none" href="{{ url_for('tasks.show', task_id=t.id) }}">{{ t.title }}</a>
+<div class="text-muted small">{{ t.client.name if t.client else 'No client' }} · {{ t.assigned_to.name if t.assigned_to else 'Unassigned' }}</div>
+<div class="small mt-1">{{ badge(t.priority) }} <span class="{{ 'text-danger' if t.is_overdue else 'text-muted' }}">{{ t.due_date|dmy }}</span></div></div>{% endfor %}</div></div>{% endfor %}</div>
+{% else %}
+<div class="card-box table-responsive"><table class="table table-hover mb-0"><thead><tr><th>Task</th><th>Client</th><th>Assigned</th><th>Priority</th><th>Status</th><th>Due</th></tr></thead><tbody>
+{% for t in tasks %}<tr><td><a class="text-decoration-none fw-semibold" href="{{ url_for('tasks.show', task_id=t.id) }}">{{ t.title }}</a></td><td>{{ t.client.name if t.client else '—' }}</td><td>{{ t.assigned_to.name if t.assigned_to else '—' }}</td><td>{{ badge(t.priority) }}</td><td>{{ badge(t.status) }}</td><td class="{{ 'text-danger fw-semibold' if t.is_overdue }}">{{ t.due_date|dmy }}</td></tr>
+{% else %}<tr><td colspan="6" class="text-center text-muted py-4">No tasks.</td></tr>{% endfor %}</tbody></table></div>{% endif %}
+{% endblock %}
+{% block scripts %}{% if view == 'kanban' %}<script>
+(function(){
+  const token = {{ csrf_token|tojson }}; let dragged = null;
+  document.querySelectorAll('.kanban-card').forEach(c => {
+    c.addEventListener('dragstart', e => { dragged = c; e.dataTransfer.setData('text/plain', c.dataset.id); });
+  });
+  document.querySelectorAll('.kanban-col').forEach(col => {
+    col.addEventListener('dragover', e => { e.preventDefault(); col.classList.add('over'); });
+    col.addEventListener('dragleave', () => col.classList.remove('over'));
+    col.addEventListener('drop', async e => {
+      e.preventDefault(); col.classList.remove('over');
+      if (!dragged) return;
+      const res = await fetch('/tasks/' + dragged.dataset.id + '/status', {method:'POST', headers:{'Content-Type':'application/json','X-CSRF-Token':token,'X-Requested-With':'fetch'}, body: JSON.stringify({status: col.dataset.status})});
+      if (res.ok) { col.appendChild(dragged); } else { alert('Could not move the task.'); }
+    });
+  });
+})();
+</script>{% endif %}{% endblock %}

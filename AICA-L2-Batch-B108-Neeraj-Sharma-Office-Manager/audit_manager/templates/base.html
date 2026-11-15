@@ -1,0 +1,65 @@
+{% from "_macros.html" import csrf %}<!doctype html>
+<html lang="en" data-theme="{{ theme }}" data-bs-theme="{{ 'dark' if theme == 'dark' else 'light' }}"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{% block title %}Office Manager{% endblock %} — {{ firm_name }}</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='vendor/bootstrap.min.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='vendor/bootstrap-icons.min.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}">
+{% block head %}{% endblock %}
+</head><body>
+{% if current_user %}
+{% set ep = request.endpoint or '' %}
+<aside class="sidebar d-flex flex-column">
+  <div class="brand"><i class="bi bi-journal-check me-1"></i> Office Manager<div class="small fw-normal text-muted text-truncate">{{ firm_name }}</div></div>
+  <nav class="nav flex-column pb-3">
+    <a class="nav-link {{ 'active' if ep == 'dashboard.index' }}" href="{{ url_for('dashboard.index') }}"><i class="bi bi-speedometer2 me-2"></i>Dashboard</a>
+    {% if can('clients') %}<a class="nav-link {{ 'active' if ep.startswith('clients') }}" href="{{ url_for('clients.index') }}"><i class="bi bi-building me-2"></i>Clients</a>{% endif %}
+    {% if can('trackers') or can('calendar') %}<div class="nav-heading">Tax &amp; Compliance</div>{% endif %}
+    {% if can('trackers') %}
+    <a class="nav-link {{ 'active' if ep == 'trackers.gst' }}" href="{{ url_for('trackers.gst') }}"><i class="bi bi-receipt-cutoff me-2"></i>GST Returns</a>
+    <a class="nav-link {{ 'active' if ep == 'trackers.itr' }}" href="{{ url_for('trackers.itr') }}"><i class="bi bi-file-earmark-check me-2"></i>ITR Filings</a>
+    <a class="nav-link {{ 'active' if ep == 'trackers.tds' }}" href="{{ url_for('trackers.tds') }}"><i class="bi bi-percent me-2"></i>TDS Returns</a>
+    {% endif %}
+    {% if can('calendar') %}<a class="nav-link {{ 'active' if ep.startswith('calendar') and not ep.startswith('calendar.due_date') }}" href="{{ url_for('calendar.index') }}"><i class="bi bi-calendar3 me-2"></i>Compliance Calendar</a>{% endif %}
+    {% if can('calendar') %}<a class="nav-link {{ 'active' if ep.startswith('calendar.due_date') }}" href="{{ url_for('calendar.due_dates') }}"><i class="bi bi-calendar-check me-2"></i>Due Date Master</a>{% endif %}
+    <div class="nav-heading">Practice</div>
+    {% if can('tasks') %}<a class="nav-link {{ 'active' if ep.startswith('tasks') }}" href="{{ url_for('tasks.index') }}"><i class="bi bi-kanban me-2"></i>Tasks</a>{% endif %}
+    {% if can('matters') and profession.key == 'advocate' %}<a class="nav-link {{ 'active' if ep.startswith('matters') }}" href="{{ url_for('matters.index') }}"><i class="bi bi-bank me-2"></i>Matters &amp; Hearings</a>{% endif %}
+    {% if can('messages') %}<a class="nav-link {{ 'active' if ep.startswith('whatsapp') }}" href="{{ url_for('whatsapp.index') }}"><i class="bi bi-whatsapp me-2"></i>WhatsApp &amp; Email</a>{% endif %}
+    {% if can('timesheet') and hourly_on %}<a class="nav-link {{ 'active' if ep.startswith('timesheet') }}" href="{{ url_for('timesheet.index') }}"><i class="bi bi-stopwatch me-2"></i>Time Sheet</a>{% endif %}
+    {% if can('billing') %}<a class="nav-link {{ 'active' if ep.startswith('billing') }}" href="{{ url_for('billing.index') }}"><i class="bi bi-cash-coin me-2"></i>Billing</a>{% endif %}
+    {% if can('staff') %}<a class="nav-link {{ 'active' if ep.startswith('staff') }}" href="{{ url_for('staff.index') }}"><i class="bi bi-people me-2"></i>Staff</a>{% endif %}
+    {% if can('reports') %}<a class="nav-link {{ 'active' if ep.startswith('reports') }}" href="{{ url_for('reports.index') }}"><i class="bi bi-graph-up-arrow me-2"></i>Reports</a>{% endif %}
+    {% if can('activity') or can('settings') %}<div class="nav-heading">Administration</div>{% endif %}
+    {% if can('activity') %}<a class="nav-link {{ 'active' if ep.startswith('activity') }}" href="{{ url_for('activity.index') }}"><i class="bi bi-clock-history me-2"></i>Activity Log</a>{% endif %}
+    {% if can('settings') %}<a class="nav-link {{ 'active' if ep.startswith('settings') }}" href="{{ url_for('settings.index') }}"><i class="bi bi-sliders me-2"></i>Settings</a>{% endif %}
+    <a class="nav-link {{ 'active' if ep == 'dashboard.help_page' }}" href="{{ url_for('dashboard.help_page') }}"><i class="bi bi-question-circle me-2"></i>Help</a>
+  </nav>
+  <div class="mt-auto p-3 border-top small">
+    <div class="fw-semibold">{{ current_user.name }}</div><div class="text-muted">{{ current_user.role_label }}</div>
+    <div class="d-flex gap-2 mt-2">
+      <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('auth.change_password') }}" title="My account: theme and password"><i class="bi bi-person-gear"></i></a>
+      <form action="{{ url_for('auth.logout') }}" method="post">{{ csrf() }}<button class="btn btn-sm btn-outline-secondary">Sign out</button></form>
+    </div>
+  </div>
+</aside>
+<main class="main">
+<div class="topbar no-print">
+  <button type="button" class="btn btn-sm btn-outline-secondary" id="backBtn" title="Back (Esc)" {{ 'disabled' if ep == 'dashboard.index' }}><i class="bi bi-arrow-left me-1"></i>Back</button>
+  <span class="small text-muted d-none d-md-inline">Esc = go back</span>
+</div>
+{% else %}<main class="container py-4" style="max-width:520px">{% endif %}
+  {% with msgs = get_flashed_messages(with_categories=true) %}{% for cat, msg in msgs %}
+    <div class="alert alert-{{ cat if cat in ['success','danger','warning','info'] else 'info' }} py-2 small">{{ msg }}</div>
+  {% endfor %}{% endwith %}
+  {% block content %}{% endblock %}
+</main>
+{% if current_user %}<div class="modal fade" id="backModal" tabindex="-1"><div class="modal-dialog modal-sm modal-dialog-centered"><div class="modal-content">
+<div class="modal-body"><div class="fw-semibold mb-1">Go back to the previous screen?</div><div class="small text-muted" id="backMsg"></div></div>
+<div class="modal-footer py-2"><button type="button" class="btn btn-sm btn-outline-secondary" data-bs-dismiss="modal">Stay here</button><button type="button" class="btn btn-sm btn-primary" id="backYes">Yes, go back</button></div></div></div></div>{% endif %}
+<div id="amToast"></div>
+<script src="{{ url_for('static', filename='vendor/bootstrap.bundle.min.js') }}"></script>
+<script>window.AM = {csrf: {{ csrf_value()|tojson }}, home: {{ url_for('dashboard.index')|tojson }}, isHome: {{ ((request.endpoint or '') == 'dashboard.index')|tojson }}};</script>
+<script src="{{ url_for('static', filename='js/app.js') }}"></script>
+{% block scripts %}{% endblock %}
+</body></html>
