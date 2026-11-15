@@ -1,0 +1,25 @@
+name: CI
+on:
+  push: { branches: [main] }
+  pull_request:
+permissions: { contents: read }
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 20 }
+      - uses: actions/setup-java@v5          # required by Firebase emulators
+        with: { distribution: temurin, java-version: 21 }
+      - run: npm install --no-audit --no-fund
+      - name: Shared logic - type check
+        run: npm run typecheck:shared
+      - name: Shared logic - unit tests
+        run: npm run test:shared
+      - name: Build Cloud Functions
+        run: npm run build:functions
+      - name: Build web app
+        run: npm run build:web
+      - name: Security rules tests (Firestore emulator)
+        run: npx firebase-tools emulators:exec --project demo-vrs-rules --only firestore "npx tsx --test tests/rules/*.test.ts"
