@@ -1,0 +1,26 @@
+{% extends "base.html" %}{% block title %}Help{% endblock %}{% block content %}
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2 no-print"><h1 class="page mb-0">Help - how to use Office Manager</h1>
+<div class="d-flex gap-2"><input id="helpSearch" class="form-control form-control-sm" style="width:240px" placeholder="Search help, e.g. backup"><button class="btn btn-sm btn-outline-secondary" onclick="window.print()"><i class="bi bi-printer me-1"></i>Print</button></div></div>
+<p class="small text-muted">Each picture shows the real screen with demo data. The red numbers on a picture match the numbers in brackets in the steps beside it. Click a picture to see it larger.</p>
+<div class="row g-3"><div class="col-lg-3 no-print"><div class="card-box p-3 small" style="position:sticky;top:10px;max-height:calc(100vh - 30px);overflow:auto">
+{% for group, sections in groups %}<div class="fw-bold mt-2 mb-1" style="color:var(--navy)">{{ group }}</div>{% for sid, title, pic, intro, steps in sections %}<a class="d-block text-decoration-none py-1 help-link" href="#{{ sid }}">{{ title }}</a>{% endfor %}{% endfor %}
+<div class="fw-bold mt-2 mb-1" style="color:var(--navy)">If something goes wrong</div><a class="d-block text-decoration-none py-1 help-link" href="#trouble">Common problems</a></div></div>
+<div class="col-lg-9">
+{% for group, sections in groups %}<h2 class="h5 fw-bold mt-2 help-group" style="color:var(--teal)">{{ group }}</h2>
+{% for sid, title, pic, intro, steps in sections %}<section class="card-box p-3 mb-3 help-section" id="{{ sid }}" style="scroll-margin-top:12px">
+<h3 class="h6 fw-bold" style="color:var(--navy)">{{ title }}</h3>{% if intro %}<p class="small mb-2">{{ intro|safe }}</p>{% endif %}
+<div class="row g-3 align-items-start"><div class="col-xl-7"><a href="{{ url_for('static', filename='help/' ~ pic ~ '.jpg') }}" class="help-pic"><img src="{{ url_for('static', filename='help/' ~ pic ~ '.jpg') }}" alt="{{ title }}" loading="lazy" class="img-fluid rounded border" style="background:#fff"></a></div>
+<div class="col-xl-5"><ol class="small mb-0 ps-3">{% for st in steps %}<li class="mb-2">{{ st|safe }}</li>{% endfor %}</ol></div></div></section>{% endfor %}{% endfor %}
+<h2 class="h5 fw-bold mt-2 help-group" style="color:var(--teal)">If something goes wrong</h2>
+<section class="card-box p-3 mb-3 help-section" id="trouble" style="scroll-margin-top:12px"><h3 class="h6 fw-bold" style="color:var(--navy)">Common problems</h3>
+<dl class="small mb-0">{% for q, a in trouble %}<dt>{{ q }}</dt><dd class="mb-3">{{ a }}</dd>{% endfor %}</dl></section>
+<div id="helpNone" class="card-box p-4 text-center text-muted" style="display:none">Nothing in Help matches that. Try a shorter word.</div></div></div>
+<div class="modal fade" id="picModal" tabindex="-1"><div class="modal-dialog modal-xl modal-dialog-centered"><div class="modal-content"><div class="modal-header py-2"><div class="fw-bold" id="picTitle"></div><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+<div class="modal-body p-2 text-center"><img id="picBig" alt="" class="img-fluid"></div></div></div></div>{% endblock %}
+{% block scripts %}<script>
+(function(){ const modal=new bootstrap.Modal(document.getElementById('picModal'));
+  document.querySelectorAll('a.help-pic').forEach(a=>a.addEventListener('click',e=>{ e.preventDefault(); document.getElementById('picBig').src=a.href; document.getElementById('picTitle').textContent=a.querySelector('img').alt; modal.show(); }));
+  const box=document.getElementById('helpSearch'); box.addEventListener('input',()=>{ const q=box.value.trim().toLowerCase(); let any=false;
+    document.querySelectorAll('.help-section').forEach(s=>{ const hit=!q||s.textContent.toLowerCase().includes(q); s.style.display=hit?'':'none'; any=any||hit; });
+    document.querySelectorAll('.help-group').forEach(g=>g.style.display=q?'none':''); document.getElementById('helpNone').style.display=any?'none':''; }); })();
+</script>{% endblock %}

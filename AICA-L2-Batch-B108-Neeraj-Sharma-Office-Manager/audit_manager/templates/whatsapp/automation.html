@@ -1,0 +1,11 @@
+{% extends "base.html" %}{% from "_macros.html" import csrf %}{% block title %}Automatic messages{% endblock %}{% block content %}
+<h1 class="page mb-2">WhatsApp &amp; Email</h1>{% include "whatsapp/_tabs.html" %}
+<p class="small text-muted">Tick what should go out by itself when something happens. <strong>Email</strong> is sent automatically within a minute. <strong>WhatsApp</strong> messages are written for you and placed in "WhatsApp ready to send"; you open the chat and press Send, because WhatsApp does not allow a program to send on its own.{% if not mail_ready %} <span class="text-danger">Email is not set up yet (Settings &gt; Email), so email ticks will do nothing until then.</span>{% endif %}</p>
+<form method="post">{{ csrf() }}<div class="card-box table-responsive"><table class="table align-middle mb-0" data-nocount="1"><thead><tr><th>When this happens</th><th>Goes to</th><th class="text-center">WhatsApp</th><th class="text-center">Email</th><th>Wording</th></tr></thead><tbody>
+{% for r in rows %}<tr><td class="fw-semibold">{{ r.label }}{% if r.key == 'due_reminder' %}<div class="small fw-normal d-flex align-items-center gap-1 mt-1">Remind <input type="number" name="auto_due_days" value="{{ due_days }}" min="0" max="30" class="form-control form-control-sm" style="width:70px"> days before the due date (once per filing)</div>{% endif %}</td>
+<td>{{ 'Staff member' if r.who == 'staff' else 'Client' }}</td>
+<td class="text-center"><input type="checkbox" class="form-check-input" name="{{ r.key }}_whatsapp" value="1" {{ 'checked' if r.whatsapp }}></td>
+<td class="text-center"><input type="checkbox" class="form-check-input" name="{{ r.key }}_email" value="1" {{ 'checked' if r.email }}></td>
+<td>{% if r.tpl %}<a class="btn btn-sm btn-outline-primary" href="{{ url_for('whatsapp.templates', edit=r.tpl.id) }}"><i class="bi bi-pencil"></i> Edit wording</a>{% else %}<span class="small text-muted">Standard wording</span>{% endif %}</td></tr>{% endfor %}</tbody></table></div>
+<button class="btn btn-primary mt-3">Save automatic messages</button></form>
+<div class="small text-muted mt-3">Returns marked Filed through an Excel import do not send messages, so a bulk import never floods your clients. Due-date reminders are checked every half hour while Office Manager is open on the host PC.</div>{% endblock %}

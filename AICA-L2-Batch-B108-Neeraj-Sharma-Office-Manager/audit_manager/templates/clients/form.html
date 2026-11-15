@@ -1,0 +1,39 @@
+{% extends "base.html" %}{% from "_macros.html" import csrf %}{% block title %}{{ 'Edit' if client.id else 'New' }} client{% endblock %}{% block content %}
+{% set v = form if form else {} %}
+{% macro val(name) %}{{ (form.get(name) if form and form|length else client[name]) or '' }}{% endmacro %}
+<h1 class="page mb-2">{{ 'Edit ' ~ client.name if client.id else 'New client' }}</h1>
+<div class="small text-muted mb-3" id="gstInfo">Tip: type the GSTIN and press <strong>Fetch</strong> to fill the name, address and PAN from the GST portal. PAN fills in from the GSTIN, and city and state from the pincode; you can change any of them.</div>
+<form method="post" class="card-box p-3">{{ csrf() }}<div class="row g-3">
+<div class="col-md-6"><label class="form-label small fw-semibold">Client name *</label><input name="name" class="form-control" required value="{{ val('name') }}"></div>
+<div class="col-md-3"><label class="form-label small fw-semibold">Category</label><select name="category" class="form-select"><option value="business" {{ 'selected' if client.category == 'business' }}>Business</option><option value="individual" {{ 'selected' if client.category == 'individual' }}>Individual</option></select></div>
+<div class="col-md-3"><label class="form-label small fw-semibold">Status</label><select name="status" class="form-select">{% for s in ['active','onboarding','inactive'] %}<option value="{{ s }}" {{ 'selected' if (client.status or 'active') == s }}>{{ s|title }}</option>{% endfor %}</select></div>
+<div class="col-md-3"><label class="form-label small fw-semibold">GSTIN</label><div class="input-group"><input name="gstin" class="form-control" maxlength="15" value="{{ val('gstin') }}"><button type="button" class="btn btn-outline-primary" id="gstFetchBtn" title="Fill name, address and PAN from the GST portal"><i class="bi bi-cloud-download"></i> Fetch</button></div></div>
+<div class="col-md-3"><label class="form-label small fw-semibold">PAN</label><input name="pan" class="form-control" maxlength="10" value="{{ val('pan') }}" placeholder="ABCDE1234F"></div>
+<div class="col-md-3"><label class="form-label small fw-semibold">TAN</label><input name="tan" class="form-control" maxlength="10" value="{{ val('tan') }}"></div>
+<div class="col-md-3"><label class="form-label small fw-semibold">Mobile</label><input name="mobile" class="form-control" value="{{ val('mobile') }}"></div>
+<div class="col-md-3"><label class="form-label small fw-semibold">Contact person</label><input name="contact_person" class="form-control" maxlength="120" value="{{ val('contact_person') }}" placeholder="Whom we deal with"></div>
+{% set desig = (form.get('contact_designation') if form and form|length else client.contact_designation) or '' %}
+<div class="col-md-3"><label class="form-label small fw-semibold">Designation</label><select name="contact_designation" class="form-select"><option value="">- choose -</option>{% for d in designations %}<option {{ 'selected' if desig == d }}>{{ d }}</option>{% endfor %}{% if desig and desig not in designations %}<option selected>{{ desig }}</option>{% endif %}</select></div>
+<div class="col-md-6"><label class="form-label small fw-semibold">Email</label><input type="email" name="email" class="form-control" value="{{ val('email') }}"></div>
+<div class="col-md-6"><label class="form-label small fw-semibold">Address</label><input name="address" class="form-control" value="{{ val('address') }}"></div>
+<div class="col-md-4"><label class="form-label small fw-semibold">Pincode</label><input name="pincode" class="form-control" maxlength="6" inputmode="numeric" value="{{ val('pincode') }}"></div>
+<div class="col-md-4"><label class="form-label small fw-semibold">City</label><input name="city" class="form-control" value="{{ val('city') }}"></div>
+<div class="col-md-4"><label class="form-label small fw-semibold">State</label><input name="state" class="form-control" value="{{ val('state') }}"></div>
+<div class="col-12"><div class="d-flex flex-wrap gap-4 small">
+<div class="form-check"><input class="form-check-input" type="checkbox" name="is_gst_registered" value="1" id="g" {{ 'checked' if client.is_gst_registered }}><label class="form-check-label" for="g">GST registered</label></div>
+<div class="form-check"><input class="form-check-input" type="checkbox" name="is_itr_applicable" value="1" id="i" {{ 'checked' if client.is_itr_applicable or not client.id }}><label class="form-check-label" for="i">ITR applicable</label></div>
+<div class="form-check"><input class="form-check-input" type="checkbox" name="is_tds_applicable" value="1" id="t" {{ 'checked' if client.is_tds_applicable }}><label class="form-check-label" for="t">TDS applicable</label></div></div></div>
+{% if current_user.is_manager_or_above %}
+<div class="col-md-4"><label class="form-label small fw-semibold">Relationship owner</label><select name="assigned_to_id" class="form-select"><option value="">— none —</option>{% for u in staff_options %}<option value="{{ u.id }}" {{ 'selected' if client.assigned_to_id == u.id }}>{{ u.name }}</option>{% endfor %}</select></div>
+<div class="col-md-8"><label class="form-label small fw-semibold">Other staff who can see this client</label><select name="staff_ids" class="form-select" multiple size="3">{% for u in staff_options %}<option value="{{ u.id }}" {{ 'selected' if u in client.staff }}>{{ u.name }}</option>{% endfor %}</select></div>
+{% endif %}
+{% if hourly_on and (current_user.is_manager_or_above or can('billing')) %}<div class="col-md-4"><label class="form-label small fw-semibold">Hourly billing rate for this client (Rs.)</label><input name="hourly_rate" value="{{ ('%g'|format(client.hourly_rate)) if client.hourly_rate else '' }}" class="form-control" inputmode="decimal" placeholder="Leave empty to use the usual rate"></div>{% endif %}
+<div class="col-12"><label class="form-label small fw-semibold">Notes</label><textarea name="notes" rows="2" class="form-control">{{ val('notes') }}</textarea></div>
+</div><div class="mt-3"><button class="btn btn-primary">Save client</button> <a class="btn btn-outline-secondary" href="{{ url_for('clients.index') }}">Cancel</a></div></form>
+<div class="modal fade" id="gstModal" tabindex="-1"><div class="modal-dialog modal-dialog-centered"><div class="modal-content">
+<div class="modal-header py-2"><div class="fw-bold">Fetch details from the GST portal</div><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+<div class="modal-body text-center"><div class="small text-muted mb-2">GSTIN <strong id="gstFor"></strong></div>
+<div class="border rounded d-inline-block p-2 mb-2 bg-white" style="min-width:220px;min-height:70px"><img id="gstCaptchaImg" alt="Captcha" style="max-width:100%"></div>
+<div class="d-flex justify-content-center gap-2"><input id="gstCaptcha" class="form-control text-center" style="max-width:180px;letter-spacing:.15em" autocomplete="off" placeholder="Captcha">
+<button type="button" class="btn btn-outline-secondary" id="gstNew" title="New captcha"><i class="bi bi-arrow-repeat"></i></button></div><div id="gstMsg" class="small mt-2 text-muted"></div></div>
+<div class="modal-footer py-2"><button type="button" class="btn btn-sm btn-outline-secondary" data-bs-dismiss="modal">Cancel</button><button type="button" class="btn btn-sm btn-primary" id="gstGo">Fetch details</button></div></div></div></div>{% endblock %}

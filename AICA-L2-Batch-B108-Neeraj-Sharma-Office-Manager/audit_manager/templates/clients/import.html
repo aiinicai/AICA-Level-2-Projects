@@ -1,0 +1,15 @@
+{% extends "base.html" %}{% from "_macros.html" import csrf %}{% block title %}Import clients{% endblock %}{% block content %}
+<h1 class="page mb-3">Import clients from Excel</h1>
+<div class="row g-3"><div class="col-lg-5"><form method="post" enctype="multipart/form-data" class="card-box p-3">{{ csrf() }}
+<div class="border rounded p-2 mb-3 bg-body-tertiary"><div class="small fw-semibold mb-1">Step 1: download the sample Excel file</div>
+<a class="btn btn-sm btn-success" href="{{ url_for('clients.import_template') }}"><i class="bi bi-file-earmark-excel me-1"></i>Download sample template (.xlsx)</a>
+<div class="small text-muted mt-2">It has the right column headings and one example row. Replace the example with your clients. Only <strong>Name</strong> is compulsory. If you give a GSTIN and leave PAN blank, the PAN is taken from the GSTIN.</div></div>
+<div class="small fw-semibold mb-1">Step 2: choose your filled file</div>
+<p class="small text-muted mb-2">Clients whose PAN (or name, when PAN is blank) already exists are skipped, so importing twice is safe.</p>
+<div class="mb-2"><input type="file" name="file" accept=".xlsx" class="form-control form-control-sm" required></div>
+<div class="mb-3"><label class="form-label small fw-semibold">Assign all imported clients to</label><select name="assigned_to_id" class="form-select form-select-sm"><option value="">— nobody —</option>{% for u in staff_options %}<option value="{{ u.id }}">{{ u.name }}</option>{% endfor %}</select></div>
+<button class="btn btn-primary">Import</button></form></div>
+{% if result %}<div class="col-lg-7"><div class="card-box p-3"><h2 class="h6 fw-bold">Result</h2>
+<p class="mb-1"><span class="badge badge-ok">{{ result.created }} added</span> <span class="badge badge-soft">{{ result.skipped }} skipped (already exist)</span> <span class="badge {{ 'badge-bad' if result.errors else 'badge-soft' }}">{{ result.errors|length }} rows with problems</span></p>
+{% if result.errors %}<ul class="small mb-0 mt-2">{% for row, msg in result.errors %}<li>{% if row %}Row {{ row }}: {% endif %}{{ msg }}</li>{% endfor %}</ul>{% endif %}</div></div>{% endif %}
+</div>{% endblock %}

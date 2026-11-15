@@ -1,0 +1,17 @@
+{% extends "base.html" %}{% from "_macros.html" import badge %}{% block title %}Dashboard{% endblock %}{% block content %}
+<h1 class="page mb-3">Dashboard</h1>
+<div class="row g-3 mb-3">
+{% for label, value, icon, tone in kpis %}
+<div class="col-6 col-lg-4 col-xl-2"><div class="card-box kpi p-3"><div class="small text-muted"><i class="bi {{ icon }} me-1"></i>{{ label }}</div><div class="fs-3 fw-bold">{{ value }}</div></div></div>
+{% endfor %}
+{% if outstanding is not none %}<div class="col-6 col-lg-4 col-xl-2"><div class="card-box kpi p-3"><div class="small text-muted"><i class="bi bi-cash-coin me-1"></i>Outstanding fees</div><div class="fs-5 fw-bold">{{ outstanding|inr }}</div></div></div>{% endif %}
+</div>
+<div class="row g-3">
+<div class="col-lg-7"><div class="card-box p-3"><h2 class="h6 fw-bold">Deadlines in the next 14 days (and overdue)</h2>
+<table class="table table-sm mb-0"><thead><tr><th>Due</th><th>Client</th><th>Item</th><th>Status</th></tr></thead><tbody>
+{% for d in upcoming %}<tr><td class="{{ 'text-danger fw-semibold' if d.is_overdue }}">{{ d.due_date|dmy }}</td><td>{{ d.client.name if d.client else '—' }}</td><td>{{ d.title }}</td><td>{{ badge('overdue' if d.is_overdue else d.status) }}</td></tr>
+{% else %}<tr><td colspan="4" class="text-muted text-center py-3">Nothing due soon.</td></tr>{% endfor %}</tbody></table></div></div>
+<div class="col-lg-5"><div class="card-box p-3"><h2 class="h6 fw-bold">My open tasks</h2>
+<ul class="list-group list-group-flush">{% for t in my_tasks %}<li class="list-group-item px-0 d-flex justify-content-between"><a href="{{ url_for('tasks.show', task_id=t.id) }}" class="text-decoration-none">{{ t.title }}</a><span class="small {{ 'text-danger' if t.is_overdue else 'text-muted' }}">{{ t.due_date|dmy }}</span></li>
+{% else %}<li class="list-group-item px-0 text-muted">No open tasks assigned to you.</li>{% endfor %}</ul></div></div>
+</div>{% endblock %}

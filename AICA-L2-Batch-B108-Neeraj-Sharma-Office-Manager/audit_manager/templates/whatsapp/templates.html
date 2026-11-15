@@ -1,0 +1,20 @@
+{% extends "base.html" %}{% from "_macros.html" import csrf %}{% block title %}WhatsApp templates{% endblock %}
+{% block content %}
+<h1 class="page mb-2">WhatsApp &amp; Email</h1>{% include "whatsapp/_tabs.html" %}
+<div class="row g-3"><div class="col-lg-7"><div class="card-box table-responsive"><table class="table align-middle mb-0"><thead><tr><th>Name</th><th>Text</th><th></th></tr></thead><tbody>
+{% for t in rows %}<tr><td class="fw-semibold">{{ t.name }}<div class="small text-muted">{{ t.category|label }}</div></td><td class="small">{% if t.image %}<img src="{{ url_for('whatsapp.picture', name=t.image) }}" alt="" style="max-height:60px;max-width:110px;border-radius:.3rem;float:right;margin-left:.5rem">{% endif %}<span style="white-space:pre-line">{{ t.body }}</span></td>
+<td class="text-nowrap"><a class="btn btn-sm btn-outline-primary" href="{{ url_for('whatsapp.templates', edit=t.id) }}"><i class="bi bi-pencil"></i> Edit</a> <form method="post" class="d-inline" action="{{ url_for('whatsapp.delete_template', tid=t.id) }}" onsubmit="return confirm('Delete this template?')">{{ csrf() }}<button class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button></form></td></tr>{% endfor %}</tbody></table></div></div>
+<div class="col-lg-5"><form method="post" enctype="multipart/form-data" class="card-box p-3">{{ csrf() }}<h2 class="h6 fw-bold">{{ 'Edit template' if edit else 'New template' }}</h2>{% if edit %}<input type="hidden" name="id" value="{{ edit.id }}">{% endif %}
+<input name="name" value="{{ edit.name if edit else '' }}" class="form-control form-control-sm mb-2" placeholder="Template name" required>
+<select name="category" class="form-select form-select-sm mb-2">{% for c in ['general','compliance','billing','documents','staff'] %}<option value="{{ c }}" {{ 'selected' if edit and edit.category == c }}>{{ c|title }}</option>{% endfor %}</select>
+<textarea name="body" id="tbody" rows="10" class="form-control mb-2" placeholder="Dear {client_name},&#10;&#10;...&#10;&#10;Regards,&#10;{firm_name}" required>{{ edit.body if edit else '' }}</textarea>
+<div class="small text-muted">Fields - click to insert, or drag into the text:</div>
+<div class="d-flex flex-wrap gap-1 my-2">{% for k, v in placeholders.items() %}<span class="badge rounded-pill badge-info field-chip" draggable="true" data-field="{{ '{' ~ k ~ '}' }}" style="cursor:grab;font-size:.78rem">{{ v }}</span>{% endfor %}</div>
+<div class="small text-muted mb-2">Use blank lines between paragraphs and *stars* for bold. The same templates are used for WhatsApp and email.</div><div class="border rounded p-2 mb-3 bg-body-tertiary"><div class="small fw-semibold mb-1"><i class="bi bi-image me-1"></i>Picture (optional) - for festival greetings and notices</div>
+{% if edit and edit.image %}<div class="d-flex align-items-center gap-2 mb-2"><img src="{{ url_for('whatsapp.picture', name=edit.image) }}" alt="" style="max-height:80px;max-width:140px;border-radius:.3rem"><div class="form-check small"><input class="form-check-input" type="checkbox" name="remove_image" value="1" id="ri"><label class="form-check-label" for="ri">Remove picture</label></div></div>{% endif %}
+<input type="file" name="image" accept=".png,.jpg,.jpeg" class="form-control form-control-sm"><div class="small text-muted mt-1">PNG or JPG, up to 3 MB. A square or upright picture (about 1080 x 1080) looks best on phones.</div></div>
+<button class="btn btn-sm btn-primary">{{ 'Save changes' if edit else 'Save template' }}</button> {% if edit %}<a class="btn btn-sm btn-outline-secondary" href="{{ url_for('whatsapp.templates') }}">Cancel</a>{% endif %}</form></div></div>{% endblock %}
+{% block scripts %}<script>
+const tb=document.getElementById('tbody');
+document.querySelectorAll('.field-chip').forEach(c=>{ c.addEventListener('click',()=>{const s=tb.selectionStart,e=tb.selectionEnd,t=c.dataset.field; tb.value=tb.value.slice(0,s)+t+tb.value.slice(e); tb.focus(); tb.setSelectionRange(s+t.length,s+t.length);}); c.addEventListener('dragstart',e=>e.dataTransfer.setData('text/plain',c.dataset.field)); });
+</script>{% endblock %}

@@ -1,0 +1,63 @@
+{% extends "base.html" %}{% from "_macros.html" import csrf %}{% block title %}WhatsApp{% endblock %}{% block content %}
+<h1 class="page mb-2">WhatsApp &amp; Email</h1>{% include "whatsapp/_tabs.html" %}
+<form method="post" action="{{ url_for('whatsapp.compose') }}" enctype="multipart/form-data" class="row g-3">{{ csrf() }}
+<div class="col-lg-7"><div class="card-box p-3">
+{% if staff %}<div class="btn-group btn-group-sm mb-3"><input type="radio" class="btn-check" name="audience" value="client" id="a1" checked><label class="btn btn-outline-primary" for="a1">Clients</label><input type="radio" class="btn-check" name="audience" value="staff" id="a2"><label class="btn btn-outline-primary" for="a2">Staff</label></div>{% else %}<input type="hidden" name="audience" value="client">{% endif %}
+<div class="d-flex flex-wrap align-items-center gap-2 mb-3"><span class="small fw-semibold">Send by</span><div class="btn-group btn-group-sm"><input type="radio" class="btn-check" name="channel" value="whatsapp" id="c1" checked><label class="btn btn-outline-success" for="c1"><i class="bi bi-whatsapp me-1"></i>WhatsApp</label><input type="radio" class="btn-check" name="channel" value="email" id="c2" {{ '' if mail_ready else 'disabled' }}><label class="btn btn-outline-success" for="c2"><i class="bi bi-envelope me-1"></i>Email</label></div>{% if not mail_ready %}<span class="small text-muted">Email needs the SMTP details in Settings.</span>{% endif %}</div>
+<label class="form-label small fw-semibold">Message template</label>
+<select id="tpl" name="template_id" class="form-select form-select-sm mb-2"><option value="">- Write my own -</option>{% for t in templates %}<option value="{{ t.id }}" data-body="{{ t.body }}" data-name="{{ t.name }}" data-image="{{ url_for('whatsapp.picture', name=t.image) if t.image else '' }}">{{ t.name }}</option>{% endfor %}</select>
+<div id="subjectBox" style="display:none"><label class="form-label small fw-semibold">Email subject</label><input name="subject" id="subject" class="form-control form-control-sm mb-2 field-target" placeholder="e.g. Due date reminder - {period}"></div>
+<label class="form-label small fw-semibold">Message</label>
+<textarea name="body" id="body" rows="11" class="form-control field-target" required style="font-size:.9rem"></textarea>
+<div class="small fw-semibold mt-2">Fields <span class="fw-normal text-muted">- click to insert where the cursor is, or drag into the message. Each is replaced with that person's details.</span></div>
+<div class="d-flex flex-wrap gap-1 mt-1" id="chips">{% for k, v in placeholders.items() %}<span class="badge rounded-pill badge-info field-chip" draggable="true" data-field="{{ '{' ~ k ~ '}' }}" title="{{ '{' ~ k ~ '}' }}" style="cursor:grab;font-size:.78rem">{{ v }}</span>{% endfor %}</div>
+<div class="small text-muted mt-1">Put *stars* around words to make them bold. Leave blank lines between paragraphs.</div>
+<div class="border rounded p-2 mt-3 bg-body-tertiary"><div class="small fw-semibold mb-1"><i class="bi bi-image me-1"></i>Picture (optional)</div>
+<div id="tplPic" class="align-items-center gap-2 mb-2" style="display:none"><img id="tplPicImg" alt="" style="max-height:80px;max-width:140px;border-radius:.3rem"><div class="form-check small"><input class="form-check-input" type="checkbox" name="use_template_image" value="1" id="uti" checked><label class="form-check-label" for="uti">Send this template's picture</label></div></div>
+<input type="file" name="image" accept=".png,.jpg,.jpeg" class="form-control form-control-sm"><div class="small text-muted mt-1">Choose a picture for this send only, or keep the template's own. Email attaches it automatically. For WhatsApp, the picture is copied for you and you paste it into the chat with Ctrl+V.</div></div>
+<div id="extra" class="border rounded p-2 mt-3 bg-body-tertiary"><div class="small fw-semibold mb-1">Values for the fields (same for everyone in this send)</div>
+<label class="form-label small mb-1">Pick from the due-date master</label>
+<select id="dueMaster" class="form-select form-select-sm mb-2"><option value="">- choose a due date -</option>{% for o in due_options %}<option data-work="{{ o.work }}" data-period="{{ o.period }}" data-due="{{ o.due_date }}">{{ o.label }}</option>{% endfor %}</select>
+<div class="row g-2"><div class="col-md-4"><label class="form-label small mb-1">Type of work</label><input name="work_type" id="work_type" list="workTypes" class="form-control form-control-sm" placeholder="e.g. GST Return" autocomplete="off"><datalist id="workTypes">{% for w in work_types %}<option value="{{ w }}">{% endfor %}</datalist></div>
+<div class="col-md-4"><label class="form-label small mb-1">Period</label><input name="period" id="period" class="form-control form-control-sm" placeholder="e.g. Oct 2026 or AY 2026-27"></div>
+<div class="col-md-4"><label class="form-label small mb-1">Due date</label><input name="due_date" id="due_date" class="form-control form-control-sm" placeholder="e.g. 20-Nov-2026"></div>
+<div class="col-md-6"><label class="form-label small mb-1">Amount</label><input name="amount" class="form-control form-control-sm" placeholder="for payment reminders"></div>
+<div class="col-md-6"><label class="form-label small mb-1">Invoice no.</label><input name="invoice_number" class="form-control form-control-sm" placeholder="for payment reminders"></div></div>
+<div class="small text-muted mt-1">The list comes from your GST, ITR and TDS due dates and the rules in Compliance Calendar. You can type over it. A field left empty simply drops its line from the message.</div></div>
+<div id="laterBox" class="mt-3" style="display:none"><label class="form-label small fw-semibold mb-1">Send later (optional)</label>
+<input type="datetime-local" name="send_at" id="send_at" class="form-control form-control-sm" style="max-width:260px">
+<div class="small text-muted mt-1">Leave empty to send now. A scheduled email goes out by itself at that time, as long as Office Manager is open on the host PC. WhatsApp cannot be scheduled, because WhatsApp needs you to press Send.</div></div>
+<button class="btn btn-primary mt-3" id="goBtn"><i class="bi bi-send me-1"></i><span id="goTxt">Prepare WhatsApp messages</span></button>
+<div class="small text-muted mt-2" id="goHelp">Nothing is sent yet. Next you click each message to open WhatsApp with the text ready; you press Send there.</div></div></div>
+<div class="col-lg-5"><div class="card-box p-3">
+<div id="pick-client"><div class="d-flex justify-content-between mb-2"><span class="fw-semibold small">Clients ({{ clients|length }}) - <span id="selCount">0</span> selected</span><a href="#" class="small" id="allc">Select all with a mobile</a></div>
+<input id="find" class="form-control form-control-sm mb-2" placeholder="Search...">
+<div style="max-height:420px;overflow:auto">{% for c in clients %}<label class="d-flex align-items-center gap-2 py-1 border-bottom small pick" data-name="{{ c.name|lower }}"><input type="checkbox" name="client_ids" value="{{ c.id }}" class="form-check-input mt-0 {{ 'has' if c.mobile }} {{ 'hasmail' if c.email }}"><span class="flex-grow-1">{{ c.name }}</span><span class="text-muted wa-only">{{ c.mobile or 'no mobile' }}</span><span class="text-muted em-only" style="display:none">{{ c.email or 'no email' }}</span></label>{% endfor %}</div></div>
+{% if staff %}<div id="pick-staff" style="display:none"><div class="fw-semibold small mb-2">Staff</div>{% for u in staff %}<label class="d-flex align-items-center gap-2 py-1 border-bottom small"><input type="checkbox" name="staff_ids" value="{{ u.id }}" class="form-check-input mt-0"><span class="flex-grow-1">{{ u.name }}</span><span class="text-muted">{{ u.phone or 'no phone' }}</span></label>{% endfor %}</div>{% endif %}
+</div>
+<div class="card-box p-3 mt-3 small"><div class="fw-semibold mb-1"><i class="bi bi-info-circle me-1"></i>How sending works</div>
+<div class="mb-1"><strong>WhatsApp:</strong> 1) tick the clients, 2) choose a template or write, 3) press Prepare. 4) On the next screen press Open chat for each person; WhatsApp opens with the message typed. 5) Press Send in WhatsApp. WhatsApp must be signed in on this PC.</div>
+<div><strong>Email:</strong> first fill in Settings &gt; Email (SMTP) once and press Send test email. Then choose Email here, give a subject, tick the clients and press Send. Each client gets their own email from your firm's address. You can also pick a later date and time.</div></div></div></form>{% endblock %}
+{% block scripts %}<script>
+const tpl=document.getElementById('tpl'),body=document.getElementById('body'),subject=document.getElementById('subject');
+tpl.addEventListener('change',()=>{const o=tpl.selectedOptions[0]; if(o&&o.dataset.body){ body.value=o.dataset.body; if(!subject.value) subject.value=o.dataset.name+' - {firm_name}'; }
+  const box=document.getElementById('tplPic'); if(o&&o.dataset.image){ document.getElementById('tplPicImg').src=o.dataset.image; box.style.display='flex'; } else { box.style.display='none'; }});
+document.getElementById('find').addEventListener('input',e=>{const q=e.target.value.toLowerCase();document.querySelectorAll('.pick').forEach(l=>l.style.display=l.dataset.name.includes(q)?'':'none');});
+const isEmail=()=>document.getElementById('c2').checked;
+const count=()=>{document.getElementById('selCount').textContent=document.querySelectorAll('input[name=client_ids]:checked').length;};
+document.addEventListener('change',e=>{ if(e.target.name==='client_ids') count(); });
+document.getElementById('allc').addEventListener('click',e=>{e.preventDefault();document.querySelectorAll('.pick:not([style*="none"]) input.'+(isEmail()?'hasmail':'has')).forEach(i=>i.checked=true);count();});
+function mode(){ const s=document.getElementById('a2')&&document.getElementById('a2').checked, em=isEmail();
+  document.getElementById('pick-client').style.display=s?'none':''; const ps=document.getElementById('pick-staff'); if(ps) ps.style.display=s?'':'none';
+  document.getElementById('extra').style.display=s?'none':''; document.getElementById('subjectBox').style.display=em?'':'none'; subject.required=em; document.getElementById('laterBox').style.display=em?'':'none';
+  document.querySelectorAll('.wa-only').forEach(x=>x.style.display=em?'none':''); document.querySelectorAll('.em-only').forEach(x=>x.style.display=em?'':'none');
+  document.getElementById('goTxt').textContent=em?'Send emails now':'Prepare WhatsApp messages';
+  document.getElementById('goHelp').textContent=em?'Emails are sent straight away from your firm email address, one per person.':'Nothing is sent yet. Next you click each message to open WhatsApp with the text ready; you press Send there.';
+  document.getElementById('allc').textContent=em?'Select all with an email':'Select all with a mobile'; }
+document.querySelectorAll('input[name=audience], input[name=channel]').forEach(r=>r.addEventListener('change',mode)); mode();
+// fields: click inserts at the cursor of the box used last; drag drops where you let go
+let target=body; document.querySelectorAll('.field-target').forEach(t=>t.addEventListener('focus',()=>{target=t;}));
+function insert(el,text){ const s=el.selectionStart??el.value.length, e=el.selectionEnd??el.value.length; el.value=el.value.slice(0,s)+text+el.value.slice(e); el.focus(); el.setSelectionRange(s+text.length,s+text.length); el.dispatchEvent(new Event('input',{bubbles:true})); }
+document.querySelectorAll('.field-chip').forEach(c=>{ c.addEventListener('click',()=>insert(target,c.dataset.field)); c.addEventListener('dragstart',e=>{e.dataTransfer.setData('text/plain',c.dataset.field); e.dataTransfer.effectAllowed='copy';}); });
+document.getElementById('dueMaster').addEventListener('change',e=>{const o=e.target.selectedOptions[0]; if(o&&o.dataset.due){document.getElementById('work_type').value=o.dataset.work;document.getElementById('period').value=o.dataset.period;document.getElementById('due_date').value=o.dataset.due;}});
+</script>{% endblock %}

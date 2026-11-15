@@ -1,0 +1,16 @@
+{% extends "base.html" %}{% block title %}Reports{% endblock %}{% block content %}
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3 no-print"><h1 class="page mb-0">Reports</h1>
+{% set q = {'type': kind, 'from_date': from_date, 'to_date': to_date} %}
+<div class="d-flex gap-2"><a class="btn btn-sm btn-outline-danger" href="{{ url_for('reports.export_pdf', **q) }}"><i class="bi bi-file-earmark-pdf me-1"></i>PDF</a>
+<a class="btn btn-sm btn-success" href="{{ url_for('reports.export_xlsx', **q) }}"><i class="bi bi-file-earmark-excel me-1"></i>Excel</a>
+<a class="btn btn-sm btn-outline-secondary" href="{{ url_for('reports.export_csv', **q) }}"><i class="bi bi-filetype-csv me-1"></i>CSV</a>
+<button class="btn btn-sm btn-outline-secondary" onclick="window.print()"><i class="bi bi-printer"></i></button></div></div>
+<form method="get" class="card-box p-3 mb-3 row g-2 mx-0 align-items-end no-print">
+<div class="col-md-5"><label class="form-label small text-muted mb-1">Report</label><select name="type" class="form-select form-select-sm">{% for k, v in types.items() %}<option value="{{ k }}" {{ 'selected' if kind == k }}>{{ v }}</option>{% endfor %}</select></div>
+<div class="col-md-2"><label class="form-label small text-muted mb-1">From</label><input type="date" name="from_date" value="{{ from_date }}" class="form-control form-control-sm"></div>
+<div class="col-md-2"><label class="form-label small text-muted mb-1">To</label><input type="date" name="to_date" value="{{ to_date }}" class="form-control form-control-sm"></div>
+<div class="col-md-3"><button class="btn btn-sm btn-primary">Generate</button> <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('reports.index') }}">Reset</a></div></form>
+<div class="card-box p-3">{% include "reports/_header.html" %}
+<div class="table-responsive mt-3"><table class="table table-sm table-hover mb-0" data-nocount="1"><thead><tr>{% for h in report.headers %}<th class="{{ 'text-end' if loop.index0 in report.money_cols }}">{{ h }}</th>{% endfor %}</tr></thead><tbody>
+{% for r in rows %}<tr>{% for c in r %}<td class="{{ 'text-end' if loop.index0 in report.money_cols }}">{{ c }}</td>{% endfor %}</tr>{% else %}<tr><td colspan="{{ report.headers|length }}" class="text-center text-muted py-4">No records found for this report criteria.</td></tr>{% endfor %}</tbody></table></div>
+<div class="small text-muted mt-2">{{ rows|length }} record(s)</div></div>{% endblock %}

@@ -1,0 +1,12 @@
+{% extends "base.html" %}{% from "_macros.html" import pager %}{% block title %}Activity log{% endblock %}{% block content %}
+<h1 class="page mb-3">Activity log</h1>
+<form method="get" class="card-box p-2 mb-3 row g-2 mx-0 align-items-end">
+<div class="col-md-3"><label class="form-label small text-muted mb-1">User</label><select name="user_id" class="form-select form-select-sm"><option value="">Everyone</option>{% for u in users %}<option value="{{ u.id }}" {{ 'selected' if user_id == u.id }}>{{ u.name }}</option>{% endfor %}</select></div>
+<div class="col-md-3"><label class="form-label small text-muted mb-1">Area</label><select name="module" class="form-select form-select-sm"><option value="">All areas</option>{% for name, n in modules %}<option value="{{ name }}" {{ 'selected' if module == name }}>{{ (name or 'other')|label }} ({{ n }})</option>{% endfor %}</select></div>
+<div class="col-md-2"><label class="form-label small text-muted mb-1">From</label><input type="date" name="from_date" value="{{ from_date }}" class="form-control form-control-sm"></div>
+<div class="col-md-2"><label class="form-label small text-muted mb-1">To</label><input type="date" name="to_date" value="{{ to_date }}" class="form-control form-control-sm"></div>
+<div class="col-md-2"><button class="btn btn-sm btn-primary">Filter</button> <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('activity.index') }}">Reset</a></div></form>
+<div class="card-box table-responsive"><table class="table table-sm mb-0" data-total="{{ logs.total }}"><thead><tr><th>When</th><th>User</th><th>Area</th><th>What happened</th></tr></thead><tbody>
+{% for l in logs.items %}<tr><td class="text-nowrap">{{ l.created_at.strftime('%d %b %Y %H:%M') }}</td><td>{{ l.user.name if l.user else 'System' }}</td><td>{{ (l.module or '')|label }}</td><td>{{ l.description }}</td></tr>
+{% else %}<tr><td colspan="4" class="text-center text-muted py-4">Nothing found.</td></tr>{% endfor %}</tbody></table></div>
+{{ pager(logs, 'activity.index', args) }}{% endblock %}

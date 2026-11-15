@@ -1,0 +1,86 @@
+{% extends "base.html" %}{% from "_macros.html" import csrf %}{% block title %}Settings{% endblock %}{% block content %}
+<h1 class="page mb-3">Settings</h1>
+<div class="row g-3"><div class="col-xl-6">
+<form method="post" action="{{ url_for('settings.firm') }}" enctype="multipart/form-data" class="card-box p-3 mb-3">{{ csrf() }}<h2 class="h6 fw-bold">Firm &amp; report letterhead</h2>
+<div class="border rounded p-2 mb-3 bg-body-tertiary"><div class="d-flex align-items-center gap-3 mb-2">{% if logo %}<img src="{{ logo }}" alt="Logo" style="max-height:56px;max-width:150px"><div class="form-check small"><input class="form-check-input" type="checkbox" name="remove_logo" value="1" id="rl"><label class="form-check-label" for="rl">Remove logo</label></div>{% else %}<span class="small text-muted">No logo uploaded.</span>{% endif %}</div>
+<label class="form-label small fw-semibold mb-1">{{ 'Replace' if logo else 'Upload' }} logo</label><input type="file" name="firm_logo" accept=".png,.jpg,.jpeg" class="form-control form-control-sm">
+<ul class="small text-muted mb-0 mt-2 ps-3"><li><strong>File type:</strong> PNG or JPG only</li><li><strong>File size:</strong> 1 MB or smaller</li><li><strong>Best size:</strong> about 400 x 160 pixels, wider than tall (anything from 200 x 80 to 1200 x 500 works)</li><li><strong>Background:</strong> white or transparent, so it looks clean on reports and invoices</li><li>It appears at the top of every report and on invoices</li></ul></div>
+<div class="row g-2">
+<div class="col-12"><label class="form-label small fw-semibold">Firm name *</label><input name="firm_name" value="{{ s.get('firm_name','') }}" class="form-control form-control-sm" required></div>
+<div class="col-12"><label class="form-label small fw-semibold">Tagline</label><input name="firm_tagline" value="{{ s.get('firm_tagline','') }}" class="form-control form-control-sm"></div>
+<div class="col-12"><label class="form-label small fw-semibold">Office address</label><textarea name="firm_address" rows="2" class="form-control form-control-sm">{{ s.get('firm_address','') }}</textarea></div>
+<div class="col-md-4"><label class="form-label small fw-semibold">Phone</label><input name="firm_phone" value="{{ s.get('firm_phone','') }}" class="form-control form-control-sm"></div>
+<div class="col-md-4"><label class="form-label small fw-semibold">Email</label><input name="firm_email" value="{{ s.get('firm_email','') }}" class="form-control form-control-sm"></div>
+<div class="col-md-4"><label class="form-label small fw-semibold">Website</label><input name="firm_website" value="{{ s.get('firm_website','') }}" class="form-control form-control-sm"></div>
+<div class="col-md-4"><label class="form-label small fw-semibold">{{ profession.reg }}</label><input name="firm_frn" value="{{ s.get('firm_frn','') }}" class="form-control form-control-sm"></div>
+<div class="col-md-4"><label class="form-label small fw-semibold">Firm PAN</label><input name="firm_pan" value="{{ s.get('firm_pan','') }}" class="form-control form-control-sm"></div>
+<div class="col-md-4"><label class="form-label small fw-semibold">Firm GSTIN</label><input name="firm_gstin" value="{{ s.get('firm_gstin','') }}" class="form-control form-control-sm"></div>
+<div class="col-md-7"><label class="form-label small fw-semibold">{{ profession.head }}</label><input name="firm_partner_name" value="{{ s.get('firm_partner_name','') }}" class="form-control form-control-sm" placeholder="CA ..."></div>
+<div class="col-md-5"><label class="form-label small fw-semibold">{{ profession.member }}</label><input name="firm_membership_no" value="{{ s.get('firm_membership_no','') }}" class="form-control form-control-sm"></div>
+<div class="col-12"><hr class="my-1"><div class="small fw-semibold">Billing defaults</div></div>
+<div class="col-3"><label class="form-label small">Invoice prefix</label><input name="invoice_prefix" value="{{ s.get('invoice_prefix','INV') }}" class="form-control form-control-sm"></div>
+<div class="col-3"><label class="form-label small">CGST %</label><input name="default_cgst_rate" value="{{ s.get('default_cgst_rate','9') }}" class="form-control form-control-sm"></div>
+<div class="col-3"><label class="form-label small">SGST %</label><input name="default_sgst_rate" value="{{ s.get('default_sgst_rate','9') }}" class="form-control form-control-sm"></div>
+<div class="col-3"><label class="form-label small">IGST %</label><input name="default_igst_rate" value="{{ s.get('default_igst_rate','18') }}" class="form-control form-control-sm"></div></div>
+<button class="btn btn-sm btn-primary w-100 mt-3">Save firm settings</button></form>
+
+<div class="card-box p-3 mb-3"><h2 class="h6 fw-bold"><i class="bi bi-envelope-at me-1"></i>Email (SMTP)</h2>
+<p class="small text-muted">Used to email invoices. Gmail and Outlook need an app password. The password is stored encrypted.</p>
+<form method="post" action="{{ url_for('settings.mail') }}">{{ csrf() }}
+<div class="form-check form-switch mb-2"><input class="form-check-input" type="checkbox" role="switch" name="mail_enabled" value="1" id="me" {{ 'checked' if s.get('mail_enabled') == '1' }}><label class="form-check-label small fw-semibold" for="me">Send email using these settings</label></div>
+<div class="row g-2 mb-2"><div class="col-8"><label class="form-label small fw-semibold">SMTP host</label><input name="mail_host" value="{{ s.get('mail_host','') }}" class="form-control form-control-sm" placeholder="smtp.gmail.com"></div><div class="col-4"><label class="form-label small fw-semibold">Port</label><input type="number" name="mail_port" value="{{ s.get('mail_port','587') }}" class="form-control form-control-sm"></div></div>
+<div class="mb-2"><label class="form-label small fw-semibold">Encryption</label><select name="mail_encryption" class="form-select form-select-sm">{% for k, v in encryptions.items() %}<option value="{{ k }}" {{ 'selected' if s.get('mail_encryption','tls') == k }}>{{ v }}</option>{% endfor %}</select></div>
+<div class="row g-2 mb-2"><div class="col-6"><label class="form-label small fw-semibold">Username</label><input name="mail_username" value="{{ s.get('mail_username','') }}" class="form-control form-control-sm" autocomplete="off"></div>
+<div class="col-6"><label class="form-label small fw-semibold">Password</label><input type="password" name="mail_password" class="form-control form-control-sm" autocomplete="new-password" placeholder="{{ 'Saved (leave blank to keep)' if mail_has_password }}"></div></div>
+{% if mail_has_password %}<div class="form-check small mb-2"><input class="form-check-input" type="checkbox" name="clear_password" value="1" id="cp"><label class="form-check-label" for="cp">Remove the saved password</label></div>{% endif %}
+<div class="row g-2 mb-3"><div class="col-6"><label class="form-label small fw-semibold">From email</label><input type="email" name="mail_from_address" value="{{ s.get('mail_from_address','') }}" class="form-control form-control-sm"></div><div class="col-6"><label class="form-label small fw-semibold">From name</label><input name="mail_from_name" value="{{ s.get('mail_from_name','') }}" class="form-control form-control-sm"></div></div>
+<button class="btn btn-sm btn-primary w-100">Save email settings</button></form>
+<form method="post" action="{{ url_for('settings.mail_test') }}" class="d-flex gap-2 mt-2">{{ csrf() }}<input type="email" name="test_to" value="{{ current_user.email }}" class="form-control form-control-sm" required><button class="btn btn-sm btn-outline-success text-nowrap">Send test email</button></form></div></div>
+<div class="col-xl-6">
+<form method="post" action="{{ url_for('settings.office') }}" class="card-box p-3 mb-3" id="office">{{ csrf() }}<h2 class="h6 fw-bold"><i class="bi bi-briefcase me-1"></i>Type of office</h2>
+<div class="row g-2"><div class="col-md-6"><label class="form-label small fw-semibold">This office is a</label><select name="profession" class="form-select form-select-sm">{% for k, v in professions.items() %}<option value="{{ k }}" {{ 'selected' if profession.key == k }}>{{ v.name }}</option>{% endfor %}</select></div>
+<div class="col-md-6"><label class="form-label small fw-semibold">Title printed under your name</label><input name="profession_title" value="{{ s.get('profession_title','') }}" class="form-control form-control-sm" placeholder="{{ profession.title }}"></div>
+<div class="col-12 small text-muted">Advocate changes the labels (Bar Council enrolment no. instead of FRN), prints "Advocate" on reports and adds the Matters &amp; Hearings menu.</div>
+<div class="col-md-8"><label class="form-label small fw-semibold">Save invoice PDFs to this folder (optional)</label><div class="input-group input-group-sm"><input name="invoice_pdf_folder" id="invFolder" value="{{ s.get('invoice_pdf_folder','') }}" class="form-control" placeholder="G:\My Drive\Invoices"><button type="button" class="btn btn-outline-secondary browse-folder" data-target="invFolder" style="display:none"><i class="bi bi-folder2-open me-1"></i>Browse</button></div></div>
+<div class="col-md-4"><label class="form-label small fw-semibold">Default hourly rate (Rs.)</label><input name="default_hourly_rate" value="{{ s.get('default_hourly_rate','0') }}" class="form-control form-control-sm"></div>
+<div class="col-12"><div class="form-check form-switch small"><input class="form-check-input" type="checkbox" role="switch" name="hourly_billing" value="1" id="hb" {{ 'checked' if s.get('hourly_billing') == '1' }}><label class="form-check-label fw-semibold" for="hb">We bill some clients by the hour (shows the Time Sheet menu and a rate box on each client)</label></div></div>
+<div class="col-12 small text-muted">If the folder is inside Google Drive or OneDrive, each invoice PDF is there ready for you to copy its share link.</div></div>
+<button class="btn btn-sm btn-primary mt-3">Save office settings</button></form>
+
+<form method="post" action="{{ url_for('settings.designations') }}" class="card-box p-3 mb-3" id="designations">{{ csrf() }}<h2 class="h6 fw-bold"><i class="bi bi-person-badge me-1"></i>Designation master</h2>
+<p class="small text-muted mb-2">The choices offered for a client's contact person (Clients &gt; New / Edit). One designation on each line; add, change or remove lines and save.</p>
+<textarea name="designations" rows="6" class="form-control form-control-sm mb-2">{{ designations|join('\n') }}</textarea>
+<button class="btn btn-sm btn-primary">Save designation master</button> <span class="small text-muted ms-2">{{ designations|length }} designations</span></form>
+
+<div class="card-box p-3 mb-3" id="dataFolder"><h2 class="h6 fw-bold"><i class="bi bi-hdd-stack me-1"></i>Where the data is kept</h2>
+<p class="small text-muted mb-2">Now: <code>{{ data_folder }}</code>. If C: drive is short of space, or you want the data to survive a Windows re-install, move it to another drive such as D:. The data is copied when the app is next opened; the old copy is left where it is.</p>
+{% if move_pending %}<div class="alert alert-warning py-2 small mb-2">Waiting to move to <code>{{ move_pending }}</code>. Close Office Manager completely and open it again.
+<form method="post" action="{{ url_for('settings.data_folder') }}" class="d-inline">{{ csrf() }}<input type="hidden" name="cancel" value="1"><button class="btn btn-sm btn-outline-secondary ms-2">Cancel</button></form></div>{% endif %}
+{% if current_user.role == 'super_admin' %}<form method="post" action="{{ url_for('settings.data_folder') }}">{{ csrf() }}<div class="input-group input-group-sm"><input name="data_folder" id="dataFolderInput" class="form-control" placeholder="D:\Office Manager Data" required><button type="button" class="btn btn-outline-secondary browse-folder" data-target="dataFolderInput" style="display:none"><i class="bi bi-folder2-open me-1"></i>Browse</button><button class="btn btn-outline-primary">Move data here</button></div></form>{% endif %}</div>
+
+<form method="post" action="{{ url_for('auth.set_theme') }}" class="card-box p-3 mb-3" id="theme">{{ csrf() }}<h2 class="h6 fw-bold"><i class="bi bi-palette me-1"></i>Colour theme</h2>
+<div class="d-flex flex-wrap gap-2">{% for k, v in themes.items() %}<button name="theme" value="{{ k }}" class="btn btn-sm {{ 'btn-primary' if theme == k else 'btn-outline-secondary' }}">{{ v }}</button>{% endfor %}</div>
+<div class="small text-muted mt-2">The theme is saved for your own login only.</div></form>
+<form method="post" action="{{ url_for('settings.report_header') }}" class="card-box p-3 mb-3" id="reportHeader">{{ csrf() }}<h2 class="h6 fw-bold"><i class="bi bi-card-heading me-1"></i>What to show at the top of reports</h2>
+<p class="small text-muted">Untick anything you do not want printed or exported on reports (screen, print, PDF, Excel and CSV). The firm name always shows. Invoices always carry the full details, as a tax invoice needs them.</p>
+<div class="row g-1">{% for k, v in report_fields.items() %}<div class="col-sm-6"><div class="form-check small"><input class="form-check-input" type="checkbox" name="show" value="{{ k }}" id="rf_{{ k }}" {{ 'checked' if k not in hidden }}><label class="form-check-label" for="rf_{{ k }}">{{ v }}</label></div></div>{% endfor %}</div>
+<button class="btn btn-sm btn-primary mt-3">Save report header choices</button></form>
+
+<div class="card-box p-3" id="backup"><h2 class="h6 fw-bold"><i class="bi bi-shield-check me-1"></i>Backup &amp; restore</h2>
+{% if restore_pending %}<div class="alert alert-warning py-2 small">A restore is waiting. Close Office Manager completely and open it again to finish it.
+<form method="post" action="{{ url_for('settings.backup_restore') }}" class="d-inline">{{ csrf() }}<input type="hidden" name="cancel" value="1"><button class="btn btn-sm btn-outline-secondary ms-2">Cancel the restore</button></form></div>{% endif %}
+<div class="small fw-semibold">1. Download a backup now</div><p class="small text-muted mb-2">One .zip file with all data and your logo. Keep copies away from this computer.</p>
+<a class="btn btn-sm btn-outline-primary mb-3" href="{{ url_for('settings.backup') }}"><i class="bi bi-download me-1"></i>Download backup</a>
+<form method="post" action="{{ url_for('settings.backup_settings') }}" class="border-top pt-3">{{ csrf() }}<div class="small fw-semibold">2. Backup to a drive or folder</div>
+<p class="small text-muted mb-2">Type a folder on the PC where Office Manager runs. For Google Drive or OneDrive, install their desktop app and give its folder, for example <code>G:\My Drive\Office Manager Backups</code> or <code>C:\Users\you\OneDrive\Office Manager Backups</code>; the files then upload to the cloud by themselves. A pen drive or second hard disk (<code>E:\Backups</code>) also works.</p>
+<div class="input-group input-group-sm mb-2"><input name="backup_folder" id="backupFolder" value="{{ s.get('backup_folder','') }}" class="form-control" placeholder="D:\Office Manager Backups"><button type="button" class="btn btn-outline-secondary browse-folder" data-target="backupFolder" style="display:none"><i class="bi bi-folder2-open me-1"></i>Browse</button></div>
+<div class="d-flex flex-wrap align-items-center gap-3 mb-2"><div class="small d-flex align-items-center gap-1">Back up automatically <select name="backup_when" class="form-select form-select-sm" style="width:auto">{% for k, v in backup_when.items() %}<option value="{{ k }}" {{ 'selected' if when == k }}>{{ v }}</option>{% endfor %}</select></div>
+<div class="small d-flex align-items-center gap-1">Keep the last <input type="number" name="backup_keep" value="{{ s.get('backup_keep','14') }}" min="1" max="365" class="form-control form-control-sm" style="width:75px"> backups</div></div>
+<button class="btn btn-sm btn-primary">Save backup settings</button></form>
+<form method="post" action="{{ url_for('settings.backup_now') }}" class="mt-2">{{ csrf() }}<button class="btn btn-sm btn-success" {{ '' if s.get('backup_folder') else 'disabled' }}><i class="bi bi-hdd me-1"></i>Back up to the folder now</button></form>
+<div class="small mt-2 {{ 'text-danger' if (s.get('backup_last_result') or '').startswith('FAILED') else 'text-muted' }}">Last folder backup: {{ s.get('backup_last_result') or 'none yet' }}</div>
+{% if current_user.role == 'super_admin' %}<form method="post" action="{{ url_for('settings.backup_restore') }}" enctype="multipart/form-data" class="border-top pt-3 mt-3">{{ csrf() }}<div class="small fw-semibold">3. Restore from a backup</div>
+<p class="small text-muted mb-2">This replaces all present data with the backup. The present data is kept as a safety copy in <code>{{ data_folder }}</code>. The restore happens when the app is next opened.</p>
+<input type="file" name="backup_file" accept=".zip,.db" class="form-control form-control-sm mb-2">
+<div class="d-flex gap-2"><input name="confirm" class="form-control form-control-sm" style="max-width:220px" placeholder="Type RESTORE to confirm" autocomplete="off"><button class="btn btn-sm btn-outline-danger">Restore</button></div></form>{% endif %}
+</div></div></div>{% endblock %}

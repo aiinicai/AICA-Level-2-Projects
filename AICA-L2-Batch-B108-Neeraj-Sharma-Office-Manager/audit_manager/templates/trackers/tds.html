@@ -1,0 +1,33 @@
+{% extends "base.html" %}{% from "_macros.html" import badge, csrf %}{% block title %}TDS Returns{% endblock %}{% block content %}
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3"><h1 class="page mb-0">TDS Returns</h1>{% if current_user.is_manager_or_above %}<a class="btn btn-sm btn-outline-success" href="{{ url_for('trackers.import_filings', kind='tds') }}"><i class="bi bi-file-earmark-excel me-1"></i>Import from Excel</a>{% endif %}</div>
+<div class="row g-3 mb-3"><div class="col-lg-7"><form method="post" action="{{ url_for('trackers.tds_add') }}" class="card-box p-3 row g-2 mx-0">{{ csrf() }}<h2 class="h6 fw-bold col-12">Track one return</h2>
+<div class="col-md-4"><select name="client_id" class="form-select form-select-sm" required><option value="">Client…</option>{% for c in clients %}<option value="{{ c.id }}">{{ c.name }}</option>{% endfor %}</select></div>
+<div class="col-md-2"><select name="financial_year" class="form-select form-select-sm">{% for f in fys %}<option>{{ f }}</option>{% endfor %}</select></div>
+<div class="col-md-2"><select name="quarter" class="form-select form-select-sm">{% for q in quarters %}<option>{{ q }}</option>{% endfor %}</select></div>
+<div class="col-md-2"><select name="form_type" class="form-select form-select-sm">{% for f in forms %}<option>{{ f }}</option>{% endfor %}</select></div>
+<div class="col-md-2"><button class="btn btn-sm btn-primary w-100">Add</button></div></form></div>
+{% if current_user.is_manager_or_above %}<div class="col-lg-5"><form method="post" action="{{ url_for('trackers.tds_bulk') }}" class="card-box p-3 row g-2 mx-0">{{ csrf() }}<h2 class="h6 fw-bold col-12"><i class="bi bi-lightning-charge me-1"></i>Bulk: create for all TDS clients</h2>
+<div class="col-3"><select name="financial_year" class="form-select form-select-sm">{% for f in fys %}<option>{{ f }}</option>{% endfor %}</select></div>
+<div class="col-3"><select name="quarter" class="form-select form-select-sm">{% for q in quarters %}<option>{{ q }}</option>{% endfor %}</select></div>
+<div class="col-3"><select name="form_type" class="form-select form-select-sm">{% for f in forms %}<option>{{ f }}</option>{% endfor %}</select></div><div class="col-3"><button class="btn btn-sm btn-success w-100">Create</button></div></form></div>{% endif %}</div>
+{% if current_user.is_manager_or_above %}<form method="post" action="{{ url_for('trackers.extend_due', kind='tds') }}" class="card-box p-3 mb-3 row g-2 mx-0 align-items-end" id="extend">{{ csrf() }}<div class="col-12"><h2 class="h6 fw-bold mb-0"><i class="bi bi-calendar-plus me-1"></i>Due date extended by the department?</h2><div class="small text-muted">Changes the due date of every return below that is not yet filed. Filed returns are left alone.</div></div>
+<div class="col-md-2"><label class="form-label small mb-1">Financial year</label><input name="financial_year" class="form-control form-control-sm" placeholder="2026-27" required></div>
+<div class="col-md-2"><label class="form-label small mb-1">Quarter</label><select name="quarter" class="form-select form-select-sm"><option>Q1</option><option>Q2</option><option>Q3</option><option>Q4</option></select></div>
+<div class="col-md-2"><label class="form-label small mb-1">Form</label><select name="form_type" class="form-select form-select-sm"><option value="">All forms</option><option>24Q</option><option>26Q</option><option>27Q</option><option>27EQ</option></select></div>
+<div class="col-md-3"><label class="form-label small mb-1">New due date</label><input type="date" name="new_date" class="form-control form-control-sm" required></div>
+<div class="col-md-2"><button class="btn btn-sm btn-outline-primary w-100">Extend</button></div></form>{% endif %}
+{% include "trackers/_filter.html" %}
+<div class="card-box table-responsive"><table class="table table-hover mb-0"><thead><tr><th>Client</th><th>TAN</th><th>FY</th><th>Qtr</th><th>Form</th><th>Due</th><th>Update</th>{% if current_user.is_manager_or_above %}<th></th>{% endif %}</tr></thead><tbody>
+{% for r in rows %}<tr><td>{{ r.client.name }}</td><td>{{ r.client.tan or '—' }}</td><td>{{ r.financial_year }}</td><td>{{ r.quarter }}</td><td>{{ r.form_type }}</td><td class="{{ 'text-danger fw-semibold' if r.status != 'filed' and r.due_date and r.due_date < today }}">{{ r.due_date|dmy }}</td>
+<td><form method="post" action="{{ url_for('trackers.tds_update', rid=r.id) }}" class="d-flex gap-1 flex-wrap">{{ csrf() }}
+<input type="date" name="due_date" value="{{ r.due_date or '' }}" class="form-control form-control-sm" style="width:140px" title="Due date - change it here if it was extended for this client">
+<select name="status" class="form-select form-select-sm" style="width:140px">{% for k, v in statuses.items() %}<option value="{{ k }}" {{ 'selected' if r.status == k }}>{{ v }}</option>{% endfor %}</select>
+<input type="date" name="filed_date" value="{{ r.filed_date or '' }}" class="form-control form-control-sm" style="width:140px">
+<input name="tds_deducted" value="{{ r.tds_deducted or '' }}" class="form-control form-control-sm" style="width:95px" placeholder="Deducted">
+<input name="tds_deposited" value="{{ r.tds_deposited or '' }}" class="form-control form-control-sm" style="width:95px" placeholder="Deposited">
+<input name="challan_number" value="{{ r.challan_number or '' }}" class="form-control form-control-sm" style="width:110px" placeholder="Challan">
+<input name="ack_number" value="{{ r.ack_number or '' }}" class="form-control form-control-sm" style="width:150px" placeholder="Ack. / token no." title="Acknowledgement (token) number of the filed TDS statement">
+<select name="assigned_to_id" class="form-select form-select-sm" style="width:120px"><option value="">—</option>{% for u in staff %}<option value="{{ u.id }}" {{ 'selected' if r.assigned_to_id == u.id }}>{{ u.name }}</option>{% endfor %}</select>
+<button class="btn btn-sm btn-outline-primary">Save</button></form></td>
+{% if current_user.is_manager_or_above %}<td><form method="post" action="{{ url_for('trackers.tracker_delete', kind='tds', rid=r.id) }}" onsubmit="return confirm('Delete this row?')">{{ csrf() }}<button class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button></form></td>{% endif %}</tr>
+{% else %}<tr><td colspan="8" class="text-center text-muted py-4">No TDS returns tracked yet.</td></tr>{% endfor %}</tbody></table></div>{% endblock %}

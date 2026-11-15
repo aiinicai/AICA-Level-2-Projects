@@ -1,0 +1,70 @@
+{% extends "base.html" %}{% from "_macros.html" import badge, csrf %}{% block title %}{{ client.name }}{% endblock %}{% block content %}
+<div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-3"><div>
+<h1 class="page mb-1">{{ client.name }} {{ badge(client.status) }}</h1>
+<div class="small text-muted">{{ client.client_code }} · PAN {{ client.pan or '—' }} · GSTIN {{ client.gstin or '—' }}{% if current_user.is_manager_or_above %} · Outstanding <strong class="text-danger">{{ client.outstanding()|inr }}</strong>{% endif %}</div></div>
+<div class="d-flex gap-2">{% if current_user.is_manager_or_above %}<a class="btn btn-sm btn-outline-success" href="{{ url_for('billing.new', client_id=client.id) }}"><i class="bi bi-receipt me-1"></i>New invoice</a>{% endif %}
+<a class="btn btn-sm btn-outline-primary" href="{{ url_for('clients.edit', client_id=client.id) }}"><i class="bi bi-pencil me-1"></i>Edit</a>
+{% if current_user.is_manager_or_above %}<form method="post" action="{{ url_for('clients.archive', client_id=client.id) }}" onsubmit="return confirm('Archive this client? Records are kept.')">{{ csrf() }}<button class="btn btn-sm btn-outline-danger"><i class="bi bi-archive"></i></button></form>{% endif %}</div></div>
+<div class="row g-3"><div class="col-lg-4"><div class="card-box p-3 small"><h2 class="h6 fw-bold">Details</h2>
+<dl class="row mb-0"><dt class="col-5 text-muted">Category</dt><dd class="col-7">{{ client.category|title }}</dd><dt class="col-5 text-muted">Contact person</dt><dd class="col-7">{{ client.contact_person or '—' }}{% if client.contact_person and client.contact_designation %} <span class="text-muted">({{ client.contact_designation }})</span>{% endif %}</dd><dt class="col-5 text-muted">Mobile</dt><dd class="col-7">{{ client.mobile or '—' }}</dd><dt class="col-5 text-muted">Email</dt><dd class="col-7">{{ client.email or '—' }}</dd>
+<dt class="col-5 text-muted">TAN</dt><dd class="col-7">{{ client.tan or '—' }}</dd><dt class="col-5 text-muted">Address</dt><dd class="col-7">{{ [client.address, client.city, client.state, client.pincode]|select|join(', ') or '—' }}</dd>
+<dt class="col-5 text-muted">Owner</dt><dd class="col-7">{{ client.assigned_to.name if client.assigned_to else '—' }}</dd></dl>{% if client.notes %}<hr><div>{{ client.notes }}</div>{% endif %}</div></div>
+<div class="col-lg-8">
+<div class="card-box p-3 mb-3"><div class="d-flex justify-content-between align-items-center"><h2 class="h6 fw-bold mb-2">Returns &amp; filings</h2>{% if client.gstin and can('trackers') %}<button type="button" class="btn btn-sm btn-outline-success mb-2" id="gstHistBtn"><i class="bi bi-cloud-download me-1"></i>Fetch GST filing history</button>{% endif %}</div><table class="table table-sm mb-0"><thead><tr><th>Type</th><th>Item</th><th>Due</th><th>Status</th></tr></thead><tbody>
+{% for r in client.gst_returns|sort(attribute='due_date', reverse=True) %}<tr><td>GST</td><td>{{ r.return_type.name }} {{ r.period }}</td><td>{{ r.due_date|dmy }}</td><td>{{ badge(r.status) }}</td></tr>{% endfor %}
+{% for r in client.itr_filings %}<tr><td>ITR</td><td>{{ r.form_type }} AY {{ r.assessment_year }}</td><td>{{ r.due_date|dmy }}</td><td>{{ badge(r.status) }}</td></tr>{% endfor %}
+{% for r in client.tds_returns %}<tr><td>TDS</td><td>{{ r.form_type }} {{ r.financial_year }} {{ r.quarter }}</td><td>{{ r.due_date|dmy }}</td><td>{{ badge(r.status) }}</td></tr>{% endfor %}
+{% if not (client.gst_returns or client.itr_filings or client.tds_returns) %}<tr><td colspan="4" class="text-muted text-center py-3">Nothing tracked yet.</td></tr>{% endif %}</tbody></table></div>
+<div class="card-box p-3"><h2 class="h6 fw-bold">Deadlines</h2><table class="table table-sm mb-0"><tbody>
+{% for d in client.deadlines|sort(attribute='due_date') %}<tr><td>{{ d.due_date|dmy }}</td><td>{{ d.title }}</td><td>{{ badge('overdue' if d.is_overdue else d.status) }}</td></tr>{% else %}<tr><td class="text-muted text-center py-3">No deadlines.</td></tr>{% endfor %}</tbody></table></div>
+{% if current_user.is_manager_or_above %}<div class="card-box p-3 mt-3"><h2 class="h6 fw-bold">Invoices</h2><table class="table table-sm mb-0"><tbody>
+{% for i in client.invoices|sort(attribute='invoice_date', reverse=True) %}<tr><td><a href="{{ url_for('billing.show', invoice_id=i.id) }}">{{ i.invoice_number }}</a></td><td>{{ i.invoice_date|dmy }}</td><td class="text-end">{{ i.total_amount|inr }}</td><td>{{ badge(i.status) }}</td></tr>{% else %}<tr><td class="text-muted text-center py-3">No invoices.</td></tr>{% endfor %}</tbody></table></div>{% endif %}
+
+<div class="card-box p-3 mt-3" id="logins"><h2 class="h6 fw-bold"><i class="bi bi-key me-1"></i>Portal logins</h2>
+<p class="small text-muted mb-2">User IDs and passwords for the client's income tax, GST, TRACES and other portals. Passwords are stored encrypted and every viewing is written to the Activity Log. Use Copy, then paste on the portal's login page.</p>
+<table class="table table-sm align-middle mb-2" data-nocount="1"><tbody>
+{% for cr in client.credentials %}<tr><td class="fw-semibold">{{ cr.portal }}{% if cr.notes %}<div class="small text-muted fw-normal">{{ cr.notes }}</div>{% endif %}</td>
+<td><span class="user-id">{{ cr.username or '' }}</span> {% if cr.username %}<button type="button" class="btn btn-sm btn-outline-secondary copy-text" data-text="{{ cr.username }}" title="Copy user ID"><i class="bi bi-clipboard"></i></button>{% endif %}</td>
+<td class="text-nowrap"><span class="pw-box text-muted">********</span> <button type="button" class="btn btn-sm btn-outline-secondary pw-show" data-url="{{ url_for('clients.credential_reveal', client_id=client.id, cid=cr.id) }}">Show</button> <button type="button" class="btn btn-sm btn-outline-secondary pw-copy" data-url="{{ url_for('clients.credential_reveal', client_id=client.id, cid=cr.id) }}"><i class="bi bi-clipboard"></i> Copy password</button></td>
+<td class="text-nowrap">{% if portals.get(cr.portal) %}<a class="btn btn-sm btn-outline-primary" href="{{ portals[cr.portal] }}" target="_blank" rel="noopener">Open portal</a>{% endif %}
+<form method="post" class="d-inline" action="{{ url_for('clients.credential_delete', client_id=client.id, cid=cr.id) }}" onsubmit="return confirm('Delete this login?')">{{ csrf() }}<button class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button></form></td></tr>
+{% else %}<tr><td class="text-muted small">No logins saved yet.</td></tr>{% endfor %}</tbody></table>
+<form method="post" action="{{ url_for('clients.credential_save', client_id=client.id) }}" class="row g-2" autocomplete="off">{{ csrf() }}
+<div class="col-md-3"><select name="portal" class="form-select form-select-sm">{% for p in portals %}<option>{{ p }}</option>{% endfor %}</select></div>
+<div class="col-md-3"><input name="username" class="form-control form-control-sm" placeholder="User ID (PAN / GSTIN / TAN...)" autocomplete="off"></div>
+<div class="col-md-2"><input type="password" name="password" class="form-control form-control-sm" placeholder="Password" autocomplete="new-password"></div>
+<div class="col-md-2"><input name="notes" class="form-control form-control-sm" placeholder="Note (optional)"></div>
+<div class="col-md-2"><button class="btn btn-sm btn-primary w-100">Save login</button></div></form></div>
+</div></div>{% endblock %}
+{% block scripts %}<div class="modal fade" id="histModal" tabindex="-1"><div class="modal-dialog modal-dialog-centered"><div class="modal-content">
+<div class="modal-header py-2"><div class="fw-bold">GST filing history from the GST portal</div><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+<div class="modal-body text-center"><div class="small text-muted mb-2">GSTIN <strong>{{ client.gstin }}</strong>. This reads the public "Search Taxpayer" page; no login is used.</div>
+<div class="border rounded d-inline-block p-2 mb-2 bg-white" style="min-width:220px;min-height:70px"><img id="histImg" alt="Captcha" style="max-width:100%"></div>
+<div class="d-flex justify-content-center gap-2"><input id="histCaptcha" class="form-control text-center" style="max-width:180px;letter-spacing:.15em" autocomplete="off" placeholder="Captcha"><button type="button" class="btn btn-outline-secondary" id="histNew"><i class="bi bi-arrow-repeat"></i></button></div>
+<div id="histMsg" class="small mt-2 text-muted"></div></div>
+<div class="modal-footer py-2"><button type="button" class="btn btn-sm btn-outline-secondary" data-bs-dismiss="modal">Close</button><button type="button" class="btn btn-sm btn-primary" id="histGo">Fetch history</button></div></div></div></div>
+<script>
+const csrfTok = AM.csrf;
+async function reveal(url){ const r = await fetch(url, {method:'POST', headers:{'X-CSRF-Token': csrfTok}}); const d = await r.json(); return d.password || ''; }
+async function copy(text){ try { await navigator.clipboard.writeText(text); } catch(e) { const t=document.createElement('textarea'); t.value=text; document.body.appendChild(t); t.select(); document.execCommand('copy'); t.remove(); } }
+document.querySelectorAll('.pw-show').forEach(b => b.addEventListener('click', async () => { const box = b.closest('td').querySelector('.pw-box');
+  if (b.textContent === 'Hide') { box.textContent = '********'; b.textContent = 'Show'; return; }
+  box.textContent = (await reveal(b.dataset.url)) || '(none saved)'; b.textContent = 'Hide'; }));
+document.querySelectorAll('.pw-copy').forEach(b => b.addEventListener('click', async () => { await copy(await reveal(b.dataset.url)); const o=b.innerHTML; b.textContent='Copied'; setTimeout(()=>b.innerHTML=o, 1500); }));
+document.querySelectorAll('.copy-text').forEach(b => b.addEventListener('click', async () => { await copy(b.dataset.text); const o=b.innerHTML; b.textContent='Copied'; setTimeout(()=>b.innerHTML=o, 1500); }));
+
+(function(){ const btn=document.getElementById('gstHistBtn'); if(!btn) return;
+  const modal=new bootstrap.Modal(document.getElementById('histModal')), img=document.getElementById('histImg'), box=document.getElementById('histCaptcha'), msg=document.getElementById('histMsg'), go=document.getElementById('histGo');
+  const say=(t,bad)=>{ msg.textContent=t; msg.className='small mt-2 '+(bad?'text-danger':'text-muted'); };
+  const load=async()=>{ box.value=''; say('Loading captcha from the GST portal...');
+    try{ const r=await fetch('/lookup/gst/captcha?t='+Date.now()); if(!r.ok){ const d=await r.json().catch(()=>({})); say(d.message||'Could not load the captcha.',true); return; }
+      img.src=URL.createObjectURL(await r.blob()); say('Type the characters shown and press Enter.'); box.focus(); }catch(e){ say('Could not reach the GST portal. Check the internet connection.',true); } };
+  btn.addEventListener('click',()=>{ modal.show(); load(); }); document.getElementById('histNew').addEventListener('click',load);
+  const run=async()=>{ if(!box.value.trim()){ box.focus(); return; } go.disabled=true; say('Fetching filing history...');
+    try{ const r=await fetch('/lookup/gst/history',{method:'POST',headers:{'Content-Type':'application/json','X-CSRF-Token':csrfTok},body:JSON.stringify({client_id:{{ client.id }},captcha:box.value.trim()})}); const d=await r.json();
+      if(!d.ok){ const m=d.message||'Could not fetch the history.'; if(d.captcha){ await load(); } say(m,true); return; }
+      say(d.created+' return(s) added, '+d.updated+' updated'+(d.skipped?', '+d.skipped+' skipped':'')+(d.unknown_types&&d.unknown_types.length?' (not set up in the app: '+d.unknown_types.join(', ')+')':'')+'. Reloading...');
+      setTimeout(()=>location.reload(),1400);
+    }catch(e){ say('Could not reach the GST portal. Try again.',true); } finally{ go.disabled=false; } };
+  go.addEventListener('click',run); box.addEventListener('keydown',e=>{ if(e.key==='Enter'){ e.preventDefault(); run(); } }); })();
+</script>{% endblock %}
