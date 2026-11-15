@@ -44,3 +44,20 @@ Copy that folder to any PC; no Python is needed there.
 - The window uses Microsoft Edge WebView2, which is built into current Windows 10/11.
 - PDFs show "Rs." instead of the rupee sign unless a font with the symbol is available.
 - Delivery of email depends on your SMTP provider; Gmail and Outlook need an app password.
+
+## Starting over with a clean database (for a demo or a fresh install)
+There is no in-app "reset" button on purpose, so client data can never be wiped by accident. To clear
+everything and start from the setup screen again:
+1. Close the app completely (and stop `run_server.bat` too, if you used it).
+2. Open the data folder: press Windows+R, type `%APPDATA%\AuditManager`, press Enter (or the folder you
+   moved data to via Settings > Data folder).
+3. Optional but recommended: take a backup first (Settings > Backup, or just copy `auditmanager.db`
+   somewhere safe) so you can restore today's data later if you need it.
+4. Delete `auditmanager.db`, and `auditmanager.db-wal` / `auditmanager.db-shm` if present. Leave
+   `location.txt`, `move_pending.txt` and `mail.key` alone unless you also want to forget saved passwords.
+5. Start the app again (`python run_desktop.py` or the built `.exe`) — it will show the first-run setup
+   screen to create a new firm and administrator.
+
+Tip: if you reset often (e.g. between repeated demo recordings), keep a saved copy of a "clean"
+`auditmanager.db` — taken right after setup, before adding real data — and copy it back in instead of
+repeating setup each time.
