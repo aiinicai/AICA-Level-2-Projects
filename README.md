@@ -1,35 +1,28 @@
-# Lordship Africa Payroll (Kenya)
+# Smart Billing Manager
 
-A desktop payroll app for Kenya written in Python. It uses only the standard library (Tkinter and SQLite), so there's nothing to install.
+Double-click **Start Smart Billing Manager.bat** to start on this computer.
+Requires Python 3.10+ on other computers. The launcher installs missing PyQt6, PyMuPDF (preview/print rendering), and ReportLab into `.vendor` on the first run only (internet required for installation). After installation, billing works entirely offline. If installation fails, run `python -m pip install -r requirements.txt` and retry.
 
-## Run
-Double-click `Run_Payroll.bat`, or run `python app.py`. The first time it opens, it asks you to create the Admin login.
+1. Open **Seller Details**, enter your trade name, address, contact and GST details, bank details, declaration and optional PNG/JPEG logo.
+2. Enter the customer name and address, date, and invoice items. Quantity must be positive. Rates exclude GST; fractional quantities are supported. Mobile and GSTIN are optional.
+3. Add or remove rows as needed. Amount and GST are rounded to two decimals per line using decimal arithmetic. Optionally round the final total to the nearest rupee.
+4. **Save** assigns a permanent number. **Search** opens saved invoices for editing. **New** and **Clear** start a blank invoice after confirming unsaved changes.
+5. **Invoice Preview** displays the current form, including unsaved changes. **Export PDF** and **Print** save first. Export PDFs default to `invoices_pdf`. Printing uses the same ReportLab PDF and your system print dialog.
 
-Run the tests with `python -m unittest test_payroll -v`.
+## Files and backup
 
-## Statutory deductions (defaults as of Oct 2026, editable in Settings > Statutory Rates)
-| Item | Rule |
-|---|---|
-| PAYE | Monthly bands: 10% up to 24,000; 25% up to 32,333; 30% up to 500,000; 32.5% up to 800,000; 35% above. Personal relief 2,400 |
-| NSSF | 6% from the employee and 6% from the employer. Tier I goes up to the LEL and Tier II runs from the LEL to the UEL. Limits are applied by date: Feb 2026 onwards is 9,000 / 108,000 (max 6,480 each side) |
-| SHIF | 2.75% of gross, minimum 300. Deductible before PAYE |
-| Housing Levy | 1.5% from the employee and 1.5% from the employer. The employee's share is deductible before PAYE |
-| Allowable deductions | Pension up to 30,000, mortgage interest up to 30,000, post-retirement medical fund up to 15,000, disability exemption 150,000 |
-| Reliefs | Insurance relief at 15% of premiums, capped at 5,000 |
-| Benefits | Non-cash benefits of 5,000 or less are exempt. Car and housing benefits are always taxable |
-| Other | Secondary employment is taxed at a flat 35% with no relief. Consultants pay 5% WHT. NITA is 50 per employee |
-| Employment Act | Overtime at 1.5x and 2x. The app warns if deductions exceed 2/3 of wages or pay is below the minimum wage |
+`database/billing.json` stores seller settings, customer information, items, tax summaries and invoices. Folders and the JSON file are created automatically. Every write uses a temporary file, atomic replacement and a backup of the previous version at `database/billing.json.bak`. A single-instance lock prevents simultaneous app writers in the same folder.
 
-## Features
-- Employee master record with KRA PIN validation, CSV import and export, and pay for joiners and leavers pro-rated by days worked
-- Loans that count down and stop when paid off, plus recurring SACCO, HELB, welfare and union deductions
-- Monthly inputs: overtime, bonus, arrears, leave pay, absence and leave days, entered on screen or by CSV import
-- Payroll runs as a draft first, then the period is closed and locked (Admin only). Closing reduces loan balances and reopening restores them
-- Reports: payslips with year-to-date totals (HTML, print to PDF), payroll register, KRA P10, NSSF, SHIF and Housing Levy returns, a bank and M-Pesa payment file, the GL journal, a statutory summary with due dates (the 9th), and the P9A card
-- PAYE calculator that works both ways: from gross to net, and from a target net back to the gross needed
-- User accounts with roles, PBKDF2-hashed passwords, a full audit trail and database backup
+Copy the whole `database` folder regularly to a safe place. A corrupt database is never silently overwritten: close the app and restore a reviewed backup manually. The `.bak` file is the previous save, not a full backup history. Deleting an invoice retains exported PDFs and does not reuse the number. New invoices use current seller settings; saved invoices retain their seller snapshot. Saving Seller Details also applies those settings to the currently open invoice.
 
-## Notes
-- Paste the P10 CSV into KRA's official iTax P10 Excel template and validate it there before uploading.
-- Check the rates whenever a new Finance Act or Legal Notice comes out. Changing a rate only affects payrolls you run after the change.
-- `payroll.db` holds confidential salary data, so keep it in a secure location and back it up regularly.
+Store the application in a writable folder. JSON is local plain text; protect the computer and backups appropriately. Amounts are INR. GST is shown as a single total per rate; this version does not split CGST/SGST/IGST or implement e-invoicing. Built-in PDF fonts support Latin text; use Latin characters for invoice text. Physical printing depends on your installed printer and driver.
+
+## Verification
+
+Run `python test_app.py` using the same Python interpreter as the app. Tests exercise money rounding and validation, create/edit/delete persistence, corruption protection, the real Qt editor, multipage PDFs and printing to a virtual PDF printer. `python test_app.py --sample` generates a sample PDF and PNG, without adding sample data to your real database.
+
+## Windows executable
+
+Run **Smart Billing Manager.exe** in this folder. All runtime libraries are bundled in this single file; no Python installation is required. The writable database remains external at `database/billing.json`. Read **EXE_AND_DATABASE.md** for database selection and trial activation instructions. Keep **OWNER_ACTIVATION_KEYS.txt** private.
+
+To rebuild, install standard Python with PATH enabled and double-click **Build EXE.bat**. It creates an isolated build environment and builds `dist/Smart Billing Manager.exe`. Build on Windows for Windows.
