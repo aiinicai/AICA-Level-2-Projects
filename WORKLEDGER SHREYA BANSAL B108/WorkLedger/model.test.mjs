@@ -1,0 +1,7 @@
+import {test} from 'node:test';
+import assert from 'node:assert/strict';
+import {sumAmounts,csv,validWork,matches} from './model.mjs';
+test('fee totals use paise rather than floating-point accumulation',()=>assert.equal(sumAmounts([{amount:'0.10'},{amount:'0.20'},{amount:'2500.55'}]),2500.85));
+test('worksheet escapes quotes, commas, newlines and formula prefixes',()=>{const out=csv([['ABC, Ltd','say "hello"','line\nbreak','=1+1',' @SUM(A1)']]);assert.ok(out.includes('"ABC, Ltd"'));assert.ok(out.includes('"say ""hello"""'));assert.ok(out.includes('"\'=1+1"'));assert.ok(out.includes('"\' @SUM(A1)"'));});
+test('work requires client note status and a bounded optional duration',()=>{const work={client_id:'client',note:'Prepared projections',status:'Completed',work_date:'2026-11-13',minutes:''};assert.equal(validWork(work),work);assert.throws(()=>validWork({...work,minutes:1441}));assert.throws(()=>validWork({...work,client_id:''}));assert.throws(()=>validWork({...work,note:' '}));assert.throws(()=>validWork({...work,status:'Billed'}));});
+test('filters preserve independent work and review statuses',()=>{const entry={client_id:'a',staff_id:'b',work_date:'2026-11-13',status:'Completed',review_status:'Pending'};assert.equal(matches(entry,{status:'Completed',stage:'Pending',since:'2026-11-10'}),true);assert.equal(matches(entry,{stage:'Billed'}),false);assert.equal(matches(entry,{client:'other'}),false);assert.equal(matches(entry,{since:'2026-11-14'}),false);});
