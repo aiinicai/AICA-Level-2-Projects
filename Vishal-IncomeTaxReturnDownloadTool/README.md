@@ -14,7 +14,19 @@ Single HTML page (`static/index.html`) + FastAPI backend (`main.py` +
    Returns" for that PAN+year and downloads the ITR-V PDF, which the page
    then auto-downloads to the user's computer.
 
-## Easiest way to run it: double-click `launcher.pyw`
+## Easiest way to run it: double-click `Start Income Tax Return Download.bat`
+
+On a computer that has **never run this tool before** (no Python
+installed at all), double-click `Start Income Tax Return Download.bat`
+instead of `launcher.pyw` directly. It:
+
+- Checks for Python 3.12. If it's missing, downloads and silently
+  installs it from python.org (one-time, needs internet).
+- Then hands off to `launcher.pyw` (below) to do everything else.
+
+If Python 3.12 is already installed, you can just double-click
+`launcher.pyw` directly — the `.bat` file is only needed for a fresh
+computer. Either way, from here on:
 
 Once the one-time setup below is done, you don't need PowerShell or the
 Chrome command at all. Just double-click `launcher.pyw` in the project
