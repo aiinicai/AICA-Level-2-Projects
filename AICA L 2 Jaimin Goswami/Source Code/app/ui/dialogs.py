@@ -215,8 +215,10 @@ class ApiKeyDialog(QDialog):
         self.finnhub_key = QLineEdit()
         self.finnhub_key.setEchoMode(QLineEdit.Password)
         curr_finnhub = get_credential("finnhub") or db.setting("finnhub_api_key") or ""
-        self.finnhub_key.setText(str(curr_finnhub))
-        self.finnhub_key.setPlaceholderText("Paste Finnhub API Key (from finnhub.io)")
+        if curr_finnhub:
+            self.finnhub_key.setPlaceholderText("•••••••••••••••• (Configured — enter new key to replace)")
+        else:
+            self.finnhub_key.setPlaceholderText("Paste Finnhub API Key (from finnhub.io)")
         form.addRow("Finnhub API Key:", self.finnhub_key)
         
         finnhub_link = QLabel('<a style="color:#60A5FA; text-decoration:none;" href="https://finnhub.io/register">Get free Finnhub Key at finnhub.io ↗</a> (Corporate earnings, IPOs & global calendars)')
@@ -227,8 +229,10 @@ class ApiKeyDialog(QDialog):
         self.gemini_key = QLineEdit()
         self.gemini_key.setEchoMode(QLineEdit.Password)
         curr_gemini = get_gemini_api_key(db)
-        self.gemini_key.setText(str(curr_gemini))
-        self.gemini_key.setPlaceholderText("Paste Google Gemini API Key (starts with AIzaSy...)")
+        if curr_gemini:
+            self.gemini_key.setPlaceholderText("•••••••••••••••• (Configured — enter new key to replace)")
+        else:
+            self.gemini_key.setPlaceholderText("Paste Google Gemini API Key (starts with AIzaSy...)")
         form.addRow("Google Gemini API Key:", self.gemini_key)
 
         gemini_link = QLabel('<a style="color:#60A5FA; text-decoration:none;" href="https://aistudio.google.com/">Get free Gemini Key at aistudio.google.com ↗</a> (1.5 Flash - 15 RPM / 1M TPM free)')
@@ -237,15 +241,36 @@ class ApiKeyDialog(QDialog):
 
         layout.addLayout(form)
 
-        info_box = QLabel("💡 <b>Tip</b>: You can also paste your keys directly into <code>API.txt</code> in the application folder. EventScope automatically reads both at runtime.")
+        info_box = QLabel("💡 <b>Privacy Notice</b>: API keys are strictly stored on your local machine using Windows Credential Manager. Zero keys are embedded in source code, databases, or repository files.")
         info_box.setWordWrap(True)
         info_box.setStyleSheet("background: #0D1C33; border: 1px solid #1E3A63; border-radius: 6px; padding: 10px; font-size: 11px; color: #CBD5E1;")
         layout.addWidget(info_box)
+
+        # Clear buttons
+        clear_btn = QPushButton("🗑️ Clear Stored Keys")
+        clear_btn.setStyleSheet("background: #1E293B; color: #EF4444; border: 1px solid #DC2626; border-radius: 4px; padding: 6px 12px; font-weight: bold;")
+        clear_btn.clicked.connect(self.clear_all_keys)
+        layout.addWidget(clear_btn)
 
         buttons = QDialogButtonBox(QDialogButtonBox.Save | QDialogButtonBox.Cancel)
         buttons.accepted.connect(self.save)
         buttons.rejected.connect(self.reject)
         layout.addWidget(buttons)
+
+    def clear_all_keys(self):
+        try:
+            from app.data_sources.manager import delete_credential
+            delete_credential("finnhub")
+            delete_credential("gemini")
+            delete_credential("trading_economics")
+        except Exception:
+            pass
+        self.db.execute("DELETE FROM user_settings WHERE key LIKE '%api_key%'")
+        self.finnhub_key.clear()
+        self.finnhub_key.setPlaceholderText("Paste Finnhub API Key (from finnhub.io)")
+        self.gemini_key.clear()
+        self.gemini_key.setPlaceholderText("Paste Google Gemini API Key (starts with AIzaSy...)")
+        QMessageBox.information(self, "Keys Cleared", "All API keys have been removed from local storage.")
 
     def save(self):
         f_key = self.finnhub_key.text().strip().strip('"\'')
@@ -261,7 +286,6 @@ class ApiKeyDialog(QDialog):
                 rows = self.db.rows("SELECT config FROM data_sources WHERE id='finnhub'")
                 cfg = json.loads(rows[0]["config"]) if rows and rows[0]["config"] else {}
                 cfg["usage_confirmed"] = True
-                cfg["api_key"] = f_key
                 self.db.execute("UPDATE data_sources SET enabled=1, status='Connected', last_error='', config=? WHERE id='finnhub'", (json.dumps(cfg),))
             except Exception:
                 pass

@@ -80,6 +80,19 @@ def set_credential(source_id, value):
         import keyring
         if value:
             keyring.set_password("Finstock.EventScope", source_id, value.strip().strip('"\''))
+        else:
+            try:
+                keyring.delete_password("Finstock.EventScope", source_id)
+            except Exception:
+                pass
+    except Exception:
+        pass
+
+
+def delete_credential(source_id):
+    try:
+        import keyring
+        keyring.delete_password("Finstock.EventScope", source_id)
     except Exception:
         pass
 
