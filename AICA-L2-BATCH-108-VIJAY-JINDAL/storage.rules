@@ -1,0 +1,38 @@
+rules_version = '2';
+// Private Cloud Storage. Candidates upload into an "incoming" area; a Cloud Function checks file signature
+// (magic bytes), size and (optionally) malware scan, then moves the file to the final private path.
+// Staff NEVER read files directly - they get short-lived signed URLs from getDocumentLink(), which writes an audit log.
+service firebase.storage {
+  match /b/{bucket}/o {
+    function signedIn() { return request.auth != null; }
+    function isSelf(uid) { return signedIn() && request.auth.uid == uid && request.auth.token.phone_number is string; }
+    function isStaffWith(grant) {
+      return signedIn() && request.auth.token.staff_active == true
+        && request.auth.token.firebase.sign_in_second_factor != null
+        && (request.auth.token.role == 'owner_admin' || (request.auth.token.grants is list && grant in request.auth.token.grants));
+    }
+    function sizeUnder(mb) { return request.resource.size < mb * 1024 * 1024; }
+    function isImage() { return request.resource.contentType.matches('image/(jpeg|png|webp)'); }
+    function isPdf() { return request.resource.contentType == 'application/pdf'; }
+
+    // Candidate uploads (write-only for the candidate; processed by function)
+    match /incoming/{uid}/photo/{file} { allow create: if isSelf(uid) && isImage() && sizeUnder(2); }
+    match /incoming/{uid}/cv/{file}    { allow create: if isSelf(uid) && isPdf() && sizeUnder(5); }
+    match /incoming/{uid}/dra/{file}   { allow create: if isSelf(uid) && (isPdf() || isImage()) && sizeUnder(5); }
+
+    // Final private files: candidate may read own; nobody writes from the client.
+    match /private/candidates/{uid}/{allPaths=**} { allow read: if isSelf(uid); allow write: if false; }
+
+    // Training assets (approved PDFs, slides, short videos): readable by signed-in users.
+    match /training/{allPaths=**} {
+      allow read: if signedIn();
+      allow write: if isStaffWith('training.manage') && sizeUnder(200);
+    }
+    // Public CMS images (banners, institute logos)
+    match /public/{allPaths=**} {
+      allow read: if true;
+      allow write: if isStaffWith('cms.manage') && isImage() && sizeUnder(2);
+    }
+    match /{allPaths=**} { allow read, write: if false; }
+  }
+}

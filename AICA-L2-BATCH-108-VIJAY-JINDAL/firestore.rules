@@ -1,0 +1,175 @@
+rules_version = '2';
+// VRS DRA Career Portal - Firestore Security Rules (Phase 1 draft, least privilege, default deny)
+// Privileged writes (registration, applications, DRA updates, scoring, certificates, staff roles, exports,
+// referral attribution, contact form) happen ONLY in Cloud Functions using the Admin SDK, which bypasses these rules.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ---------- helpers ----------
+    function signedIn() { return request.auth != null; }
+    function isSelf(uid) { return signedIn() && request.auth.uid == uid; }
+    function tok() { return request.auth.token; }
+    function phoneVerified() { return signedIn() && tok().phone_number is string; }
+    // Staff must: hold a role claim, be active, and have completed MFA in this session.
+    function isStaff() {
+      return signedIn()
+        && tok().role in ['owner_admin', 'recruiter', 'document_reviewer', 'viewer']
+        && tok().staff_active == true
+        && tok().firebase.sign_in_second_factor != null;
+    }
+    function isOwnerAdmin() { return isStaff() && tok().role == 'owner_admin'; }
+    function hasGrant(grant) { return isStaff() && (tok().role == 'owner_admin' || (tok().grants is list && grant in tok().grants)); }
+    function onlyChanges(keys) { return request.resource.data.diff(resource.data).affectedKeys().hasOnly(keys); }
+    // Candidates may edit only self-service fields. IDs, phone, source, status and review flags are server-owned.
+    function validSelfUpdate() {
+      let d = request.resource.data;
+      return onlyChanges(['fullName', 'alternateMobile', 'whatsappSameAsMobile', 'whatsappNumber', 'preferredLanguage',
+                          'location', 'primaryRole', 'experienceType', 'relevantExperienceMonths', 'languagesKnown',
+                          'availabilityConfirmedAt', 'updatedAt'])
+        && d.fullName is string && d.fullName.size() >= 2 && d.fullName.size() <= 80
+        && d.location.pin is string && d.location.pin.matches('^[1-9][0-9]{5}$')
+        && d.location.stateCode is string && d.location.stateCode.size() == 2
+        && d.updatedAt == request.time;
+    }
+    function candidateActive(uid) {
+      return get(/databases/$(database)/documents/candidates/$(uid)).data.accountStatus == 'active';
+    }
+
+    // ---------- candidates ----------
+    match /candidates/{uid} {
+      allow get: if isSelf(uid) || hasGrant('profile.basic');
+      allow list: if hasGrant('profile.basic');   // staff queries must be paginated & filtered in UI
+      allow create, delete: if false;          // created by completeRegistration function; deletion by workflow
+      allow update: if isSelf(uid) && resource.data.accountStatus == 'active' && validSelfUpdate();
+
+      // Restricted identity (father name, DOB, addresses, masked PAN) and compensation.
+      match /restricted/identity {
+        allow get: if isSelf(uid) || hasGrant('identity.restricted');
+        allow create, update: if isSelf(uid) && candidateActive(uid)
+          && request.resource.data.keys().hasOnly(['fatherName', 'dateOfBirth', 'streetAddress', 'permanentAddress', 'updatedAt'])
+          && (!('panMasked' in request.resource.data));   // PAN only via function (encrypted server-side)
+        allow delete: if false;
+      }
+      match /restricted/compensation {
+        allow get: if isSelf(uid) || hasGrant('compensation');
+        allow create, update: if isSelf(uid) && candidateActive(uid)
+          && request.resource.data.keys().hasOnly(['currentMonthlySalaryInr', 'expectedMonthlySalaryInr', 'updatedAt']);
+        allow delete: if false;
+      }
+      // Occupation sub-profiles (collections now; chartered_accountant etc. later).
+      match /occupations/{key} {
+        allow get: if isSelf(uid) || hasGrant('profile.basic');
+        allow create, update: if isSelf(uid) && candidateActive(uid) && key in ['collections'];
+        allow delete: if false;
+      }
+      // Official DRA qualification: read own/staff; writes only via updateDraQualification / reviewDraDocument functions
+      match /dra/{docId} {
+        allow get: if isSelf(uid) || hasGrant('profile.basic');
+        allow write: if false;
+      }
+      match /resumes/{resumeId} {
+        allow read: if isSelf(uid) || hasGrant('profile.basic');
+        allow create, update: if isSelf(uid) && candidateActive(uid);
+        allow delete: if isSelf(uid);
+      }
+      // Append-only consent ledger.
+      match /consents/{consentId} {
+        allow read: if isSelf(uid) || isOwnerAdmin();
+        allow create: if isSelf(uid)
+          && request.resource.data.keys().hasOnly(['purpose', 'granted', 'noticeVersion', 'at', 'channel'])
+          && request.resource.data.purpose in ['privacy_notice', 'terms', 'recruitment_contact', 'marketing',
+               'whatsapp_updates', 'employer_sharing', 'ai_resume_processing', 'certificate_public_verification']
+          && request.resource.data.granted is bool
+          && request.resource.data.at == request.time;
+        allow update, delete: if false;
+      }
+    }
+
+    // ---------- referrals ----------
+    match /referral_codes/{code} { allow read, write: if false; }  // resolved server-side only
+    match /referral_stats/{uid} { allow get: if isSelf(uid) || hasGrant('referrals.report'); allow list: if hasGrant('referrals.report'); allow write: if false; }
+    match /referral_attributions/{id} { allow read: if hasGrant('referrals.report'); allow write: if false; }
+
+    // ---------- vacancies & applications ----------
+    match /vacancies/{vacancyId} {
+      allow get, list: if resource.data.status == 'published' || hasGrant('vacancies.manage') || hasGrant('notes.recruitment');
+      allow create, update: if hasGrant('vacancies.manage')
+        && request.resource.data.status in ['draft', 'published', 'closed', 'archived']
+        && request.resource.data.certificationPolicy in ['mandatory', 'preferred', 'not_required']
+        && request.resource.data.openings is int && request.resource.data.openings > 0;
+      allow delete: if false;  // archive instead
+    }
+    match /applications/{applicationId} {
+      allow get: if (signedIn() && resource.data.uid == request.auth.uid) || hasGrant('notes.recruitment');
+      allow list: if (signedIn() && resource.data.uid == request.auth.uid) || hasGrant('notes.recruitment');
+      allow write: if false;   // submitApplication function only (deterministic ID => no duplicates)
+    }
+    match /applications_internal/{applicationId} {
+      allow read: if hasGrant('notes.recruitment');
+      allow create, update: if hasGrant('notes.recruitment');
+      allow delete: if false;
+      match /events/{eventId} {
+        allow read: if hasGrant('notes.recruitment');
+        allow create: if hasGrant('notes.recruitment') && request.resource.data.byUid == request.auth.uid;
+        allow update, delete: if false;     // append-only history
+      }
+    }
+
+    // ---------- training ----------
+    match /courses/{courseId} {
+      allow get, list: if resource.data.status == 'published' || hasGrant('training.manage');
+      allow write: if hasGrant('training.manage');
+      match /{sub=**} {
+        allow read: if get(/databases/$(database)/documents/courses/$(courseId)).data.status == 'published' || hasGrant('training.manage');
+        allow write: if hasGrant('training.manage');
+      }
+    }
+    match /question_bank/{qid} { allow read, write: if hasGrant('training.manage'); }   // answer keys never reach candidates
+    match /assessments/{aid} { allow read: if signedIn(); allow write: if hasGrant('training.manage'); }
+    match /cohorts/{cid} { allow read, write: if hasGrant('training.manage'); }
+    match /enrollments/{enrollmentId} {
+      // enrollmentId = {uid}_{courseId}
+      allow get, list: if (signedIn() && resource.data.uid == request.auth.uid) || hasGrant('training.manage');
+      allow create: if phoneVerified() && enrollmentId == request.auth.uid + '_' + request.resource.data.courseId
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.keys().hasOnly(['uid', 'courseId', 'enrolledAt', 'completedLessonIds', 'bookmarks', 'source']);
+      allow update: if signedIn() && resource.data.uid == request.auth.uid && onlyChanges(['completedLessonIds', 'bookmarks', 'lastLessonId', 'updatedAt']);
+      allow delete: if false;
+    }
+    match /attempts/{attemptId} {
+      allow get, list: if (signedIn() && resource.data.uid == request.auth.uid) || hasGrant('training.manage');
+      allow write: if false;   // startAttempt / submitAttempt functions only - browser never scores
+    }
+    match /certificates/{certificateId} {
+      allow get, list: if (signedIn() && resource.data.uid == request.auth.uid) || hasGrant('training.manage');
+      allow write: if false;   // issueCertificate function only
+    }
+    // Public verification: single-document lookup only, no listing/enumeration.
+    match /certificate_verification/{certificateId} { allow get: if true; allow list, write: if false; }
+
+    // ---------- CMS, institutes, reference data ----------
+    match /cms_public/{doc=**} { allow read: if true; allow write: if hasGrant('cms.manage'); }
+    match /institutes/{id} {
+      allow get, list: if resource.data.published == true || hasGrant('cms.manage');
+      allow write: if hasGrant('cms.manage');
+    }
+    match /reference/{doc=**} { allow read: if true; allow write: if hasGrant('cms.manage'); }   // roles, products, languages, job categories
+    match /geo_districts/{id} { allow read: if true; allow write: if hasGrant('cms.manage'); }
+    match /geo_other_entries/{id} { allow read, write: if hasGrant('cms.manage'); }
+    match /settings_private/{doc} { allow read, write: if isOwnerAdmin(); }   // NO secrets are stored here
+
+    // ---------- staff, audit, contact, exports ----------
+    match /staff/{uid} { allow get: if isSelf(uid) || isOwnerAdmin(); allow list: if isOwnerAdmin(); allow write: if false; }
+    match /audit_logs/{id} { allow read: if isOwnerAdmin(); allow write: if false; }
+    match /contact_messages/{id} { allow read: if isOwnerAdmin(); allow write: if false; }
+    match /exports/{id} { allow read: if isOwnerAdmin(); allow write: if false; }
+    match /ai_usage/{id} { allow read: if isOwnerAdmin(); allow write: if false; }
+    match /data_requests/{id} {      // correction / closure / deletion requests
+      allow get: if (signedIn() && resource.data.uid == request.auth.uid) || isOwnerAdmin();
+      allow write: if false;         // requestDataRights function
+    }
+
+    // Default deny for everything else.
+    match /{document=**} { allow read, write: if false; }
+  }
+}
