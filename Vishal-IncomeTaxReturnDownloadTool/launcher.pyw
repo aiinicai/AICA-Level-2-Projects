@@ -5,12 +5,16 @@ Double-click THIS file to run the whole Income Tax Return Download
 tool. No command prompt, no manual Chrome command.
 
 What it does, in order:
+  0. First time ever on a given computer only: creates a Python
+     virtual environment and installs everything from
+     requirements.txt (plus Playwright's Chromium), so you don't
+     need to run pip/playwright install commands yourself.
   1. Starts a real Chrome window in the background with the
      remote-debugging port the automation needs (this is the step
      that used to be a manual command from README.md). That Chrome
-     window is pushed off-screen, so you never see it.
+     window is fully hidden (headless) - you never see it.
   2. Starts the FastAPI/uvicorn server in the background.
-  3. Opens your normal browser at http://localhost:8000.
+  3. Opens your normal browser at http://localhost:8001.
 
 A small status window stays open so you can see what's happening
 and read any error. You can minimize it; the server keeps running
@@ -44,26 +48,107 @@ CHROME_CANDIDATES = [
 ]
 
 
-def find_python():
+VENV_DIR = BASE_DIR / "venv"
+SETUP_LOG_PATH = BASE_DIR / "setup.log"
+
+
+def _venv_python_path():
+    # Windows venv layout first (this project targets Windows), then the
+    # Unix layout just in case this ever runs elsewhere.
+    for c in (VENV_DIR / "Scripts" / "python.exe", VENV_DIR / "bin" / "python"):
+        if c.exists():
+            return c
+    return None
+
+
+def _run_setup_step(cmd, log, label):
+    """
+    Run one setup command, with its full output appended to setup.log
+    (pip/playwright output is long), and only a short status plus the
+    last few lines surfaced in the status window on failure.
+    """
+    log(label)
+    with open(SETUP_LOG_PATH, "a", encoding="utf-8") as f:
+        f.write(f"\n$ {' '.join(str(c) for c in cmd)}\n")
+        f.flush()
+        result = subprocess.run(
+            cmd, cwd=str(BASE_DIR), stdout=f, stderr=subprocess.STDOUT, text=True
+        )
+    if result.returncode != 0:
+        tail = SETUP_LOG_PATH.read_text(encoding="utf-8", errors="replace").splitlines()[-15:]
+        log("ERROR: " + label + " failed. Last lines of setup.log:")
+        for line in tail:
+            log("    " + line)
+        return False
+    return True
+
+
+def _find_base_python():
+    """
+    A base/system Python to create the venv with (this project needs
+    3.12 or similar - not 3.14, where Playwright's dependencies don't
+    yet have prebuilt wheels). Prefer the Windows Python launcher's
+    3.12 if present, otherwise fall back to whatever "python" is on
+    PATH and hope it's compatible.
+    """
+    for candidate in (["py", "-3.12"], ["python3.12"], ["python"], ["py"]):
+        try:
+            subprocess.run(candidate + ["--version"], check=True,
+                            capture_output=True, cwd=str(BASE_DIR))
+            return candidate
+        except Exception:
+            continue
+    return None
+
+
+def ensure_venv(log):
     """
     Double-clicking a .pyw file runs it with whichever Python Windows
     has associated with that file type - usually the system/base
-    Python, NOT the project's venv (where fastapi/uvicorn/playwright
-    are actually installed). If we used sys.executable to launch
-    uvicorn, it would silently fail with "No module named uvicorn" in
-    server.log and just hang here forever. So look for this project's
-    own venv first and use that interpreter explicitly.
+    Python, NOT a project venv (where fastapi/uvicorn/playwright are
+    actually installed). On a computer that has never run this tool
+    before, there IS no venv yet - so create one, install
+    requirements.txt into it, and install Playwright's Chromium,
+    all automatically, the first time. Later runs just reuse it.
     """
-    candidates = [
-        BASE_DIR / "venv" / "Scripts" / "python.exe",   # Windows venv
-        BASE_DIR / ".venv" / "Scripts" / "python.exe",
-        BASE_DIR / "venv" / "bin" / "python",           # just in case
-        BASE_DIR / ".venv" / "bin" / "python",
-    ]
-    for c in candidates:
-        if c.exists():
-            return str(c)
-    return sys.executable
+    existing = _venv_python_path()
+    if existing:
+        return str(existing)
+
+    log("First run on this computer - setting up Python packages "
+        "(fastapi, uvicorn, playwright). This can take a few minutes, "
+        "only on this first run...")
+
+    base_python = _find_base_python()
+    if not base_python:
+        log("ERROR: No Python installation found on this computer. "
+            "Install Python 3.12 from python.org first, then try again.")
+        return None
+
+    if not _run_setup_step(base_python + ["-m", "venv", str(VENV_DIR)], log,
+                            "Creating a Python environment for this tool..."):
+        return None
+
+    venv_python = _venv_python_path()
+    if not venv_python:
+        log("ERROR: Virtual environment was created but python.exe is missing.")
+        return None
+
+    req_file = BASE_DIR / "requirements.txt"
+    if not _run_setup_step(
+        [str(venv_python), "-m", "pip", "install", "-r", str(req_file)],
+        log, "Installing required packages (fastapi, uvicorn, playwright)...",
+    ):
+        return None
+
+    if not _run_setup_step(
+        [str(venv_python), "-m", "playwright", "install", "chromium"],
+        log, "Installing Chromium for Playwright (one-time, a few hundred MB)...",
+    ):
+        return None
+
+    log("Setup complete.")
+    return str(venv_python)
 
 
 def _port_open(host, port, timeout=0.5):
@@ -155,7 +240,9 @@ def ensure_server(log):
         log(f"Server is already running on port {APP_PORT} - reusing it.")
         return True
 
-    python_exe = find_python()
+    python_exe = ensure_venv(log)
+    if not python_exe:
+        return False
     log(f"Starting the Income Tax Return Download server (using {python_exe})...")
     creationflags = subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0
 
