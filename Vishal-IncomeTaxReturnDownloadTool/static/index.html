@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Income Tax Return Download</title>
+<style>
+  :root{
+    --teal:#0f6d5a;
+    --teal-light:#e8f5f1;
+    --text:#1f2937;
+    --muted:#6b7280;
+    --border:#e5e7eb;
+    --error:#d93025;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; min-height:100vh;
+    display:flex; align-items:center; justify-content:center;
+    background:#f3f4f6;
+    font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;
+    color:var(--text);
+  }
+  .card{
+    width:420px; max-width:92vw;
+    background:#fff; border-radius:16px;
+    box-shadow:0 2px 16px rgba(0,0,0,0.08);
+    overflow:hidden;
+  }
+  .header{
+    text-align:center; padding:28px 24px 20px;
+    border-bottom:1px solid var(--border);
+  }
+  .header .tag{
+    letter-spacing:2px; font-size:11px; color:var(--muted); font-weight:600;
+  }
+  .header h1{
+    font-size:22px; margin:6px 0 0; color:var(--teal); font-weight:700;
+  }
+  .body{ padding:28px 24px; text-align:center; }
+  .body h2{ font-size:16px; margin:0 0 4px; }
+  .body p.sub{ color:var(--muted); font-size:13px; margin:0 0 20px; }
+  .icon-circle{
+    width:56px; height:56px; border-radius:50%;
+    border:2px solid var(--teal); color:var(--teal);
+    display:flex; align-items:center; justify-content:center;
+    margin:0 auto 16px; font-size:24px;
+  }
+  .masked{
+    font-weight:700; color:var(--teal); font-size:16px; margin-bottom:16px;
+  }
+  input[type=text], input[type=password]{
+    width:100%; padding:12px 14px; border:1px solid var(--border);
+    border-radius:8px; font-size:14px; margin-bottom:10px; outline:none;
+  }
+  input:focus{ border-color:var(--teal); }
+  button.primary{
+    width:100%; padding:12px; border-radius:8px; border:1px solid var(--teal);
+    background:#fff; color:var(--teal); font-weight:600; font-size:14px;
+    cursor:pointer; margin-top:4px;
+  }
+  button.primary:hover{ background:var(--teal-light); }
+  button.primary:disabled{ opacity:0.5; cursor:not-allowed; }
+  select{
+    width:100%; padding:12px; border:1px solid var(--border);
+    border-radius:8px; font-size:14px; margin-bottom:10px;
+  }
+  .error{ color:var(--error); font-size:13px; margin:-4px 0 10px; text-align:left; }
+  .footer{
+    text-align:center; font-size:11px; color:var(--muted);
+    padding:14px; border-top:1px solid var(--border);
+  }
+  .hidden{ display:none; }
+</style>
+</head>
+<body>
+
+<div class="card">
+  <div class="header">
+    <div class="tag">INCOME TAX RETURN DOWNLOAD</div>
+    <h1>Income Tax Return Download</h1>
+  </div>
+
+  <div class="body">
+
+    <!-- Step 1: PAN + Password -->
+    <div id="step-login">
+      <h2>Download ITR-V</h2>
+      <p class="sub">Enter your PAN and Income Tax portal password</p>
+      <input type="text" id="pan" placeholder="PAN Number" autocomplete="off" />
+      <input type="password" id="password" placeholder="Password" />
+      <div class="error hidden" id="login-error"></div>
+      <button class="primary" id="btn-login" onclick="doLogin()">Continue</button>
+    </div>
+
+    <!-- Step 2: Confirm email -->
+    <div id="step-email" class="hidden">
+      <div class="icon-circle">&#9993;</div>
+      <h2>Confirm your Email</h2>
+      <p class="sub">To verify it's you, type your full registered email</p>
+      <div class="masked" id="masked-email-display"></div>
+      <input type="text" id="email-input" placeholder="your full email address" />
+      <div class="error hidden" id="email-error"></div>
+      <button class="primary" id="btn-email" onclick="doConfirmEmail()">Confirm</button>
+    </div>
+
+    <!-- Step 3: Confirm mobile -->
+    <div id="step-mobile" class="hidden">
+      <div class="icon-circle">&#128222;</div>
+      <h2>Confirm your Mobile Number</h2>
+      <p class="sub">Now type your full registered mobile number</p>
+      <div class="masked" id="masked-mobile-display"></div>
+      <input type="text" id="mobile-input" placeholder="your full mobile number" />
+      <div class="error hidden" id="mobile-error"></div>
+      <button class="primary" id="btn-mobile" onclick="doConfirmMobile()">Confirm</button>
+    </div>
+
+    <!-- Step 4: Assessment Year -->
+    <div id="step-year" class="hidden">
+      <h2>Select Assessment Year</h2>
+      <p class="sub">Choose the year you want the ITR-V for</p>
+      <select id="year-select"></select>
+      <div class="error hidden" id="year-error"></div>
+      <button class="primary" id="btn-download" onclick="doDownload()">Download ITR-V</button>
+    </div>
+
+    <!-- Step 5: Done -->
+    <div id="step-done" class="hidden">
+      <div class="icon-circle">&#10003;</div>
+      <h2>ITR-V Downloaded</h2>
+      <p class="sub">Your download should start automatically.</p>
+    </div>
+
+  </div>
+
+  <div class="footer">Income Tax Return Download &middot; Confidential</div>
+</div>
+
+<script>
+let sessionId = null;
+
+function show(id){
+  document.querySelectorAll('.body > div').forEach(d => d.classList.add('hidden'));
+  document.getElementById(id).classList.remove('hidden');
+}
+function showError(id, msg){
+  const el = document.getElementById(id);
+  el.textContent = msg;
+  el.classList.remove('hidden');
+}
+function clearError(id){
+  document.getElementById(id).classList.add('hidden');
+}
+
+async function postJSON(url, body){
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify(body)
+  });
+  return res.json();
+}
+
+async function doLogin(){
+  clearError('login-error');
+  const pan = document.getElementById('pan').value.trim();
+  const password = document.getElementById('password').value;
+  if(!pan || !password){ showError('login-error','PAN and Password required'); return; }
+
+  document.getElementById('btn-login').disabled = true;
+  const res = await postJSON('/api/login', {pan, password});
+  document.getElementById('btn-login').disabled = false;
+
+  if(!res.ok){ showError('login-error', res.error || 'Login failed'); return; }
+
+  sessionId = res.session_id;
+  document.getElementById('masked-email-display').textContent = res.masked_email;
+  document.getElementById('masked-mobile-display').textContent = res.masked_mobile;
+  show('step-email');
+}
+
+async function doConfirmEmail(){
+  clearError('email-error');
+  const email = document.getElementById('email-input').value.trim();
+  const res = await postJSON('/api/confirm-email', {session_id: sessionId, email});
+  if(!res.ok){ showError('email-error', res.error || 'Wrong email'); return; }
+  show('step-mobile');
+}
+
+async function doConfirmMobile(){
+  clearError('mobile-error');
+  const mobile = document.getElementById('mobile-input').value.trim();
+  const res = await postJSON('/api/confirm-mobile', {session_id: sessionId, mobile});
+  if(!res.ok){ showError('mobile-error', res.error || 'Wrong mobile number'); return; }
+
+  const yearsRes = await fetch('/api/assessment-years?session_id=' + encodeURIComponent(sessionId));
+  const years = await yearsRes.json();
+  if(!years.ok){ showError('mobile-error', years.error || 'Could not load assessment years'); return; }
+
+  const select = document.getElementById('year-select');
+  select.innerHTML = '';
+  years.years.forEach(y => {
+    const opt = document.createElement('option');
+    opt.value = y; opt.textContent = y;
+    select.appendChild(opt);
+  });
+  show('step-year');
+}
+
+async function doDownload(){
+  clearError('year-error');
+  const assessment_year = document.getElementById('year-select').value;
+  const res = await fetch('/api/download-itrv', {
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({session_id: sessionId, assessment_year})
+  });
+
+  if(res.headers.get('content-type') === 'application/pdf'){
+    const blob = await res.blob();
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = 'ITRV_' + assessment_year + '.pdf';
+    document.body.appendChild(a); a.click(); a.remove();
+    show('step-done');
+  } else {
+    const data = await res.json();
+    showError('year-error', data.error || 'Download failed');
+  }
+}
+</script>
+</body>
+</html>
