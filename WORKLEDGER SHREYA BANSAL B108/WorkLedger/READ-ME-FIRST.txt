@@ -1,0 +1,147 @@
+WORKLEDGER — AICA LEVEL 2, PROJECT 2
+Custom HTML interface + Python backend + Supabase + optional Gemini
+
+AGREED RULES
+Staff can select all active clients and make quick work entries throughout the day.
+Only the reviewer enters amounts. Staff receive no fee, proposal-item or invoice data.
+Work status is separate from billing status. AI only suggests note wording/category.
+
+FIRST-TIME SETUP (we can do these one at a time in chat)
+
+1. CREATE A DEDICATED SUPABASE PROJECT
+Open https://supabase.com/dashboard and sign in/create an account.
+Create a new project named WorkLedger. Use a dedicated project for this office app.
+Choose and keep your database password safely; it is NOT pasted into WorkLedger.
+Wait for the project to become ready. Do not run the supplied SQL in an unrelated
+existing database. This version assumes one firm per project.
+
+2. SET UP THE DATABASE
+Open the project's SQL Editor and create a new query.
+Open setup.sql in Notepad. Copy its complete contents into the query and click Run.
+Run setup.sql only once in the new project. If it fails, copy the error into chat.
+Do not continue or repeatedly rerun it until the error is resolved.
+The setup is transactional: an error rolls back that attempted setup.
+Private tables are in wl_private, which is intentionally not publicly exposed.
+
+3. CREATE YOUR REVIEWER LOGIN
+Go to Authentication > Users in Supabase.
+Use Add user / Create user (not Send invitation) to create your email/password login.
+Use the option to confirm the email immediately if presented.
+Open activate-reviewer.sql in Notepad. Replace YOUR_EMAIL_HERE with exactly that
+login email. Paste the edited script into a NEW SQL Editor query and Run.
+Verify that the result shows your email, reviewer role and active=true.
+Do not share passwords in chat.
+
+4. GET THE PROJECT CONNECTION DETAILS
+Find your Project URL and publishable key in the project's API/connection settings.
+A legacy anon key also works. Do NOT use a secret key or service_role key.
+These are NOT your Google AI Studio key or database password.
+Keep project connection details available for the next step.
+
+5. START THE APP
+Extract all ZIP files to a folder named WorkLedger.
+Double-click START.bat, or open a command window inside the folder and run:
+python server.py
+Open http://localhost:8510 in your browser. Keep the command window open.
+No additional Python packages are required.
+The first screen asks for your Project URL and publishable/anon key. Connect.
+Sign in with the reviewer email/password you created.
+If the connection was mistyped, stop the app, rename connection.json to
+connection-old.json, restart and enter the corrected connection details.
+
+6. ADD A CLIENT
+Open Clients & staff. Add one SAMPLE client and optional retainer-scope notes.
+Use sample information for initial testing.
+
+7. ADD A STAFF LOGIN
+In Supabase Authentication > Users, create a second email/password account.
+Do not make it a reviewer. New accounts default to INACTIVE staff.
+Return to WorkLedger, Refresh, open Clients & staff, set the staff display name,
+tick Active and click Save access. It can now sign in.
+The app has no public sign-up screen. Keep the project's public-sign-up setting
+disabled if you do not need other sign-up flows. Unknown accounts remain inactive
+and cannot read app data until you explicitly activate them.
+
+8. TEST STAFF ENTRY
+Sign out and sign in with the staff account.
+Choose the sample client, describe work, select Completed and Save work.
+Optional time spent is in whole minutes. Category is under Work category.
+Staff can edit their own entries until approved for billing.
+
+9. TEST REVIEW AND BILLING
+Sign out and sign in as reviewer. Refresh if needed.
+Review work > choose Billable > enter an amount > Approve decision.
+Billable approval requires the work status to be Completed.
+Ready to bill > select entries for ONE client > Create proposal.
+Billing history shows the draft and a CSV worksheet download.
+Do not mark a real invoice issued for a sample test. A genuine issued reference
+and invoice date are required to mark associated work Billed.
+This app does not issue GST-compliant invoices, send bills, post accounting
+entries, collect receivables or calculate tax. It captures and tracks work-to-billing.
+
+10. TEST CLARIFICATION
+Reviewer: choose Ask staff and write a question on an unbilled sample entry.
+Staff: Needs my response > answer > Send response.
+Reviewer: the item returns to Pending with the conversation preserved.
+New information requires Refresh; this first version is not live-push/realtime.
+
+11. OPTIONAL AI
+Reviewer: Settings > add your Google AI Studio key and model > Apply connection.
+The default is gemini-3.5-flash (the model used successfully in Project 1).
+Staff can now click Help organise my note, review the suggestion and apply it.
+The original note is unchanged unless Use this suggestion is clicked.
+The note still needs Save work. No fees are generated or approved by AI.
+Key stays in this Python process's memory until it stops; it is not in exports.
+Only submitted note text and its chosen category go to Google. Notes may themselves
+contain client information, so use suitable content for your office's arrangements.
+
+IMPORTANT WORKFLOW BEHAVIOUR
+- Retainer/Complimentary closes the billing review without changing work status.
+- Editing a closed, nonbillable entry returns its review to Pending.
+- Entries approved for billing are locked against staff edits.
+- Reviewer can Return to pending before a proposal is created.
+- Cancel a DRAFT proposal to release its entries back to Ready.
+- Issued records cannot be changed in this first version. Corrections/credit notes
+  need a later explicit workflow; the app does not silently rewrite history.
+- Repeated identical requests are deduplicated using request IDs in the database.
+- Proposal creation checks current statuses and locks source entries transactionally.
+- Shared records are reloaded after saved actions; stale entry versions are rejected.
+- Existing records remain visible if a client/staff member is deactivated.
+- Fee totals are before any separately applicable tax; retainer notes are advisory.
+- An entry is a work record, not necessarily the whole assignment. Record clear
+  descriptions to avoid submitting duplicate work records for the same activity.
+
+LOCAL NOW; OFFICE DEPLOYMENT LATER
+This starter binds to localhost and is for testing from your computer. Supabase
+stores shared records, but other staff devices cannot reach this local URL yet.
+Deploying the backend with HTTPS, appropriate cookie settings, login rate limits
+and persistent server configuration is a separate next step after workflow testing.
+This is a functional course-project build, not a claim of production readiness.
+
+FILES AND DATA
+connection.json is created locally after connecting; do not publish it with code.
+No Supabase secret/service-role key is needed. App tables deny direct access;
+database functions check identity/active role and shape what each role receives.
+Only the reviewer can activate staff, manage clients or change billing decisions.
+The office data export includes fees, people and the latest 200 activity events;
+it is not a full database backup and has no import function. Use Supabase backup
+facilities separately if you need backup/restore. Passwords and AI keys are excluded.
+Python sessions expire after 12 hours or a server restart. Tokens are held in
+server memory and an HttpOnly SameSite cookie identifies the local session.
+
+VALIDATION STATUS
+4 JavaScript helper tests and 7 Python request-handler tests pass.
+Python and JavaScript syntax checked; app file routing and session handling tested.
+The handler tests use in-memory requests, without a real network socket.
+Supabase SQL deployment, database authorisation, concurrent transactions, browser
+appearance and live Gemini still need end-to-end tests in your project.
+If an error appears, copy its text into the chat; do not share keys or passwords.
+
+Developer checks (not needed to start):
+python -m unittest test_server.py -v
+node --test model.test.mjs
+
+Sources:
+https://supabase.com/docs/guides/database/functions
+https://supabase.com/docs/guides/auth/passwords
+https://supabase.com/docs/guides/database/postgres/row-level-security
