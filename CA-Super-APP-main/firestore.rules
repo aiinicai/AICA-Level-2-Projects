@@ -1,0 +1,65 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper functions
+    function isValidId(id) {
+      return id is string && id.size() > 0 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function isValidTask(data) {
+      return data.keys().hasAll(['id', 'title', 'completed']) &&
+        data.id is string && data.id.size() <= 128 &&
+        data.title is string && data.title.size() > 0 && data.title.size() <= 300 &&
+        data.completed is bool &&
+        (!('createdAt' in data) || data.createdAt == null || (data.createdAt is string && data.createdAt.size() <= 50)) &&
+        (!('description' in data) || data.description == null || (data.description is string && data.description.size() <= 2000)) &&
+        (!('assignedTo' in data) || data.assignedTo == null || (data.assignedTo is string && data.assignedTo.size() <= 100)) &&
+        (!('deadline' in data) || data.deadline == null || (data.deadline is string && data.deadline.size() <= 50)) &&
+        (!('isUrgent' in data) || data.isUrgent is bool) &&
+        (!('completedAt' in data) || data.completedAt == null || (data.completedAt is string && data.completedAt.size() <= 50)) &&
+        (!('completedBy' in data) || data.completedBy == null || (data.completedBy is string && data.completedBy.size() <= 100)) &&
+        (!('updatedAt' in data) || data.updatedAt == null || (data.updatedAt is string && data.updatedAt.size() <= 50)) &&
+        (!('attachments' in data) || data.attachments is list);
+    }
+
+    function isValidOfficeSettings(data) {
+      return data.keys().hasAll(['id']) &&
+        data.id is string && data.id.size() <= 64 &&
+        (!('officeDistrict' in data) || (data.officeDistrict is string && data.officeDistrict.size() <= 100)) &&
+        (!('officeState' in data) || (data.officeState is string && data.officeState.size() <= 50)) &&
+        (!('defaultNicCode' in data) || (data.defaultNicCode is string && data.defaultNicCode.size() <= 150)) &&
+        (!('adminUsername' in data) || (data.adminUsername is string && data.adminUsername.size() <= 100)) &&
+        (!('adminPasswordHash' in data) || (data.adminPasswordHash is string && data.adminPasswordHash.size() <= 200)) &&
+        (!('staffUsername' in data) || (data.staffUsername is string && data.staffUsername.size() <= 100)) &&
+        (!('staffPasswordHash' in data) || (data.staffPasswordHash is string && data.staffPasswordHash.size() <= 200)) &&
+        (!('staffMembers' in data) || (data.staffMembers is list && data.staffMembers.size() <= 100));
+    }
+
+    // Default deny all unknown collections
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Connection test document
+    match /test/{docId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    // Tasks collection for CA office compliance items
+    match /tasks/{taskId} {
+      allow get, list: if true;
+      allow create: if isValidId(taskId) && isValidTask(request.resource.data);
+      allow update: if isValidId(taskId) && isValidTask(request.resource.data);
+      allow delete: if isValidId(taskId);
+    }
+
+    // Office settings & defaults
+    match /officeSettings/{settingId} {
+      allow get, list: if true;
+      allow create, update: if isValidId(settingId) && isValidOfficeSettings(request.resource.data);
+      allow delete: if isValidId(settingId);
+    }
+  }
+}
