@@ -88,7 +88,8 @@ def run_window(rt: Runtime) -> bool:
     try:
         os.makedirs(storage, exist_ok=True)
         rt.window = webview.create_window(TITLE, rt.url, width=1400, height=900, min_size=(1000, 640), text_select=True)
-        webview.start(private_mode=False, storage_path=storage)
+        icon = str(resource_path("app/assets/tally_mis.ico"))
+        webview.start(private_mode=False, storage_path=storage, icon=icon if os.path.isfile(icon) else None)
         return True
     except Exception:
         rt.window = None

@@ -1,7 +1,7 @@
-# Tally MIS — offline dashboard for TallyPrime (Python)
+# Tally MIS â€” offline dashboard for TallyPrime (Python)
 
 An AICA Level 2 (ICAI) capstone project. It is a **Windows desktop app** that reads a company from **TallyPrime**
-(or from exported XML files), shows an MIS dashboard — overview, profit & loss, receivables & payables — and has a floating
+(or from exported XML files), shows an MIS dashboard â€” overview, profit & loss, receivables & payables â€” and has a floating
 **assistant** that explains the figures using a language model running on your own PC.
 
 * Works **offline**. Nothing is sent to the internet. The only network traffic is to TallyPrime and LM Studio on the same PC.
@@ -22,7 +22,7 @@ An AICA Level 2 (ICAI) capstone project. It is a **Windows desktop app** that re
 | **Balance sheet** | Statement with comparison, then Liquidity, Solvency & capital, Asset quality & returns, Risk & integrity checks and Cash flow tabs, each with KPI cards and month-end trends. |
 | **Receivables & payables** | Bill-wise ageing by due date, overdue list, collection priority, notes, trend. |
 | **5 colour themes** | Light, Dark, Ocean, Warm, High contrast (menu top-right, or Settings). |
-| **Assistant** (round button, bottom right) | Ask "Explain the net profit", "Who owes us the most?" …. Answers only about the open company by default; a Settings switch allows general questions, which are then labelled *General knowledge — not from your company data*. |
+| **Assistant** (round button, bottom right) | Ask "Explain the net profit", "Who owes us the most?" â€¦. Answers only about the open company by default; a Settings switch allows general questions, which are then labelled *General knowledge â€” not from your company data*. |
 
 Not in this version (shown as "coming in a later version"): inventory, insights & alerts, data-quality
 screens, custom KPI formulas, ledger-mapping editor, CSV/Excel export.
@@ -31,13 +31,13 @@ screens, custom KPI formulas, ledger-mapping editor, CSV/Excel export.
 
 ## Install and run
 
-### Option A — the EXE (easiest)
+### Option A â€” the EXE (easiest)
 1. Use the ready-made `dist/TallyMIS.exe` (68 MB, included in this repository), or build it yourself (see *Build the EXE* below).
-   SHA-256 of the included file: `0B5B4DB82A5A986C1DCE3C8E51F0CF7ED1B8B29173CCBAB9234DEEB9285BC783`. Windows SmartScreen may warn because the file is not code-signed: choose *More info → Run anyway*.
+   SHA-256 of the included file: `C8E71A664202D6F6A2DEB2A969CE056CB03BDAA7E8166FDCC25B8107B3263F58`. Windows SmartScreen may warn because the file is not code-signed: choose *More info â†’ Run anyway*.
 2. Double-click `TallyMIS.exe`. A window opens. Needs **Windows 10/11 with the Edge WebView2 runtime** (already on Windows 11).
-3. **Data sources → Load demo company** to explore immediately, or keep TallyPrime open and use **Sync from Tally**.
+3. **Data sources â†’ Load demo company** to explore immediately, or keep TallyPrime open and use **Sync from Tally**.
 
-### Option B — from source
+### Option B â€” from source
 Requires **Python 3.15** (and Node 20+ only if you want to rebuild the screens).
 
 ```powershell
@@ -55,14 +55,14 @@ as voucher dates, so they import in TallyPrime Educational mode too, and each co
 
 | Folder | What it is |
 |---|---|
-| `sample_tally_data_full/` | **4½ years (Apr 2021 – Sep 2025), 6,094 vouchers, with stock**: 30 items, 2 godowns, sales/purchases/returns, GST, 2 cost centres, 25 customers and 12 suppliers (bill-wise), loans, fixed assets and depreciation, tax provisions. Exercises every screen. Steps: [HOW_TO_OPEN_IN_TALLY.md](sample_tally_data_full/HOW_TO_OPEN_IN_TALLY.md) |
+| `sample_tally_data_full/` | **4Â½ years (Apr 2021 â€“ Sep 2025), 6,094 vouchers, with stock**: 30 items, 2 godowns, sales/purchases/returns, GST, 2 cost centres, 25 customers and 12 suppliers (bill-wise), loans, fixed assets and depreciation, tax provisions. Exercises every screen. Steps: [HOW_TO_OPEN_IN_TALLY.md](sample_tally_data_full/HOW_TO_OPEN_IN_TALLY.md) |
 | `sample_tally_data/` | A small accounts-only company (421 vouchers, 18 months) for a quick first test. Steps: [HOW_TO_OPEN_IN_TALLY.md](sample_tally_data/HOW_TO_OPEN_IN_TALLY.md) |
 
 Regenerate them with `tools/make_tally_sample.py` (small) and `tools/node/make-full-sample.ts` (full; needs the original Node project, see the notes in that file).
 
 ## Connecting to TallyPrime
-1. In TallyPrime open your company, then **F1 (Help) → Settings → Connectivity** and set *TallyPrime acts as* **Server**
-   (or **Both**) on port **9000** (any port 9000–9010 works).
+1. In TallyPrime open your company, then **F1 (Help) â†’ Settings â†’ Connectivity** and set *TallyPrime acts as* **Server**
+   (or **Both**) on port **9000** (any port 9000â€“9010 works).
 2. In Tally MIS go to **Data sources & sync**. It finds Tally and lists the open company. Tick the months and press **Sync**.
 3. The app **only reads** from Tally. It never creates, changes or deletes anything in Tally.
 
@@ -71,7 +71,7 @@ Regenerate them with `tools/make_tally_sample.py` (small) and `tools/node/make-f
 ## The assistant (LM Studio)
 1. Install [LM Studio](https://lmstudio.ai), download the model **`google/gemma-4-e2b`**, load it, and start its local server
    (Developer tab, default `http://localhost:1234`).
-2. Open **Settings → Appearance & assistant**: it shows whether LM Studio and the model are found.
+2. Open **Settings â†’ Appearance & assistant**: it shows whether LM Studio and the model are found.
 3. Click the round chat button and ask. *Figures used* shows exactly what the AI was given.
 
 How it stays honest:
@@ -80,7 +80,7 @@ How it stays honest:
 * After the reply, **every number is checked** against that list. If one does not match, the reply is withheld and the
   verified figures are shown instead.
 * The app **refuses any address that is not this PC**, so figures cannot be sent elsewhere.
-* Thinking mode is switched off for the request (`reasoning_effort: none`) so a reasoning model such as Gemma 4 answers in about 10–30 seconds instead of timing out.
+* Thinking mode is switched off for the request (`reasoning_effort: none`) so a reasoning model such as Gemma 4 answers in about 10â€“30 seconds instead of timing out.
 * Default = company questions only. Turning on *Allow general questions* labels those replies as general knowledge.
 
 ## How it was built and checked (the capstone story)
@@ -91,8 +91,8 @@ logic was re-written in Python**. Each phase was checked against the original:
 |---|---|
 | 1 Tally reader | Same records as Node on 63 MB of data; request messages byte-identical; Python uses about half the memory. [docs/PHASE1_RESULTS.md](docs/PHASE1_RESULTS.md) |
 | 2 In-memory model | 40,271 database values identical to Node; nothing written to disk; wipe verified. [docs/PHASE2_RESULTS.md](docs/PHASE2_RESULTS.md) |
-| 3 Calculations | 25–33 report answers in each of 3 scenarios identical to Node, 70,000+ values, 0 differences. [docs/PHASE3_RESULTS.md](docs/PHASE3_RESULTS.md) |
-| 4–5 Server and window | FastAPI on 127.0.0.1 with host and header guards; pywebview window; closing wipes data. |
+| 3 Calculations | 25â€“33 report answers in each of 3 scenarios identical to Node, 70,000+ values, 0 differences. [docs/PHASE3_RESULTS.md](docs/PHASE3_RESULTS.md) |
+| 4â€“5 Server and window | FastAPI on 127.0.0.1 with host and header guards; pywebview window; closing wipes data. |
 | 6 Themes | 5 themes. |
 | 7 Assistant | LM Studio client, figure checker, scope switch; tested with a pretend LM Studio, then with the real one. |
 | 8 EXE | One file, about 71 MB. |
@@ -103,7 +103,7 @@ Architecture and decisions: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 ```powershell
 .\.venv\Scripts\python.exe -m pytest
 ```
-67 tests: Tally reader edge cases, in-memory model and wipe, **Python-vs-Node answer comparison**, API, assistant, the 4½-year sample company, licensing.
+67 tests: Tally reader edge cases, in-memory model and wipe, **Python-vs-Node answer comparison**, API, assistant, the 4Â½-year sample company, licensing.
 The Node comparison uses saved answers in `tests/golden/` (made from fictional data), so Node is not needed to run the tests.
 
 ## Build the EXE
@@ -119,7 +119,7 @@ Tally MIS is for learning and evaluation. See [LICENSE](LICENSE). The app has an
 | Mode | What you get |
 |---|---|
 | **Evaluation** (no key) | The fictional demo company is unlimited. Real data: one company, 3 months per Tally sync, 3 MB per imported file. A banner says so. |
-| **Licensed** (key entered in *Settings → Licence*) | No limits, or the limits written in the key: **one specific PC** (machine fingerprint), an **expiry date**, a **number of companies**. |
+| **Licensed** (key entered in *Settings â†’ Licence*) | No limits, or the limits written in the key: **one specific PC** (machine fingerprint), an **expiry date**, a **number of companies**. |
 
 Keys are signed with the author's private key (Ed25519). The app holds only the public key, so it can check a key but nobody can make one. No internet, no account.
 The private key is never in this project. The author issues keys with `tools/make_license.py`.
@@ -130,7 +130,7 @@ The private key is never in this project. The author issues keys with `tools/mak
   changes need an app-only header.
 * Tally and LM Studio addresses are restricted to this PC.
 * Company data is held in DuckDB `:memory:` with spill-to-disk and file access switched off. The window's storage keeps only your theme choice.
-* Assistant preferences (switch, model name) are saved in `%APPDATA%\TallyMIS\settings.json` — no company data.
+* Assistant preferences (switch, model name) are saved in `%APPDATA%\TallyMIS\settings.json` â€” no company data.
 
 ## Known limits
 * Live sync was tested against a **mock Tally server** with fictional data and the original project's recorded Tally behaviour;
