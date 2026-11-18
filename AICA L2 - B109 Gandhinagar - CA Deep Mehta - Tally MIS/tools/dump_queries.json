@@ -1,0 +1,53 @@
+{
+ "counts": {
+  "ledger_groups": "SELECT COUNT(*) v FROM ledger_groups", "ledgers": "SELECT COUNT(*) v FROM ledgers",
+  "voucher_types": "SELECT COUNT(*) v FROM voucher_types", "cost_centres": "SELECT COUNT(*) v FROM cost_centres",
+  "stock_groups": "SELECT COUNT(*) v FROM stock_groups", "units": "SELECT COUNT(*) v FROM units", "godowns": "SELECT COUNT(*) v FROM godowns",
+  "stock_items": "SELECT COUNT(*) v FROM stock_items", "vouchers": "SELECT COUNT(*) v FROM vouchers",
+  "voucher_lines": "SELECT COUNT(*) v FROM voucher_lines", "cost_allocations": "SELECT COUNT(*) v FROM cost_allocations",
+  "bill_allocations_opening": "SELECT COUNT(*) v FROM bill_allocations WHERE is_opening = 1",
+  "bill_allocations_voucher": "SELECT COUNT(*) v FROM bill_allocations WHERE is_opening = 0",
+  "inventory_lines": "SELECT COUNT(*) v FROM inventory_lines", "source_balances": "SELECT COUNT(*) v FROM source_balances",
+  "stock_snapshots": "SELECT COUNT(*) v FROM stock_snapshots", "ledger_closing_values": "SELECT COUNT(*) v FROM ledger_closing_values"
+ },
+ "sums": {
+  "voucher_lines_amount": "SELECT COALESCE(SUM(amount_paise),0) v FROM voucher_lines",
+  "voucher_lines_abs": "SELECT COALESCE(SUM(ABS(amount_paise)),0) v FROM voucher_lines",
+  "voucher_line_total": "SELECT COALESCE(SUM(line_total_paise),0) v FROM vouchers",
+  "unbalanced_vouchers": "SELECT COUNT(*) v FROM vouchers WHERE line_total_paise <> 0",
+  "ledger_opening": "SELECT COALESCE(SUM(opening_paise),0) v FROM ledgers",
+  "ledger_credit_limit": "SELECT COALESCE(SUM(credit_limit_paise),0) v FROM ledgers",
+  "billwise_ledgers": "SELECT COALESCE(SUM(is_billwise),0) v FROM ledgers",
+  "bill_amount": "SELECT COALESCE(SUM(amount_paise),0) v FROM bill_allocations",
+  "bill_credit_days": "SELECT COALESCE(SUM(credit_days),0) v FROM bill_allocations",
+  "inventory_qty": "SELECT COALESCE(SUM(qty_e4),0) v FROM inventory_lines",
+  "inventory_value": "SELECT COALESCE(SUM(value_paise),0) v FROM inventory_lines",
+  "inventory_in": "SELECT COUNT(*) v FROM inventory_lines WHERE direction = 'in'",
+  "cost_alloc_amount": "SELECT COALESCE(SUM(amount_paise),0) v FROM cost_allocations",
+  "source_balance_sum": "SELECT COALESCE(SUM(closing_paise),0) v FROM source_balances",
+  "stock_opening_qty": "SELECT COALESCE(SUM(opening_qty_e4),0) v FROM stock_items",
+  "stock_opening_value": "SELECT COALESCE(SUM(opening_value_paise),0) v FROM stock_items",
+  "snapshot_qty": "SELECT COALESCE(SUM(qty_e4),0) v FROM stock_snapshots",
+  "snapshot_value": "SELECT COALESCE(SUM(value_paise),0) v FROM stock_snapshots",
+  "closing_values": "SELECT COALESCE(SUM(amount_paise),0) v FROM ledger_closing_values",
+  "accounting_vouchers": "SELECT COALESCE(SUM(is_accounting),0) v FROM vouchers",
+  "inventory_vouchers": "SELECT COALESCE(SUM(is_inventory),0) v FROM vouchers",
+  "cancelled_vouchers": "SELECT COALESCE(SUM(is_cancelled),0) v FROM vouchers",
+  "invoice_vouchers": "SELECT COALESCE(SUM(is_invoice),0) v FROM vouchers",
+  "party_linked_vouchers": "SELECT COUNT(*) v FROM vouchers WHERE party_ledger_id IS NOT NULL",
+  "ledgers_with_group_id": "SELECT COUNT(*) v FROM ledgers WHERE group_id IS NOT NULL",
+  "reserved_groups": "SELECT COALESCE(SUM(is_reserved),0) v FROM ledger_groups",
+  "known_voucher_types": "SELECT COALESCE(SUM(is_known),0) v FROM voucher_types"
+ },
+ "groups": {
+  "vouchers_by_base_type": "SELECT base_type k, COUNT(*) v FROM vouchers GROUP BY base_type",
+  "vouchers_by_month": "SELECT SUBSTR(date,1,7) k, COUNT(*) v FROM vouchers GROUP BY SUBSTR(date,1,7)",
+  "groups_by_primary": "SELECT primary_group k, COUNT(*) v FROM ledger_groups GROUP BY primary_group",
+  "voucher_type_base": "SELECT name || '=' || base_type k, affects_accounts * 10 + affects_inventory v FROM voucher_types",
+  "ledger_movement": "SELECT l.name k, COALESCE(SUM(vl.amount_paise),0) v FROM ledgers l LEFT JOIN voucher_lines vl ON vl.ledger_id = l.id GROUP BY l.name",
+  "ledger_group_names": "SELECT name || '->' || COALESCE(group_name,'') k, COALESCE(group_id,0) * 0 + opening_paise v FROM ledgers",
+  "item_inventory": "SELECT s.name k, COALESCE(SUM(CASE WHEN il.direction='in' THEN il.qty_e4 ELSE -il.qty_e4 END),0) v FROM stock_items s LEFT JOIN inventory_lines il ON il.stock_item_id = s.id GROUP BY s.name",
+  "bill_by_ledger": "SELECT l.name k, SUM(b.amount_paise) v FROM bill_allocations b JOIN ledgers l ON l.id = b.ledger_id GROUP BY l.name",
+  "voucher_party_amounts": "SELECT v.source_key k, v.line_total_paise + COALESCE(SUM(vl.amount_paise),0) v FROM vouchers v LEFT JOIN voucher_lines vl ON vl.voucher_id = v.id GROUP BY v.source_key, v.line_total_paise"
+ }
+}
