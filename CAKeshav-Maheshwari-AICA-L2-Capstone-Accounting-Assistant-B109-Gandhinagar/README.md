@@ -3,7 +3,7 @@
 **Participant:** CA Keshav Maheshwari, FCA (M. No. 159754), Maheshwari Keshav & Co., Ahmedabad\
 **Course:** Certificate Course on AI for Chartered Accountants (AICA) — Level 2\
 **Project:** Accounting Assistant for TallyPrime (v10)\
-**Video link:** ____________________________________________ *(YouTube unlisted / Google Drive, "Anyone with the link")*
+**Video link:** https://drive.google.com/drive/folders/1JPwGl8h6Zh-KefnrXyXTWG6FYehqyxFZ\
 
 An offline yet intelligent Windows desktop app that sits beside TallyPrime. It learns from past entries and corrections, so a bank line or invoice handled before gets the same ledger automatically. It reads supplier invoices (optionally with Google Gemini, after masking), turns bank and credit-card statements into Tally entries by rules alone (banking never goes to AI — blocked in code), and checks the books for TDS / GST compliance gaps and red flags. Every entry is reviewed before it is posted.
 
