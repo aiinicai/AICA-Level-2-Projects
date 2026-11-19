@@ -1,0 +1,26 @@
+{% extends "base.html" %}{% load ui %}
+{% block title %}Clients{% endblock %}
+{% block content %}
+<div class="mb-6 flex flex-wrap items-end justify-between gap-3">
+  <div><h1 class="text-2xl font-semibold tracking-tight">Clients</h1><p class="mt-1 text-sm text-slate-500">Everyone you act for, with their active engagements.</p></div>
+  <a class="btn-primary" href="{% url 'client_create' %}">+ Add client</a>
+</div>
+<form method="get" class="mb-4 flex flex-wrap items-center gap-3">
+  <input class="input max-w-xs" name="q" value="{{ q }}" placeholder="Search name, PAN, GSTIN, email…">
+  <label class="flex items-center gap-2 text-sm text-slate-600"><input type="checkbox" name="archived" value="1" {% if archived %}checked{% endif %} onchange="this.form.submit()"> Show archived</label>
+  <button class="btn-ghost">Search</button>
+</form>
+<div class="card overflow-x-auto"><table class="w-full">
+  <thead class="border-b border-slate-200 bg-slate-50"><tr><th class="th">Client</th><th class="th">PAN / GSTIN</th><th class="th">Contact</th><th class="th">Active services</th><th class="th">Open tasks</th></tr></thead>
+  <tbody class="divide-y divide-slate-100">
+  {% for c in clients %}
+    <tr class="hover:bg-slate-50">
+      <td class="td"><a class="link" href="{% url 'client_detail' c.pk %}">{{ c.name }}</a><div class="text-xs text-slate-400">{{ c.get_type_display }}</div></td>
+      <td class="td font-mono text-xs text-slate-600">{{ c.pan|default:"—" }}<div>{{ c.gstin|default:"" }}</div></td>
+      <td class="td text-slate-600">{{ c.contact_person }}<div class="text-xs text-slate-400">{{ c.phone|default:c.email }}</div></td>
+      <td class="td"><div class="flex flex-wrap gap-1">{% for s in c.services.all %}{% if s.is_active %}<span class="badge bg-violet-100 text-violet-700">{{ s.name }}</span>{% endif %}{% empty %}<span class="text-slate-300">—</span>{% endfor %}</div></td>
+      <td class="td text-slate-600">{{ c.open_tasks }}</td>
+    </tr>
+  {% empty %}<tr><td colspan="5" class="px-4 py-10 text-center text-sm text-slate-400">No clients found.</td></tr>{% endfor %}
+  </tbody></table></div>
+{% endblock %}

@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block title %}New recurring deadline{% endblock %}
+{% block content %}
+<div class="max-w-xl">
+  <h1 class="mb-4 text-2xl font-semibold tracking-tight">New recurring deadline</h1>
+  <form method="post" class="card space-y-4 p-6" novalidate>{% csrf_token %}
+    {% if form.non_field_errors %}<div class="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{{ form.non_field_errors }}</div>{% endif %}
+    <div><label class="label" for="preset">Start from a compliance template</label>
+      <select class="input" id="preset"><option value="">Custom…</option>{% for p in presets %}<option value="{{ p.key }}">{{ p.title }} ({{ p.frequency|title }}, day {{ p.day_of_month }})</option>{% endfor %}</select>
+      <p class="mt-1 text-xs text-slate-400">Due dates are editable defaults. Verify against current CBDT / CBIC notifications and extensions.</p></div>
+    <div class="grid gap-4 sm:grid-cols-2">{% include "_fields.html" %}</div>
+    <div class="flex justify-end gap-2 pt-2"><a class="btn-ghost" href="{% url 'recurring_list' %}">Cancel</a><button class="btn-primary">Create schedule</button></div>
+  </form>
+</div>
+{{ presets|json_script:"presets-data" }}
+{% endblock %}
+{% block scripts %}
+<script>
+  const presets = JSON.parse(document.getElementById('presets-data').textContent);
+  document.getElementById('preset').addEventListener('change', e => {
+    const p = presets.find(x => x.key === e.target.value); if (!p) return;
+    const set = (n, v) => { const el = document.getElementById('id_' + n); if (el) el.value = v ?? ''; };
+    set('title', p.title); set('frequency', p.frequency); set('day_of_month', p.day_of_month); set('month', p.month); set('priority', p.priority);
+  });
+</script>
+{% endblock %}

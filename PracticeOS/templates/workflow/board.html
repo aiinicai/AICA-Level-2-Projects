@@ -1,0 +1,62 @@
+{% extends "base.html" %}{% load ui %}
+{% block title %}Tasks{% endblock %}
+{% block content %}
+<div class="mb-4 flex flex-wrap items-end justify-between gap-3">
+  <div><h1 class="text-2xl font-semibold tracking-tight">Tasks &amp; Deadlines</h1><p class="mt-1 text-sm text-slate-500">Drag cards between columns to update their status.</p></div>
+  <a class="btn-primary" href="{% url 'task_create' %}">+ New task</a>
+</div>
+<div class="mb-5 flex flex-wrap items-center justify-between gap-3 border-b border-slate-200">
+  <div class="flex gap-1">
+    <a class="-mb-px border-b-2 border-brand-500 px-4 py-2 text-sm font-medium text-brand-600" href="{% url 'board' %}">Board</a>
+    <a class="-mb-px border-b-2 border-transparent px-4 py-2 text-sm font-medium text-slate-500 hover:text-slate-700" href="{% url 'recurring_list' %}">Recurring deadlines</a>
+  </div>
+  <label class="mb-2 flex items-center gap-2 text-sm text-slate-600"><input type="checkbox" {% if mine %}checked{% endif %} onchange="location.search = this.checked ? '?mine=1' : ''"> Only my tasks</label>
+</div>
+<form id="csrf">{% csrf_token %}</form>
+<div class="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+  {% for value, label, items in columns %}
+  <div class="column rounded-xl border border-t-4 border-slate-200 bg-slate-100/60 p-3 transition
+       {% if value == 'TODO' %}border-t-slate-400{% elif value == 'IN_PROGRESS' %}border-t-blue-500{% elif value == 'REVIEW' %}border-t-amber-500{% else %}border-t-emerald-500{% endif %}" data-status="{{ value }}">
+    <div class="mb-3 flex items-center justify-between px-1 text-sm font-semibold text-slate-700">{{ label }}<span class="count rounded-full bg-white px-2 py-0.5 text-xs font-medium text-slate-500">{{ items|length }}</span></div>
+    <div class="cards min-h-[3rem] space-y-2.5">
+      {% for t in items %}
+      <div class="card cursor-grab p-3 hover:border-brand-500 active:cursor-grabbing" draggable="true" data-id="{{ t.pk }}" data-url="{% url 'task_status' t.pk %}">
+        <a class="block text-sm font-medium text-slate-900" href="{% url 'task_edit' t.pk %}">{{ t.title }}</a>
+        {% if t.client %}<div class="mt-0.5 text-xs text-slate-500">{{ t.client.name }}</div>{% endif %}
+        {% if t.period_label %}<div class="text-xs text-slate-400">{{ t.period_label }}</div>{% endif %}
+        <div class="mt-2.5 flex items-center justify-between text-xs">
+          <span class="{% if t.is_overdue %}font-semibold text-red-600{% else %}text-slate-500{% endif %}">{% if t.due_date %}{% if t.is_overdue %}Overdue · {% endif %}{{ t.due_date|date:"d M Y" }}{% else %}No due date{% endif %}</span>
+          <div class="flex items-center gap-1.5">{% if t.priority == 'HIGH' %}<span class="{{ 'HIGH'|tone }}">High</span>{% endif %}
+            {% if t.assignee %}<span title="{{ t.assignee.name }}" class="flex h-6 w-6 items-center justify-center rounded-full bg-brand-100 text-[10px] font-semibold text-brand-700">{{ t.assignee.name|initials }}</span>{% endif %}</div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+  const csrf = document.querySelector('#csrf [name=csrfmiddlewaretoken]').value;
+  let dragged = null;
+  const recount = () => document.querySelectorAll('.column').forEach(c => c.querySelector('.count').textContent = c.querySelectorAll('[data-id]').length);
+  document.querySelectorAll('[data-id]').forEach(card => {
+    card.addEventListener('dragstart', e => { dragged = card; e.dataTransfer.effectAllowed = 'move'; card.classList.add('opacity-50'); });
+    card.addEventListener('dragend', () => card.classList.remove('opacity-50'));
+  });
+  document.querySelectorAll('.column').forEach(col => {
+    col.addEventListener('dragover', e => { e.preventDefault(); col.classList.add('bg-brand-50'); });
+    col.addEventListener('dragleave', () => col.classList.remove('bg-brand-50'));
+    col.addEventListener('drop', async e => {
+      e.preventDefault(); col.classList.remove('bg-brand-50');
+      if (!dragged) return;
+      const source = dragged.parentElement, card = dragged; dragged = null;
+      if (source === col.querySelector('.cards')) return;
+      col.querySelector('.cards').appendChild(card); recount();           // optimistic move
+      const res = await fetch(card.dataset.url, { method: 'POST', headers: { 'X-CSRFToken': csrf, 'Content-Type': 'application/json' }, body: JSON.stringify({ status: col.dataset.status }) });
+      if (!res.ok) { source.appendChild(card); recount(); alert('Could not update the task. Please try again.'); }
+    });
+  });
+</script>
+{% endblock %}

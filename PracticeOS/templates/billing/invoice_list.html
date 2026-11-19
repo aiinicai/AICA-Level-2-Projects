@@ -1,0 +1,26 @@
+{% extends "base.html" %}{% load ui %}
+{% block title %}Invoices{% endblock %}
+{% block content %}
+<div class="mb-6 flex flex-wrap items-end justify-between gap-3">
+  <div><h1 class="text-2xl font-semibold tracking-tight">Invoices</h1><p class="mt-1 text-sm text-slate-500">Billing and payment tracking.</p></div>
+  <div class="flex gap-2"><a class="btn-ghost" href="{% url 'invoice_from_time' %}">Bill logged time</a><a class="btn-primary" href="{% url 'invoice_create' %}">+ New invoice</a></div>
+</div>
+<form method="get" class="mb-4 flex flex-wrap items-center gap-3">
+  <select class="input max-w-[11rem]" name="status" onchange="this.form.submit()"><option value="">All statuses</option>{% for v, l in statuses %}<option value="{{ v }}" {% if status == v %}selected{% endif %}>{{ l }}</option>{% endfor %}</select>
+  <select class="input max-w-[14rem]" name="client" onchange="this.form.submit()"><option value="">All clients</option>{% for c in clients %}<option value="{{ c.pk }}" {% if client_id == c.pk|stringformat:"s" %}selected{% endif %}>{{ c.name }}</option>{% endfor %}</select>
+  <div class="ml-auto text-sm text-slate-600">Pending balance <b>{{ pending_total|inr }}</b>{% if overdue_total %}<span class="ml-3 text-red-600">Overdue <b>{{ overdue_total|inr }}</b></span>{% endif %}</div>
+</form>
+<div class="card overflow-x-auto"><table class="w-full">
+  <thead class="border-b border-slate-200 bg-slate-50"><tr><th class="th">Invoice</th><th class="th">Client</th><th class="th">Issued</th><th class="th">Due</th><th class="th">Total</th><th class="th">Balance</th><th class="th">Status</th><th class="th"></th></tr></thead>
+  <tbody class="divide-y divide-slate-100">
+  {% for i in invoices %}
+    <tr class="hover:bg-slate-50 {% if i.status == 'CANCELLED' %}opacity-50{% endif %}">
+      <td class="td"><a class="link" href="{% url 'invoice_detail' i.pk %}">{{ i.number }}</a></td><td class="td text-slate-600">{{ i.client.name }}</td>
+      <td class="td text-slate-500">{{ i.issue_date|date:"d M Y" }}</td><td class="td {% if i.is_overdue %}font-medium text-red-600{% else %}text-slate-500{% endif %}">{{ i.due_date|date:"d M Y" }}</td>
+      <td class="td">{{ i.total|inr }}</td><td class="td font-medium">{% if i.status == 'CANCELLED' %}—{% else %}{{ i.balance|inr }}{% endif %}</td>
+      <td class="td"><span class="{{ i.status_key|tone }}">{{ i.status_label }}</span></td>
+      <td class="td whitespace-nowrap text-right text-xs">{% if i.status == 'PENDING' %}<a class="font-medium text-emerald-600 hover:underline" href="{% url 'invoice_pay' i.pk %}">Record payment</a>{% endif %}</td>
+    </tr>
+  {% empty %}<tr><td colspan="8" class="px-4 py-10 text-center text-sm text-slate-400">No invoices yet.</td></tr>{% endfor %}
+  </tbody></table></div>
+{% endblock %}

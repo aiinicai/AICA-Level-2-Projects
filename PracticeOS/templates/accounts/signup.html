@@ -1,0 +1,54 @@
+{% extends "auth_base.html" %}
+{% block title %}Create workspace{% endblock %}
+{% block width %}max-w-lg{% endblock %}
+{% block content %}
+<form method="post" class="card space-y-5 p-6" novalidate>
+  {% csrf_token %}
+  <h1 class="text-lg font-semibold">Create your firm's workspace</h1>
+  {% if form.non_field_errors %}<div class="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{{ form.non_field_errors }}</div>{% endif %}
+
+  <fieldset class="space-y-4"><legend class="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">1 · Your account</legend>
+    {% for f in form.account_fields %}
+      <div><label class="label" for="{{ f.id_for_label }}">{{ f.label }} *</label>{{ f }}
+        {% if f.help_text %}<p class="mt-1 text-xs text-slate-400">{{ f.help_text }}</p>{% endif %}
+        {% for e in f.errors %}<p class="mt-1 text-xs text-red-600">{{ e }}</p>{% endfor %}</div>
+    {% endfor %}
+  </fieldset>
+
+  <fieldset class="space-y-4"><legend class="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">2 · Firm profile</legend>
+    {% for f in form.firm_fields %}
+      <div><label class="label" for="{{ f.id_for_label }}">{{ f.label }} *</label>{{ f }}
+        {% for e in f.errors %}<p class="mt-1 text-xs text-red-600">{{ e }}</p>{% endfor %}</div>
+    {% endfor %}
+  </fieldset>
+
+  <fieldset class="space-y-2"><legend class="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">3 · Workspace address</legend>
+    <div class="flex items-stretch"><div class="flex-1 [&>input]:rounded-r-none">{{ form.subdomain }}</div>
+      <span class="flex items-center rounded-r-lg border border-l-0 border-slate-300 bg-slate-50 px-3 text-sm text-slate-500">.practiceos.app</span></div>
+    <p id="sub-status" class="text-sm text-slate-400">{{ form.subdomain.help_text }}</p>
+    {% for e in form.subdomain.errors %}<p class="text-xs text-red-600">{{ e }}</p>{% endfor %}
+  </fieldset>
+  <button class="btn-primary w-full">Create workspace</button>
+</form>
+<p class="mt-4 text-center text-sm text-slate-500">Already have a workspace? <a class="font-medium text-brand-600 hover:underline" href="{% url 'login' %}">Sign in</a></p>
+{% endblock %}
+{% block scripts %}
+<script>
+  // Workspace-address simulation: suggest from the firm name, then check availability (debounced).
+  const firm = document.getElementById('id_firm_name'), sub = document.getElementById('id_subdomain'), out = document.getElementById('sub-status');
+  let touched = !!sub.value, timer;
+  sub.addEventListener('input', () => { touched = true; check(sub.value); });
+  firm.addEventListener('input', () => { if (!touched) check(firm.value, true); });
+  function check(name, fill) {
+    clearTimeout(timer);
+    out.textContent = 'Checking availability…'; out.className = 'text-sm text-slate-400';
+    timer = setTimeout(async () => {
+      const r = await (await fetch("{% url 'subdomain_check' %}?name=" + encodeURIComponent(name))).json();
+      if (fill) sub.value = r.subdomain;
+      out.textContent = r.subdomain ? (r.available ? '✓ ' + r.subdomain + '.practiceos.app is available' : '✕ Not available – try another name') : '';
+      out.className = 'text-sm ' + (r.available ? 'text-emerald-600' : 'text-red-600');
+    }, 350);
+  }
+  if (sub.value) check(sub.value);
+</script>
+{% endblock %}

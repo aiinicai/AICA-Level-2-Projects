@@ -1,0 +1,28 @@
+{% extends "base.html" %}{% load ui %}
+{% block title %}Team{% endblock %}
+{% block content %}
+<div class="mb-6 flex flex-wrap items-end justify-between gap-3">
+  <div><h1 class="text-2xl font-semibold tracking-tight">Team &amp; access</h1>
+    <p class="mt-1 text-sm text-slate-500">Admins manage everything; team members work on clients and tasks; client logins see only their own portal.</p></div>
+  <a class="btn-primary" href="{% url 'team_invite' %}">+ Add login</a>
+</div>
+<div class="card overflow-x-auto"><table class="w-full">
+  <thead class="border-b border-slate-200 bg-slate-50"><tr><th class="th">Name</th><th class="th">Email</th><th class="th">Role</th><th class="th">Rate / hr</th><th class="th">Status</th><th class="th"></th></tr></thead>
+  <tbody class="divide-y divide-slate-100">
+  {% for u in users %}
+    <tr class="{% if not u.is_active %}opacity-50{% endif %}">
+      <td class="td font-medium">{{ u.name }}{% if u == request.user %} <span class="text-xs text-slate-400">(you)</span>{% endif %}{% if u.client %}<div class="text-xs font-normal text-slate-400">{{ u.client.name }}</div>{% endif %}</td>
+      <td class="td text-slate-600">{{ u.email }}</td>
+      <td class="td"><span class="{{ u.role|tone }}">{{ u.get_role_display }}</span></td>
+      <td class="td text-slate-600">{% if u.hourly_rate %}{{ u.hourly_rate|inr }}{% else %}—{% endif %}</td>
+      <td class="td"><span class="{% if u.is_active %}{{ 'GOOD'|tone }}{% else %}badge bg-slate-100 text-slate-600{% endif %}">{% if u.is_active %}Active{% else %}Disabled{% endif %}</span></td>
+      <td class="td whitespace-nowrap text-right text-xs">
+        {% if u != request.user %}
+          {% if u.role != 'CLIENT' %}<form class="inline" method="post" action="{% url 'team_toggle_role' u.pk %}">{% csrf_token %}<button class="mr-3 text-slate-500 hover:text-brand-600">Make {% if u.role == 'ADMIN' %}team member{% else %}admin{% endif %}</button></form>{% endif %}
+          <form class="inline" method="post" action="{% url 'team_toggle_active' u.pk %}">{% csrf_token %}<button class="text-slate-500 hover:text-red-600">{% if u.is_active %}Disable{% else %}Enable{% endif %}</button></form>
+        {% endif %}
+      </td>
+    </tr>
+  {% endfor %}
+  </tbody></table></div>
+{% endblock %}

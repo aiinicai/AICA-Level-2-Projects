@@ -1,0 +1,17 @@
+{% extends "auth_base.html" %}{% load ui %}
+{% block title %}Client portal{% endblock %}
+{% block width %}max-w-4xl{% endblock %}
+{% block content %}
+<div class="mb-6 flex items-center justify-between rounded-xl border border-slate-200 bg-white p-4">
+  <div><div class="text-xs font-medium uppercase tracking-wide text-slate-400">Client portal</div><div class="text-lg font-semibold">{{ request.firm.name }}</div><div class="text-sm text-slate-500">Signed in as {{ request.user.name }}</div></div>
+  <form method="post" action="{% url 'logout' %}">{% csrf_token %}<button class="rounded-lg border border-slate-300 px-3 py-2 text-sm hover:bg-slate-50">Sign out</button></form>
+</div>
+<section class="card mb-6 overflow-x-auto"><h2 class="border-b border-slate-200 px-5 py-3 font-semibold">Your invoices</h2>
+  <table class="w-full"><thead class="bg-slate-50"><tr><th class="px-4 py-2.5 text-left text-xs font-semibold uppercase text-slate-500">Invoice</th><th class="px-4 py-2.5 text-left text-xs font-semibold uppercase text-slate-500">Issued</th><th class="px-4 py-2.5 text-left text-xs font-semibold uppercase text-slate-500">Due</th><th class="px-4 py-2.5 text-left text-xs font-semibold uppercase text-slate-500">Total</th><th class="px-4 py-2.5 text-left text-xs font-semibold uppercase text-slate-500">Balance</th><th class="px-4 py-2.5 text-left text-xs font-semibold uppercase text-slate-500">Status</th></tr></thead>
+    <tbody class="divide-y divide-slate-100">{% for i in invoices %}<tr><td class="px-4 py-3 text-sm font-medium">{{ i.number }}</td><td class="px-4 py-3 text-sm text-slate-500">{{ i.issue_date|date:"d M Y" }}</td><td class="px-4 py-3 text-sm {% if i.is_overdue %}font-medium text-red-600{% else %}text-slate-500{% endif %}">{{ i.due_date|date:"d M Y" }}</td><td class="px-4 py-3 text-sm">{{ i.total|inr }}</td><td class="px-4 py-3 text-sm font-medium">{{ i.balance|inr }}</td><td class="px-4 py-3 text-sm"><span class="{{ i.status_key|tone }}">{{ i.status_label }}</span></td></tr>
+    {% empty %}<tr><td colspan="6" class="px-4 py-10 text-center text-sm text-slate-400">No invoices yet.</td></tr>{% endfor %}</tbody></table></section>
+<section class="card"><h2 class="border-b border-slate-200 px-5 py-3 font-semibold">Shared documents</h2>
+  {% for d in docs %}<div class="flex items-center justify-between border-b border-slate-100 px-5 py-3 text-sm last:border-0"><div><div class="font-medium">{{ d.name }}</div><div class="text-xs text-slate-400">{{ d.category }}{% if d.financial_year %} · FY {{ d.financial_year }}{% endif %} · {{ d.created_at|date:"d M Y" }}</div></div>
+    {% if d.type == 'UPLOAD' %}<a class="rounded-lg border border-slate-300 px-3 py-1.5 hover:bg-slate-50" href="{% url 'document_download' d.pk %}">Download</a>{% elif d.type == 'LINK' %}<a class="rounded-lg border border-slate-300 px-3 py-1.5 hover:bg-slate-50" href="{{ d.url }}" target="_blank" rel="noopener noreferrer">Open ↗</a>{% endif %}</div>
+  {% empty %}<div class="px-4 py-10 text-center text-sm text-slate-400">Nothing has been shared with you yet.</div>{% endfor %}</section>
+{% endblock %}

@@ -1,0 +1,27 @@
+{% extends "base.html" %}{% load ui %}
+{% block title %}Recurring deadlines{% endblock %}
+{% block content %}
+<div class="mb-4"><h1 class="text-2xl font-semibold tracking-tight">Tasks &amp; Deadlines</h1><p class="mt-1 text-sm text-slate-500">Recurring compliance deadlines create tasks automatically ahead of each due date.</p></div>
+<div class="mb-5 flex gap-1 border-b border-slate-200">
+  <a class="-mb-px border-b-2 border-transparent px-4 py-2 text-sm font-medium text-slate-500 hover:text-slate-700" href="{% url 'board' %}">Board</a>
+  <a class="-mb-px border-b-2 border-brand-500 px-4 py-2 text-sm font-medium text-brand-600" href="{% url 'recurring_list' %}">Recurring deadlines</a>
+</div>
+<div class="mb-4 flex flex-wrap items-center gap-2">
+  <a class="btn-primary" href="{% url 'recurring_create' %}">+ New recurring deadline</a>
+  <form method="post" action="{% url 'recurring_run' %}">{% csrf_token %}<button class="btn-ghost">Generate due tasks now</button></form>
+</div>
+<div class="card overflow-x-auto"><table class="w-full">
+  <thead class="border-b border-slate-200 bg-slate-50"><tr><th class="th">Deadline</th><th class="th">Client</th><th class="th">Repeats</th><th class="th">Next due</th><th class="th">Tasks made</th><th class="th"></th></tr></thead>
+  <tbody class="divide-y divide-slate-100">
+  {% for r in rules %}
+    <tr class="{% if not r.is_active %}opacity-50{% endif %}">
+      <td class="td font-medium">{{ r.title }}</td><td class="td text-slate-600">{{ r.client.name|default:"—" }}</td>
+      <td class="td text-slate-600">{{ r.get_frequency_display }} · day {{ r.day_of_month }}</td><td class="td">{{ r.next_due_date|date:"d M Y" }}</td><td class="td text-slate-600">{{ r.tasks.count }}</td>
+      <td class="td whitespace-nowrap text-right text-xs">
+        <form class="inline" method="post" action="{% url 'recurring_toggle' r.pk %}">{% csrf_token %}<button class="mr-3 text-slate-500 hover:text-brand-600">{% if r.is_active %}Pause{% else %}Resume{% endif %}</button></form>
+        <form class="inline" method="post" action="{% url 'recurring_delete' r.pk %}" onsubmit="return confirm('Delete this schedule? Tasks already created are kept.')">{% csrf_token %}<button class="text-slate-500 hover:text-red-600">Delete</button></form>
+      </td>
+    </tr>
+  {% empty %}<tr><td colspan="6" class="px-4 py-10 text-center text-sm text-slate-400">No recurring deadlines yet. Start with a GSTR-3B or ITR template.</td></tr>{% endfor %}
+  </tbody></table></div>
+{% endblock %}

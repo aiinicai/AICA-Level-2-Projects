@@ -1,0 +1,28 @@
+{% extends "base.html" %}{% load ui %}
+{% block title %}Dashboard{% endblock %}
+{% block content %}
+<h1 class="text-2xl font-semibold tracking-tight">Welcome, {{ request.user.name|firstname }}</h1>
+<p class="mb-6 mt-1 text-sm text-slate-500">Here is where your practice stands today.</p>
+<div class="grid grid-cols-2 gap-4 lg:grid-cols-4">
+  <div class="card p-4"><div class="text-xs font-medium uppercase tracking-wide text-slate-500">Active clients</div><div class="mt-1.5 text-2xl font-semibold">{{ s.clients }}</div></div>
+  <div class="card p-4"><div class="text-xs font-medium uppercase tracking-wide text-slate-500">Overdue tasks</div><div class="mt-1.5 text-2xl font-semibold {% if s.overdue %}text-red-600{% endif %}">{{ s.overdue }}</div><div class="text-xs text-slate-400">{{ s.due_week }} due in the next 7 days</div></div>
+  <div class="card p-4"><div class="text-xs font-medium uppercase tracking-wide text-slate-500">Assigned to me</div><div class="mt-1.5 text-2xl font-semibold">{{ s.mine }}</div><div class="text-xs text-slate-400">open tasks</div></div>
+  <div class="card p-4"><div class="text-xs font-medium uppercase tracking-wide text-slate-500">Unbilled time</div><div class="mt-1.5 text-2xl font-semibold">{{ s.unbilled_hours }} h</div><div class="text-xs text-slate-400">billable, not yet invoiced</div></div>
+  <div class="card p-4"><div class="text-xs font-medium uppercase tracking-wide text-slate-500">Outstanding</div><div class="mt-1.5 text-2xl font-semibold">{{ s.outstanding|inr }}</div><div class="text-xs text-slate-400">pending invoices</div></div>
+  <div class="card p-4"><div class="text-xs font-medium uppercase tracking-wide text-slate-500">Overdue receivables</div><div class="mt-1.5 text-2xl font-semibold {% if s.overdue_amount %}text-red-600{% endif %}">{{ s.overdue_amount|inr }}</div></div>
+  <div class="card p-4"><div class="text-xs font-medium uppercase tracking-wide text-slate-500">Received this month</div><div class="mt-1.5 text-2xl font-semibold">{{ s.received_month|inr }}</div></div>
+  <div class="card p-4"><div class="text-xs font-medium uppercase tracking-wide text-slate-500">Pipeline</div>
+    <div class="mt-2 space-y-1 text-sm">{% for label, n in s.pipeline %}<div class="flex justify-between"><span class="text-slate-600">{{ label }}</span><span class="font-medium">{{ n }}</span></div>{% endfor %}</div></div>
+</div>
+<div class="card mt-6 overflow-hidden">
+  <div class="flex items-center justify-between border-b border-slate-200 px-4 py-3"><h2 class="font-semibold">Upcoming deadlines</h2><a class="link text-sm" href="{% url 'board' %}">Open task board →</a></div>
+  <table class="w-full"><tbody class="divide-y divide-slate-100">
+    {% for t in upcoming %}
+    <tr><td class="td font-medium">{{ t.title }}{% if t.period_label %}<span class="ml-2 text-xs font-normal text-slate-400">{{ t.period_label }}</span>{% endif %}</td>
+      <td class="td text-slate-500">{{ t.client.name|default:"—" }}</td><td class="td text-slate-500">{{ t.assignee.name|default:"Unassigned" }}</td>
+      <td class="td"><span class="{{ t.status|tone }}">{{ t.get_status_display }}</span></td>
+      <td class="td text-right {% if t.is_overdue %}font-medium text-red-600{% else %}text-slate-600{% endif %}">{{ t.due_date|date:"d M Y" }}</td></tr>
+    {% empty %}<tr><td class="td text-center text-slate-400">Nothing scheduled.</td></tr>{% endfor %}
+  </tbody></table>
+</div>
+{% endblock %}

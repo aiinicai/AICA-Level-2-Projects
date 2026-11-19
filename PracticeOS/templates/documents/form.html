@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block title %}Add document{% endblock %}
+{% block content %}
+<div class="max-w-xl">
+  <h1 class="mb-4 text-2xl font-semibold tracking-tight">Add document</h1>
+  <form method="post" enctype="multipart/form-data" class="card space-y-4 p-6" novalidate>{% csrf_token %}
+    {% if form.non_field_errors %}<div class="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{{ form.non_field_errors }}</div>{% endif %}
+    <div class="grid grid-cols-3 gap-2">
+      {% for radio in form.type %}
+        <label class="cursor-pointer rounded-lg border border-slate-300 px-2 py-2 text-center text-xs hover:bg-slate-50 has-[:checked]:border-brand-500 has-[:checked]:bg-brand-50 has-[:checked]:font-semibold has-[:checked]:text-brand-700">
+          <span class="hidden">{{ radio.tag }}</span><div class="text-base">{% if radio.data.value == 'UPLOAD' %}⬆{% elif radio.data.value == 'LINK' %}🔗{% else %}📁{% endif %}</div>{{ radio.choice_label }}</label>
+      {% endfor %}
+    </div>
+    <div data-show="UPLOAD">{% with f=form.file %}<label class="label" for="{{ f.id_for_label }}">File *</label>{{ f }}<p class="mt-1 text-xs text-slate-400">{{ f.help_text }}</p>{% for e in f.errors %}<p class="mt-1 text-xs text-red-600">{{ e }}</p>{% endfor %}{% endwith %}</div>
+    <div data-show="LINK">{% with f=form.url %}<label class="label" for="{{ f.id_for_label }}">Link *</label>{{ f }}<p class="mt-1 text-xs text-slate-400">{{ f.help_text }}</p>{% for e in f.errors %}<p class="mt-1 text-xs text-red-600">{{ e }}</p>{% endfor %}{% endwith %}</div>
+    <div data-show="PHYSICAL">{% with f=form.physical_location %}<label class="label" for="{{ f.id_for_label }}">{{ f.label }} *</label>{{ f }}<p class="mt-1 text-xs text-slate-400">{{ f.help_text }}</p>{% for e in f.errors %}<p class="mt-1 text-xs text-red-600">{{ e }}</p>{% endfor %}{% endwith %}</div>
+    {% for f in form %}{% if f.name == 'client' or f.name == 'name' %}
+      <div><label class="label" for="{{ f.id_for_label }}">{{ f.label }}{% if f.name == 'client' %} *{% endif %}</label>{{ f }}{% if f.help_text %}<p class="mt-1 text-xs text-slate-400">{{ f.help_text }}</p>{% endif %}{% for e in f.errors %}<p class="mt-1 text-xs text-red-600">{{ e }}</p>{% endfor %}</div>
+    {% endif %}{% endfor %}
+    <div class="grid grid-cols-2 gap-4">
+      <div><label class="label" for="{{ form.financial_year.id_for_label }}">Financial year</label>{{ form.financial_year }}<p class="mt-1 text-xs text-slate-400">{{ form.financial_year.help_text }}</p></div>
+      <div><label class="label" for="{{ form.category.id_for_label }}">Category</label>{{ form.category }}</div>
+    </div>
+    <datalist id="doc-cats">{% for c in categories %}<option value="{{ c }}">{% endfor %}</datalist>
+    <label class="flex items-center gap-2 text-sm text-slate-600">{{ form.shared_with_client }} {{ form.shared_with_client.label }}</label>
+    <div class="flex justify-end gap-2 pt-2"><a class="btn-ghost" href="{% url 'document_list' %}">Cancel</a><button class="btn-primary">Save</button></div>
+  </form>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+  const sync = () => { const t = document.querySelector('[name=type]:checked')?.value;
+    document.querySelectorAll('[data-show]').forEach(el => el.style.display = el.dataset.show === t ? '' : 'none'); };
+  document.querySelectorAll('[name=type]').forEach(r => r.addEventListener('change', sync)); sync();
+</script>
+{% endblock %}

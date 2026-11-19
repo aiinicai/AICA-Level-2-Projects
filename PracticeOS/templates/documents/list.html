@@ -1,0 +1,32 @@
+{% extends "base.html" %}{% load ui %}
+{% block title %}Documents{% endblock %}
+{% block content %}
+<div class="mb-6 flex flex-wrap items-end justify-between gap-3">
+  <div><h1 class="text-2xl font-semibold tracking-tight">Documents</h1><p class="mt-1 text-sm text-slate-500">Uploaded files, links to digital records, and where the paper originals are kept.</p></div>
+  <a class="btn-primary" href="{% url 'document_create' %}">+ Add document</a>
+</div>
+<form method="get" class="mb-4 flex flex-wrap gap-3">
+  <input class="input max-w-xs" name="q" value="{{ f.q }}" placeholder="Search name or category…">
+  <select class="input max-w-[14rem]" name="client" onchange="this.form.submit()"><option value="">All clients</option>{% for c in clients %}<option value="{{ c.pk }}" {% if f.client == c.pk|stringformat:"s" %}selected{% endif %}>{{ c.name }}</option>{% endfor %}</select>
+  <select class="input max-w-[11rem]" name="type" onchange="this.form.submit()"><option value="">All types</option>{% for v, l in types %}<option value="{{ v }}" {% if f.type == v %}selected{% endif %}>{{ l }}</option>{% endfor %}</select>
+  <button class="btn-ghost">Search</button>
+</form>
+<div class="card overflow-x-auto"><table class="w-full">
+  <thead class="border-b border-slate-200 bg-slate-50"><tr><th class="th">Document</th><th class="th">Client</th><th class="th">Type</th><th class="th">Where / how to open</th><th class="th">FY</th><th class="th">Added</th><th class="th"></th></tr></thead>
+  <tbody class="divide-y divide-slate-100">
+  {% for d in docs %}
+    <tr class="hover:bg-slate-50">
+      <td class="td"><div class="font-medium">{{ d.name }}</div><div class="text-xs text-slate-400">{{ d.category }}{% if d.size_bytes %} · {{ d.size_bytes|filesizeformat }}{% endif %}</div></td>
+      <td class="td text-slate-600">{{ d.client.name }}</td>
+      <td class="td"><span class="{{ d.type|tone }}">{{ d.get_type_display }}</span></td>
+      <td class="td">{% if d.type == 'UPLOAD' %}<a class="link" href="{% url 'document_download' d.pk %}">Download</a>{% elif d.type == 'LINK' %}<a class="link" href="{{ d.url }}" target="_blank" rel="noopener noreferrer">Open link ↗</a>{% else %}<span class="text-slate-700">📁 {{ d.physical_location }}</span>{% endif %}</td>
+      <td class="td text-slate-500">{{ d.financial_year|default:"—" }}</td>
+      <td class="td text-xs text-slate-500">{{ d.created_at|date:"d M Y" }}<div>{{ d.uploaded_by.name }}</div></td>
+      <td class="td whitespace-nowrap text-right text-xs">
+        <form class="inline" method="post" action="{% url 'document_share' d.pk %}">{% csrf_token %}<button class="mr-3 {% if d.shared_with_client %}font-medium text-emerald-600{% else %}text-slate-400 hover:text-slate-700{% endif %}" title="Toggle client portal visibility">{% if d.shared_with_client %}Shared ✓{% else %}Share{% endif %}</button></form>
+        <form class="inline" method="post" action="{% url 'document_delete' d.pk %}" onsubmit="return confirm('Delete this document?{% if d.type == 'UPLOAD' %} The stored file will be removed.{% endif %}')">{% csrf_token %}<button class="text-slate-400 hover:text-red-600">Delete</button></form>
+      </td>
+    </tr>
+  {% empty %}<tr><td colspan="7" class="px-4 py-10 text-center text-sm text-slate-400">No documents match.</td></tr>{% endfor %}
+  </tbody></table></div>
+{% endblock %}

@@ -1,0 +1,59 @@
+{% extends "base.html" %}{% load ui %}
+{% block title %}New invoice{% endblock %}
+{% block content %}
+<div class="max-w-4xl">
+  <h1 class="mb-4 text-2xl font-semibold tracking-tight">New invoice</h1>
+  <form method="post" class="card space-y-5 p-6" novalidate>{% csrf_token %}
+    {% if form.non_field_errors %}<div class="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{{ form.non_field_errors }}</div>{% endif %}
+    <div class="grid gap-4 sm:grid-cols-2">{% include "_fields.html" %}</div>
+
+    <div>
+      <h2 class="mb-2 text-sm font-semibold">Line items</h2>
+      {{ formset.management_form }}
+      {% if formset.non_form_errors %}<div class="mb-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{{ formset.non_form_errors }}</div>{% endif %}
+      <div class="mb-1 grid grid-cols-12 gap-2 text-xs font-medium text-slate-500"><span class="col-span-5">Description</span><span class="col-span-2">Qty</span><span class="col-span-3">Rate (₹)</span><span class="col-span-2">GST %</span></div>
+      <div id="rows" class="space-y-2">
+        {% for f in formset %}
+        <div class="row grid grid-cols-12 gap-2">
+          <div class="col-span-5">{{ f.description }}{% for e in f.description.errors %}<p class="text-xs text-red-600">{{ e }}</p>{% endfor %}</div>
+          <div class="col-span-2">{{ f.quantity }}{% for e in f.quantity.errors %}<p class="text-xs text-red-600">{{ e }}</p>{% endfor %}</div>
+          <div class="col-span-3">{{ f.rate }}{% for e in f.rate.errors %}<p class="text-xs text-red-600">{{ e }}</p>{% endfor %}</div>
+          <div class="col-span-2">{{ f.tax_rate }}{% for e in f.tax_rate.errors %}<p class="text-xs text-red-600">{{ e }}</p>{% endfor %}</div>
+        </div>
+        {% endfor %}
+      </div>
+      <button type="button" id="add-row" class="mt-2 text-sm font-medium text-brand-600 hover:underline">+ Add line</button>
+    </div>
+
+    <div class="ml-auto w-60 space-y-1 text-sm">
+      <div class="flex justify-between text-slate-500"><span>Subtotal</span><span id="t-sub">₹0.00</span></div>
+      <div class="flex justify-between text-slate-500"><span>GST</span><span id="t-tax">₹0.00</span></div>
+      <div class="flex justify-between border-t border-slate-200 pt-1 font-semibold"><span>Total</span><span id="t-total">₹0.00</span></div>
+      <p class="pt-1 text-xs text-slate-400">Preview only. Final amounts are calculated on the server.</p>
+    </div>
+    <div class="flex justify-end gap-2"><a class="btn-ghost" href="{% url 'invoice_list' %}">Cancel</a><button class="btn-primary">Create invoice</button></div>
+  </form>
+</div>
+<template id="row-template"><div class="row grid grid-cols-12 gap-2">
+  <div class="col-span-5">{{ formset.empty_form.description }}</div><div class="col-span-2">{{ formset.empty_form.quantity }}</div>
+  <div class="col-span-3">{{ formset.empty_form.rate }}</div><div class="col-span-2">{{ formset.empty_form.tax_rate }}</div></div></template>
+{% endblock %}
+{% block scripts %}
+<script>
+  const rows = document.getElementById('rows'), total = document.getElementById('id_items-TOTAL_FORMS');
+  const fmt = n => '₹' + n.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  function calc() {
+    let sub = 0, tax = 0;
+    rows.querySelectorAll('.row').forEach(r => {
+      const v = n => parseFloat(r.querySelector('[name$="-' + n + '"]').value) || 0, amt = v('quantity') * v('rate');
+      sub += amt; tax += amt * v('tax_rate') / 100;
+    });
+    document.getElementById('t-sub').textContent = fmt(sub); document.getElementById('t-tax').textContent = fmt(tax); document.getElementById('t-total').textContent = fmt(sub + tax);
+  }
+  document.getElementById('add-row').addEventListener('click', () => {
+    const html = document.getElementById('row-template').innerHTML.replaceAll('__prefix__', total.value);
+    rows.insertAdjacentHTML('beforeend', html); total.value = +total.value + 1; calc();
+  });
+  rows.addEventListener('input', calc); calc();
+</script>
+{% endblock %}

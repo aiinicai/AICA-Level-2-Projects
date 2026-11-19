@@ -1,0 +1,51 @@
+{% extends "base.html" %}{% load ui %}
+{% block title %}{{ client.name }}{% endblock %}
+{% block content %}
+<a class="text-sm text-slate-500 hover:text-brand-600" href="{% url 'client_list' %}">← All clients</a>
+<div class="mb-6 mt-2 flex flex-wrap items-end justify-between gap-3">
+  <div><h1 class="text-2xl font-semibold tracking-tight">{{ client.name }}</h1><p class="mt-1 text-sm text-slate-500">{{ client.get_type_display }}{% if not client.is_active %} · Archived{% endif %}</p></div>
+  <div class="flex gap-2">
+    <a class="btn-ghost" href="{% url 'client_edit' client.pk %}">Edit</a>
+    {% if client.is_active %}<form method="post" action="{% url 'client_archive' client.pk %}" onsubmit="return confirm('Archive this client? Their records are kept and can be restored.')">{% csrf_token %}<button class="btn-danger">Archive</button></form>
+    {% else %}<form method="post" action="{% url 'client_restore' client.pk %}">{% csrf_token %}<button class="btn-ghost">Restore</button></form>{% endif %}
+  </div>
+</div>
+<div class="grid gap-6 lg:grid-cols-3">
+  <div class="card p-5 lg:col-span-2"><h2 class="mb-3 font-semibold">Profile</h2>
+    <dl class="grid gap-x-6 gap-y-3 sm:grid-cols-2">
+      {% for label, v in profile %}<div><dt class="text-xs text-slate-400">{{ label }}</dt><dd class="text-sm">{{ v|default:"—" }}</dd></div>{% endfor %}
+    </dl>
+    {% if client.notes %}<p class="mt-4 rounded-lg bg-slate-50 p-3 text-sm text-slate-600">{{ client.notes }}</p>{% endif %}
+  </div>
+  <div class="card p-5"><div class="text-xs font-medium uppercase tracking-wide text-slate-500">Outstanding</div>
+    <div class="mt-1 text-2xl font-semibold {% if outstanding > 0 %}text-amber-600{% endif %}">{{ outstanding|inr }}</div>
+    <a class="link mt-2 inline-block text-sm" href="{% url 'invoice_list' %}?client={{ client.pk }}">View invoices →</a></div>
+</div>
+
+<div class="card mt-6">
+  <div class="flex items-center justify-between border-b border-slate-200 px-5 py-3"><h2 class="font-semibold">Services</h2><a class="btn-ghost" href="{% url 'service_create' client.pk %}">+ Add service</a></div>
+  {% for s in services %}
+    <div class="flex items-center justify-between border-b border-slate-100 px-5 py-3 text-sm last:border-0">
+      <div><span class="font-medium">{{ s.name }}</span>{% if not s.is_active %} <span class="badge bg-slate-100 text-slate-600">Inactive</span>{% endif %}
+        <div class="text-xs text-slate-400">{% if s.fee is not None %}{{ s.fee|inr }}{% else %}No fee set{% endif %} · {{ s.get_billing_frequency_display|default:"One-off" }}</div></div>
+      <div class="flex gap-3 text-xs"><a class="text-slate-500 hover:text-brand-600" href="{% url 'service_edit' client.pk s.pk %}">Edit</a>
+        <form method="post" action="{% url 'service_delete' client.pk s.pk %}" onsubmit="return confirm('Remove this service?')">{% csrf_token %}<button class="text-slate-500 hover:text-red-600">Remove</button></form></div>
+    </div>
+  {% empty %}<div class="px-4 py-10 text-center text-sm text-slate-400">No services yet. Add what you do for this client.</div>{% endfor %}
+</div>
+
+<div class="mt-6 grid gap-6 lg:grid-cols-3">
+  <section class="card"><div class="flex items-center justify-between border-b border-slate-200 px-5 py-3"><h2 class="font-semibold">Tasks</h2><a class="text-xs link" href="{% url 'task_create' %}?client={{ client.pk }}">+ New</a></div>
+    {% for t in tasks %}<div class="border-b border-slate-100 px-5 py-3 text-sm last:border-0"><div class="font-medium">{{ t.title }}</div>
+      <div class="mt-1 flex items-center justify-between text-xs text-slate-500"><span class="{{ t.status|tone }}">{{ t.get_status_display }}</span><span>{{ t.due_date|date:"d M Y" }}</span></div></div>
+    {% empty %}<div class="px-4 py-10 text-center text-sm text-slate-400">No tasks</div>{% endfor %}</section>
+  <section class="card"><div class="flex items-center justify-between border-b border-slate-200 px-5 py-3"><h2 class="font-semibold">Documents</h2><a class="text-xs link" href="{% url 'document_create' %}?client={{ client.pk }}">+ Add</a></div>
+    {% for d in documents %}<div class="border-b border-slate-100 px-5 py-3 text-sm last:border-0"><div class="font-medium">{{ d.name }}</div>
+      <div class="mt-1 text-xs text-slate-500">{% if d.type == 'LINK' %}<a class="link" href="{{ d.url }}" target="_blank" rel="noopener noreferrer">Open link ↗</a>{% elif d.type == 'UPLOAD' %}<a class="link" href="{% url 'document_download' d.pk %}">Download</a>{% else %}📁 {{ d.physical_location }}{% endif %}</div></div>
+    {% empty %}<div class="px-4 py-10 text-center text-sm text-slate-400">No documents</div>{% endfor %}</section>
+  <section class="card"><h2 class="border-b border-slate-200 px-5 py-3 font-semibold">Invoices</h2>
+    {% for i in invoices %}<a href="{% url 'invoice_detail' i.pk %}" class="flex items-center justify-between border-b border-slate-100 px-5 py-3 text-sm last:border-0 hover:bg-slate-50"><div><div class="font-medium">{{ i.number }}</div><div class="text-xs text-slate-400">{{ i.issue_date|date:"d M Y" }}</div></div>
+      <div class="text-right"><div>{{ i.total|inr }}</div><span class="{{ i.status_key|tone }}">{{ i.status_label }}</span></div></a>
+    {% empty %}<div class="px-4 py-10 text-center text-sm text-slate-400">No invoices</div>{% endfor %}</section>
+</div>
+{% endblock %}

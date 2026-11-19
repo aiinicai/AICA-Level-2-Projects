@@ -1,0 +1,31 @@
+{% extends "base.html" %}{% load ui %}
+{% block title %}Timesheets{% endblock %}
+{% block content %}
+<div class="mb-6 flex flex-wrap items-end justify-between gap-3">
+  <div><h1 class="text-2xl font-semibold tracking-tight">Timesheets</h1><p class="mt-1 text-sm text-slate-500">{% if request.user.is_admin %}Time logged across the firm.{% else %}Your logged time.{% endif %}</p></div>
+  <a class="btn-primary" href="{% url 'time_create' %}">+ Log time</a>
+</div>
+<form method="get" class="mb-4 flex flex-wrap items-end gap-3">
+  <div><label class="label">From</label><input class="input" type="date" name="from" value="{{ f.from }}"></div>
+  <div><label class="label">To</label><input class="input" type="date" name="to" value="{{ f.to }}"></div>
+  <div><label class="label">Client</label><select class="input" name="client"><option value="">All clients</option>{% for c in clients %}<option value="{{ c.pk }}" {% if f.client == c.pk|stringformat:"s" %}selected{% endif %}>{{ c.name }}</option>{% endfor %}</select></div>
+  <button class="btn-ghost">Apply</button>
+  <div class="ml-auto text-right text-sm text-slate-600"><div><span class="text-slate-400">Total</span> <b>{{ total|hhmm }}</b></div><div><span class="text-slate-400">Billable</span> <b>{{ billable|hhmm }}</b></div></div>
+</form>
+<div class="grid gap-6 lg:grid-cols-3">
+  <div class="card overflow-x-auto lg:col-span-2"><table class="w-full">
+    <thead class="border-b border-slate-200 bg-slate-50"><tr><th class="th">Date</th>{% if request.user.is_admin %}<th class="th">Who</th>{% endif %}<th class="th">Client / work</th><th class="th">Time</th><th class="th">Status</th><th class="th"></th></tr></thead>
+    <tbody class="divide-y divide-slate-100">
+    {% for e in entries %}
+      <tr><td class="td whitespace-nowrap text-slate-600">{{ e.work_date|date:"d M Y" }}</td>{% if request.user.is_admin %}<td class="td text-slate-600">{{ e.user.name }}</td>{% endif %}
+        <td class="td"><div class="font-medium">{{ e.client.name }}</div><div class="text-xs text-slate-400">{{ e.task.title|default:e.description|default:"General work" }}</div></td>
+        <td class="td whitespace-nowrap font-medium">{{ e.minutes|hhmm }}</td>
+        <td class="td">{% if e.invoice_id %}<span class="{{ 'GOOD'|tone }}">Invoiced</span>{% elif e.billable %}<span class="{{ 'IN_PROGRESS'|tone }}">Billable</span>{% else %}<span class="badge bg-slate-100 text-slate-600">Non-billable</span>{% endif %}</td>
+        <td class="td text-right text-xs">{% if not e.invoice_id %}<a class="text-slate-500 hover:text-brand-600" href="{% url 'time_edit' e.pk %}">Edit</a>{% endif %}</td></tr>
+    {% empty %}<tr><td colspan="6" class="px-4 py-10 text-center text-sm text-slate-400">No time logged in this period.</td></tr>{% endfor %}
+    </tbody></table></div>
+  <div class="card h-fit"><h2 class="border-b border-slate-200 px-4 py-3 font-semibold">By client</h2>
+    {% for s in summary %}<div class="flex justify-between border-b border-slate-100 px-4 py-2.5 text-sm last:border-0"><span class="truncate pr-3">{{ s.client }}</span><span class="whitespace-nowrap font-medium">{{ s.minutes|hhmm }}</span></div>
+    {% empty %}<div class="px-4 py-10 text-center text-sm text-slate-400">No data</div>{% endfor %}</div>
+</div>
+{% endblock %}
