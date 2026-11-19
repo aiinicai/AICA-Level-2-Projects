@@ -1,0 +1,29 @@
+{% extends "base.html" %}{% load ui %}
+{% block title %}Bill logged time{% endblock %}
+{% block content %}
+<div class="max-w-3xl">
+  <h1 class="mb-4 text-2xl font-semibold tracking-tight">Bill logged time</h1>
+  <form method="get" class="card mb-4 flex items-end gap-3 p-4">
+    <div class="flex-1"><label class="label">Client</label>
+      <select class="input" name="client" onchange="this.form.submit()"><option value="">Select client…</option>{% for c in clients %}<option value="{{ c.pk }}" {% if client and client.pk == c.pk %}selected{% endif %}>{{ c.name }}</option>{% endfor %}</select></div>
+    <noscript><button class="btn-ghost">Show time</button></noscript>
+  </form>
+  {% if client %}
+  <form method="post" class="card space-y-4 p-6" novalidate>{% csrf_token %}
+    {% if form.non_field_errors %}<div class="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{{ form.non_field_errors }}</div>{% endif %}
+    {% for e in form.entries.errors %}<p class="text-sm text-red-600">{{ e }}</p>{% endfor %}
+    <div class="max-h-64 divide-y divide-slate-100 overflow-y-auto rounded-lg border border-slate-200">
+      {% for checkbox in form.entries %}
+        <label class="flex cursor-pointer items-center gap-3 px-3 py-2 text-sm hover:bg-slate-50">{{ checkbox.tag }}
+          {% with e=checkbox.data.value.instance %}<span class="w-24 text-slate-500">{{ e.work_date|date:"d M Y" }}</span>
+          <span class="flex-1 truncate">{{ e.task.title|default:e.description|default:"Professional services" }} <span class="text-slate-400">· {{ e.user.name }}</span></span><span class="font-medium">{{ e.minutes|hhmm }}</span>{% endwith %}</label>
+      {% empty %}<div class="px-4 py-8 text-center text-sm text-slate-400">No unbilled billable time for this client.</div>{% endfor %}
+    </div>
+    <div class="grid gap-4 sm:grid-cols-3">
+      {% for f in form %}{% if f.name != 'entries' %}<div><label class="label" for="{{ f.id_for_label }}">{{ f.label }}</label>{{ f }}{% if f.help_text %}<p class="mt-1 text-xs text-slate-400">{{ f.help_text }}</p>{% endif %}{% for e in f.errors %}<p class="mt-1 text-xs text-red-600">{{ e }}</p>{% endfor %}</div>{% endif %}{% endfor %}
+    </div>
+    <div class="flex justify-end gap-2"><a class="btn-ghost" href="{% url 'invoice_list' %}">Cancel</a><button class="btn-primary">Create invoice</button></div>
+  </form>
+  {% else %}<p class="text-sm text-slate-400">Choose a client to see their unbilled time.</p>{% endif %}
+</div>
+{% endblock %}

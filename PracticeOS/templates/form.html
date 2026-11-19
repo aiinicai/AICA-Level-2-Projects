@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block title %}{{ title }}{% endblock %}
+{% block content %}
+<div class="{% if wide %}max-w-3xl{% else %}max-w-xl{% endif %}">
+  <h1 class="mb-4 text-2xl font-semibold tracking-tight text-slate-900">{{ title }}</h1>
+  {% if intro %}<p class="mb-4 text-sm text-slate-500">{{ intro }}</p>{% endif %}
+  <form method="post" class="card space-y-4 p-6" novalidate>
+    {% csrf_token %}
+    {% if form.non_field_errors %}<div class="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{{ form.non_field_errors }}</div>{% endif %}
+    <div class="grid gap-4 sm:grid-cols-2">{% include "_fields.html" %}</div>
+    {% if suggestions %}<datalist id="service-suggestions">{% for s in suggestions %}<option value="{{ s }}">{% endfor %}</datalist>{% endif %}
+    <div class="flex items-center justify-between pt-2">
+      <div>{% if delete_url %}<button form="delete-form" class="btn-danger" onclick="return confirm('Delete this?')">Delete</button>{% endif %}</div>
+      <div class="flex gap-2">
+        <a class="btn-ghost" href="{% if back_pk %}{% url cancel_url back_pk %}{% else %}{% url cancel_url %}{% endif %}">Cancel</a>
+        <button class="btn-primary">{{ submit|default:"Save" }}</button>
+      </div>
+    </div>
+  </form>
+  {% if delete_url %}<form id="delete-form" method="post" action="{% url delete_url delete_pk %}">{% csrf_token %}</form>{% endif %}
+</div>
+{% endblock %}

@@ -1,0 +1,217 @@
+{% extends "base.html" %}{% load ui %}
+{% block title %}{{ invoice.number }}{% endblock %}
+{% block content %}
+<div class="no-print mb-4 flex flex-wrap items-center justify-between gap-3">
+  <a class="text-sm text-slate-500 hover:text-brand-600" href="{% url 'invoice_list' %}">← All invoices</a>
+  
+  <div class="flex flex-wrap items-center gap-2">
+    <!-- WhatsApp Share -->
+    <a href="{{ wa_url }}" target="_blank" rel="noopener noreferrer" class="btn bg-emerald-600 text-white hover:bg-emerald-700 shadow-sm" title="Share invoice directly on WhatsApp">
+      <svg class="w-4 h-4 fill-current" viewBox="0 0 24 24"><path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946.003-6.556 5.338-11.891 11.893-11.891 3.181.001 6.167 1.24 8.413 3.488 2.245 2.248 3.481 5.236 3.48 8.414-.003 6.557-5.338 11.892-11.893 11.892-1.99-.001-3.951-.5-5.688-1.448l-6.305 1.654zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.886-4.434 9.889-9.885.002-5.462-4.415-9.89-9.881-9.892-5.452 0-9.887 4.434-9.889 9.884-.001 2.225.651 3.891 1.746 5.634l-.999 3.648 3.742-.981zm11.387-5.464c-.074-.124-.272-.198-.57-.347-.297-.149-1.758-.868-2.031-.967-.272-.099-.47-.149-.669.149-.198.297-.768.967-.941 1.165-.173.198-.347.223-.644.074-.297-.149-1.255-.462-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.297-.347.446-.521.151-.172.2-.296.3-.495.099-.198.05-.372-.025-.521-.075-.148-.669-1.611-.916-2.206-.242-.579-.487-.501-.669-.51l-.57-.01c-.198 0-.52.074-.792.372s-1.04 1.016-1.04 2.479 1.065 2.876 1.213 3.074c.149.198 2.095 3.2 5.076 4.487.709.306 1.263.489 1.694.626.712.226 1.36.194 1.872.118.571-.085 1.758-.719 2.006-1.413.248-.695.248-1.29.173-1.414z"/></svg>
+      <span>WhatsApp</span>
+    </a>
+
+    <!-- Email Share Button (triggers modal) -->
+    <button type="button" class="btn-ghost inline-flex items-center gap-1.5" onclick="document.getElementById('email-modal').classList.remove('hidden')">
+      <svg class="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
+      <span>Email</span>
+    </button>
+
+    <button class="btn-ghost" onclick="window.print()">Print / Save PDF</button>
+
+    {% if invoice.status == 'PENDING' %}
+      <a class="btn-primary" href="{% url 'invoice_pay' invoice.pk %}">Record payment</a>
+      {% if not invoice.payments.all %}
+        <form method="post" action="{% url 'invoice_cancel' invoice.pk %}" onsubmit="return confirm('Cancel this invoice? The number is retained for audit and linked time is released for re-billing.')">
+          {% csrf_token %}
+          <button class="btn-danger">Cancel</button>
+        </form>
+      {% endif %}
+    {% endif %}
+  </div>
+</div>
+
+<!-- Email Modal Dialog -->
+<div id="email-modal" class="no-print fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4 backdrop-blur-sm hidden">
+  <div class="card w-full max-w-lg bg-white p-6 shadow-xl space-y-4">
+    <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+      <h3 class="text-base font-semibold text-slate-900">Send Invoice by Email</h3>
+      <button type="button" class="text-slate-400 hover:text-slate-600 text-lg" onclick="document.getElementById('email-modal').classList.add('hidden')">✕</button>
+    </div>
+
+    <form method="post" action="{% url 'invoice_send_email' invoice.pk %}" class="space-y-4">
+      {% csrf_token %}
+      <div>
+        <label class="label">Recipient Email *</label>
+        <input type="email" name="recipient" required class="input" value="{{ invoice.client.email|default:'' }}" placeholder="client@example.com" />
+      </div>
+
+      <div>
+        <label class="label">Custom Message (Optional)</label>
+        <textarea name="custom_note" rows="2" class="input" placeholder="e.g. Kindly find attached invoice. Please let us know once transferred."></textarea>
+      </div>
+
+      <div class="rounded-lg bg-slate-50 p-3 text-xs text-slate-600 border border-slate-100">
+        <div>Subject: <b>{{ email_subject }}</b></div>
+        <div class="mt-1 text-slate-400">Includes invoice breakdown, bank details, and an online view link.</div>
+      </div>
+
+      <div class="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-100">
+        <a href="{{ mailto_url }}" class="text-xs font-medium text-brand-600 hover:underline inline-flex items-center gap-1">
+          <span>Open in Outlook / Gmail</span> ↗
+        </a>
+        <div class="flex gap-2">
+          <button type="button" class="btn-ghost" onclick="document.getElementById('email-modal').classList.add('hidden')">Cancel</button>
+          <button type="submit" class="btn-primary">Send Email</button>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="card max-w-4xl space-y-6 p-8 text-sm bg-white shadow-sm print:shadow-none print:border-none print:p-0">
+  <!-- Invoice Header -->
+  <div class="flex flex-col sm:flex-row justify-between items-start gap-6 border-b border-slate-200 pb-6">
+    <!-- Billed To -->
+    <div class="space-y-1">
+      <div class="text-xs font-semibold uppercase tracking-wider text-slate-400">Tax Invoice</div>
+      <div class="text-2xl font-bold tracking-tight text-slate-900">{{ invoice.number }}</div>
+      <div class="pt-2 text-xs font-semibold uppercase tracking-wider text-slate-400">Billed To</div>
+      <div class="text-base font-semibold text-slate-800">{{ invoice.client.name }}</div>
+      {% if invoice.client.address %}<div class="text-xs text-slate-500 whitespace-pre-line max-w-xs">{{ invoice.client.address }}</div>{% endif %}
+      <div class="text-xs text-slate-600 space-y-0.5 pt-1">
+        {% if invoice.client.gstin %}<div>GSTIN: <span class="font-mono font-medium text-slate-800">{{ invoice.client.gstin }}</span></div>{% endif %}
+        {% if invoice.client.pan %}<div>PAN: <span class="font-mono font-medium text-slate-800">{{ invoice.client.pan }}</span></div>{% endif %}
+        {% if invoice.client.email %}<div>Email: {{ invoice.client.email }}</div>{% endif %}
+        {% if invoice.client.phone %}<div>Phone: {{ invoice.client.phone }}</div>{% endif %}
+      </div>
+      <div class="pt-2"><span class="{{ invoice.status_key|tone }} inline-block">{{ invoice.status_label }}</span></div>
+    </div>
+
+    <!-- Firm Details -->
+    <div class="text-left sm:text-right text-xs space-y-1 max-w-sm ml-auto">
+      <div class="text-lg font-bold text-slate-900">{{ invoice.firm.name }}</div>
+      {% if invoice.firm.address %}<div class="whitespace-pre-line text-slate-500">{{ invoice.firm.address }}</div>{% endif %}
+      <div class="text-slate-600 space-y-0.5 pt-1">
+        {% if invoice.firm.gstin %}<div>GSTIN: <span class="font-mono font-medium text-slate-800">{{ invoice.firm.gstin }}</span></div>{% endif %}
+        {% if invoice.firm.pan %}<div>PAN: <span class="font-mono font-medium text-slate-800">{{ invoice.firm.pan }}</span></div>{% endif %}
+        {% if invoice.firm.phone or invoice.firm.email %}
+          <div>
+            {% if invoice.firm.phone %}{{ invoice.firm.phone }}{% endif %}
+            {% if invoice.firm.phone and invoice.firm.email %} · {% endif %}
+            {% if invoice.firm.email %}{{ invoice.firm.email }}{% endif %}
+          </div>
+        {% endif %}
+      </div>
+      <div class="pt-3 border-t border-slate-100 mt-2 space-y-0.5">
+        <div><span class="text-slate-400">Issue Date:</span> <span class="font-medium text-slate-800">{{ invoice.issue_date|date:"d M Y" }}</span></div>
+        <div><span class="text-slate-400">Due Date:</span> <span class="font-medium text-slate-800">{{ invoice.due_date|date:"d M Y" }}</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Line Items Table -->
+  <table class="w-full">
+    <thead class="border-b border-slate-200 text-xs font-semibold uppercase text-slate-500">
+      <tr>
+        <th class="py-2.5 text-left">Description</th>
+        <th class="py-2.5 text-right w-16">Qty</th>
+        <th class="py-2.5 text-right w-24">Rate</th>
+        <th class="py-2.5 text-right w-20">GST</th>
+        <th class="py-2.5 text-right w-28">Amount</th>
+      </tr>
+    </thead>
+    <tbody class="divide-y divide-slate-100 text-sm">
+      {% for i in invoice.items.all %}
+        <tr>
+          <td class="py-3 pr-2 text-slate-800 font-medium">{{ i.description }}</td>
+          <td class="py-3 text-right text-slate-600">{{ i.quantity|floatformat:"-2" }}</td>
+          <td class="py-3 text-right text-slate-600">{{ i.rate|inr }}</td>
+          <td class="py-3 text-right text-slate-600">{{ i.tax_rate|floatformat:"-2" }}%</td>
+          <td class="py-3 text-right font-medium text-slate-900">{{ i.amount|inr }}</td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <!-- Calculation Summary -->
+  <div class="ml-auto w-72 space-y-1.5 border-t border-slate-200 pt-3">
+    <div class="flex justify-between text-slate-600"><span>Subtotal</span><span>{{ invoice.subtotal|inr }}</span></div>
+    <div class="flex justify-between text-slate-600"><span>GST Total</span><span>{{ invoice.tax_amount|inr }}</span></div>
+    <div class="flex justify-between border-t border-slate-200 pt-2 text-base font-bold text-slate-900"><span>Total Due</span><span>{{ invoice.total|inr }}</span></div>
+    <div class="flex justify-between text-emerald-600 font-medium"><span>Received</span><span>{{ invoice.paid_amount|inr }}</span></div>
+    <div class="flex justify-between font-bold text-slate-900 border-t border-slate-100 pt-1"><span>Balance Payable</span><span>{{ invoice.balance|inr }}</span></div>
+  </div>
+
+  <!-- Payment History (if any) -->
+  {% if invoice.payments.all %}
+    <div class="pt-2">
+      <div class="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-400">Payment History</div>
+      <ul class="divide-y divide-slate-100 rounded-lg border border-slate-200 text-xs">
+        {% for p in invoice.payments.all %}
+          <li class="flex justify-between px-3 py-2 bg-slate-50">
+            <span>{{ p.paid_on|date:"d M Y" }} · {{ p.method|default:"Online Transfer" }}{% if p.reference %} · Ref: {{ p.reference }}{% endif %}</span>
+            <b class="text-emerald-700">{{ p.amount|inr }}</b>
+          </li>
+        {% endfor %}
+      </ul>
+    </div>
+  {% endif %}
+
+  <!-- Notes (if any) -->
+  {% if invoice.notes %}
+    <div class="rounded-lg bg-slate-50 p-3.5 text-xs text-slate-600 border border-slate-100">
+      <span class="font-semibold text-slate-700">Notes / Terms:</span> {{ invoice.notes }}
+    </div>
+  {% endif %}
+
+  <!-- Bottom Section: Bank Details & Authorized Signatory -->
+  <div class="pt-6 border-t border-slate-200 grid grid-cols-1 sm:grid-cols-2 gap-6 items-end">
+    <!-- Bank Details Box -->
+    <div class="rounded-xl border border-slate-200 bg-slate-50/70 p-4 text-xs space-y-1.5">
+      <div class="font-semibold text-slate-900 uppercase tracking-wider text-[11px] mb-2 flex items-center gap-1.5">
+        <span>🏦</span> Bank &amp; Payment Details
+      </div>
+      {% if invoice.firm.bank_name %}
+        <div class="flex justify-between"><span class="text-slate-500">Bank Name:</span> <span class="font-medium text-slate-800">{{ invoice.firm.bank_name }}</span></div>
+      {% endif %}
+      {% if invoice.firm.bank_account_name %}
+        <div class="flex justify-between"><span class="text-slate-500">Account Name:</span> <span class="font-medium text-slate-800">{{ invoice.firm.bank_account_name }}</span></div>
+      {% endif %}
+      {% if invoice.firm.bank_account_no %}
+        <div class="flex justify-between"><span class="text-slate-500">Account No:</span> <span class="font-mono font-medium text-slate-800">{{ invoice.firm.bank_account_no }}</span></div>
+      {% endif %}
+      {% if invoice.firm.bank_ifsc %}
+        <div class="flex justify-between"><span class="text-slate-500">IFSC Code:</span> <span class="font-mono font-medium text-slate-800">{{ invoice.firm.bank_ifsc }}</span></div>
+      {% endif %}
+      {% if invoice.firm.bank_branch %}
+        <div class="flex justify-between"><span class="text-slate-500">Branch:</span> <span class="text-slate-800">{{ invoice.firm.bank_branch }}</span></div>
+      {% endif %}
+      {% if invoice.firm.upi_id %}
+        <div class="flex justify-between border-t border-slate-200/80 pt-1 mt-1"><span class="text-slate-500">UPI ID / VPA:</span> <span class="font-mono font-semibold text-brand-700">{{ invoice.firm.upi_id }}</span></div>
+      {% endif %}
+      {% if not invoice.firm.bank_name and not invoice.firm.upi_id %}
+        <div class="text-slate-400 italic">Bank details not yet configured. Update under Firm Settings.</div>
+      {% endif %}
+    </div>
+
+    <!-- Signatory & Stamp Box -->
+    <div class="text-right flex flex-col items-end justify-end space-y-2">
+      <div class="text-xs font-medium text-slate-700">For <span class="font-semibold">{{ invoice.firm.name }}</span></div>
+      
+      <div class="h-20 flex items-center justify-end my-1">
+        {% if invoice.firm.signature_image %}
+          <img src="{% url 'firm_signature' %}" alt="Signature" class="max-h-20 max-w-[200px] object-contain" />
+        {% else %}
+          <div class="text-slate-300 text-xs italic pr-4">Authorized Signature</div>
+        {% endif %}
+      </div>
+
+      <div class="border-t border-slate-300 pt-1.5 w-52 text-center ml-auto">
+        <div class="text-xs font-semibold text-slate-800">{{ invoice.firm.signatory_name|default:invoice.firm.name }}</div>
+        <div class="text-[11px] text-slate-500">{{ invoice.firm.signatory_designation|default:"Authorized Signatory" }}</div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
