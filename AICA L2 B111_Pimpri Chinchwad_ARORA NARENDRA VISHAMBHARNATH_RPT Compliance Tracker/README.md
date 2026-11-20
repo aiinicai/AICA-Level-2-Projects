@@ -4,10 +4,9 @@
 **Author:** CA Narendrra V Arora (Membership No. 048714)
 
 **Live app:** https://rpt-compliance-tracker.lovable.app
-**Video walkthrough:** link to be added
+**Video walkthrough:** https://youtu.be/gYyCgUOTCKw
 
 ---
-
 ## The problem
 
 Related party transactions are among the most closely watched areas in Indian corporate governance. A company has to identify every related party transaction, make sure the audit committee, the board and, where required, the shareholders approved it before it happened, check that it was at a market price, and then disclose it correctly under Ind AS 24 and in Form AOC-2.
