@@ -1,9 +1,11 @@
 # Related Party Transactions Compliance Tracker
 
 **AICA Level 2 Capstone Project | Batch 111, Pimpri Chinchwad**
+
 **Author:** CA Narendrra V Arora (Membership No. 048714)
 
 **Live app:** https://rpt-compliance-tracker.lovable.app
+
 **Video walkthrough:** https://youtu.be/gYyCgUOTCKw
 
 ---
