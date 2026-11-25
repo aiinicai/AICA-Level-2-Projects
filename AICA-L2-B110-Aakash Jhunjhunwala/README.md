@@ -1,6 +1,6 @@
 # ISA Prep Pro – AI-Assisted Exam Preparation & Progress Tracker
 
-**Author:** CA Aakash Jhunjhunwala (Membership No.3 316161)
+**Author:** CA Aakash Jhunjhunwala (Membership No. 316161)
 **Course:** ICAI AICA Level 2 – Capstone Project (Batch B110)
 **Live site:** https://isa.tranzcape.in/
 
