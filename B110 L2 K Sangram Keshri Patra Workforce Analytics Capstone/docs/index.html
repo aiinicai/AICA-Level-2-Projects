@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>CFO Workforce Dashboard</title>
+  <meta name="description" content="Multi-country workforce analytics: headcount and cost against budget, workforce walk, grade and location mix. AICA Level 2 capstone.">
+  <meta name="theme-color" content="#1F3864">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icons/icon-192.png">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Workforce">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="bar">
+    <div class="brand"><img src="icons/icon-192.png" alt="" width="28" height="28"> CFO Workforce Dashboard</div>
+    <div class="actions">
+      <button id="install" class="btn" hidden>Install app</button>
+      <label class="btn">Load month file<input type="file" id="file" accept=".json,application/json" hidden></label>
+    </div>
+  </header>
+
+  <main class="wf">
+    <section id="title">
+      <h1>Workforce – <span data-k="period">—</span></h1>
+      <p class="sub">India · UK · US · France · China · internal employees and external consultants · monthly cost in ₹ crore at month FX rates</p>
+      <p class="lede" id="takeaway">Group headcount is <b data-k="actual_hc">—</b>, <b data-k="hc_var_pct">—</b> against budget, while monthly cost of ₹<b data-k="actual_cost_cr">—</b> Cr is <b data-k="cost_var_pct">—</b> against budget<span id="lede-tail"></span>.</p>
+      <p class="sub" id="status"></p>
+    </section>
+
+    <section class="cards">
+      <div class="card"><div class="lbl">Total headcount (month-end)</div><div class="big" data-k="actual_hc">—</div>
+        <div class="vs">Budget <span data-k="budget_hc">—</span> · <span data-k="hc_var_pct">—</span></div></div>
+      <div class="card"><div class="lbl">Monthly workforce cost</div><div class="big">₹<span data-k="actual_cost_cr">—</span> Cr</div>
+        <div class="vs">Budget ₹<span data-k="budget_cost_cr">—</span> Cr · <span data-k="cost_var_pct">—</span></div></div>
+      <div class="card"><div class="lbl">Cost per head per month</div><div class="big">₹<span data-k="cph_lakh">—</span> L</div>
+        <div class="vs">Budget ₹<span data-k="cph_budget_lakh">—</span> L · <span data-k="cph_var_pct">—</span></div></div>
+      <div class="card"><div class="lbl">Internal / external headcount</div><div class="big"><span data-k="internal_hc">—</span> / <span data-k="external_hc">—</span></div>
+        <div class="vs">External share <span data-k="external_share">—</span> · internal exits <span data-k="internal_exit_pct">—</span> of opening</div></div>
+    </section>
+
+    <section class="filters">
+      <label>Country
+        <select id="country">
+          <option value="">All countries</option>
+        </select>
+      </label>
+      <label>Walk population
+        <select id="pop">
+          <option value="Total">Internal + external</option>
+          <option value="Internal">Internal employees</option>
+          <option value="External">External consultants</option>
+        </select>
+      </label>
+    </section>
+
+    <section class="grid2">
+      <div class="panel">
+        <h2>Workforce walk <span class="scope" data-scope>— group</span></h2>
+        <p class="sub">Opening + hires − leavers − terminations + project hires = closing</p>
+        <div class="chart" id="walk-chart"></div>
+        <p class="sub">Leavers: resignations (internal), completed contracts (external). Terminations: involuntary exits, early contract ends, conversions to employee. Axis does not start at zero.</p>
+      </div>
+      <div class="panel">
+        <h2>Cost bridge: budget to actual <span class="scope" data-scope>— group</span></h2>
+        <p class="sub">₹ crore per month. Volume = extra heads at budget cost per head; rate / mix = cost-per-head difference on actual heads</p>
+        <div class="chart" id="bridge-chart"></div>
+        <p class="sub">Axis does not start at zero.</p>
+      </div>
+    </section>
+
+    <section class="panel" id="commentary">
+      <h2>Variance commentary <span class="scope" data-scope>— group</span></h2>
+      <div class="comment">
+        <div><h3>What happened</h3>
+          <p>Headcount closed at <b data-c="actual_hc">—</b> against a budget of <b data-c="budget_hc">—</b> (<b data-c="hc_var">—</b> heads). Monthly cost was ₹<b data-c="actual_cost_cr">—</b> Cr against ₹<b data-c="budget_cost_cr">—</b> Cr, a variance of ₹<b data-c="cost_var_cr">—</b> Cr (<b data-c="cost_var_pct">—</b>).</p></div>
+        <div><h3>Why</h3>
+          <p>The extra heads give a volume effect of ₹<b data-c="volume_cr">—</b> Cr, and the change in cost per head a rate / mix effect of ₹<b data-c="rate_cr">—</b> Cr: ₹<b data-c="cph_lakh">—</b> L a head against ₹<b data-c="cph_budget_lakh">—</b> L budgeted (<b data-c="cph_var_pct">—</b>).<span id="why-country"></span></p></div>
+        <div><h3>Business impact</h3>
+          <p id="impact">—</p></div>
+        <div><h3>Action required</h3>
+          <ul>
+            <li>Country heads to confirm whether the lower cost per head is structural (junior and project hiring) or timing (unfilled senior roles, bonus phasing).</li>
+            <li>Approve the headcount overrun into the plan, or set a hiring freeze in the countries above budget.</li>
+            <li>Reforecast the remaining months using actual cost per head and the approved headcount.</li>
+            <li>Review the external share against the target mix before contracts are renewed.</li>
+          </ul></div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>Variance by country</h2>
+      <p class="sub">Internal and external combined · cost in ₹ crore per month · variance = actual − budget · tap a row to focus on that country</p>
+      <div class="tablewrap">
+        <table id="country-table">
+          <thead><tr><th>Country</th><th>Actual HC</th><th>Budget HC</th><th>HC var %</th><th>Actual cost</th><th>Budget cost</th><th>Cost var %</th><th>Volume</th><th>Rate / mix</th><th>Cost / head var %</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="grid2">
+      <div class="panel">
+        <h2>Grade mix – internal employees</h2>
+        <p class="sub">Share of month-end headcount by grade (G1 associate → G6 director)</p>
+        <div class="chart" id="grade-chart"></div>
+      </div>
+      <div class="panel">
+        <h2>Location mix</h2>
+        <p class="sub">Month-end headcount, internal and external; label shows share of group and external %</p>
+        <div class="chart" id="loc-chart"></div>
+      </div>
+    </section>
+
+    <details class="notes">
+      <summary>Definitions and data</summary>
+      <ul>
+        <li>Data: <code>data/dashboard_data.json</code>, written by <code>consolidate.py</code> from the five country files received through the n8n intake workflow, the FY26 budget and the FX assumptions. Replace this file each month, or use <em>Load month file</em> to view another month on this device.</li>
+        <li>Headcount is the population active at month-end. Monthly cost = internal CTC ÷ 12 plus external bill rate × billable units (160 hours, 20 days or 1 month), converted to INR at the month's FX rate.</li>
+        <li>Budget is at the same FX rates, so variances carry no currency effect. Volume effect = HC variance × budget cost per head; rate / mix effect = (actual − budget cost per head) × actual HC.</li>
+        <li>All names and figures are fictitious sample data for the ICAI AICA Level 2 capstone.</li>
+      </ul>
+    </details>
+    <footer class="sub" id="foot"></footer>
+  </main>
+
+  <script src="lib/d3.min.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
