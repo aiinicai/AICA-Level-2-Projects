@@ -1,0 +1,768 @@
+{
+ "name": "Workforce Data Intake (AICA L2 Capstone)",
+ "nodes": [
+  {
+   "parameters": {
+    "pollTimes": {
+     "item": [
+      {
+       "mode": "custom",
+       "cronExpression": "0 0 * 25 * *"
+      }
+     ]
+    },
+    "simple": false,
+    "filters": {
+     "q": "subject:\"WF-DATA\" has:attachment",
+     "readStatus": "both"
+    },
+    "options": {
+     "dataPropertyAttachmentsPrefixName": "attachment_",
+     "downloadAttachments": true
+    }
+   },
+   "id": "7ae18a61-452a-45f1-8baf-7e1d38a1eec6",
+   "name": "Watch SPOC Submissions",
+   "type": "n8n-nodes-base.gmailTrigger",
+   "typeVersion": 1.4,
+   "position": [
+    0,
+    96
+   ],
+   "credentials": {
+    "gmailOAuth2": {
+     "name": "Gmail account"
+    }
+   }
+  },
+  {
+   "parameters": {},
+   "id": "e9e3d588-10e7-48bc-8569-b1b87b787ca9",
+   "name": "Run Now - Process Waiting Emails",
+   "type": "n8n-nodes-base.manualTrigger",
+   "typeVersion": 1,
+   "position": [
+    -460,
+    260
+   ]
+  },
+  {
+   "parameters": {
+    "resource": "message",
+    "operation": "getAll",
+    "returnAll": true,
+    "simple": false,
+    "filters": {
+     "q": "subject:\"WF-DATA\" has:attachment newer_than:35d",
+     "readStatus": "both"
+    },
+    "options": {
+     "dataPropertyAttachmentsPrefixName": "attachment_",
+     "downloadAttachments": true
+    }
+   },
+   "id": "01f4c832-c8ab-4be9-88fe-49873830db14",
+   "name": "Fetch Recent Submissions",
+   "type": "n8n-nodes-base.gmail",
+   "typeVersion": 2.2,
+   "position": [
+    -240,
+    260
+   ],
+   "credentials": {
+    "gmailOAuth2": {
+     "name": "Gmail account"
+    }
+   }
+  },
+  {
+   "parameters": {
+    "resource": "row",
+    "operation": "rowNotExists",
+    "dataTableId": {
+     "__rl": true,
+     "mode": "list",
+     "value": "",
+     "cachedResultName": "WF_Submission_Log (create and select)"
+    },
+    "matchType": "allConditions",
+    "filters": {
+     "conditions": [
+      {
+       "keyName": "messageId",
+       "keyValue": "={{ $json.id }}"
+      }
+     ]
+    }
+   },
+   "id": "5ea19106-1e84-4acd-a9d3-945f084b8119",
+   "name": "Skip Already Processed",
+   "type": "n8n-nodes-base.dataTable",
+   "typeVersion": 1.1,
+   "position": [
+    -20,
+    100
+   ]
+  },
+  {
+   "parameters": {
+    "mode": "runOnceForEachItem",
+    "jsCode": "const COUNTRIES = ['India', 'UK', 'US', 'France', 'China'];\nconst MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];\nconst subject = String($json.subject || ($json.headers && $json.headers.subject) || '').trim();\nconst sender = ($json.from && $json.from.value && $json.from.value[0] && $json.from.value[0].address) || '';\nconst issues = [];\nlet country = '';\nlet period = '';\nconst m = subject.match(/WF-DATA\\s*\\|\\s*([A-Za-z]+)\\s*\\|\\s*([A-Za-z]{3})-(\\d{4})/i);\nif (!m) {\n  issues.push('Subject must follow the format: WF-DATA | <Country> | <Mon-YYYY>  (e.g. WF-DATA | India | Nov-2026)');\n} else {\n  country = COUNTRIES.find(c => c.toLowerCase() === m[1].toLowerCase()) || '';\n  if (!country) issues.push('Country \"' + m[1] + '\" is not recognised. Use one of: ' + COUNTRIES.join(', '));\n  const mon = m[2].charAt(0).toUpperCase() + m[2].slice(1).toLowerCase();\n  if (!MONTHS.includes(mon)) issues.push('Month \"' + m[2] + '\" is not valid. Use Jan, Feb, ... Dec');\n  else period = mon + '-' + m[3];\n}\nconst bin = $input.item.binary || {};\nconst xl = Object.keys(bin).filter(k => String(bin[k].fileName || '').toLowerCase().endsWith('.xlsx'));\nif (xl.length === 0) issues.push('No Excel (.xlsx) attachment found. Please attach the workforce template.');\nif (xl.length > 1) issues.push('More than one Excel file attached. Send one file per country per month.');\nif (xl.length === 1 && country && !String(bin[xl[0]].fileName).toLowerCase().includes(country.toLowerCase()))\n  issues.push('Attachment name \"' + bin[xl[0]].fileName + '\" does not mention ' + country + '. Check you attached the right file.');\nconst valid = issues.length === 0;\nconst out = { json: {\n  messageId: $json.id, threadId: $json.threadId, sender, subject, country, period,\n  originalFileName: xl.length ? bin[xl[0]].fileName : '',\n  fileName: valid ? 'Workforce_' + country + '_' + period + '.xlsx' : '',\n  valid, issues: issues.join(' | '),\n  receivedAt: $json.date || new Date().toISOString()\n} };\nif (xl.length) out.binary = { data: bin[xl[0]] };\nreturn out;"
+   },
+   "id": "5b5912f0-ec0d-4b38-8de9-9765aa6fd547",
+   "name": "Validate Submission",
+   "type": "n8n-nodes-base.code",
+   "typeVersion": 2,
+   "position": [
+    272,
+    224
+   ]
+  },
+  {
+   "parameters": {
+    "conditions": {
+     "options": {
+      "caseSensitive": true,
+      "leftValue": "",
+      "typeValidation": "strict",
+      "version": 2
+     },
+     "conditions": [
+      {
+       "leftValue": "={{ $json.valid }}",
+       "rightValue": "",
+       "operator": {
+        "type": "boolean",
+        "operation": "true",
+        "singleValue": true
+       }
+      }
+     ],
+     "combinator": "and"
+    },
+    "options": {}
+   },
+   "id": "7ec5ff60-ee9d-4cc6-a678-3a897bb559a6",
+   "name": "Submission Valid?",
+   "type": "n8n-nodes-base.if",
+   "typeVersion": 2.4,
+   "position": [
+    496,
+    224
+   ]
+  },
+  {
+   "parameters": {
+    "name": "={{ $json.fileName }}",
+    "driveId": {
+     "__rl": true,
+     "mode": "list",
+     "value": "My Drive"
+    },
+    "folderId": {
+     "__rl": true,
+     "mode": "list",
+     "value": "",
+     "cachedResultName": "WF_Inbox (select your folder)"
+    },
+    "options": {}
+   },
+   "id": "30427a27-b3a6-4f48-87eb-ba39aea25a3f",
+   "name": "Save File to WF_Inbox",
+   "type": "n8n-nodes-base.googleDrive",
+   "typeVersion": 3,
+   "position": [
+    800,
+    128
+   ],
+   "credentials": {
+    "googleDriveOAuth2Api": {
+     "name": "Google Drive account"
+    }
+   }
+  },
+  {
+   "parameters": {
+    "dataTableId": {
+     "__rl": true,
+     "mode": "list",
+     "value": "",
+     "cachedResultName": "WF_Submission_Log (create and select)"
+    },
+    "columns": {
+     "mappingMode": "defineBelow",
+     "value": {
+      "messageId": "={{ $('Validate Submission').item.json.messageId }}",
+      "country": "={{ $('Validate Submission').item.json.country }}",
+      "period": "={{ $('Validate Submission').item.json.period }}",
+      "sender": "={{ $('Validate Submission').item.json.sender }}",
+      "subject": "={{ $('Validate Submission').item.json.subject }}",
+      "fileName": "={{ $('Validate Submission').item.json.fileName }}",
+      "status": "Accepted",
+      "issues": "",
+      "driveFileId": "={{ $json.id }}",
+      "driveLink": "={{ $json.webViewLink }}",
+      "receivedAt": "={{ $('Validate Submission').item.json.receivedAt }}"
+     },
+     "schema": [
+      {
+       "id": "messageId",
+       "displayName": "messageId",
+       "required": false,
+       "defaultMatch": false,
+       "display": true,
+       "type": "string",
+       "canBeUsedToMatch": true
+      },
+      {
+       "id": "country",
+       "displayName": "country",
+       "required": false,
+       "defaultMatch": false,
+       "display": true,
+       "type": "string",
+       "canBeUsedToMatch": true
+      },
+      {
+       "id": "period",
+       "displayName": "period",
+       "required": false,
+       "defaultMatch": false,
+       "display": true,
+       "type": "string",
+       "canBeUsedToMatch": true
+      },
+      {
+       "id": "sender",
+       "displayName": "sender",
+       "required": false,
+       "defaultMatch": false,
+       "display": true,
+       "type": "string",
+       "canBeUsedToMatch": true
+      },
+      {
+       "id": "subject",
+       "displayName": "subject",
+       "required": false,
+       "defaultMatch": false,
+       "display": true,
+       "type": "string",
+       "canBeUsedToMatch": true
+      },
+      {
+       "id": "fileName",
+       "displayName": "fileName",
+       "required": false,
+       "defaultMatch": false,
+       "display": true,
+       "type": "string",
+       "canBeUsedToMatch": true
+      },
+      {
+       "id": "status",
+       "displayName": "status",
+       "required": false,
+       "defaultMatch": false,
+       "display": true,
+       "type": "string",
+       "canBeUsedToMatch": true
+      },
+      {
+       "id": "issues",
+       "displayName": "issues",
+       "required": false,
+       "defaultMatch": false,
+       "display": true,
+       "type": "string",
+       "canBeUsedToMatch": true
+      },
+      {
+       "id": "driveFileId",
+       "displayName": "driveFileId",
+       "required": false,
+       "defaultMatch": false,
+       "display": true,
+       "type": "string",
+       "canBeUsedToMatch": true
+      },
+      {
+       "id": "driveLink",
+       "displayName": "driveLink",
+       "required": false,
+       "defaultMatch": false,
+       "display": true,
+       "type": "string",
+       "canBeUsedToMatch": true
+      },
+      {
+       "id": "receivedAt",
+       "displayName": "receivedAt",
+       "required": false,
+       "defaultMatch": false,
+       "display": true,
+       "type": "dateTime",
+       "canBeUsedToMatch": true
+      }
+     ]
+    },
+    "options": {}
+   },
+   "id": "66503839-be87-45d4-8f79-ce7ec2f3c295",
+   "name": "Log Accepted Submission",
+   "type": "n8n-nodes-base.dataTable",
+   "typeVersion": 1.1,
+   "position": [
+    1024,
+    128
+   ]
+  },
+  {
+   "parameters": {
+    "operation": "reply",
+    "messageId": "={{ $('Validate Submission').item.json.messageId }}",
+    "message": "=<p>Hello,</p><p>Thank you. Your workforce file for <b>{{ $(\"Validate Submission\").item.json.country }}</b> – <b>{{ $(\"Validate Submission\").item.json.period }}</b> has been received and passed the intake checks.</p><p>It has been saved as <i>{{ $(\"Validate Submission\").item.json.fileName }}</i> and will be included in the group consolidation.</p><p>Regards,<br>FP&amp;A – Workforce Analytics</p>",
+    "options": {
+     "appendAttribution": false,
+     "replyToSenderOnly": true
+    }
+   },
+   "id": "66fc834b-5f47-42f5-90df-b6a08132137e",
+   "name": "Confirm Receipt to SPOC",
+   "type": "n8n-nodes-base.gmail",
+   "typeVersion": 2.2,
+   "position": [
+    1248,
+    128
+   ],
+   "credentials": {
+    "gmailOAuth2": {
+     "name": "Gmail account"
+    }
+   }
+  },
+  {
+   "parameters": {
+    "dataTableId": {
+     "__rl": true,
+     "mode": "list",
+     "value": "",
+     "cachedResultName": "WF_Submission_Log (create and select)"
+    },
+    "columns": {
+     "mappingMode": "defineBelow",
+     "value": {
+      "messageId": "={{ $json.messageId }}",
+      "country": "={{ $json.country }}",
+      "period": "={{ $json.period }}",
+      "sender": "={{ $json.sender }}",
+      "subject": "={{ $json.subject }}",
+      "fileName": "={{ $json.originalFileName }}",
+      "status": "Rejected",
+      "issues": "={{ $json.issues }}",
+      "driveFileId": "",
+      "driveLink": "",
+      "receivedAt": "={{ $json.receivedAt }}"
+     },
+     "schema": [
+      {
+       "id": "messageId",
+       "displayName": "messageId",
+       "required": false,
+       "defaultMatch": false,
+       "display": true,
+       "type": "string",
+       "canBeUsedToMatch": true
+      },
+      {
+       "id": "country",
+       "displayName": "country",
+       "required": false,
+       "defaultMatch": false,
+       "display": true,
+       "type": "string",
+       "canBeUsedToMatch": true
+      },
+      {
+       "id": "period",
+       "displayName": "period",
+       "required": false,
+       "defaultMatch": false,
+       "display": true,
+       "type": "string",
+       "canBeUsedToMatch": true
+      },
+      {
+       "id": "sender",
+       "displayName": "sender",
+       "required": false,
+       "defaultMatch": false,
+       "display": true,
+       "type": "string",
+       "canBeUsedToMatch": true
+      },
+      {
+       "id": "subject",
+       "displayName": "subject",
+       "required": false,
+       "defaultMatch": false,
+       "display": true,
+       "type": "string",
+       "canBeUsedToMatch": true
+      },
+      {
+       "id": "fileName",
+       "displayName": "fileName",
+       "required": false,
+       "defaultMatch": false,
+       "display": true,
+       "type": "string",
+       "canBeUsedToMatch": true
+      },
+      {
+       "id": "status",
+       "displayName": "status",
+       "required": false,
+       "defaultMatch": false,
+       "display": true,
+       "type": "string",
+       "canBeUsedToMatch": true
+      },
+      {
+       "id": "issues",
+       "displayName": "issues",
+       "required": false,
+       "defaultMatch": false,
+       "display": true,
+       "type": "string",
+       "canBeUsedToMatch": true
+      },
+      {
+       "id": "driveFileId",
+       "displayName": "driveFileId",
+       "required": false,
+       "defaultMatch": false,
+       "display": true,
+       "type": "string",
+       "canBeUsedToMatch": true
+      },
+      {
+       "id": "driveLink",
+       "displayName": "driveLink",
+       "required": false,
+       "defaultMatch": false,
+       "display": true,
+       "type": "string",
+       "canBeUsedToMatch": true
+      },
+      {
+       "id": "receivedAt",
+       "displayName": "receivedAt",
+       "required": false,
+       "defaultMatch": false,
+       "display": true,
+       "type": "dateTime",
+       "canBeUsedToMatch": true
+      }
+     ]
+    },
+    "options": {}
+   },
+   "id": "5a0a59b0-a33c-432e-9fe7-8ec13c7b7a9f",
+   "name": "Log Rejected Submission",
+   "type": "n8n-nodes-base.dataTable",
+   "typeVersion": 1.1,
+   "position": [
+    800,
+    320
+   ]
+  },
+  {
+   "parameters": {
+    "operation": "reply",
+    "messageId": "={{ $('Validate Submission').item.json.messageId }}",
+    "message": "=<p>Hello,</p><p>Your workforce submission could not be accepted because of the following issue(s):</p><ul>{{ $(\"Validate Submission\").item.json.issues.split(\" | \").map(i => \"<li>\" + i + \"</li>\").join(\"\") }}</ul><p>Please correct and resend with the subject line <b>WF-DATA | &lt;Country&gt; | &lt;Mon-YYYY&gt;</b> and the Excel template attached.</p><p>Regards,<br>FP&amp;A – Workforce Analytics</p>",
+    "options": {
+     "appendAttribution": false,
+     "replyToSenderOnly": true
+    }
+   },
+   "id": "f2b2ae45-2601-4512-805a-9f2ee42adb7e",
+   "name": "Ask SPOC to Resubmit",
+   "type": "n8n-nodes-base.gmail",
+   "typeVersion": 2.2,
+   "position": [
+    1024,
+    320
+   ],
+   "credentials": {
+    "gmailOAuth2": {
+     "name": "Gmail account"
+    }
+   }
+  },
+  {
+   "parameters": {
+    "operation": "markAsRead",
+    "messageId": "={{ $('Validate Submission').item.json.messageId }}"
+   },
+   "id": "9359d57d-d402-46fc-be3f-35567617214c",
+   "name": "Mark Email as Processed",
+   "type": "n8n-nodes-base.gmail",
+   "typeVersion": 2.2,
+   "position": [
+    1480,
+    224
+   ],
+   "credentials": {
+    "gmailOAuth2": {
+     "name": "Gmail account"
+    }
+   }
+  },
+  {
+   "parameters": {
+    "rule": {
+     "interval": [
+      {
+       "field": "cronExpression",
+       "expression": "0 0 18 25 * *"
+      }
+     ]
+    }
+   },
+   "id": "10dda634-95a1-409d-88f1-63b9d1846e68",
+   "name": "25th of Month at 6 PM",
+   "type": "n8n-nodes-base.scheduleTrigger",
+   "typeVersion": 1.4,
+   "position": [
+    0,
+    416
+   ]
+  },
+  {
+   "parameters": {
+    "operation": "get",
+    "dataTableId": {
+     "__rl": true,
+     "mode": "list",
+     "value": "",
+     "cachedResultName": "WF_Submission_Log (create and select)"
+    },
+    "returnAll": true
+   },
+   "id": "6f29d93c-23f6-463d-8fb1-7ddb254b6cad",
+   "name": "Read Submission Log",
+   "type": "n8n-nodes-base.dataTable",
+   "typeVersion": 1.1,
+   "position": [
+    272,
+    544
+   ],
+   "alwaysOutputData": true
+  },
+  {
+   "parameters": {
+    "jsCode": "const COUNTRIES = ['India', 'UK', 'US', 'France', 'China'];\nconst period = $now.toFormat('MMM-yyyy');\nconst rows = $input.all().map(i => i.json).filter(r => r.period === period);\nconst lines = COUNTRIES.map(c => {\n  const acc = rows.filter(r => r.country === c && r.status === 'Accepted');\n  const rej = rows.filter(r => r.country === c && r.status === 'Rejected');\n  const status = acc.length ? 'Received' : (rej.length ? 'Rejected – awaiting resubmission' : 'Pending');\n  const last = acc.length ? acc[acc.length - 1] : null;\n  return { country: c, status, when: last ? String(last.receivedAt).slice(0, 10) : '-', file: last ? last.fileName : '-' };\n});\nconst received = lines.filter(l => l.status === 'Received').length;\nconst colour = s => s === 'Received' ? '#1a7f37' : (s === 'Pending' ? '#9a6700' : '#cf222e');\nconst table = '<table border=\"1\" cellpadding=\"6\" style=\"border-collapse:collapse;font-family:Arial;font-size:13px\">' +\n  '<tr style=\"background:#1F3864;color:#fff\"><th>Country</th><th>Status</th><th>Received on</th><th>File</th></tr>' +\n  lines.map(l => '<tr><td>' + l.country + '</td><td style=\"color:' + colour(l.status) + '\"><b>' + l.status + '</b></td><td>' + l.when + '</td><td>' + l.file + '</td></tr>').join('') + '</table>';\nconst next = received === COUNTRIES.length ? 'All five countries are in. Run the consolidation script.' : 'Follow up with: ' + lines.filter(l => l.status !== 'Received').map(l => l.country).join(', ') + '.';\nreturn [{ json: { period, received, total: COUNTRIES.length, html: table, next } }];"
+   },
+   "id": "58ac7f59-5301-4cae-a462-00b477f47623",
+   "name": "Build Status Summary",
+   "type": "n8n-nodes-base.code",
+   "typeVersion": 2,
+   "position": [
+    496,
+    544
+   ]
+  },
+  {
+   "parameters": {
+    "sendTo": "your.email@example.com",
+    "subject": "=Workforce data status {{ $json.period }}: {{ $json.received }} of {{ $json.total }} countries received",
+    "message": "=<p>Workforce submissions for <b>{{ $json.period }}</b>:</p>{{ $json.html }}<p><b>Next step:</b> {{ $json.next }}</p>",
+    "options": {
+     "appendAttribution": false
+    }
+   },
+   "id": "ecd742e4-3bf4-4917-99d1-c3ee90603af5",
+   "name": "Email Status to FP&A",
+   "type": "n8n-nodes-base.gmail",
+   "typeVersion": 2.2,
+   "position": [
+    720,
+    544
+   ],
+   "credentials": {
+    "gmailOAuth2": {
+     "name": "Gmail account"
+    }
+   }
+  }
+ ],
+ "connections": {
+  "Watch SPOC Submissions": {
+   "main": [
+    [
+     {
+      "node": "Skip Already Processed",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Run Now - Process Waiting Emails": {
+   "main": [
+    [
+     {
+      "node": "Fetch Recent Submissions",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Fetch Recent Submissions": {
+   "main": [
+    [
+     {
+      "node": "Skip Already Processed",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Skip Already Processed": {
+   "main": [
+    [
+     {
+      "node": "Validate Submission",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Validate Submission": {
+   "main": [
+    [
+     {
+      "node": "Submission Valid?",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Submission Valid?": {
+   "main": [
+    [
+     {
+      "node": "Save File to WF_Inbox",
+      "type": "main",
+      "index": 0
+     }
+    ],
+    [
+     {
+      "node": "Log Rejected Submission",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Save File to WF_Inbox": {
+   "main": [
+    [
+     {
+      "node": "Log Accepted Submission",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Log Accepted Submission": {
+   "main": [
+    [
+     {
+      "node": "Confirm Receipt to SPOC",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Confirm Receipt to SPOC": {
+   "main": [
+    [
+     {
+      "node": "Mark Email as Processed",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Log Rejected Submission": {
+   "main": [
+    [
+     {
+      "node": "Ask SPOC to Resubmit",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Ask SPOC to Resubmit": {
+   "main": [
+    [
+     {
+      "node": "Mark Email as Processed",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "25th of Month at 6 PM": {
+   "main": [
+    [
+     {
+      "node": "Read Submission Log",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Read Submission Log": {
+   "main": [
+    [
+     {
+      "node": "Build Status Summary",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Build Status Summary": {
+   "main": [
+    [
+     {
+      "node": "Email Status to FP&A",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  }
+ },
+ "settings": {
+  "timezone": "Asia/Kolkata",
+  "executionOrder": "v1"
+ }
+}
