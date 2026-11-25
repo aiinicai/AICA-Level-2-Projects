@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AssetTrack</title>
+  <link rel="stylesheet" href="/static/css/app.css" />
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="brand-title">AssetTrack</div>
+        <div class="brand-sub">Fixed Asset &amp; Stationery Tracker</div>
+      </div>
+      <button class="nav-btn active" data-tab="dashboard">📊 Dashboard</button>
+      <button class="nav-btn" data-tab="assets">🏢 Fixed Assets</button>
+      <button class="nav-btn" data-tab="maintenance">🔧 Maintenance Log</button>
+      <button class="nav-btn" data-tab="vendors">📇 Vendors</button>
+      <button class="nav-btn" data-tab="stationery">📦 Stationery</button>
+      <div class="sidebar-footer">
+        <div>Local SQLite + Excel Export</div>
+      </div>
+    </aside>
+
+    <div class="main-content">
+      <header class="topbar">
+        <div class="topbar-title">
+          <span class="mobile-brand">AssetTrack</span>
+          <h2 id="pageTitle">Dashboard</h2>
+        </div>
+        <div class="topbar-actions">
+          <button class="btn btn-primary" onclick="openAssetModal()">+ Add Asset</button>
+          <a class="btn" href="/qr/print" target="_blank" rel="noopener">🏷️ Print QR Stickers</a>
+          <a class="btn" href="/api/export/excel" download="v0_assets_master.xlsx">⬇ Export Excel (.xlsx)</a>
+        </div>
+      </header>
+
+      <main class="page-body">
+        <!-- DASHBOARD -->
+        <section id="view-dashboard" class="tab-view">
+          <div class="kpi-grid" id="kpiGrid"></div>
+          <div class="card">
+            <div class="card-header">
+              <h3>🚨 Upcoming &amp; Overdue Maintenance</h3>
+              <span class="badge badge-slate" id="maintAlertSummary">0</span>
+            </div>
+            <div id="maintAlertsList" class="alert-list"></div>
+          </div>
+          <div class="card">
+            <div class="card-header">
+              <h3>📦 Low-Stock Stationery</h3>
+              <span class="badge badge-slate" id="stockAlertSummary">0</span>
+            </div>
+            <div id="stockAlertsList" class="alert-list"></div>
+          </div>
+        </section>
+
+        <!-- FIXED ASSETS -->
+        <section id="view-assets" class="tab-view" style="display:none;">
+          <div class="card">
+            <div class="toolbar">
+              <input id="assetSearch" class="input" style="flex:1;min-width:180px;" placeholder="Search tag, name, location..." oninput="loadAssets()" />
+              <select id="assetStatusFilter" onchange="loadAssets()">
+                <option value="">All Statuses</option>
+                <option value="OPERATIONAL">Operational</option>
+                <option value="NEEDS_REPAIR">Needs Repair</option>
+                <option value="IN_MAINTENANCE">In Maintenance</option>
+                <option value="DECOMMISSIONED">Decommissioned</option>
+              </select>
+              <button class="btn btn-primary" onclick="openAssetModal()">+ Add Asset</button>
+            </div>
+            <div class="pill-row" id="categoryFilterPills" style="margin-bottom:14px;">
+              <button class="pill active" data-cat="" onclick="setCategoryFilter('')">All</button>
+              <button class="pill" data-cat="FURNITURE" onclick="setCategoryFilter('FURNITURE')">🪑 Furniture</button>
+              <button class="pill" data-cat="IT_HARDWARE" onclick="setCategoryFilter('IT_HARDWARE')">💻 IT</button>
+              <button class="pill" data-cat="ELECTRICAL" onclick="setCategoryFilter('ELECTRICAL')">⚡ Electrical</button>
+              <button class="pill" data-cat="OFFICE_FIXTURES" onclick="setCategoryFilter('OFFICE_FIXTURES')">🏢 Fixtures</button>
+              <button class="pill" data-cat="MACHINERY" onclick="setCategoryFilter('MACHINERY')">⚙️ Machinery</button>
+            </div>
+            <div class="table-wrap desktop-table">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Photo</th>
+                    <th>Tag</th>
+                    <th>Asset Name</th>
+                    <th>Category</th>
+                    <th>Location</th>
+                    <th>Vendor</th>
+                    <th>Next Maint.</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="assetsTableBody"></tbody>
+              </table>
+            </div>
+            <div id="assetsCardGrid" class="mobile-cards"></div>
+          </div>
+        </section>
+
+        <!-- SINGULAR MAINTENANCE LOG -->
+        <section id="view-maintenance" class="tab-view" style="display:none;">
+          <div class="card">
+            <div class="card-header">
+              <h3>🔧 Maintenance Log</h3>
+              <button class="btn btn-primary" onclick="openMaintenanceModal()">+ Log Maintenance</button>
+            </div>
+            <div class="table-wrap desktop-table">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Photo</th>
+                    <th>Scheduled</th>
+                    <th>Asset</th>
+                    <th>Vendor</th>
+                    <th>Description</th>
+                    <th>Cost</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="maintenanceTableBody"></tbody>
+              </table>
+            </div>
+            <div id="maintenanceCardGrid" class="mobile-cards"></div>
+          </div>
+        </section>
+
+        <!-- VENDORS -->
+        <section id="view-vendors" class="tab-view" style="display:none;">
+          <div class="card">
+            <div class="card-header">
+              <h3>📇 Vendor Directory</h3>
+              <button class="btn btn-primary" onclick="openVendorModal()">+ Add Vendor</button>
+            </div>
+            <div class="table-wrap desktop-table">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Vendor Name</th>
+                    <th>Type</th>
+                    <th>Contact</th>
+                    <th>Phone</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="vendorsTableBody"></tbody>
+              </table>
+            </div>
+            <div id="vendorsCardGrid" class="mobile-cards"></div>
+          </div>
+        </section>
+
+        <!-- STATIONERY -->
+        <section id="view-stationery" class="tab-view" style="display:none;">
+          <div class="card">
+            <div class="card-header">
+              <h3>📦 Stationery &amp; Consumables</h3>
+              <button class="btn btn-primary" onclick="openStationeryModal()">+ Add Item</button>
+            </div>
+            <div class="table-wrap desktop-table">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Item Name</th>
+                    <th>Category</th>
+                    <th>Stock</th>
+                    <th>Reorder At</th>
+                    <th>Status</th>
+                    <th>Vendor</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="stationeryTableBody"></tbody>
+              </table>
+            </div>
+            <div id="stationeryCardGrid" class="mobile-cards"></div>
+          </div>
+        </section>
+
+        <footer class="app-footnote">{{ company_name }} · Fixed Asset &amp; Stationery Management</footer>
+      </main>
+    </div>
+
+    <nav class="mobile-nav">
+      <button class="active" data-tab="dashboard"><span>📊</span>Home</button>
+      <button data-tab="assets"><span>🏢</span>Assets</button>
+      <button data-tab="maintenance"><span>🔧</span>Maint.</button>
+      <button data-tab="vendors"><span>📇</span>Vendors</button>
+      <button data-tab="stationery"><span>📦</span>Stock</button>
+    </nav>
+  </div>
+
+  <!-- MODAL: ADD ASSET -->
+  <div id="assetModal" class="modal-backdrop">
+    <div class="modal">
+      <div class="modal-header">
+        <h3>Add Fixed Asset</h3>
+        <button class="btn btn-sm" onclick="closeModal('assetModal')">✕</button>
+      </div>
+      <form id="assetForm" onsubmit="submitAssetForm(event)">
+        <div class="modal-body">
+          <div class="form-grid">
+            <div class="form-group"><label>Asset Tag (blank = auto)</label><input id="assetTag" class="input" placeholder="AST-FURN-001" /></div>
+            <div class="form-group"><label>Asset Name *</label><input id="assetName" class="input" required /></div>
+            <div class="form-group">
+              <label>Category *</label>
+              <select id="assetCategory">
+                <option value="FURNITURE">🪑 Furniture</option>
+                <option value="IT_HARDWARE">💻 IT Hardware</option>
+                <option value="ELECTRICAL">⚡ Electrical</option>
+                <option value="OFFICE_FIXTURES">🏢 Office Fixtures</option>
+                <option value="MACHINERY">⚙️ Machinery</option>
+              </select>
+            </div>
+            <div class="form-group"><label>Location *</label><input id="assetLocation" class="input" required /></div>
+            <div class="form-group"><label>Vendor</label><select id="assetVendorId"></select></div>
+            <div class="form-group"><label>Purchase Cost</label><input id="assetPurchaseCost" type="number" step="0.01" min="0" class="input" /></div>
+            <div class="form-group"><label>Purchase Date</label><input id="assetPurchaseDate" type="date" class="input" /></div>
+            <div class="form-group"><label>Warranty End</label><input id="assetWarrantyEnd" type="date" class="input" /></div>
+            <div class="form-group">
+              <label>Maintenance Cycle</label>
+              <select id="assetMaintCycle">
+                <option value="MONTHLY">Monthly</option>
+                <option value="QUARTERLY" selected>Quarterly</option>
+                <option value="BI_ANNUAL">Bi-Annual</option>
+                <option value="ANNUAL">Annual</option>
+                <option value="AS_NEEDED">As Needed</option>
+              </select>
+            </div>
+            <div class="form-group"><label>Photo (Optional)</label><input id="assetPhotoInput" type="file" accept="image/*" class="input" /></div>
+            <div class="form-group full"><label>Notes</label><textarea id="assetNotes" rows="2"></textarea></div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn" onclick="closeModal('assetModal')">Cancel</button>
+          <button type="submit" class="btn btn-primary">Save Asset</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: LOG MAINTENANCE -->
+  <div id="maintenanceModal" class="modal-backdrop">
+    <div class="modal">
+      <div class="modal-header">
+        <h3>Log Maintenance</h3>
+        <button class="btn btn-sm" onclick="closeModal('maintenanceModal')">✕</button>
+      </div>
+      <form id="maintenanceForm" onsubmit="submitMaintenanceForm(event)">
+        <div class="modal-body">
+          <div class="form-grid">
+            <div class="form-group"><label>Asset *</label><select id="maintAssetId" required></select></div>
+            <div class="form-group"><label>Vendor</label><select id="maintVendorId"></select></div>
+            <div class="form-group"><label>Scheduled Date *</label><input id="maintScheduledDate" type="date" class="input" required /></div>
+            <div class="form-group">
+              <label>Status</label>
+              <select id="maintStatus">
+                <option value="SCHEDULED">Scheduled</option>
+                <option value="IN_PROGRESS">In Progress</option>
+                <option value="COMPLETED">Completed</option>
+              </select>
+            </div>
+            <div class="form-group"><label>Cost</label><input id="maintCost" type="number" step="0.01" min="0" class="input" /></div>
+            <div class="form-group"><label>Photo (Optional)</label><input id="maintPhotoInput" type="file" accept="image/*" class="input" /></div>
+            <div class="form-group full"><label>Description *</label><textarea id="maintDescription" rows="3" required></textarea></div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn" onclick="closeModal('maintenanceModal')">Cancel</button>
+          <button type="submit" class="btn btn-primary">Save Entry</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: ADD VENDOR -->
+  <div id="vendorModal" class="modal-backdrop">
+    <div class="modal">
+      <div class="modal-header">
+        <h3>Add Vendor</h3>
+        <button class="btn btn-sm" onclick="closeModal('vendorModal')">✕</button>
+      </div>
+      <form id="vendorForm" onsubmit="submitVendorForm(event)">
+        <div class="modal-body">
+          <div class="form-grid">
+            <div class="form-group"><label>Vendor Name *</label><input id="vendorName" class="input" required /></div>
+            <div class="form-group">
+              <label>Type</label>
+              <select id="vendorType">
+                <option value="CARPENTER">Carpenter</option>
+                <option value="FURNITURE_STORE">Furniture Store</option>
+                <option value="SERVICE_CENTER">Service Center</option>
+                <option value="STATIONERY">Stationery Supplier</option>
+              </select>
+            </div>
+            <div class="form-group"><label>Contact Person</label><input id="vendorContact" class="input" /></div>
+            <div class="form-group"><label>Phone / WhatsApp *</label><input id="vendorPhone" class="input" required placeholder="+91 9876543210" /></div>
+            <div class="form-group full"><label>Address</label><input id="vendorAddress" class="input" /></div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn" onclick="closeModal('vendorModal')">Cancel</button>
+          <button type="submit" class="btn btn-primary">Save Vendor</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: ADD STATIONERY -->
+  <div id="stationeryModal" class="modal-backdrop">
+    <div class="modal">
+      <div class="modal-header">
+        <h3>Add Stationery Item</h3>
+        <button class="btn btn-sm" onclick="closeModal('stationeryModal')">✕</button>
+      </div>
+      <form id="stationeryForm" onsubmit="submitStationeryForm(event)">
+        <div class="modal-body">
+          <div class="form-grid">
+            <div class="form-group"><label>Item Name *</label><input id="stockName" class="input" required /></div>
+            <div class="form-group">
+              <label>Category</label>
+              <select id="stockCategory">
+                <option value="PAPER">Paper</option>
+                <option value="WRITING">Writing</option>
+                <option value="INK">Printer Ink / Toner</option>
+                <option value="PANTRY">Pantry &amp; Cleaning</option>
+              </select>
+            </div>
+            <div class="form-group"><label>Current Stock *</label><input id="stockQty" type="number" min="0" value="10" class="input" required /></div>
+            <div class="form-group"><label>Unit *</label><input id="stockUnit" value="Reams" class="input" required /></div>
+            <div class="form-group"><label>Reorder Threshold *</label><input id="stockThreshold" type="number" min="0" value="5" class="input" required /></div>
+            <div class="form-group"><label>Preferred Vendor</label><select id="stockVendorId"></select></div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn" onclick="closeModal('stationeryModal')">Cancel</button>
+          <button type="submit" class="btn btn-primary">Save Item</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div id="toast" class="toast"></div>
+  <script src="/static/js/app.js"></script>
+</body>
+</html>

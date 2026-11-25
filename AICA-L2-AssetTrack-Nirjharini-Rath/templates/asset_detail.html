@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>{{ asset.asset_tag }} — {{ asset.name }}</title>
+  <link rel="stylesheet" href="/static/css/app.css" />
+  <style>
+    body { padding: 18px; }
+    .wrap { max-width: 960px; margin: 0 auto; }
+    .grid { display: grid; grid-template-columns: 1.6fr 1fr; gap: 16px; }
+    .gallery { display: flex; gap: 10px; flex-wrap: wrap; }
+    .gallery img { max-height: 220px; border-radius: 10px; border: 1px solid var(--border); }
+    @media (max-width: 780px) { .grid { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="card" style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;">
+      <div style="display:flex;align-items:center;gap:12px;">
+        <div class="brand-pill">AssetTrack</div>
+        <div>
+          <code>{{ asset.asset_tag }}</code>
+          <h2 style="font-size:19px;">{{ asset.name }}</h2>
+        </div>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        <a class="btn" href="/">← Back</a>
+        <a class="btn" href="/qr/print?asset_id={{ asset.id }}" target="_blank" rel="noopener">🏷️ Print QR</a>
+        {% if wa_url %}<a class="btn btn-wa" href="{{ wa_url }}" target="_blank" rel="noopener">💬 WhatsApp Vendor</a>{% endif %}
+      </div>
+    </div>
+
+    <div class="grid">
+      <div>
+        <div class="card">
+          <div class="card-header"><h3>Asset Details</h3><span class="badge badge-slate">{{ asset.status }}</span></div>
+          {% if asset.photos %}
+          <div class="gallery" style="margin-bottom:14px;">
+            {% for p in asset.photos %}<img src="{{ p }}" alt="asset" />{% endfor %}
+          </div>
+          {% endif %}
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;font-size:13.5px;">
+            <div><strong>Category:</strong> {{ asset.category }}</div>
+            <div><strong>Location:</strong> {{ asset.location }}</div>
+            <div><strong>Purchase Date:</strong> {{ asset.purchase_date or '—' }}</div>
+            <div><strong>Cost:</strong> {{ asset.purchase_cost if asset.purchase_cost is not none else '—' }}</div>
+            <div><strong>Vendor:</strong> {{ asset.vendor_name or '—' }}</div>
+            <div><strong>Next Maintenance:</strong> {{ asset.next_maintenance_date or '—' }}</div>
+          </div>
+          {% if asset.notes %}<p style="margin-top:12px;font-size:13.5px;color:var(--muted);">{{ asset.notes }}</p>{% endif %}
+        </div>
+
+        <div class="card">
+          <div class="card-header"><h3>Maintenance History</h3></div>
+          {% if maintenance_records %}
+          <div class="alert-list">
+            {% for m in maintenance_records %}
+            <div class="alert-item">
+              <div>
+                <strong>{{ m.scheduled_date }}</strong> — {{ m.description }}
+                <div style="font-size:12px;color:var(--muted);">Vendor: {{ m.vendor_name or 'Independent' }} · Cost: {{ m.cost if m.cost is not none else '—' }}</div>
+              </div>
+              <span class="badge {% if m.status == 'COMPLETED' %}badge-green{% else %}badge-orange{% endif %}">{{ m.status }}</span>
+            </div>
+            {% endfor %}
+          </div>
+          {% else %}
+          <div style="color:var(--muted);font-size:13.5px;">No maintenance records yet.</div>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="card" style="text-align:center;">
+        <div class="card-header"><h3>QR Sticker</h3></div>
+        <div style="max-width:190px;margin:0 auto 10px;">{{ qr_svg | safe }}</div>
+        <div style="font-size:11.5px;color:var(--muted);word-break:break-all;">{{ qr_url }}</div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
