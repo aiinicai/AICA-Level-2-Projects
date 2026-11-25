@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>CFO Workforce Dashboard</title>
+  <meta name="description" content="Multi-country workforce analytics: headcount and cost against budget, workforce walk, grade and location mix, monthly trend. AICA Level 2 capstone.">
+  <meta name="theme-color" content="#1F3864">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icons/icon-192.png">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Workforce">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="bar">
+    <div class="brand"><img src="icons/icon-192.png" alt="" width="28" height="28"> CFO Workforce Dashboard</div>
+    <div class="actions">
+      <button id="install" class="btn" hidden>Install app</button>
+      <label class="btn">Load month files<input type="file" id="file" accept=".json,application/json" multiple hidden></label>
+    </div>
+  </header>
+
+  <main class="wf">
+    <section id="title">
+      <h1><span id="scope-name">Group</span> workforce – <span id="period-name">—</span></h1>
+      <p class="sub" id="scope-sub">India · UK · US · France · China · internal employees and external consultants · monthly cost in ₹ crore at month FX rates</p>
+      <p class="lede" id="takeaway">Loading…</p>
+      <p class="sub" id="status"></p>
+    </section>
+
+    <nav class="tabs" role="tablist" aria-label="Pages">
+      <button role="tab" id="tab-overview" data-view="overview" aria-selected="true">Workforce overview</button>
+      <button role="tab" id="tab-projects" data-view="projects" aria-selected="false">Projects</button>
+    </nav>
+
+    <section class="seg-wrap" aria-label="View">
+      <div class="seg" id="country-buttons" role="group" aria-label="Choose group or a country"></div>
+    </section>
+
+    <section class="filters" aria-label="Filters">
+      <label>Year <select id="year"></select></label>
+      <label>Month <select id="month"></select></label>
+      <label id="pop-wrap">Walk population
+        <select id="pop">
+          <option value="Total">Internal + external</option>
+          <option value="Internal">Internal employees</option>
+          <option value="External">External consultants</option>
+        </select>
+      </label>
+      <button id="reset" class="btn-plain" type="button">Reset filters</button>
+    </section>
+
+    <div id="view-overview">
+    <section class="cards">
+      <div class="card"><div class="lbl">Total headcount (month-end)</div><div class="big" data-k="actual_hc">—</div>
+        <div class="vs">Budget <span data-k="budget_hc">—</span> · <span data-k="hc_var_pct">—</span> · MoM <span data-k="mom_hc">—</span></div></div>
+      <div class="card"><div class="lbl">Monthly workforce cost</div><div class="big">₹<span data-k="actual_cost_cr">—</span> Cr</div>
+        <div class="vs">Budget ₹<span data-k="budget_cost_cr">—</span> Cr · <span data-k="cost_var_pct">—</span> · MoM <span data-k="mom_cost">—</span></div></div>
+      <div class="card"><div class="lbl">Cost per head per month</div><div class="big">₹<span data-k="cph_lakh">—</span> L</div>
+        <div class="vs">Budget ₹<span data-k="cph_budget_lakh">—</span> L · <span data-k="cph_var_pct">—</span></div></div>
+      <div class="card"><div class="lbl">Internal / external headcount</div><div class="big"><span data-k="internal_hc">—</span> / <span data-k="external_hc">—</span></div>
+        <div class="vs">External share <span data-k="external_share">—</span> · internal exits <span data-k="internal_exit_pct">—</span> of opening</div></div>
+    </section>
+
+    <section class="panel" id="share-panel">
+      <h2>Country share of group: headcount vs cost <span class="scope" data-scope></span></h2>
+      <p class="sub">Each country's share of group month-end headcount compared with its share of group monthly cost · a cost share below the headcount share means a lower cost per head than the group average · tap a country to open it</p>
+      <div class="chart" id="share-chart"></div>
+      <div class="legend"><span><i class="sw-act"></i>Share of group headcount</span><span><i class="sw-cost"></i>Share of group cost</span><span id="share-avg"></span></div>
+    </section>
+
+    <section class="grid2">
+      <div class="panel">
+        <h2>Workforce walk <span class="scope" data-scope></span></h2>
+        <p class="sub">Opening + hires − leavers − terminations + project hires = closing</p>
+        <div class="chart" id="walk-chart"></div>
+        <p class="sub">Leavers: resignations (internal), completed contracts (external). Terminations: involuntary exits, early contract ends, conversions to employee. Axis does not start at zero.</p>
+      </div>
+      <div class="panel">
+        <h2>Cost bridge: budget to actual <span class="scope" data-scope></span></h2>
+        <p class="sub">₹ crore per month. Volume = extra heads at budget cost per head; rate / mix = cost-per-head difference on actual heads</p>
+        <div class="chart" id="bridge-chart"></div>
+        <p class="sub">Axis does not start at zero.</p>
+      </div>
+    </section>
+
+    <section class="panel" id="trend">
+      <h2>Monthly trend: actual vs budget <span class="scope" data-scope-only></span></h2>
+      <p class="sub">Every month loaded · the selected month is highlighted</p>
+      <div class="grid2 tight">
+        <div><h3>Headcount (month-end)</h3><div class="chart short" id="trend-hc"></div></div>
+        <div><h3>Monthly cost (₹ crore)</h3><div class="chart short" id="trend-cost"></div></div>
+      </div>
+      <div class="legend"><span><i class="sw-act"></i>Actual</span><span><i class="sw-bud"></i>Budget</span></div>
+    </section>
+
+    <section class="panel" id="commentary">
+      <h2>Variance commentary <span class="scope" data-scope></span></h2>
+      <div class="comment">
+        <div><h3>What happened</h3><p id="c-what">—</p></div>
+        <div><h3>Why</h3><p id="c-why">—</p></div>
+        <div><h3>Business impact</h3><p id="impact">—</p></div>
+        <div><h3>Action required</h3>
+          <ul>
+            <li>Country heads to confirm whether the lower cost per head is structural (junior and project hiring) or timing (unfilled senior roles, bonus phasing).</li>
+            <li>Approve the headcount overrun into the plan, or set a hiring freeze where headcount is above budget.</li>
+            <li>Reforecast the remaining months using actual cost per head and the approved headcount.</li>
+            <li>Review the external share against the target mix before contracts are renewed.</li>
+          </ul></div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2 id="table-title">Variance by country <span class="scope" data-scope></span></h2>
+      <p class="sub" id="table-sub">Cost in ₹ crore per month · variance = actual − budget · tap a row to open that country</p>
+      <div class="tablewrap">
+        <table id="var-table">
+          <thead><tr><th id="th-first">Country</th><th>Actual HC</th><th>Budget HC</th><th>HC var %</th><th>Actual cost</th><th>Budget cost</th><th>Cost var %</th><th>Volume</th><th>Rate / mix</th><th>Cost / head var %</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="grid2">
+      <div class="panel">
+        <h2>Grade mix – internal employees <span class="scope" data-scope></span></h2>
+        <p class="sub" id="grade-sub">Share of month-end headcount by grade (G1 associate → G6 director)</p>
+        <div class="chart" id="grade-chart"></div>
+      </div>
+      <div class="panel">
+        <h2>Location mix <span class="scope" data-scope></span></h2>
+        <p class="sub" id="loc-sub">Month-end headcount, internal and external; label shows share of group and external %</p>
+        <div class="chart" id="loc-chart"></div>
+      </div>
+    </section>
+
+    </div>
+
+    <div id="view-projects" hidden>
+      <section class="cards">
+        <div class="card"><div class="lbl">Project headcount (month-end)</div><div class="big" data-p="heads">—</div>
+          <div class="vs"><span data-p="int">—</span> internal / <span data-p="ext">—</span> external · MoM <span data-p="mom_heads">—</span></div></div>
+        <div class="card"><div class="lbl">Project monthly cost</div><div class="big">₹<span data-p="cost">—</span> Cr</div>
+          <div class="vs"><span data-p="cost_share">—</span> of total workforce cost · MoM <span data-p="mom_cost">—</span></div></div>
+        <div class="card"><div class="lbl">Cost per project head per month</div><div class="big">₹<span data-p="cph">—</span> L</div>
+          <div class="vs">Whole workforce ₹<span data-p="cph_all">—</span> L</div></div>
+        <div class="card"><div class="lbl">Active projects / joined this month</div><div class="big"><span data-p="nproj">—</span> / <span data-p="joined">—</span></div>
+          <div class="vs">Project share of headcount <span data-p="head_share">—</span></div></div>
+      </section>
+
+      <section class="grid2">
+        <div class="panel">
+          <h2>Headcount and cost by project <span class="scope" data-scope></span></h2>
+          <p class="sub">Month-end heads, internal and external; label shows monthly cost and cost per head · tap a bar to highlight the project</p>
+          <div class="chart" id="proj-chart"></div>
+        </div>
+        <div class="panel">
+          <h2>Project cost trend <span class="scope" data-scope-only></span></h2>
+          <p class="sub">Monthly cost by project, ₹ crore · every month loaded · the selected month is highlighted</p>
+          <div class="chart" id="proj-trend"></div>
+        </div>
+      </section>
+
+      <section class="panel">
+        <h2>Project register <span class="scope" data-scope></span></h2>
+        <p class="sub">Project hires (internal) and project-engaged consultants (external) active at month-end · cost in ₹ crore per month</p>
+        <div class="tablewrap">
+          <table id="proj-table">
+            <thead><tr><th>Project</th><th>Countries</th><th>Internal</th><th>External</th><th>Total heads</th><th>Joined in month</th><th>Monthly cost</th><th>Cost / head (₹ L)</th><th>External %</th><th>Share of project cost</th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="panel" id="proj-matrix-panel">
+        <h2>Project heads by country <span class="scope" data-scope></span></h2>
+        <p class="sub">Month-end heads (internal + external) · darker cells hold more heads · tap a country column header to open it</p>
+        <div class="tablewrap"><table id="proj-matrix"><thead></thead><tbody></tbody></table></div>
+      </section>
+    </div>
+
+    <details class="notes">
+      <summary>Definitions and data</summary>
+      <ul>
+        <li>Data: <code>data/index.json</code> lists the months; each month is <code>data/dashboard_data_&lt;Mon-YYYY&gt;.json</code>, written by <code>consolidate.py</code> from the five country files received through the n8n intake workflow, the FY26 budget and the FX assumptions. <em>Load month files</em> opens one or more dashboard_data JSON files (select several at once) on this device only.</li>
+        <li>Headcount is the population active at month-end. Monthly cost = internal CTC ÷ 12 plus external bill rate × billable units (160 hours, 20 days or 1 month), converted to INR at the month's FX rate.</li>
+        <li>Budget is at the same FX rates, so variances carry no currency effect. Volume effect = HC variance × budget cost per head; rate / mix effect = (actual − budget cost per head) × actual HC. MoM = change against the previous month loaded.</li>
+        <li>Projects: internal employees with hire type "Project" and consultants with engagement type "Project", active at month-end. "Joined in month" counts those whose hire date or contract start falls in the month. There is no project budget in the sample, so the Projects page shows actuals and trend only.</li>
+        <li>All names and figures are fictitious sample data for the ICAI AICA Level 2 capstone.</li>
+      </ul>
+    </details>
+    <footer class="sub" id="foot"></footer>
+  </main>
+
+  <script src="lib/d3.min.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
