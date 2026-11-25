@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block title %}Uploads{% endblock %}
+{% block content %}
+<h1 class="h4">Uploads</h1>
+<div class="row g-3">
+  {% if can_edit %}
+  <div class="col-lg-5">
+    <div class="card"><div class="card-header py-1 fw-semibold">Upload a file</div>
+    <div class="card-body">
+      <form method="post" action="/uploads" enctype="multipart/form-data" x-data="{ src: '' }">
+        <input type="hidden" name="csrf_token" value="{{ csrf }}">
+        <div class="mb-2"><label class="form-label small mb-0" for="source">The file contains</label>
+          <select class="form-select form-select-sm" id="source" name="source" x-model="src" required>
+            <option value="">Choose...</option>
+            {% for sp in sources %}<option value="{{ sp.source_type }}">{{ sp.title }}</option>{% endfor %}
+          </select></div>
+        <div class="mb-2"><label class="form-label small mb-0" for="file">File (.xlsx or .csv, up to {{ limit_mb }} MB, no macros)</label>
+          <input class="form-control form-control-sm" type="file" id="file" name="file" accept=".xlsx,.csv" required></div>
+        <div class="row g-2 mb-2">
+          <div class="col"><label class="form-label small mb-0" for="as_of">As-of date of the data</label>
+            <input class="form-control form-control-sm" type="date" id="as_of" name="as_of" value="{{ today.isoformat() }}"></div>
+          <div class="col" x-show="src === 'other'"><label class="form-label small mb-0" for="slot">Label (other files)</label>
+            <input class="form-control form-control-sm" id="slot" name="slot" placeholder="file name"></div>
+        </div>
+        <button class="btn btn-sm btn-primary">Upload and check</button>
+        <div class="small text-muted mt-2">Any row error rejects the whole file and the current data stays. Upload the category list first.
+          A new upload replaces the current file of the same kind; your holds and other changes are kept.</div>
+      </form>
+    </div></div>
+    <div class="card mt-3"><div class="card-header py-1 fw-semibold">Input templates</div>
+      <ul class="list-group list-group-flush small">
+        {% for sp in sources %}<li class="list-group-item py-1"><a href="/templates/{{ sp.template_file }}">{{ sp.template_file }}</a> · {{ sp.title }}</li>{% endfor %}
+      </ul></div>
+  </div>
+  {% endif %}
+  <div class="col">
+    <div class="card"><div class="card-header py-1 fw-semibold">Upload log (file hash log)</div>
+    <div class="table-responsive"><table class="table table-sm small mb-0">
+      <thead><tr><th>#</th><th>When</th><th>By</th><th>Source</th><th>File</th><th>Status</th><th class="text-end">Rows</th><th>SHA-256</th></tr></thead>
+      <tbody>{% for b in batches %}
+        {% set badge = {'accepted': 'success', 'exceptions': 'warning', 'rejected': 'danger', 'superseded': 'secondary'}.get(b.status.value, 'light') %}
+        <tr><td><a href="/uploads/{{ b.id }}">{{ b.id }}</a></td><td>{{ b.uploaded_at|dmy }}</td><td>{{ names.get(b.uploaded_by_id, '-') }}</td>
+          <td>{{ b.source_type.value }}{% if b.slot != b.source_type.value %} · {{ b.slot }}{% endif %}</td>
+          <td><a href="/uploads/{{ b.id }}">{{ b.original_filename }}</a></td>
+          <td><span class="badge text-bg-{{ badge }}">{{ 'current' if b.status.value == 'accepted' else b.status.value }}</span></td>
+          <td class="text-end">{{ b.row_count }}</td><td class="font-monospace" title="{{ b.sha256 }}">{{ b.sha256[:12] }}</td></tr>
+      {% else %}<tr><td colspan="8" class="text-muted">Nothing uploaded yet.</td></tr>{% endfor %}</tbody>
+    </table></div></div>
+  </div>
+</div>
+{% endblock %}

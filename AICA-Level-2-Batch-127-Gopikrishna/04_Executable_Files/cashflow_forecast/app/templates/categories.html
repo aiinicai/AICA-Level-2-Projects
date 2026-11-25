@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block title %}Categories{% endblock %}
+{% block content %}
+<h1 class="h4">Categories</h1>
+<p class="text-muted small">Rows of the forecast come from this list, grouped by summary group in display order. The list is normally
+  uploaded (Uploads → Category list); here you can adjust it. A category in use cannot change direction; deactivate it instead.</p>
+<table class="table table-sm small bg-white border align-middle">
+  <thead class="table-light"><tr><th>Name</th><th>Direction</th><th>Summary group</th><th>Order</th><th>Treatment</th><th>Active</th><th class="text-end">Items</th><th></th></tr></thead>
+  <tbody>
+  {% for c in cats %}
+  <tr><td colspan="8" class="p-0">
+    <form method="post" action="/admin/categories" class="d-flex gap-2 align-items-center px-2 py-1">
+      <input type="hidden" name="csrf_token" value="{{ csrf }}"><input type="hidden" name="category_id" value="{{ c.id }}">
+      <input class="form-control form-control-sm" name="name" value="{{ c.name }}" style="max-width: 15rem" aria-label="Name">
+      <select class="form-select form-select-sm" name="direction" style="max-width: 7rem" aria-label="Direction" {% if used.get(c.id) %}disabled{% endif %}>
+        {% for d in ['inflow', 'outflow'] %}<option value="{{ d }}" {% if c.direction.value == d %}selected{% endif %}>{{ d }}</option>{% endfor %}</select>
+      <input class="form-control form-control-sm" name="group" value="{{ c.summary_group }}" list="groups" style="max-width: 12rem" aria-label="Group">
+      <input class="form-control form-control-sm" name="order" value="{{ c.display_order }}" style="max-width: 5rem" inputmode="numeric" aria-label="Order">
+      <select class="form-select form-select-sm" name="treatment" style="max-width: 8rem" aria-label="Treatment">
+        {% for t in ['fixed', 'deferrable'] %}<option value="{{ t }}" {% if c.default_treatment.value == t %}selected{% endif %}>{{ t }}</option>{% endfor %}</select>
+      <div class="form-check"><input class="form-check-input" type="checkbox" name="active" value="1" {% if c.is_active %}checked{% endif %} aria-label="Active"></div>
+      <span class="ms-auto text-muted">{{ used.get(c.id, 0) }}</span>
+      <button class="btn btn-sm btn-outline-primary">Save</button>
+    </form></td></tr>
+  {% endfor %}
+  <tr><td colspan="8" class="p-0 table-light">
+    <form method="post" action="/admin/categories" class="d-flex gap-2 align-items-center px-2 py-1">
+      <input type="hidden" name="csrf_token" value="{{ csrf }}">
+      <input class="form-control form-control-sm" name="name" placeholder="New category" required style="max-width: 15rem" aria-label="Name">
+      <select class="form-select form-select-sm" name="direction" style="max-width: 7rem" aria-label="Direction"><option>outflow</option><option>inflow</option></select>
+      <input class="form-control form-control-sm" name="group" placeholder="Summary group" list="groups" style="max-width: 12rem" aria-label="Group">
+      <input class="form-control form-control-sm" name="order" placeholder="Order" style="max-width: 5rem" aria-label="Order">
+      <select class="form-select form-select-sm" name="treatment" style="max-width: 8rem" aria-label="Treatment"><option>fixed</option><option>deferrable</option></select>
+      <button class="btn btn-sm btn-primary ms-auto">Add</button>
+    </form></td></tr>
+  </tbody>
+</table>
+<datalist id="groups">{% for g in groups %}<option value="{{ g }}">{% endfor %}</datalist>
+{% endblock %}

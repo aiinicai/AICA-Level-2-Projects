@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block title %}Exports{% endblock %}
+{% block content %}
+<h1 class="h4">Excel exports</h1>
+<p class="text-muted small">Each export is recalculated in LibreOffice and compared with the app, cell by cell. Only exports that
+  pass can be downloaded. Use <strong>Export to Excel</strong> on the lot grid to make a new one (it uses the view on screen).</p>
+<table class="table table-sm small bg-white border align-middle">
+  <thead class="table-light"><tr><th>#</th><th>Created</th><th>As of</th><th>Scenario</th><th>By</th><th>Check</th><th></th></tr></thead>
+  <tbody>
+  {% for l in logs %}
+  <tr>
+    <td>{{ l.id }}</td><td>{{ l.created_at|dmy }}</td><td>{{ l.as_of_date|dmy }}</td>
+    <td>{{ scenarios.get(l.scenario_id, '-') }}</td><td>{{ names.get(l.created_by_id, 'console') }}</td>
+    <td>{% if l.released %}<span class="badge text-bg-success">passed</span>
+        {% elif l.check_status.value == 'not_run' %}<span class="badge text-bg-secondary">blocked: not checked</span>
+        {% else %}<span class="badge text-bg-danger">blocked: {{ (l.differences or [])|length }} difference(s)</span>{% endif %}</td>
+    <td class="text-end"><a href="/exports/{{ l.id }}">Details</a>
+      {% if l.released %} · <a href="/exports/{{ l.id }}/download">Download</a>{% endif %}</td>
+  </tr>
+  {% else %}
+  <tr><td colspan="7" class="text-muted">No exports yet.</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

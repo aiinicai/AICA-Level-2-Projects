@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+{% block title %}Approvals{% endblock %}
+{% block content %}
+<h1 class="h4">Changes waiting for approval</h1>
+<p class="text-muted small">
+  {% if enabled %}Approval is <strong>on</strong>: holds, deferrals and other changes wait here, and the forecast keeps using what was
+  approved before until an Approver (or Admin) approves. Nobody can approve their own change.
+  Releasing a hold or going back to the imported figures applies at once (it returns to the ERP data).
+  {% else %}Approval is <strong>off</strong> (Admin → Settings → approver_enabled), so changes apply at once. Requests made while it was on are still listed below.{% endif %}</p>
+
+{% if not waiting %}
+<div class="alert alert-light border">Nothing is waiting for approval.</div>
+{% else %}
+<table class="table table-sm small bg-white border align-middle">
+  <thead class="table-light"><tr><th>Item</th><th>Change requested</th><th>Asked by</th>
+    <th class="text-end">Lowest funding position after holds<br><span class="fw-normal">now → if approved</span></th><th style="width: 30%"></th></tr></thead>
+  <tbody>
+  {% for o in waiting %}
+  {% set li = items.get((o.source_type, o.source_key)) %}
+  {% set im = impact.get(o.id) %}
+  <tr>
+    <td>{% if li %}<strong>{{ li.counterparty }}</strong> · {{ li.reference or o.source_key }}<br>
+        <span class="text-muted">{{ o.source_type.value }} · {{ li.planned_date|dmy }} · {{ li.amount|money(false) }}</span>
+        {% else %}{{ o.source_type.value }} {{ o.source_key }} <span class="text-muted">(not in the current data)</span>{% endif %}</td>
+    <td><span class="badge text-bg-warning">{{ labels.get(o.action.value, o.action.value) }}</span>
+      {% if o.action.value == 'hold' %} until {{ o.new_date|dmy if o.new_date else 'further notice (open-ended)' }}{% endif %}
+      {% if o.action.value != 'hold' and o.new_date %} to {{ o.new_date|dmy }}{% endif %}
+      {% if o.target_lot_start %} to the lot starting {{ o.target_lot_start|dmy }}{% endif %}
+      {% if o.new_amount is not none %} · {{ o.new_amount|money(false) }}{% endif %}
+      {% if o.reason %}<br><span class="text-muted">Reason: {{ o.reason }}</span>{% endif %}</td>
+    <td>{{ names.get(o.created_by_id, '-') }}<br><span class="text-muted">{{ o.created_at|dmy }}</span></td>
+    <td class="text-end">{% if im %}
+      <span class="{{ 'text-danger' if im.now < 0 }}">{{ im.now|money(false) }}</span> ({{ im.now_lot }})<br>→
+      <strong class="{{ 'text-danger' if im.after < 0 }}">{{ im.after|money(false) }}</strong> ({{ im.after_lot }})
+      <div class="text-muted">lots with a gap: {{ im.gaps_now }} → {{ im.gaps_after }}</div>{% else %}-{% endif %}</td>
+    <td>
+      {% if can_approve and o.created_by_id != user.id %}
+      <form method="post" action="/approvals/{{ o.id }}" class="d-flex gap-1 flex-wrap">
+        <input type="hidden" name="csrf_token" value="{{ csrf }}">
+        <input class="form-control form-control-sm" name="comment" placeholder="Comment (required to reject)" maxlength="300" style="min-width: 12rem; flex: 1">
+        <button class="btn btn-sm btn-success" name="decision" value="approve">Approve</button>
+        <button class="btn btn-sm btn-outline-danger" name="decision" value="reject">Reject</button>
+      </form>
+      {% elif can_approve %}<span class="text-muted">Your own request: another Approver or Admin must decide.</span>{% endif %}
+      {% if o.created_by_id == user.id or can_admin %}
+      <form method="post" action="/approvals/{{ o.id }}" class="mt-1" data-confirm="Withdraw this request?">
+        <input type="hidden" name="csrf_token" value="{{ csrf }}">
+        <button class="btn btn-sm btn-link p-0" name="decision" value="withdraw">Withdraw request</button></form>
+      {% endif %}
+    </td>
+  </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endif %}
+
+<h2 class="h6 mt-4">Recent decisions</h2>
+<table class="table table-sm small bg-white border">
+  <thead class="table-light"><tr><th>Item</th><th>Change</th><th>Asked by</th><th>Outcome</th><th>By</th><th>When</th></tr></thead>
+  <tbody>
+  {% for o in decided %}
+  <tr><td>{{ o.source_type.value }} {{ o.source_key }}</td>
+    <td>{{ labels.get(o.action.value, o.action.value) }}{% if o.new_date %} {{ o.new_date|dmy }}{% endif %}{% if o.new_amount is not none %} · {{ o.new_amount|money(false) }}{% endif %}
+      {% if o.reason %}<br><span class="text-muted">{{ o.reason }}</span>{% endif %}</td>
+    <td>{{ names.get(o.created_by_id, '-') }}</td>
+    <td>{% if o.approval_status.value == 'approved' %}<span class="badge text-bg-success">approved</span>{% if not o.is_active %} <span class="text-muted">(since revoked)</span>{% endif %}
+        {% elif o.approval_status.value == 'rejected' %}<span class="badge text-bg-danger">rejected</span>
+        {% else %}<span class="badge text-bg-secondary">withdrawn / superseded</span>{% endif %}</td>
+    <td>{{ names.get(o.approved_by_id or o.revoked_by_id, '-') }}</td>
+    <td>{{ (o.approved_at or o.revoked_at)|dmy }}</td></tr>
+  {% else %}
+  <tr><td colspan="6" class="text-muted">No decisions yet.</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

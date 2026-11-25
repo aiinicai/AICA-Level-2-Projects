@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="htmx-config" content='{"includeIndicatorStyles": false, "allowEval": false}'>
+  <title>{% block title %}Cash Flow Forecast{% endblock %} · CFF</title>
+  <link rel="stylesheet" href="/static/vendor/bootstrap.min.css">
+  <link rel="stylesheet" href="/static/app.css">
+  <script src="/static/vendor/htmx.min.js" defer></script>
+  <script src="/static/app.js" defer></script>
+  <script src="/static/vendor/alpine.min.js" defer></script>
+  <script src="/static/vendor/bootstrap.bundle.min.js" defer></script>
+</head>
+<body hx-headers='{"X-CSRF-Token": "{{ csrf }}"}'>
+{% if user %}
+<nav class="navbar navbar-expand-lg navbar-dark bg-navy">
+  <div class="container-fluid">
+    <a class="navbar-brand fw-semibold" href="/forecast">Cash Flow Forecast</a>
+    <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#nav" aria-label="Menu">
+      <span class="navbar-toggler-icon"></span></button>
+    <div class="collapse navbar-collapse" id="nav">
+      {% set p = request.url.path %}
+      {% if user.must_change_password %}
+      <ul class="navbar-nav me-auto"><li class="nav-item"><span class="nav-link active">Choose your password to continue</span></li></ul>
+      {% else %}
+      <ul class="navbar-nav me-auto">
+        <li class="nav-item"><a class="nav-link {% if p.startswith('/forecast') %}active{% endif %}" href="/forecast">Lot grid</a></li>
+        <li class="nav-item"><a class="nav-link {% if p.startswith('/pdcs') %}active{% endif %}" href="/pdcs">PDC list</a></li>
+        <li class="nav-item"><a class="nav-link {% if p.startswith('/holds') %}active{% endif %}" href="/holds">Hold register</a></li>
+        <li class="nav-item"><a class="nav-link {% if p.startswith('/scenarios') %}active{% endif %}" href="/scenarios">Scenarios</a></li>
+        <li class="nav-item"><a class="nav-link {% if p.startswith('/balances') %}active{% endif %}" href="/balances">Balances &amp; facility</a></li>
+        <li class="nav-item"><a class="nav-link {% if p.startswith('/uploads') %}active{% endif %}" href="/uploads">Uploads</a></li>
+        <li class="nav-item"><a class="nav-link {% if p.startswith('/exceptions') %}active{% endif %}" href="/exceptions">Exceptions
+          <span hx-get="/exceptions/count" hx-trigger="load, forecast-changed from:body" hx-swap="innerHTML"></span></a></li>
+        <li class="nav-item"><a class="nav-link {% if p.startswith('/exports') %}active{% endif %}" href="/exports">Exports</a></li>
+        <li class="nav-item"><a class="nav-link {% if p.startswith('/approvals') %}active{% endif %}" href="/approvals">Approvals
+          <span hx-get="/approvals/count" hx-trigger="load, forecast-changed from:body" hx-swap="innerHTML"></span></a></li>
+        {% if can_audit %}
+        <li class="nav-item"><a class="nav-link {% if p.startswith('/audit') %}active{% endif %}" href="/audit">Audit log</a></li>
+        {% endif %}
+        {% if can_admin %}
+        <li class="nav-item dropdown">
+          <a class="nav-link dropdown-toggle {% if p.startswith('/admin') %}active{% endif %}" href="#" role="button" data-bs-toggle="dropdown">Admin</a>
+          <ul class="dropdown-menu">
+            <li><a class="dropdown-item" href="/admin/users">Users</a></li>
+            <li><a class="dropdown-item" href="/admin/categories">Categories</a></li>
+            <li><a class="dropdown-item" href="/admin/settings">Settings</a></li>
+            <li><a class="dropdown-item" href="/admin/backups">Backups</a></li>
+          </ul>
+        </li>
+        {% endif %}
+      </ul>
+      {% endif %}
+      <span class="navbar-text small me-2">{{ user.full_name or user.username }} · {{ user.role.value|capitalize }}</span>
+      {% if not user.must_change_password %}<a class="btn btn-sm btn-link link-light me-2" href="/account/password">Change password</a>{% endif %}
+      <form method="post" action="/logout" class="d-inline">
+        <input type="hidden" name="csrf_token" value="{{ csrf }}">
+        <button class="btn btn-sm btn-outline-light">Sign out</button>
+      </form>
+    </div>
+  </div>
+</nav>
+{% endif %}
+<main class="container-fluid py-3">
+  {% if flash %}
+  <div class="alert alert-{{ flash.kind }} alert-dismissible fade show py-2" role="alert">{{ flash.message }}
+    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button></div>
+  {% endif %}
+  {% block content %}{% endblock %}
+</main>
+<div class="modal fade" id="modal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-xl modal-dialog-scrollable"><div class="modal-content" id="modal-body"></div></div>
+</div>
+<footer class="text-muted small text-center pb-3">Synthetic data only · v{{ version }} · runs offline</footer>
+</body>
+</html>

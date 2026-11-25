@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% load humanize %}
+{% block title %}Revaluation & impairment{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between mb-3">
+  <h4 class="mb-0">Revaluation & impairment</h4>
+  {% if is_data_entry %}<a href="{% url 'assets:revaluation_create' %}" class="btn btn-primary btn-sm">Record revaluation</a>{% endif %}
+</div>
+<div class="card stat-card p-3">
+<table class="table table-sm table-hover">
+  <thead><tr><th>Asset</th><th>Valuer</th><th>Date</th><th class="text-end">Fair value</th><th class="text-end">Surplus/deficit</th><th>&gt;10%?</th><th>Status</th>{% if is_approver %}<th>Decide</th>{% endif %}</tr></thead>
+  <tbody>
+  {% for r in items %}
+    <tr>
+      <td><a href="{{ r.asset.get_absolute_url }}">{{ r.asset.asset_id }}</a></td>
+      <td>{{ r.valuer_name }} ({{ r.valuer_registration_number }})</td>
+      <td>{{ r.valuation_date }}</td>
+      <td class="text-end">₹{{ r.fair_value|intcomma }}</td>
+      <td class="text-end">₹{{ r.surplus_or_deficit|intcomma }}</td>
+      <td>{% if r.exceeds_10pct_threshold %}<span class="badge bg-warning text-dark">CARO disclosure</span>{% else %}No{% endif %}</td>
+      <td>{% if r.approved_by %}<span class="badge bg-success">Approved</span>{% else %}<span class="badge bg-secondary">Pending</span>{% endif %}</td>
+      {% if is_approver %}
+      <td>
+        {% if not r.approved_by %}
+        <form method="post" action="{% url 'assets:revaluation_decide' r.pk %}" class="d-flex gap-1">
+          {% csrf_token %}
+          <button name="decision" value="approve" class="btn btn-sm btn-success">Approve</button>
+          <button name="decision" value="reject" class="btn btn-sm btn-outline-danger">Reject</button>
+        </form>
+        {% endif %}
+      </td>
+      {% endif %}
+    </tr>
+  {% empty %}<tr><td colspan="8" class="text-muted">No revaluations recorded.</td></tr>{% endfor %}
+  </tbody>
+</table>
+</div>
+{% endblock %}

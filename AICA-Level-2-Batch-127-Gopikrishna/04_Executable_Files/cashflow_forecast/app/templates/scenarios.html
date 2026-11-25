@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block title %}Scenarios{% endblock %}
+{% block content %}
+<h1 class="h4">Scenarios</h1>
+<p class="text-muted small">Every scenario uses the same imported data and the same holds and changes. A scenario only switches
+  the rules: leave out risk-adjusted collections, or use the advisory collection-delay model instead of due dates.</p>
+{% set fc0 = runs[0][1] %}
+<div class="table-responsive mb-4"><table class="table table-sm small bg-white border">
+  <thead class="table-light"><tr><th>Scenario</th><th>Line</th>{% for lt in fc0.fc_lots %}<th class="text-end">{{ lt.label }}</th>{% endfor %}</tr></thead>
+  <tbody>{% for sc, fc in runs %}
+    <tr><td rowspan="3" class="fw-semibold">{{ sc.name }}{% if sc.is_default %} <span class="badge text-bg-primary">default</span>{% endif %}
+      <div class="fw-normal text-muted">{{ 'Risk excluded' if sc.exclude_risk_adjusted else 'Risk included' }} · {{ 'delay model' if sc.use_delay_model else 'due dates' }}</div></td>
+      <td>Closing balance</td>{% for v in fc.lines.closing %}<td class="text-end {{ 'text-danger' if v < 0 }}">{{ v|money }}</td>{% endfor %}</tr>
+    <tr class="fw-semibold"><td>Net funding position after holds</td>{% for v in fc.lines.fp_after %}<td class="text-end {{ 'text-danger' if v < 0 }}">{{ v|money }}</td>{% endfor %}</tr>
+    <tr><td>Holds sufficient?</td>{% for st in fc.lot_status %}<td class="text-end"><span class="badge badge-status {{ status_css[st] }}">{{ st }}</span></td>{% endfor %}</tr>
+  {% endfor %}</tbody>
+</table></div>
+
+<div class="row g-3">
+{% for sc, fc in runs %}
+  <div class="col-md-6 col-xl-4"><div class="card"><div class="card-body">
+    <form method="post" action="/scenarios">
+      <input type="hidden" name="csrf_token" value="{{ csrf }}"><input type="hidden" name="scenario_id" value="{{ sc.id }}">
+      <div class="mb-1"><input class="form-control form-control-sm fw-semibold" name="name" value="{{ sc.name }}" {% if not can_admin %}disabled{% endif %} aria-label="Name"></div>
+      <div class="mb-1"><input class="form-control form-control-sm" name="description" value="{{ sc.description }}" {% if not can_admin %}disabled{% endif %} aria-label="Description"></div>
+      <div class="form-check"><input class="form-check-input" type="checkbox" name="exclude_risk" value="1" id="r{{ sc.id }}" {% if sc.exclude_risk_adjusted %}checked{% endif %} {% if not can_admin %}disabled{% endif %}>
+        <label class="form-check-label small" for="r{{ sc.id }}">Exclude risk-adjusted collections</label></div>
+      <div class="form-check"><input class="form-check-input" type="checkbox" name="use_delay" value="1" id="d{{ sc.id }}" {% if sc.use_delay_model %}checked{% endif %} {% if not can_admin %}disabled{% endif %}>
+        <label class="form-check-label small" for="d{{ sc.id }}">Use the collection-delay model (advisory)</label></div>
+      <div class="form-check mb-2"><input class="form-check-input" type="checkbox" name="is_default" value="1" id="f{{ sc.id }}" {% if sc.is_default %}checked{% endif %} {% if not can_admin %}disabled{% endif %}>
+        <label class="form-check-label small" for="f{{ sc.id }}">Default scenario (daily snapshot)</label></div>
+      {% if can_admin %}<button class="btn btn-sm btn-outline-primary">Save</button>{% endif %}
+      <a class="btn btn-sm btn-link" href="/forecast?scenario={{ sc.id }}">Open in the grid</a>
+    </form>
+  </div></div></div>
+{% endfor %}
+{% if can_admin %}
+  <div class="col-md-6 col-xl-4"><div class="card border-dashed"><div class="card-body">
+    <form method="post" action="/scenarios">
+      <input type="hidden" name="csrf_token" value="{{ csrf }}">
+      <div class="small fw-semibold mb-1">New scenario</div>
+      <div class="mb-1"><input class="form-control form-control-sm" name="name" placeholder="Name" required aria-label="Name"></div>
+      <div class="mb-1"><input class="form-control form-control-sm" name="description" placeholder="Description" aria-label="Description"></div>
+      <div class="form-check"><input class="form-check-input" type="checkbox" name="exclude_risk" value="1" id="rn"><label class="form-check-label small" for="rn">Exclude risk-adjusted collections</label></div>
+      <div class="form-check mb-2"><input class="form-check-input" type="checkbox" name="use_delay" value="1" id="dn"><label class="form-check-label small" for="dn">Use the collection-delay model</label></div>
+      <button class="btn btn-sm btn-primary">Add scenario</button>
+    </form>
+  </div></div></div>
+{% endif %}
+</div>
+{% endblock %}

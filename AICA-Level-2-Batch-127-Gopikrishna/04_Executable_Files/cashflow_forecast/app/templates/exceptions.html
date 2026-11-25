@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% block title %}Exceptions{% endblock %}
+{% block content %}
+<h1 class="h4">Exceptions</h1>
+<p class="text-muted small">Category text in an upload that is not in the category list. Map it to a category (remembered for the next upload),
+  add it as a new category, or ignore it (its rows stay stored but are left out). A file becomes current when all its exceptions are resolved.</p>
+{% for r in rows %}
+<div class="card mb-2"><div class="card-body py-2">
+  <div class="d-flex flex-wrap justify-content-between">
+    <div><strong>"{{ r.e.raw_text }}"</strong> <span class="text-muted small">in {{ r.batch.original_filename }} (upload #{{ r.batch.id }}) ·
+      {{ r.n }} row(s) · {{ r.amount|money(false) }}{% if r.direction %} · {{ r.direction }}{% endif %}</span></div>
+    <div class="small">{% if r.suggested %}Suggestion: <strong>{{ r.suggested.name }}</strong> ({{ r.e.suggestion_score|round|int }}% match){% else %}<span class="text-muted">No close match</span>{% endif %}</div>
+  </div>
+  {% if can_edit %}
+  <div class="row g-2 mt-1" x-data="{ how: '{{ 'map' if r.suggested else 'new' }}' }">
+    <div class="col-auto"><select class="form-select form-select-sm" x-model="how" aria-label="Resolution">
+      <option value="map">Map to a category</option><option value="new">Add as a new category</option><option value="ignore">Ignore</option></select></div>
+    <form method="post" action="/exceptions/{{ r.e.id }}" class="col row g-2" x-show="how === 'map'">
+      <input type="hidden" name="csrf_token" value="{{ csrf }}"><input type="hidden" name="how" value="map">
+      <div class="col-auto"><select class="form-select form-select-sm" name="category_id" aria-label="Category">
+        {% for c in cats %}{% if not r.direction or c.direction.value == r.direction or r.batch.source_type.value == 'other' %}
+        <option value="{{ c.id }}" {% if r.suggested and c.id == r.suggested.id %}selected{% endif %}>{{ c.name }} ({{ c.direction.value }})</option>{% endif %}{% endfor %}</select></div>
+      <div class="col-auto form-check mt-1"><input class="form-check-input" type="checkbox" name="remember" value="1" checked id="rem{{ r.e.id }}">
+        <label class="form-check-label small" for="rem{{ r.e.id }}">Remember for next uploads</label></div>
+      <div class="col-auto"><button class="btn btn-sm btn-primary">Map</button></div>
+    </form>
+    <form method="post" action="/exceptions/{{ r.e.id }}" class="col row g-2" x-show="how === 'new'">
+      <input type="hidden" name="csrf_token" value="{{ csrf }}"><input type="hidden" name="how" value="new">
+      <div class="col-auto"><input class="form-control form-control-sm" name="name" value="{{ r.e.raw_text }}" aria-label="Name"></div>
+      <div class="col-auto"><select class="form-select form-select-sm" name="direction" aria-label="Direction">
+        <option value="outflow" {% if r.direction != 'inflow' %}selected{% endif %}>Outflow</option><option value="inflow" {% if r.direction == 'inflow' %}selected{% endif %}>Inflow</option></select></div>
+      <div class="col-auto"><input class="form-control form-control-sm" name="group" list="groups" placeholder="Summary group" required aria-label="Summary group"></div>
+      <div class="col-auto"><button class="btn btn-sm btn-primary">Add category</button></div>
+    </form>
+    <form method="post" action="/exceptions/{{ r.e.id }}" class="col" x-show="how === 'ignore'" data-confirm="Leave these rows out of the forecast?">
+      <input type="hidden" name="csrf_token" value="{{ csrf }}"><input type="hidden" name="how" value="ignore">
+      <button class="btn btn-sm btn-outline-danger">Ignore these rows</button>
+    </form>
+  </div>
+  {% endif %}
+</div></div>
+{% else %}
+<div class="alert alert-success py-2">No open exceptions.</div>
+{% endfor %}
+<datalist id="groups">{% for g in groups %}<option value="{{ g }}">{% endfor %}</datalist>
+
+<h2 class="h5 mt-4">Advisory checks</h2>
+<p class="text-muted small">Possible double counting found by comparing the current files. They never change data on their own.</p>
+{% if findings_error %}<div class="alert alert-warning small">The checks could not run: {{ findings_error }}</div>{% endif %}
+<table class="table table-sm small bg-white border">
+  <thead><tr><th>Check</th><th>Finding</th><th>Suggested action</th><th></th></tr></thead>
+  <tbody>{% for f in findings %}
+    <tr><td>{{ f.rule.replace('_', ' ') }}</td><td>{{ f.message }}</td><td>{{ f.suggested_action }}</td>
+      <td>{% if can_edit %}
+        {% if f.rule == 'bill_discounted_invoice' %}{% set src, key = f.keys[0] %}
+        <form method="post" action="/findings/act"><input type="hidden" name="csrf_token" value="{{ csrf }}">
+          <input type="hidden" name="source" value="{{ src }}"><input type="hidden" name="key" value="{{ key }}">
+          <input type="hidden" name="action" value="bill_discounted"><button class="btn btn-sm btn-outline-primary">Flag invoice</button></form>
+        {% elif f.rule in ('pdc_vs_allocation', 'possible_duplicate') %}{% set src, key = f.keys[-1] %}
+        <form method="post" action="/findings/act" data-confirm="Exclude {{ key }} from the forecast?"><input type="hidden" name="csrf_token" value="{{ csrf }}">
+          <input type="hidden" name="source" value="{{ src }}"><input type="hidden" name="key" value="{{ key }}">
+          <input type="hidden" name="action" value="exclude"><button class="btn btn-sm btn-outline-danger">Exclude {{ key }}</button></form>
+        {% endif %}{% endif %}</td></tr>
+  {% else %}<tr><td colspan="4" class="text-muted">No findings.</td></tr>{% endfor %}</tbody>
+</table>
+{% endblock %}

@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+{% block title %}Users{% endblock %}
+{% block content %}
+<h1 class="h4">Users</h1>
+<p class="text-muted small">New users and password resets get a temporary password, shown once on this page. Give it to the
+  person directly (not by e-mail). They must choose their own password at first sign-in. A reset also signs the user out
+  everywhere. The last active Admin cannot be removed. Every change is written to the audit log.</p>
+
+{% if temp %}
+<div class="alert alert-warning border-2" role="alert">
+  <div class="fw-semibold mb-1">{% if temp.why == 'created' %}User '{{ temp.username }}' created.{% else %}Password of '{{ temp.username }}' reset.{% endif %}
+    Temporary password (shown only now):</div>
+  <div class="d-flex align-items-center gap-2">
+    <code class="fs-5 px-2 py-1 bg-white border rounded user-select-all" id="temp-pw">{{ temp.password }}</code>
+    <span class="small text-muted">User name: <strong>{{ temp.username }}</strong>. Note it down now; it cannot be shown again.</span>
+  </div>
+</div>
+{% endif %}
+
+<table class="table table-sm small bg-white border align-middle">
+  <thead class="table-light"><tr><th>User name</th><th>Full name</th><th>Role</th><th>Active</th><th>Status</th><th>Last sign-in</th><th></th></tr></thead>
+  <tbody>
+  {% for u in users %}
+  <tr class="{% if not u.is_active %}text-muted{% endif %}">
+    <td class="fw-semibold">{{ u.username }}{% if u.id == user.id %} <span class="badge text-bg-secondary">you</span>{% endif %}</td>
+    <td colspan="3" class="p-0">
+      <form method="post" action="/admin/users/{{ u.id }}" class="d-flex gap-2 align-items-center px-2 py-1">
+        <input type="hidden" name="csrf_token" value="{{ csrf }}">
+        <input class="form-control form-control-sm" name="full_name" value="{{ u.full_name }}" style="max-width: 14rem" aria-label="Full name">
+        <select class="form-select form-select-sm" name="role" style="max-width: 8rem" aria-label="Role">
+          {% for r in roles %}<option value="{{ r.value }}" {% if u.role == r %}selected{% endif %}>{{ r.value|capitalize }}</option>{% endfor %}
+          {% if u.role not in roles %}<option value="{{ u.role.value }}" selected>{{ u.role.value|capitalize }}</option>{% endif %}
+        </select>
+        <div class="form-check"><input class="form-check-input" type="checkbox" name="active" value="1" {% if u.is_active %}checked{% endif %} aria-label="Active"></div>
+        <button class="btn btn-sm btn-outline-primary">Save</button>
+      </form>
+    </td>
+    <td>
+      {% if u.id in locked %}<span class="badge text-bg-danger">locked</span>{% endif %}
+      {% if u.must_change_password %}<span class="badge text-bg-warning">must change password</span>{% endif %}
+      {% if not u.is_active %}<span class="badge text-bg-secondary">inactive</span>{% endif %}
+    </td>
+    <td>{{ u.last_login_at|dmy if u.last_login_at else '-' }}</td>
+    <td class="text-end text-nowrap">
+      {% if u.id in locked %}
+      <form method="post" action="/admin/users/{{ u.id }}/unlock" class="d-inline">
+        <input type="hidden" name="csrf_token" value="{{ csrf }}"><button class="btn btn-sm btn-outline-success">Unlock</button></form>
+      {% endif %}
+      {% if u.id != user.id %}
+      <form method="post" action="/admin/users/{{ u.id }}/reset" class="d-inline"
+            data-confirm="Reset the password of {{ u.username }}? They will be signed out and get a temporary password.">
+        <input type="hidden" name="csrf_token" value="{{ csrf }}">
+        <button class="btn btn-sm btn-outline-danger">Reset password</button></form>
+      {% endif %}
+    </td>
+  </tr>
+  {% endfor %}
+  </tbody>
+</table>
+
+<h2 class="h6 mt-4">Add a user</h2>
+<form method="post" action="/admin/users" class="d-flex flex-wrap gap-2 align-items-center bg-white border rounded px-2 py-2">
+  <input type="hidden" name="csrf_token" value="{{ csrf }}">
+  <input class="form-control form-control-sm" name="username" placeholder="User name (e.g. a.rahman)" required style="max-width: 14rem" aria-label="User name">
+  <input class="form-control form-control-sm" name="full_name" placeholder="Full name" style="max-width: 14rem" aria-label="Full name">
+  <select class="form-select form-select-sm" name="role" style="max-width: 8rem" aria-label="Role">
+    {% for r in roles %}<option value="{{ r.value }}" {% if r.value == 'viewer' %}selected{% endif %}>{{ r.value|capitalize }}</option>{% endfor %}
+  </select>
+  <button class="btn btn-sm btn-primary">Create with temporary password</button>
+</form>
+<p class="small text-muted mt-2">Roles: <strong>Admin</strong> manages users, categories and settings, and can edit.
+  <strong>Preparer</strong> uploads files and changes the forecast. <strong>Viewer</strong> reads only.
+  {% if roles|length > 3 %}<strong>Approver</strong> approves pending changes.{% else %}The Approver role appears when it is switched on in Settings.{% endif %}</p>
+{% endblock %}

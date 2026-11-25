@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% load humanize %}
+{% block title %}{{ cwip.reference }}{% endblock %}
+{% block content %}
+<h4>{{ cwip.reference }} — {{ cwip.description }}</h4>
+<p class="text-muted small">{{ cwip.entity }} &middot; {{ cwip.vendor }} &middot; <span class="badge bg-light text-dark">{{ cwip.get_status_display }}</span></p>
+
+<div class="row">
+  <div class="col-md-6">
+    <table class="table table-sm">
+      <tr><th>PO / GRN / Invoice</th><td>{{ cwip.po_number }} / {{ cwip.grn_number }} / {{ cwip.invoice_number }}</td></tr>
+      <tr><th>Base cost</th><td>₹{{ cwip.base_cost|intcomma }}</td></tr>
+      <tr><th>Freight</th><td>₹{{ cwip.freight_cost|intcomma }}</td></tr>
+      <tr><th>Duty</th><td>₹{{ cwip.duty_cost|intcomma }}</td></tr>
+      <tr><th>Installation</th><td>₹{{ cwip.installation_cost|intcomma }}</td></tr>
+      <tr><th>Borrowing cost</th><td>₹{{ cwip.borrowing_cost|intcomma }}</td></tr>
+      <tr><th>Other</th><td>₹{{ cwip.other_cost|intcomma }}</td></tr>
+      <tr class="table-active"><th>Total cost to capitalise</th><td><strong>₹{{ cwip.total_cost|intcomma }}</strong></td></tr>
+    </table>
+    {% if can_capitalise and is_data_entry %}
+    <a href="{% url 'assets:cwip_capitalise' cwip.pk %}" class="btn btn-success">Capitalise this CWIP item →</a>
+    {% elif not can_capitalise %}
+    <div class="alert alert-success py-2">Already capitalised as
+      {% for a in cwip.capitalised_assets.all %}<a href="{{ a.get_absolute_url }}">{{ a.asset_id }}</a>{% endfor %}.
+    </div>
+    {% endif %}
+  </div>
+  <div class="col-md-6">
+    <h6>Documents</h6>
+    <table class="table table-sm">
+      <tbody>{% for d in cwip.documents.all %}<tr><td>{{ d.get_doc_type_display }}</td><td><a href="{{ d.file.url }}">{{ d.file.name }}</a></td></tr>{% empty %}<tr><td class="text-muted">None attached.</td></tr>{% endfor %}</tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

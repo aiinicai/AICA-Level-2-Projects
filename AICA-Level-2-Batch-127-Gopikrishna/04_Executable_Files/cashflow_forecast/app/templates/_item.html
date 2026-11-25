@@ -1,0 +1,136 @@
+{# One item = one <tbody> (main row + action row), swapped as a whole after an action.
+   Needs: i (ItemOut or none), fc, ovr, mode ('cell' | 'pdc'), labels, status_labels, actions_for, suggestions. #}
+{% set ncols = 12 if mode == 'pdc' else 7 %}
+{% if not i %}
+<tbody><tr><td colspan="{{ ncols }}" class="text-muted small">
+  {% if message %}<span class="text-success">{{ message }}</span> {% endif %}The item is no longer in the current data.</td></tr></tbody>
+{% else %}
+{% set changes = ovr.get((i.source, i.key), []) %}
+{% set h = i.hold %}
+<tbody x-data="{ act: '' }">
+<tr class="{{ 'held' if h }}">
+  {% if mode == 'pdc' %}
+  <td>{{ i.item.counterparty }}</td>
+  <td>{{ i.item.reference }}</td>
+  <td class="small text-muted">{{ i.key.split('|')[0] }}</td>
+  <td>{{ i.item.planned_date|dmy }}</td>
+  <td>{{ fc.fc_lots[i.lot].label if i.lot is not none else '-' }}</td>
+  <td class="num">{{ i.eff_amount|money(false) }}</td>
+  {% else %}
+  <td>{{ i.item.reference or i.key }}</td>
+  <td>{{ i.item.counterparty }}{% if i.item.project %} <span class="text-muted small">· {{ i.item.project }}</span>{% endif %}</td>
+  <td class="small">{{ i.source }}</td>
+  <td>{{ i.item.planned_date|dmy }}{% if i.eff_date != i.item.planned_date %}<br><span class="small text-primary">→ {{ i.eff_date|dmy }}</span>{% endif %}</td>
+  <td class="num">{{ i.eff_amount|money(false) }}{% if i.eff_amount != i.item.amount %}<br><span class="small text-muted">was {{ i.item.amount|money(false) }}</span>{% endif %}</td>
+  {% endif %}
+  <td>
+    {% if h %}<span class="badge text-bg-warning">On hold</span>
+    {% else %}<span class="badge {{ 'text-bg-light border' if i.status == 'active' else 'text-bg-secondary' }}">{{ status_labels.get(i.status, i.status) }}</span>{% endif %}
+    {% for f in i.flags %}<span class="badge text-bg-info chip">{{ f }}</span> {% endfor %}
+  </td>
+  {% if mode == 'pdc' %}
+  <td class="num">{{ h.amount|money if h else '' }}</td>
+  <td>{% if h %}{{ h.honour_date|dmy if h.honour_date else 'open-ended' }}{% endif %}</td>
+  <td>{% if h %}{{ fc.fc_lots[h.honour_lot].label if h.honour_lot is not none else 'after horizon' }}{% endif %}</td>
+  <td class="num">{{ h.days_held if h and h.days_held is not none else '' }}</td>
+  {% endif %}
+  <td>
+    {% if can_edit %}
+    <select class="form-select form-select-sm" x-model="act" aria-label="Action">
+      <option value="">{{ 'On hold' if h else ('Changed' if changes else 'Active') }}</option>
+      {% for a in actions_for(i) %}<option value="{{ a }}">{{ 'Extend / change hold' if a == 'hold' and h else labels[a] }}</option>{% endfor %}
+      {% if h %}<option value="release">Release hold</option>{% endif %}
+      {% if changes %}<option value="reset">Back to as imported</option>{% endif %}
+    </select>
+    {% endif %}
+  </td>
+</tr>
+{% if message or error or (h and h.warnings) or changes %}
+<tr class="{{ 'held' if h }}"><td colspan="{{ ncols }}" class="small py-1">
+  {% if message %}<span class="text-success fw-semibold me-2">✓ {{ message }}</span>{% endif %}
+  {% if error %}<span class="text-danger fw-semibold me-2">Not saved: {{ error }}</span>{% endif %}
+  {% if h %}{% for w in h.warnings %}<span class="text-danger me-2">⚠ {{ w }}</span>{% endfor %}{% endif %}
+  {% for o in changes %}
+    {% set waiting = not o.is_active %}
+    <span class="badge {{ 'text-bg-warning-subtle border border-warning' if waiting else 'text-bg-light border' }} chip me-1">
+      {%- if waiting %}⏳ Waiting for approval: {% endif %}{{ labels.get(o.action.value, o.action.value) }}
+      {%- if o.new_date %} {{ o.new_date|dmy }}{% endif %}{%- if o.target_lot_start %} → lot {{ o.target_lot_start|dmy }}{% endif %}
+      {%- if o.new_amount is not none %} {{ o.new_amount|money(false) }}{% endif %}
+      {%- if o.reason %} · {{ o.reason }}{% endif %}
+      {%- if o.approval_status.value == 'approved' %} · approved{% endif %}
+      {% if can_edit %}
+      <form class="d-inline" hx-post="/items/action" hx-target="closest tbody" hx-swap="outerHTML"
+            data-confirm="{{ 'Withdraw this request?' if waiting else 'Revoke this change?' }}">
+        <input type="hidden" name="source" value="{{ i.source }}"><input type="hidden" name="key" value="{{ i.key }}">
+        <input type="hidden" name="mode" value="{{ mode }}"><input type="hidden" name="action" value="revoke">
+        <input type="hidden" name="override_id" value="{{ o.id }}">
+        <button class="btn btn-link btn-sm p-0 ms-1 text-danger" title="{{ 'Withdraw' if waiting else 'Revoke' }}">×</button></form>
+      {% endif %}</span>
+  {% endfor %}
+</td></tr>
+{% endif %}
+{% if can_edit %}
+<tr x-show="act" x-cloak class="action-form"><td colspan="{{ ncols }}">
+  {% set amt = i.eff_amount %}
+  {% macro hidden(action, src, key, mode) %}
+    <input type="hidden" name="source" value="{{ src }}"><input type="hidden" name="key" value="{{ key }}">
+    <input type="hidden" name="mode" value="{{ mode }}"><input type="hidden" name="action" value="{{ action }}">
+  {% endmacro %}
+  {% if 'hold' in actions_for(i) %}
+  {% set picks = suggestions(fc, i) %}
+  {% set start = (h.honour_date.isoformat() if h and h.honour_date else (picks[0][1].isoformat() if picks else '')) %}
+  <form x-show="act === 'hold'" class="row g-2 align-items-end" hx-post="/items/action" hx-target="closest tbody" hx-swap="outerHTML"
+        x-data="{ d: '{{ start }}', open: {{ 'true' if h and not h.honour_date else 'false' }} }">
+    {{ hidden('hold', i.source, i.key, mode) }}
+    <div class="col-auto"><label class="form-label small mb-0">Next honouring date</label>
+      <input type="date" class="form-control form-control-sm" name="new_date" x-model="d" :disabled="open" min="{{ i.item.planned_date.isoformat() }}"></div>
+    <div class="col-auto">
+      {% for label, d in picks %}<button type="button" class="btn btn-sm btn-outline-secondary me-1 mb-1" @click="d = '{{ d.isoformat() }}'; open = false">{{ label }}</button>{% endfor %}
+      <div class="form-check form-check-inline ms-1"><input class="form-check-input" type="checkbox" name="open_ended" value="1" x-model="open" id="oe-{{ i.item.line_item_id }}">
+        <label class="form-check-label small" for="oe-{{ i.item.line_item_id }}">Open-ended</label></div></div>
+    <div class="col-auto"><label class="form-label small mb-0">Amount to hold</label>
+      <input class="form-control form-control-sm" name="amount" inputmode="decimal" placeholder="full {{ amt|money(false) }}"
+             value="{{ h.amount if h and h.amount != amt else '' }}" style="width: 9rem"></div>
+    <div class="col"><label class="form-label small mb-0">Reason</label>
+      <input class="form-control form-control-sm" name="reason" list="hold-reasons" value="{{ h.reason if h else '' }}" maxlength="500"></div>
+    <div class="col-auto"><button class="btn btn-sm btn-warning">{{ 'Save change' if h else 'Hold cheque' }}</button></div>
+    <div class="col-12 small text-muted">The cheque stays in the Vendor PDCs row (as per ERP). The grid takes it out of
+      {{ fc.fc_lots[i.lot].label if i.lot is not none else 'its lot' }} and puts it back in the lot of the honouring date. Funding is shown before and after holds.</div>
+  </form>
+  {% endif %}
+  <form x-show="act === 'defer'" class="row g-2 align-items-end" hx-post="/items/action" hx-target="closest tbody" hx-swap="outerHTML">
+    {{ hidden('defer', i.source, i.key, mode) }}
+    <div class="col-auto"><label class="form-label small mb-0">Move to lot</label>
+      <select class="form-select form-select-sm" name="lot_start">{% for lt in fc.fc_lots %}{% if lt.start > i.eff_date or i.lot is none or loop.index0 > i.lot %}<option value="{{ lt.start.isoformat() }}">{{ lt.label }}</option>{% endif %}{% endfor %}</select></div>
+    <div class="col"><label class="form-label small mb-0">Reason (date agreed with the counterparty)</label><input class="form-control form-control-sm" name="reason" maxlength="500"></div>
+    <div class="col-auto"><button class="btn btn-sm btn-primary">Defer</button></div>
+  </form>
+  <form x-show="act === 'redate'" class="row g-2 align-items-end" hx-post="/items/action" hx-target="closest tbody" hx-swap="outerHTML">
+    {{ hidden('redate', i.source, i.key, mode) }}
+    <div class="col-auto"><label class="form-label small mb-0">New date</label><input type="date" class="form-control form-control-sm" name="new_date" required></div>
+    <div class="col"><label class="form-label small mb-0">Reason</label><input class="form-control form-control-sm" name="reason" maxlength="500"></div>
+    <div class="col-auto"><button class="btn btn-sm btn-primary">Re-date</button></div>
+  </form>
+  <form x-show="act === 'reduce'" class="row g-2 align-items-end" hx-post="/items/action" hx-target="closest tbody" hx-swap="outerHTML">
+    {{ hidden('reduce', i.source, i.key, mode) }}
+    <div class="col-auto"><label class="form-label small mb-0">New amount (max {{ i.item.amount|money(false) }})</label>
+      <input class="form-control form-control-sm" name="amount" inputmode="decimal" required></div>
+    <div class="col"><label class="form-label small mb-0">Reason</label><input class="form-control form-control-sm" name="reason" maxlength="500"></div>
+    <div class="col-auto"><button class="btn btn-sm btn-primary">Reduce</button></div>
+  </form>
+  {% for a, text, btn in [('exclude', 'Leave this item out of the forecast (it stays stored as imported).', 'Exclude'),
+                          ('risk_adjusted', 'Flag as risk-adjusted: the Risk-adjusted scenario leaves it out.', 'Flag'),
+                          ('bill_discounted', 'Already financed by bill discounting: it will not be counted again as a collection.', 'Flag'),
+                          ('release', 'Release the hold: the cheque is honoured on its own date.', 'Release'),
+                          ('reset', 'Revoke every change on this item and use it as imported.', 'Revoke all')] %}
+  <form x-show="act === '{{ a }}'" class="row g-2 align-items-end" hx-post="/items/action" hx-target="closest tbody" hx-swap="outerHTML">
+    {{ hidden(a, i.source, i.key, mode) }}
+    <div class="col-auto small">{{ text }}</div>
+    <div class="col"><input class="form-control form-control-sm" name="reason" placeholder="Reason" maxlength="500"></div>
+    <div class="col-auto"><button class="btn btn-sm btn-outline-danger">{{ btn }}</button></div>
+  </form>
+  {% endfor %}
+</td></tr>
+{% endif %}
+</tbody>
+{% endif %}

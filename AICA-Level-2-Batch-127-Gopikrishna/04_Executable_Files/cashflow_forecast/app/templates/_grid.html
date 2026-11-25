@@ -1,0 +1,97 @@
+{% set k = fc.kpis %}
+<div class="row g-2 mb-3">
+  {% set low = k.lowest_fp_after %}
+  <div class="col-6 col-md-4 col-xl-2"><div class="kpi {{ 'bad' if low.value < 0 else 'ok' }}">
+    <div class="small text-muted">Lowest funding position (after holds)</div>
+    <div class="v {{ 'text-danger' if low.value < 0 }}">{{ low.value|money(false) }}</div><div class="small">{{ low.lot }}</div></div></div>
+  <div class="col-6 col-md-4 col-xl-2"><div class="kpi {{ 'bad' if k.gap_lots_after else 'ok' }}">
+    <div class="small text-muted">Lots with a funding gap</div>
+    <div class="v">{{ k.gap_lots_before }} before · {{ k.gap_lots_after }} after holds</div>
+    <div class="small">First gap: {{ k.first_gap_after or k.first_gap_before or 'none' }}</div></div></div>
+  <div class="col-6 col-md-4 col-xl-2"><div class="kpi {{ 'bad' if k.closing_after_at_horizon < 0 else 'ok' }}">
+    <div class="small text-muted">Closing at horizon (after holds)</div>
+    <div class="v {{ 'text-danger' if k.closing_after_at_horizon < 0 }}">{{ k.closing_after_at_horizon|money(false) }}</div>
+    <div class="small">Before holds {{ k.closing_at_horizon|money(false) }}</div></div></div>
+  <div class="col-6 col-md-4 col-xl-2"><div class="kpi {{ 'warn' if k.holds_count else '' }}">
+    <div class="small text-muted">Cheques on hold</div>
+    <div class="v">{{ k.holds_count }} · {{ k.holds_total|money(false) }}</div>
+    <div class="small">{% if k.holds_not_represented > 0 %}{{ k.holds_not_represented|money }} not re-presented{% else %}all re-presented in horizon{% endif %}</div></div></div>
+  <div class="col-6 col-md-4 col-xl-2"><div class="kpi {{ 'bad' if k.overall == 'NOT sufficient' else ('warn' if k.overall == 'Covered by holds' else 'ok') }}">
+    <div class="small text-muted">Are the holds sufficient?</div>
+    <div class="v"><span class="badge {{ status_css[k.overall] }}">{{ k.overall }}</span></div>
+    <div class="small">{{ fc.scenario }}{{ ' · risk excluded' if fc.exclude_risk }}</div></div></div>
+  <div class="col-6 col-md-4 col-xl-2"><div class="kpi">
+    <div class="small text-muted">ERP bank balance (opening)</div>
+    <div class="v">{{ fc.erp_opening|money(false) }}</div>
+    <div class="small">Facility available {{ fc.facility_total|money(false) }}</div></div></div>
+</div>
+
+{% if fc.warnings %}
+<div class="alert alert-warning py-2 small">{% for w in fc.warnings %}<div>{{ w }}</div>{% endfor %}</div>
+{% endif %}
+
+<div class="grid-wrap" id="grid">
+<table class="grid">
+  <thead>
+    <tr class="band"><th class="lbl"></th>{% for b in grid.bands %}<th colspan="{{ b[1] }}">{{ b[0] }}</th>{% endfor %}</tr>
+    <tr class="lots"><th class="lbl">{{ fc.settings.base_currency }}</th>
+      {% for c in grid.cols %}<th class="num {{ 'cur' if c.status == 'CURRENT' }} {{ 'subtotal' if c.kind in ('month','horizon') }} {{ 'locked' if c.kind == 'actual' }}">{{ c.label }}</th>{% endfor %}</tr>
+    <tr class="status"><th class="lbl"></th>
+      {% for c in grid.cols %}<th class="num {{ 'cur' if c.status == 'CURRENT' }}">{{ c.status }}</th>{% endfor %}</tr>
+  </thead>
+  <tbody>
+  {% for r in grid.rows %}
+    {% if r.kind in ('section', 'group') %}
+    <tr class="{{ r.kind }}"><td class="lbl">{{ r.label }}{% if r.hint %}<span class="hint">{{ r.hint }}</span>{% endif %}</td><td colspan="{{ grid.cols|length }}"></td></tr>
+    {% elif r.kind == 'status' %}
+    <tr class="status-row"><td class="lbl fw-semibold">{{ r.label }}</td>
+      {% for c in r.cells %}<td class="num">{% if c.value %}<span class="badge badge-status {{ c.css }}">{{ c.value }}</span>{% endif %}</td>{% endfor %}</tr>
+    {% else %}
+    <tr class="{{ r.kind }} {{ r.css }}"><td class="lbl">{{ r.label }}</td>
+      {% for c in r.cells %}{% set col = grid.cols[loop.index0] %}
+      {% if c.drill %}
+      <td class="num drill {{ c.css }} {{ 'cur' if col.status == 'CURRENT' }} {{ 'neg' if c.value|neg }}" title="Show the items"
+          hx-get="/forecast/cell?lot={{ c.drill.lot }}&cat={{ c.drill.cat }}" hx-target="#modal-body">{{ c.value|money }}</td>
+      {% else %}
+      <td class="num {{ c.css }} {{ 'cur' if col.status == 'CURRENT' }} {{ 'neg' if c.value|neg }}">{{ c.value|money if c.value is not none else '' }}</td>
+      {% endif %}
+      {% endfor %}</tr>
+    {% endif %}
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+<div class="small text-muted mt-1">Click a category figure to see its items and hold, defer or re-date them. Figures: #,##0.000, negatives in brackets.
+  {% if fc.columns|selectattr('partial')|list %}* the month total covers only the remaining lots.{% endif %}</div>
+
+<div class="row g-3 mt-1">
+  <div class="col-lg-6">
+    <div class="card"><div class="card-header py-1 fw-semibold">Bank position and ERP tie-out</div>
+    <div class="card-body p-2">
+      <table class="table table-sm small mb-2">
+        <thead><tr><th>Bank</th><th>Account</th><th>Ccy</th><th class="text-end">Balance</th><th class="text-end">Rate</th><th class="text-end">OMR</th></tr></thead>
+        <tbody>{% for b in fc.balances %}<tr><td>{{ b.bank }}</td><td>{{ b.account }}</td><td>{{ b.currency }}</td>
+          <td class="text-end">{{ b.balance|money(false) }}</td><td class="text-end">{{ b.rate }}</td><td class="text-end">{{ b.omr|money(false) }}</td></tr>{% endfor %}
+        <tr class="fw-semibold"><td colspan="5">Total ERP bank balance = model opening of the current lot</td><td class="text-end">{{ fc.tieout.erp_total|money(false) }}</td></tr></tbody>
+      </table>
+      {% set p = fc.tieout.previous %}
+      {% if p %}
+      <div class="small">Forecast saved {{ p.as_of|dmy }}: opening {{ p.opening|money(false) }} + movement {{ p.movement|money(false) }}
+        = expected {{ p.expected|money(false) }} today. ERP {{ fc.tieout.erp_total|money(false) }} →
+        <strong class="{{ 'text-danger' if p.variance < 0 }}">variance {{ p.variance|money(false) }}</strong></div>
+      {% else %}<div class="small text-muted">No earlier snapshot yet to compare with (the variance appears from the second day).</div>{% endif %}
+      <table class="table table-sm small mt-2 mb-0">
+        <thead><tr><th>Facility</th><th>Type</th><th class="text-end">Limit</th><th class="text-end">Utilised</th><th class="text-end">Available</th></tr></thead>
+        <tbody>{% for f in fc.facilities %}<tr><td>{{ f.bank }}</td><td>{{ f.facility_type }}</td><td class="text-end">{{ f.limit|money }}</td>
+          <td class="text-end">{{ f.utilised|money }}</td><td class="text-end">{{ f.available|money(false) }}</td></tr>{% endfor %}</tbody>
+      </table>
+    </div></div>
+  </div>
+  <div class="col-lg-6">
+    <div class="card"><div class="card-header py-1 fw-semibold">Commentary</div>
+      <div class="card-body p-2 small">
+        <p class="mb-2">{{ summary }}</p>
+        <ul class="mb-0 ps-3">{% for lt, text in commentary %}<li>{{ text }}</li>{% endfor %}</ul>
+      </div></div>
+  </div>
+</div>

@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block title %}Transfers{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between mb-3">
+  <h4 class="mb-0">Transfers</h4>
+  <a href="{% url 'transfers:create' %}" class="btn btn-primary btn-sm">New transfer</a>
+</div>
+<div class="card stat-card p-3">
+<table class="table table-sm table-hover">
+  <thead><tr><th>Asset</th><th>From</th><th>To</th><th>Status</th><th>Requested by</th><th>Sign off</th></tr></thead>
+  <tbody>
+  {% for t in items %}
+    <tr>
+      <td><a href="{{ t.asset.get_absolute_url }}">{{ t.asset.asset_id }}</a></td>
+      <td>{{ t.from_location.breadcrumb }}</td>
+      <td>{{ t.to_location.breadcrumb }}</td>
+      <td><span class="badge bg-light text-dark">{{ t.get_status_display }}</span>{% if t.triggered_by_mismatch %} <span class="badge bg-warning text-dark">from scan mismatch</span>{% endif %}</td>
+      <td>{{ t.requested_by }}</td>
+      <td>
+        {% if t.status == 'PENDING' %}
+        <form method="post" action="{% url 'transfers:sign_off' t.pk %}">{% csrf_token %}<button class="btn btn-sm btn-success">Sign off</button></form>
+        {% endif %}
+      </td>
+    </tr>
+  {% empty %}<tr><td colspan="6" class="text-muted">No transfers yet.</td></tr>{% endfor %}
+  </tbody>
+</table>
+</div>
+{% endblock %}
