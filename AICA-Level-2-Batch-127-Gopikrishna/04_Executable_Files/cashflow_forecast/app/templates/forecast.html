@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block title %}Lot grid{% endblock %}
+{% block content %}
+<div class="d-flex flex-wrap align-items-end gap-3 mb-3">
+  <div>
+    <h1 class="h4 mb-0">Working capital forecast · {{ fc.settings.base_currency }}</h1>
+    <div class="text-muted small">As of {{ fc.as_of|dmy }} · {{ fc.fc_lots|length }} lots to {{ fc.fc_lots[-1].end|dmy }}</div>
+  </div>
+  <form id="view-form" class="d-flex flex-wrap gap-2 align-items-end ms-auto" hx-get="/forecast" hx-target="#grid-area"
+        hx-trigger="change" hx-push-url="true" hx-indicator="#grid-area">
+    <div><label class="form-label small mb-0" for="scenario">Scenario</label>
+      <select class="form-select form-select-sm" id="scenario" name="scenario">
+        {% for s in v.scenarios %}<option value="{{ s.id }}" {% if s.id == v.scenario.id %}selected{% endif %}>{{ s.name }}</option>{% endfor %}
+      </select></div>
+    <div><label class="form-label small mb-0" for="risk">Risk-adjusted collections</label>
+      <select class="form-select form-select-sm" id="risk" name="risk">
+        <option value="" {% if not v.risk %}selected{% endif %}>Scenario default ({{ 'excluded' if v.scenario.exclude_risk_adjusted else 'included' }})</option>
+        <option value="on" {% if v.risk == 'on' %}selected{% endif %}>Exclude</option>
+        <option value="off" {% if v.risk == 'off' %}selected{% endif %}>Include</option>
+      </select></div>
+    <div><label class="form-label small mb-0" for="delay">Collection dates</label>
+      <select class="form-select form-select-sm" id="delay" name="delay">
+        <option value="" {% if not v.delay %}selected{% endif %}>Scenario default ({{ 'delay model' if v.scenario.use_delay_model else 'due dates' }})</option>
+        <option value="off" {% if v.delay == 'off' %}selected{% endif %}>Due dates</option>
+        <option value="on" {% if v.delay == 'on' %}selected{% endif %}>Delay model (advisory)</option>
+      </select></div>
+    <div><label class="form-label small mb-0" for="months">Horizon</label>
+      <select class="form-select form-select-sm" id="months" name="months">
+        <option value="">As in settings</option>
+        {% for m in [1, 2, 3, 4, 6, 9, 12] %}<option value="{{ m }}" {% if v.months == m %}selected{% endif %}>{{ m }} month{{ 's' if m > 1 }}</option>{% endfor %}
+      </select></div>
+    <div><label class="form-label small mb-0" for="as_of">As-of date</label>
+      <input class="form-control form-control-sm" type="date" id="as_of" name="as_of" value="{{ v.as_of.isoformat() if v.as_of else '' }}"></div>
+  </form>
+  <form method="post" action="/export" class="d-inline" data-busy="Exporting and checking...">
+    <input type="hidden" name="csrf_token" value="{{ csrf }}">
+    <button class="btn btn-sm btn-primary" title="Excel with live formulas, checked against this screen before download">Export to Excel</button>
+  </form>
+  {% if can_edit %}
+  <button class="btn btn-sm btn-outline-primary" hx-post="/snapshot" hx-include="#view-form" hx-target="#modal-body">Save snapshot</button>
+  {% endif %}
+</div>
+<div id="grid-area" class="grid-area" hx-get="/forecast" hx-trigger="forecast-changed from:body" hx-include="#view-form">
+  {% include "_grid.html" %}
+</div>
+{% endblock %}

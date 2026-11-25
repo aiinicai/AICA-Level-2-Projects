@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% block title %}Audit log{% endblock %}
+{% block content %}
+<h1 class="h4">Audit log</h1>
+<p class="text-muted small">Every sign-in, upload, change, approval, export and setting change, newest first. The log is
+  append-only: nobody can edit or delete it from the app. Times are local.</p>
+<form method="get" action="/audit" class="row g-2 align-items-end mb-3">
+  <div class="col-auto"><label class="form-label small mb-0" for="f-user">User</label>
+    <select class="form-select form-select-sm" id="f-user" name="user"><option value="">All</option>
+      {% for u in users %}<option value="{{ u }}" {% if q.user == u %}selected{% endif %}>{{ u }}</option>{% endfor %}</select></div>
+  <div class="col-auto"><label class="form-label small mb-0" for="f-action">Type</label>
+    <select class="form-select form-select-sm" id="f-action" name="action"><option value="">All</option>
+      {% for g in groups %}<option value="{{ g }}" {% if q.action == g %}selected{% endif %}>{{ g }}</option>{% endfor %}</select></div>
+  <div class="col-auto"><label class="form-label small mb-0" for="f-text">Item / key contains</label>
+    <input class="form-control form-control-sm" id="f-text" name="text" value="{{ q.text }}" placeholder="e.g. cheque number"></div>
+  <div class="col-auto"><label class="form-label small mb-0" for="f-from">From</label>
+    <input type="date" class="form-control form-control-sm" id="f-from" name="date_from" value="{{ q.date_from }}"></div>
+  <div class="col-auto"><label class="form-label small mb-0" for="f-to">To</label>
+    <input type="date" class="form-control form-control-sm" id="f-to" name="date_to" value="{{ q.date_to }}"></div>
+  <div class="col-auto"><button class="btn btn-sm btn-primary">Filter</button> <a class="btn btn-sm btn-link" href="/audit">Clear</a></div>
+  <div class="col-auto ms-auto"><a class="btn btn-sm btn-outline-secondary"
+     href="/audit.csv?user={{ q.user|urlencode }}&action={{ q.action|urlencode }}&text={{ q.text|urlencode }}&date_from={{ q.date_from }}&date_to={{ q.date_to }}">Download CSV ({{ total }} rows)</a></div>
+</form>
+<table class="table table-sm small bg-white border align-top">
+  <thead class="table-light"><tr><th>#</th><th>Time</th><th>User</th><th>Action</th><th>Item</th><th>Before</th><th>After</th><th>IP</th></tr></thead>
+  <tbody>
+  {% for r in rows %}
+  <tr><td class="text-muted">{{ r.id }}</td><td class="text-nowrap">{{ r.ts|dmy }}</td><td>{{ r.username }}</td>
+    <td><code>{{ r.action }}</code></td><td>{{ r.entity }} {{ r.entity_key }}</td>
+    <td class="audit-json">{% if r.before %}{% for k, v in r.before.items() %}<div><span class="text-muted">{{ k }}:</span> {{ v }}</div>{% endfor %}{% endif %}</td>
+    <td class="audit-json">{% if r.after %}{% for k, v in r.after.items() %}<div><span class="text-muted">{{ k }}:</span> {{ v }}</div>{% endfor %}{% endif %}</td>
+    <td class="text-muted">{{ r.ip }}</td></tr>
+  {% else %}
+  <tr><td colspan="8" class="text-muted">No entries match.</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% if pages > 1 %}
+<nav class="small">Page {{ page }} of {{ pages }} ·
+  {% if page > 1 %}<a href="/audit?page={{ page - 1 }}&user={{ q.user|urlencode }}&action={{ q.action|urlencode }}&text={{ q.text|urlencode }}&date_from={{ q.date_from }}&date_to={{ q.date_to }}">newer</a>{% endif %}
+  {% if page < pages %}<a href="/audit?page={{ page + 1 }}&user={{ q.user|urlencode }}&action={{ q.action|urlencode }}&text={{ q.text|urlencode }}&date_from={{ q.date_from }}&date_to={{ q.date_to }}">older</a>{% endif %}</nav>
+{% endif %}
+{% endblock %}

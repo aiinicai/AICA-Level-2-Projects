@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+{% block title %}Balances and facility{% endblock %}
+{% block content %}
+<h1 class="h4">Bank balances and facility</h1>
+<p class="text-muted small">ERP bank-ledger balances per account and as-of date. The latest as-of date ({{ as_of|dmy }}) is the default forecast date.
+  Up to {{ s.max_bank_accounts_base_currency }} {{ s.base_currency }} accounts; other currencies need a manual rate to {{ s.base_currency }}.</p>
+<div class="row g-3">
+  <div class="col-xl-7">
+    <div class="card"><div class="card-header py-1 fw-semibold">Bank balances</div>
+    <div class="card-body p-2">
+      <table class="table table-sm small">
+        <thead><tr><th>Bank</th><th>Account</th><th>Ccy</th><th>As of</th><th class="text-end">Balance</th><th class="text-end">Rate</th><th class="text-end">{{ s.base_currency }}</th></tr></thead>
+        <tbody>
+        {% for a, hist in rows %}
+          {% for b in hist %}
+          <tr class="{{ 'fw-semibold' if loop.first else 'text-muted' }}"><td>{{ a.bank_name if loop.first }}</td><td>{{ a.account_name if loop.first }}</td><td>{{ a.currency }}</td>
+            <td>{{ b.as_of_date|dmy }}</td><td class="text-end">{{ b.balance|money(false) }}</td><td class="text-end">{{ b.fx_rate_to_base }}</td>
+            <td class="text-end">{{ (b.balance * b.fx_rate_to_base)|money(false) }}</td></tr>
+          {% else %}<tr><td>{{ a.bank_name }}</td><td>{{ a.account_name }}</td><td colspan="5" class="text-muted">no balance yet</td></tr>{% endfor %}
+        {% else %}<tr><td colspan="7" class="text-muted">No accounts yet. Add a balance below or upload the bank balances template.</td></tr>{% endfor %}
+        </tbody>
+      </table>
+      {% if can_edit %}
+      <form method="post" action="/balances" class="row g-2 align-items-end" x-data="{ ccy: '{{ s.base_currency }}' }">
+        <input type="hidden" name="csrf_token" value="{{ csrf }}">
+        <div class="col-md-3"><label class="form-label small mb-0">Bank</label><input class="form-control form-control-sm" name="bank" required list="banks"></div>
+        <div class="col-md-3"><label class="form-label small mb-0">Account</label><input class="form-control form-control-sm" name="account" required list="accounts"></div>
+        <div class="col-md-1"><label class="form-label small mb-0">Ccy</label><input class="form-control form-control-sm" name="currency" x-model="ccy" maxlength="3"></div>
+        <div class="col-md-2"><label class="form-label small mb-0">As of</label><input type="date" class="form-control form-control-sm" name="as_of" value="{{ as_of.isoformat() }}" required></div>
+        <div class="col-md-2"><label class="form-label small mb-0">Balance</label><input class="form-control form-control-sm" name="balance" inputmode="decimal" required></div>
+        <div class="col-md-1" x-show="ccy.toUpperCase() !== '{{ s.base_currency }}'"><label class="form-label small mb-0">Rate</label><input class="form-control form-control-sm" name="rate" inputmode="decimal"></div>
+        <div class="col-12"><button class="btn btn-sm btn-primary">Save balance</button>
+          <span class="small text-muted ms-2">Saving the same account and date again replaces the figure (audited).</span></div>
+        <datalist id="banks">{% for a, h in rows %}<option value="{{ a.bank_name }}">{% endfor %}</datalist>
+        <datalist id="accounts">{% for a, h in rows %}<option value="{{ a.account_name }}">{% endfor %}</datalist>
+      </form>
+      {% endif %}
+    </div></div>
+  </div>
+  <div class="col-xl-5">
+    <div class="card"><div class="card-header py-1 fw-semibold">Bank facility</div>
+    <div class="card-body p-2">
+      <table class="table table-sm small">
+        <thead><tr><th>Bank</th><th>Type</th><th>As of</th><th class="text-end">Limit</th><th class="text-end">Utilised</th><th class="text-end">Available</th></tr></thead>
+        <tbody>{% for f in facilities %}<tr><td>{{ f.bank_name }}</td><td>{{ f.facility_type }}</td><td>{{ f.as_of_date|dmy }}</td>
+          <td class="text-end">{{ f.limit_amount|money }}</td><td class="text-end">{{ f.utilised_amount|money }}</td><td class="text-end fw-semibold">{{ f.available_amount|money(false) }}</td></tr>
+        {% else %}<tr><td colspan="6" class="text-muted">No facility entered.</td></tr>{% endfor %}</tbody>
+      </table>
+      {% if can_edit %}
+      <form method="post" action="/facility" class="row g-2 align-items-end">
+        <input type="hidden" name="csrf_token" value="{{ csrf }}">
+        <div class="col-md-4"><label class="form-label small mb-0">Bank</label><input class="form-control form-control-sm" name="bank" required></div>
+        <div class="col-md-4"><label class="form-label small mb-0">Type</label><input class="form-control form-control-sm" name="facility_type" value="Overdraft"></div>
+        <div class="col-md-4"><label class="form-label small mb-0">As of</label><input type="date" class="form-control form-control-sm" name="as_of" value="{{ as_of.isoformat() }}"></div>
+        <div class="col-md-4"><label class="form-label small mb-0">Limit</label><input class="form-control form-control-sm" name="limit" inputmode="decimal"></div>
+        <div class="col-md-4"><label class="form-label small mb-0">Utilised</label><input class="form-control form-control-sm" name="utilised" inputmode="decimal"></div>
+        <div class="col-md-4"><label class="form-label small mb-0">Available</label><input class="form-control form-control-sm" name="available" inputmode="decimal" placeholder="limit - utilised"></div>
+        <div class="col-12"><button class="btn btn-sm btn-primary">Save facility</button>
+          <span class="small text-muted ms-2">The forecast uses Available.</span></div>
+      </form>
+      {% endif %}
+    </div></div>
+  </div>
+</div>
+{% endblock %}

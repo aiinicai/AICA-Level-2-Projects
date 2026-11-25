@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}Backups{% endblock %}
+{% block content %}
+<div class="d-flex align-items-end gap-3 mb-2">
+  <h1 class="h4 mb-0">Backups</h1>
+  <form method="post" action="/admin/backups" class="ms-auto" data-busy="Backing up...">
+    <input type="hidden" name="csrf_token" value="{{ csrf }}"><button class="btn btn-sm btn-primary">Back up now</button></form>
+</div>
+<p class="text-muted small">Each backup holds the database and every uploaded file, encrypted with the backup passphrase.
+  {% if s.auto_backup %}A backup is made automatically once a day while the app runs.{% else %}Automatic daily backups are off (CFF_AUTO_BACKUP).{% endif %}
+  The newest {{ s.backup_keep }} are kept in <code>{{ s.backups_dir }}</code>.
+  {% if s.backup_copy_dir %}Each one is also copied to <code>{{ s.backup_copy_dir }}</code>.{% else %}
+  <strong>Set CFF_BACKUP_COPY_DIR</strong> (a network share or another disk) so backups survive a failure of this PC.{% endif %}</p>
+<div class="alert alert-warning small py-2">Keep a copy of the backup passphrase (<code>instance\backup.key</code>, or CFF_BACKUP_PASSPHRASE)
+  somewhere safe and away from this PC. Without it no backup can be opened.
+  To restore: stop the app, then run <code>restore_backup.bat</code> (see the README).</div>
+<table class="table table-sm small bg-white border">
+  <thead class="table-light"><tr><th>File</th><th>Created</th><th class="text-end">Size</th><th></th></tr></thead>
+  <tbody>
+  {% for b in backups %}
+  <tr><td>{{ b.path.name }}</td><td>{{ b.created.strftime('%d-%b-%Y %H:%M') }}</td><td class="text-end">{{ '{:,.0f}'.format(b.size / 1024) }} KB</td>
+    <td class="text-end"><a href="/admin/backups/{{ b.path.name }}">Download</a></td></tr>
+  {% else %}
+  <tr><td colspan="4" class="text-muted">No backups yet.</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

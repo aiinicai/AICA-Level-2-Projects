@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block title %}PDC list{% endblock %}
+{% block content %}
+<div class="d-flex flex-wrap align-items-end gap-3 mb-2">
+  <div><h1 class="h4 mb-0">Vendor PDC list</h1>
+    <div class="text-muted small">As of {{ fc.as_of|dmy }}{% if can_edit %} · choose <strong>Hold cheque</strong> in the Action column, then the next honouring date{% endif %}.</div></div>
+  <form class="d-flex flex-wrap gap-2 align-items-end ms-auto" hx-get="/pdcs" hx-target="#pdc-table" hx-trigger="change, keyup changed delay:400ms from:#q" hx-push-url="true">
+    <div><label class="form-label small mb-0" for="lot">Lot</label>
+      <select class="form-select form-select-sm" id="lot" name="lot"><option value="">All lots</option>
+        {% for lt in fc.fc_lots %}<option value="{{ loop.index0 }}" {% if lot == loop.index0|string %}selected{% endif %}>{{ lt.label }}</option>{% endfor %}</select></div>
+    <div><label class="form-label small mb-0" for="show">Show</label>
+      <select class="form-select form-select-sm" id="show" name="show">
+        <option value="">All cheques</option><option value="held" {% if show == 'held' %}selected{% endif %}>On hold</option>
+        <option value="not_held" {% if show == 'not_held' %}selected{% endif %}>Not on hold</option></select></div>
+    <div><label class="form-label small mb-0" for="q">Vendor / cheque</label>
+      <input class="form-control form-control-sm" id="q" name="q" value="{{ q }}" placeholder="Search"></div>
+  </form>
+</div>
+<div class="sticky-summary pb-2" hx-get="/pdcs/summary" hx-trigger="forecast-changed from:body">
+  {% include "_hold_summary.html" %}
+</div>
+<div id="pdc-table">{% include "_pdc_table.html" %}</div>
+<datalist id="hold-reasons">{% for r in reasons %}<option value="{{ r }}">{% endfor %}</datalist>
+{% endblock %}

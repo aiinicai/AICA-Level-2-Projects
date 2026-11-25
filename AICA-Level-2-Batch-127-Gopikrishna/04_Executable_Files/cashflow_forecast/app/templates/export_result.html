@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block title %}Excel export{% endblock %}
+{% block content %}
+<h1 class="h4">Excel export</h1>
+<p class="text-muted small mb-2">{{ log.filename }} · as of {{ log.as_of_date|dmy }} · scenario {{ scenarios.get(log.scenario_id, '-') }}
+  · by {{ names.get(log.created_by_id, 'console') }}</p>
+
+{% if log.released and available %}
+<div class="alert alert-success">
+  <div class="fw-semibold">Formula check passed. The workbook is ready.</div>
+  <div class="small">{{ log.note }}</div>
+  <a class="btn btn-success btn-sm mt-2" href="/exports/{{ log.id }}/download">Download Excel</a>
+  <div class="small text-muted mt-2">SHA-256 {{ log.sha256 }}</div>
+</div>
+{% elif log.released %}
+<div class="alert alert-warning">The check passed, but the file is no longer available or has been changed on disk
+  since it was checked, so it cannot be downloaded. Export again.</div>
+{% elif log.check_status.value == 'not_run' %}
+<div class="alert alert-danger">
+  <div class="fw-semibold">Export blocked: the formula check could not run.</div>
+  <div class="small">{{ log.note }}</div>
+</div>
+{% else %}
+<div class="alert alert-danger">
+  <div class="fw-semibold">Export blocked: the recalculated workbook does not match the screen.</div>
+  <div class="small">{{ log.note }}</div>
+</div>
+{% if log.differences %}
+<table class="table table-sm small bg-white border">
+  <thead class="table-light"><tr><th>Sheet</th><th>Cell</th><th>Row / column</th><th class="text-end">App</th><th class="text-end">Excel (LibreOffice)</th></tr></thead>
+  <tbody>
+  {% for d in log.differences %}
+  <tr><td>{{ d.sheet }}</td><td>{{ d.cell }}</td><td>{{ d.item }}</td><td class="text-end">{{ d.app }}</td><td class="text-end">{{ d.excel if d.excel is not none else '(empty)' }}</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endif %}
+{% endif %}
+<a class="btn btn-sm btn-outline-secondary" href="/forecast">Back to the lot grid</a>
+<a class="btn btn-sm btn-link" href="/exports">All exports</a>
+{% endblock %}
