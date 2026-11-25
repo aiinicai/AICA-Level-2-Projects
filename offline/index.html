@@ -1,0 +1,1761 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>Family Tasks</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#4f46e5">
+<link rel="apple-touch-icon" href="icon-192.png">
+<style>
+  :root { --bg:#f6f7f9; --card:#fff; --ink:#1d2430; --mute:#6b7685; --line:#e3e7ee;
+          --yes:#1f9d55; --no:#d64545; --must:#c2410c; --opt:#2563eb; --accent:#4f46e5; }
+  * { box-sizing:border-box; }
+  body { margin:0; font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif; background:var(--bg); color:var(--ink); padding-bottom:90px; }
+  header { background:var(--accent); color:#fff; padding:12px 14px 0; position:sticky; top:0; z-index:5; }
+  header h1 { font-size:18px; margin:0 0 8px; }
+  .tabs { display:flex; gap:6px; overflow-x:auto; }
+  .tab { background:rgba(255,255,255,.18); color:#fff; border:0; padding:10px 14px; border-radius:10px 10px 0 0; font-size:15px; white-space:nowrap; }
+  .tab.active { background:var(--bg); color:var(--accent); font-weight:700; }
+  .datebar { display:flex; align-items:center; justify-content:space-between; padding:10px 14px; }
+  .datebar button { border:1px solid var(--line); background:var(--card); border-radius:8px; padding:8px 14px; font-size:16px; }
+  .datebar .d { font-weight:600; }
+  .session { margin:6px 12px 14px; }
+  .session h2 { font-size:15px; margin:0 0 6px; color:var(--mute); text-transform:uppercase; letter-spacing:.05em; }
+  .task { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:10px 12px; margin-bottom:8px; }
+  .task.done { border-color:var(--yes); background:#f0faf4; }
+  .task.skipped { border-color:var(--no); background:#fdf3f3; }
+  .row1 { display:flex; justify-content:space-between; align-items:flex-start; gap:8px; }
+  .title { font-size:16px; font-weight:600; }
+  .meta { font-size:12px; color:var(--mute); margin-top:2px; }
+  .badge { font-size:11px; padding:2px 7px; border-radius:999px; color:#fff; margin-left:6px; vertical-align:middle; }
+  .badge.must { background:var(--must); } .badge.opt { background:var(--opt); }
+  .btns { display:flex; gap:8px; margin-top:8px; }
+  .btns button { flex:1; padding:11px; border-radius:10px; border:2px solid; font-size:16px; font-weight:700; background:#fff; }
+  .yes { color:var(--yes); border-color:var(--yes) !important; } .yes.on { background:var(--yes) !important; color:#fff; }
+  .no { color:var(--no); border-color:var(--no) !important; } .no.on { background:var(--no) !important; color:#fff; }
+  .del { background:none; border:0; font-size:18px; color:var(--mute); }
+  .empty { color:var(--mute); font-size:14px; padding:6px 2px; }
+  .fab { position:fixed; right:16px; bottom:16px; background:var(--accent); color:#fff; border:0; border-radius:999px; padding:16px 22px; font-size:17px; font-weight:700; box-shadow:0 4px 12px rgba(0,0,0,.25); }
+  .fab.mic { right:auto; left:16px; padding:14px 18px; font-size:22px; background:#dc2626; }
+  .vl { display:flex; gap:6px; overflow-x:auto; padding:2px 0 6px; } .vl .chip { white-space:nowrap; }
+  .vmic { width:84px; height:84px; border-radius:50%; border:0; background:#dc2626; color:#fff; font-size:34px; display:block; margin:8px auto; box-shadow:0 4px 14px rgba(220,38,38,.4); }
+  .vmic.on { animation:vp 1s infinite; background:#b91c1c; } @keyframes vp { 50% { box-shadow:0 0 0 14px rgba(220,38,38,.18); } }
+  .vcard { border:2px solid var(--line); border-radius:12px; padding:10px; margin-top:10px; } .vcard label { margin-top:8px; }
+  .vcard select, .vcard input, #vText { width:100%; padding:9px; font-size:15px; border:1px solid var(--line); border-radius:8px; box-sizing:border-box; }
+  .vgrid { display:grid; grid-template-columns:1fr 1fr; gap:8px; } .vgrid label { margin-top:4px; } .asm { color:#b45309; font-size:11px; font-weight:400; }
+  .sheet { position:fixed; inset:0; background:rgba(0,0,0,.45); display:none; align-items:flex-end; z-index:10; }
+  .sheet.open { display:flex; }
+  .panel { background:#fff; width:100%; max-height:92vh; overflow:auto; border-radius:18px 18px 0 0; padding:16px; }
+  .panel h3 { margin:0 0 10px; }
+  label { display:block; font-size:13px; color:var(--mute); margin:10px 0 4px; }
+  input, select { width:100%; padding:11px; font-size:16px; border:1px solid var(--line); border-radius:10px; background:#fff; }
+  .seg { display:flex; gap:8px; } .seg button { flex:1; padding:10px; border:2px solid var(--line); background:#fff; border-radius:10px; font-size:15px; }
+  .seg button.sel { border-color:var(--accent); background:#eef; font-weight:700; }
+  .days { display:flex; gap:6px; flex-wrap:wrap; } .days button { width:42px; height:42px; border-radius:50%; border:2px solid var(--line); background:#fff; }
+  .days button.sel { background:var(--accent); color:#fff; border-color:var(--accent); }
+  .actions { display:flex; gap:10px; margin-top:16px; } .actions button { flex:1; padding:13px; font-size:16px; border-radius:10px; border:0; }
+  .save { background:var(--accent); color:#fff; font-weight:700; } .cancel { background:var(--line); }
+  .hidden { display:none; }
+  .linkbtn { background:none; border:0; color:#fff; font-size:22px; padding:0 6px; }
+
+  /* single-line task rows */
+  .task { padding:6px 8px 6px 10px; border-left:5px solid var(--must); margin-bottom:6px; border-radius:10px; }
+  .task.o { border-left-color:var(--opt); }
+  .line { display:flex; align-items:center; gap:5px; }
+  .tt { flex:1 1 auto; min-width:0; font-size:14px; font-weight:600; line-height:1.2; }
+  .tn { display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; word-break:break-word; }
+  .tt i { display:block; font-style:normal; font-weight:400; font-size:11px; color:var(--mute); margin-top:1px; }
+  .yn { flex:0 0 32px; height:32px; padding:0; border-radius:8px; border:2px solid; font-size:16px; font-weight:700; background:#fff; }
+  .who { flex:0 0 60px; width:60px; padding:6px 2px; font-size:12px; border-radius:8px; }
+  .nt { flex:0 1 76px; width:76px; min-width:0; padding:6px; font-size:12px; border-radius:8px; }
+  .del { flex:0 0 auto; padding:0 2px; font-size:16px; }
+  .info { font-size:12px; color:var(--mute); padding:4px 2px 0; }
+  .legend { font-size:12px; color:var(--mute); padding:0 14px 4px; }
+  .legend b { display:inline-block; width:10px; height:10px; border-radius:2px; vertical-align:middle; margin:0 3px 0 8px; }
+
+  .hidden { display:none !important; }
+  /* achievements */
+  #ach { padding:0 12px 20px; }
+  .mnav { display:flex; align-items:center; justify-content:space-between; padding:10px 2px; }
+  .mnav button { border:1px solid var(--line); background:#fff; border-radius:8px; padding:8px 14px; font-size:16px; }
+  .mnav button:disabled { opacity:.35; }
+  .mnav b { font-size:16px; }
+  .hero { position:relative; overflow:hidden; border-radius:20px; padding:16px; color:#fff; display:flex; gap:14px; align-items:center; background:linear-gradient(135deg,var(--h1),var(--h2)); box-shadow:0 6px 18px rgba(0,0,0,.15); }
+  .ring { --p:0; --c:#fff; flex:0 0 96px; width:96px; height:96px; border-radius:50%; background:conic-gradient(var(--c) calc(var(--p)*1%), rgba(255,255,255,.28) 0); display:flex; align-items:center; justify-content:center; }
+  .ring .in { width:74px; height:74px; border-radius:50%; background:rgba(0,0,0,.28); display:flex; flex-direction:column; align-items:center; justify-content:center; }
+  .ring b { font-size:22px; line-height:1; } .ring span { font-size:11px; opacity:.85; }
+  .hero .t { min-width:0; } .hero .em { font-size:34px; line-height:1; animation:bob 2s ease-in-out infinite; display:inline-block; }
+  .hero h3 { margin:4px 0 2px; font-size:19px; } .hero p { margin:0; font-size:13px; opacity:.95; }
+  @keyframes bob { 0%,100%{transform:translateY(0) rotate(-6deg)} 50%{transform:translateY(-5px) rotate(6deg)} }
+  .conf { position:absolute; top:-20px; font-size:18px; animation:fall linear infinite; pointer-events:none; }
+  @keyframes fall { to { transform:translateY(190px) rotate(360deg); opacity:0; } }
+  .lvl { margin-top:8px; font-size:12px; } .bar { height:8px; background:rgba(255,255,255,.3); border-radius:99px; overflow:hidden; margin-top:3px; }
+  .bar i { display:block; height:100%; background:#fff; border-radius:99px; }
+  .tiles { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin:10px 0; }
+  .tile { background:#fff; border:1px solid var(--line); border-radius:14px; padding:10px 12px; }
+  .tile .n { font-size:22px; font-weight:800; } .tile .l { font-size:12px; color:var(--mute); }
+  .card { background:#fff; border:1px solid var(--line); border-radius:16px; padding:12px; margin-bottom:10px; }
+  .card h4 { margin:0 0 8px; font-size:14px; }
+  .srow { display:flex; align-items:center; gap:8px; font-size:13px; margin:5px 0; } .srow .bg { flex:1; height:10px; background:#eef0f4; border-radius:99px; overflow:hidden; } .srow .bg i { display:block; height:100%; border-radius:99px; background:linear-gradient(90deg,#34d399,#22c55e); }
+  .srow .v { width:38px; text-align:right; color:var(--mute); }
+  .cal { display:grid; grid-template-columns:repeat(7,1fr); gap:4px; text-align:center; }
+  .cal .wd { font-size:11px; color:var(--mute); }
+  .cell { position:relative; aspect-ratio:1; border-radius:10px; background:#f3f4f8; display:flex; align-items:center; justify-content:center; font-size:19px; }
+  .cell small { position:absolute; top:2px; left:4px; font-size:9px; color:var(--mute); }
+  .cell.perfect { background:#fef3c7; } .cell.good { background:#dcfce7; } .cell.ok { background:#e0f2fe; } .cell.low { background:#ffedd5; } .cell.zero { background:#fee2e2; } .cell.future { opacity:.35; background:transparent; border:1px dashed var(--line); }
+  .cell.today { outline:2px solid var(--accent); }
+  .leg { font-size:11px; color:var(--mute); margin-top:8px; line-height:1.7; }
+  .badges { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+  .badge2 { border-radius:12px; padding:8px; text-align:center; background:linear-gradient(135deg,#fff7ed,#fef3c7); border:1px solid #fcd34d; font-size:12px; }
+  .badge2 .e { font-size:28px; } .badge2 b { display:block; font-size:13px; }
+  .badge2.lock { filter:grayscale(1); opacity:.55; background:#f3f4f8; border-color:var(--line); }
+  .facts { font-size:14px; line-height:1.9; }
+  .lb { display:flex; align-items:center; gap:8px; padding:8px; border-radius:12px; margin-bottom:6px; background:#f8f9fc; }
+  .lb.me { background:#eef; outline:2px solid var(--accent); }
+  .lb .m { font-size:22px; width:30px; text-align:center; } .lb .nm { flex:1; min-width:0; } .lb .nm b { font-size:14px; } .lb .nm div { font-size:11px; color:var(--mute); }
+  .lb .sc { text-align:right; font-weight:800; } .lb .sc small { display:block; font-weight:400; font-size:11px; color:var(--mute); }
+  .sharebtn { display:block; text-align:center; background:#22c55e; color:#fff; text-decoration:none; padding:13px; border-radius:12px; font-weight:700; font-size:16px; margin-top:4px; }
+
+  .fcard { background:#fff; border:1px solid var(--line); border-radius:16px; padding:12px; margin-bottom:10px; }
+  .fcard.new { border:2px dashed var(--accent); background:#fafaff; }
+  .fhead { display:flex; align-items:center; gap:10px; margin-bottom:8px; } .fav { font-size:34px; width:46px; text-align:center; } .fsub { font-size:12px; color:var(--mute); }
+  .fgrid { display:grid; grid-template-columns:1fr 1fr; gap:6px 10px; } .fgrid label { margin:4px 0 0; } .fgrid .f-role2 { grid-column:1 / -1; }
+  .factions { display:flex; gap:8px; margin-top:10px; } .factions button { flex:1; padding:12px; border:0; border-radius:10px; font-size:15px; font-weight:700; }
+  .fsave { background:var(--accent); color:#fff; } .fdel { background:#fee2e2; color:#b91c1c; flex:0 0 auto !important; }
+  #fam { padding:0 12px 24px; }
+
+  .session { margin:6px 6px 12px; } .task { padding:6px 6px 6px 8px; }
+  .tab { padding:9px 9px; font-size:14px; }
+  .fq { flex:0 0 66px; width:66px; padding:6px 0; font-size:11px; border-radius:8px; }
+  .who { flex:0 0 48px !important; width:48px !important; font-size:11.5px; }
+  .nt { flex:0 1 54px !important; width:54px !important; }
+  .yn { flex:0 0 30px; height:30px; }
+  .lnk { background:none; border:0; color:var(--accent); font-size:13px; padding:2px 6px; }
+  .hint { font-size:12px; color:var(--mute); margin-top:10px; }
+  .tab.fam { background:#6d64f0; position:sticky; right:0; margin-left:4px; box-shadow:-6px 0 8px -4px rgba(0,0,0,.25); }
+  .tab.fam.active { background:var(--bg); }
+  /* family rows: one line per member */
+  .frow { display:grid; grid-template-columns:minmax(0,1fr) 34px 68px 78px 58px; gap:4px; align-items:center; background:#fff; border:1px solid var(--line); border-radius:12px; padding:6px; margin-bottom:6px; }
+  .frow input, .frow select { padding:7px 2px; font-size:11.5px; border-radius:8px; min-width:0; width:100%; }
+  .frow .f-age { text-align:center; padding:7px 0; }
+  .frow.fhdr { background:none; border:0; padding:0 6px; margin-bottom:2px; font-size:11px; color:var(--mute); }
+  .frow.new { border:2px dashed var(--accent); background:#fafaff; }
+  .frow.dirty { border-color:#f59e0b; background:#fffbeb; }
+  .fav2 { display:none; font-size:20px; text-align:center; }
+  .fbtns { display:flex; gap:3px; justify-content:flex-end; } .fbtns button { width:28px; height:30px; padding:0; border:0; border-radius:8px; font-size:14px; background:#eef0f4; }
+  .dirty .fsv { background:var(--accent); } .fadd { background:#22c55e !important; color:#fff; font-size:18px !important; font-weight:700; }
+  .fdl { background:#fee2e2 !important; }
+  .rcell { min-width:0; }
+  @media (min-width:410px) { .frow { grid-template-columns:22px minmax(0,1fr) 34px 68px 78px 58px; } .fav2 { display:block; } }
+  #famhint { font-size:12px; color:var(--mute); padding:0 2px 8px; }
+
+  .tab.special { background:#6d64f0; } .tab.special.active { background:var(--bg); }
+  .tab.fam { position:static; box-shadow:none; margin-left:0; }
+  .champ { position:relative; overflow:hidden; border-radius:16px; padding:12px 14px; margin:4px 0 10px; color:#fff; background:linear-gradient(135deg,#f59e0b,#ea580c); font-size:15px; box-shadow:0 5px 14px rgba(0,0,0,.15); }
+  .champ small { display:block; opacity:.92; margin-top:3px; font-size:12px; }
+  .cmpwrap { overflow-x:auto; border:1px solid var(--line); border-radius:14px; background:#fff; margin-bottom:10px; }
+  table.cmp { border-collapse:separate; border-spacing:0; width:100%; font-size:13px; }
+  table.cmp th, table.cmp td { padding:6px 3px; text-align:center; border-bottom:1px solid #f0f1f5; min-width:60px; }
+  table.cmp .lab { position:sticky; left:0; z-index:1; background:#fff; text-align:left; font-weight:600; font-size:12px; min-width:88px; max-width:96px; padding-left:8px; border-right:1px solid #f0f1f5; }
+  table.cmp thead th { background:#fafbff; vertical-align:top; padding-top:8px; }
+  table.cmp thead .av { font-size:24px; line-height:1.1; } table.cmp thead .nm { font-size:12px; font-weight:700; } table.cmp thead .md { font-size:16px; }
+  table.cmp tr.grp td { background:#f3f4f8; color:var(--mute); font-weight:700; font-size:12px; text-align:left; padding:5px 8px; }
+  table.cmp td.best { background:#dcfce7; color:#166534; font-weight:800; }
+  table.cmp td small { display:block; font-size:10px; color:var(--mute); line-height:1.15; }
+  table.cmp td.off { opacity:.45; filter:grayscale(1); }
+  table.cmp.days td { padding:2px 0; font-size:16px; border-bottom:1px solid #f6f7fa; }
+  table.cmp.days td.lab { font-size:11px; font-weight:600; } table.cmp.days tr.today td { background:#eef; }
+  details.cmpd { margin-bottom:10px; } details.cmpd summary { font-weight:700; font-size:14px; padding:8px 2px; }
+  .legend2 { font-size:11px; color:var(--mute); margin:-4px 2px 10px; }
+  .legend2 b { background:#dcfce7; color:#166534; padding:0 5px; border-radius:4px; }
+
+  .bellbtn { position:relative; background:rgba(255,255,255,.18); border:0; color:#fff; font-size:20px; border-radius:10px; padding:4px 10px; margin-bottom:8px; }
+  .bellbtn span { position:absolute; top:-4px; right:-4px; background:#ef4444; color:#fff; font-size:11px; font-weight:700; border-radius:99px; padding:1px 6px; }
+  #banners { position:fixed; top:8px; left:8px; right:8px; z-index:60; display:flex; flex-direction:column; gap:8px; pointer-events:none; }
+  .bn { pointer-events:auto; background:#1d2430; color:#fff; border-radius:14px; padding:10px 12px; box-shadow:0 8px 24px rgba(0,0,0,.35); border-left:6px solid #f59e0b; animation:slidein .25s ease-out; }
+  .pad { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; max-width:270px; margin:8px auto; } .pad button { padding:16px 0; font-size:24px; border:1px solid var(--line); border-radius:14px; background:#fff; }
+  .pad button:active { background:#e0e7ff; } .pad .ok { background:#16a34a; color:#fff; border-color:#16a34a; }
+  .lockrow { display:flex; justify-content:space-between; align-items:center; gap:8px; padding:7px 0; border-top:1px solid #eee; font-size:14px; } .lockrow button { padding:7px 10px; border-radius:8px; border:1px solid var(--line); background:#fff; font-size:13px; }
+  .imptbl { width:100%; border-collapse:collapse; font-size:12px; margin-top:8px; } .imptbl td, .imptbl th { padding:4px 3px; border-top:1px solid #eee; text-align:left; vertical-align:top; }
+  .bn.digest { border-left-color:#25d366; }
+  .sendcard { border:2px solid var(--line); border-radius:12px; padding:10px; margin-top:10px; background:#fff; } .sendcard.sent { border-color:#25d366; background:#f0fdf4; }
+  .wabtn { display:block; text-align:center; padding:12px; border-radius:10px; background:#25d366; color:#fff; font-weight:700; text-decoration:none; margin-top:8px; font-size:15px; }
+  .sendcard input.ph, .sendcard textarea { width:100%; padding:8px; font-size:14px; border:1px solid var(--line); border-radius:8px; box-sizing:border-box; }
+  .bn.missed { border-left-color:#ef4444; background:#3b1212; } .bn.test { border-left-color:#22c55e; }
+  .bn b { font-size:15px; } .bn .bb { font-size:13px; opacity:.9; margin-top:2px; }
+  .bn .ba { display:flex; gap:8px; margin-top:8px; } .bn button { flex:1; padding:9px; border:0; border-radius:10px; font-weight:700; font-size:14px; }
+  .bn .bd { background:#22c55e; color:#fff; } .bn .bs { background:#475569; color:#fff; } .bn .bx { flex:0 0 40px; background:transparent; color:#cbd5e1; }
+  @keyframes slidein { from { transform:translateY(-30px); opacity:0; } to { transform:none; opacity:1; } }
+  .nli { padding:8px 4px; border-bottom:1px solid var(--line); font-size:14px; } .nli.unread b { color:var(--accent); } .nli small { display:block; color:var(--mute); font-size:12px; }
+  .chips { display:flex; flex-wrap:wrap; gap:6px; margin:4px 0 8px; } .chip { padding:7px 11px; border:2px solid var(--line); background:#fff; border-radius:99px; font-size:13px; }
+  .chip.sel { border-color:var(--accent); background:#eef; font-weight:700; color:var(--accent); }
+  .rmbtn { width:100%; padding:12px; border:0; border-radius:10px; background:var(--accent); color:#fff; font-size:15px; font-weight:700; margin-top:6px; } .rmbtn.alt { background:#eef0f4; color:var(--ink); }
+  .rm3 label { display:flex; align-items:center; justify-content:space-between; margin:4px 0; font-size:14px; color:var(--ink); } .rm3 input { width:140px; }
+  .rmsec b { font-size:14px; } .rmsec { padding:6px 0 10px; border-bottom:1px solid var(--line); margin-bottom:8px; } .rmsec:last-child { border:0; }
+  .info select.rm { width:auto; padding:5px; font-size:12px; border-radius:8px; }
+@media print{body *{visibility:hidden}#content,#content *{visibility:visible}#content{position:absolute;left:0;top:0;width:100%}.noprint{display:none!important}}
+</style>
+</head>
+<body>
+<header>
+  <div style="display:flex;justify-content:space-between;align-items:center"><h1>👨‍👩‍👧‍👦 Family Tasks</h1><div style="display:flex;gap:8px"><button class="bellbtn hidden" id="lockBtn" title="Lock this phone">🔒</button><button class="bellbtn" id="fbBtn" title="Testing week: feedback and checklist">💬</button><button class="bellbtn" id="sendBtn" title="Send task lists on WhatsApp">📤</button><button class="bellbtn" id="bellBtn" title="Notifications">🔔<span id="bellN" class="hidden">0</span></button></div></div>
+  <div class="tabs" id="tabs"></div>
+</header>
+
+<div id="banners"></div>
+<div class="datebar">
+  <button id="prev">‹</button>
+  <div class="d" id="dateLabel"></div>
+  <button id="next">›</button>
+</div>
+<div class="legend"><b style="background:var(--must)"></b>Must do <b style="background:var(--opt)"></b>Optional · tap name for details</div>
+<div id="content"></div>
+<div id="ach" class="hidden"></div>
+<div id="fam" class="hidden"></div>
+<div id="rep" class="hidden"></div>
+
+<button class="fab" id="addTaskBtn">＋ Add task</button>
+<button class="fab mic" id="micBtn" title="Add a task by voice">🎤</button>
+
+<!-- add task sheet -->
+<div class="sheet" id="taskSheet"><div class="panel">
+  <h3>Add task</h3>
+  <label>What needs to be done?</label>
+  <input id="fTitle" placeholder="e.g. Take medicine">
+  <label>Session</label>
+  <div class="seg" id="fSession">
+    <button data-v="morning" class="sel">🌅 Morning</button>
+    <button data-v="afternoon">☀️ Afternoon</button>
+    <button data-v="evening">🌙 Evening</button>
+  </div>
+  <label>Time of the task (optional)</label>
+  <input id="fTime" type="time">
+  <label>Remind me</label>
+  <select id="fRemind"></select>
+  <label>Importance</label>
+  <div class="seg" id="fMust">
+    <button data-v="1" class="sel">Must do</button>
+    <button data-v="0">Optional</button>
+  </div>
+  <label>Repeat</label>
+  <select id="fFreq"></select>
+  <div id="weeklyBox" class="hidden"><label>On which days?</label>
+    <div class="days" id="fDays"></div></div>
+  <div id="customBox" class="hidden">
+    <label>Every</label>
+    <div style="display:flex;gap:8px"><input id="fInterval" type="number" min="1" value="3">
+      <select id="fUnit"><option value="days">days</option><option value="weeks">weeks</option><option value="months">months</option></select></div>
+  </div>
+  <label>First due date</label><input id="fStart" type="date">
+  <label>Ends on (optional)</label><input id="fEnd" type="date">
+  <div class="actions"><button class="cancel" id="cancelTask">Cancel</button><button class="save" id="saveTask">Save</button></div>
+</div></div>
+
+
+
+<!-- feedback sheet -->
+<div class="sheet" id="fbSheet"><div class="panel">
+  <h3>🧪 Testing week</h3>
+  <details id="fbCheck" open><summary style="font-weight:700">✅ My checklist <span id="fbProg" style="font-weight:400;color:#666"></span></summary><div id="fbItems"></div></details>
+  <h3 style="margin-top:14px">💬 Tell us</h3>
+  <div class="chips" id="fbKind"></div>
+  <label>Who are you?</label><select id="fbWho" style="width:100%;padding:9px;font-size:15px;border:1px solid var(--line);border-radius:8px"></select>
+  <label>What happened, or what would help?</label>
+  <textarea id="fbText" rows="3" maxlength="1000" style="width:100%;padding:9px;font-size:15px;border:1px solid var(--line);border-radius:8px;box-sizing:border-box" placeholder="e.g. On the Reports tab the PDF button did nothing"></textarea>
+  <button class="rmbtn" id="fbSend">Send</button>
+  <h3 style="margin-top:14px">📋 Notes so far <button class="chip" id="fbCopy" style="font-size:12px;margin-left:6px">Copy all</button></h3>
+  <div id="fbList"></div>
+  <div class="actions"><button class="cancel" id="fbClose">Close</button></div>
+</div></div>
+
+<!-- send sheet -->
+<div class="sheet" id="sendSheet"><div class="panel">
+  <h3>📤 Send task lists on WhatsApp</h3>
+  <div class="chips" id="sdDay"></div>
+  <div class="chips" id="sdLang"></div>
+  <div id="sdList"></div>
+  <div class="hint" style="font-size:12px;color:#666;margin-top:10px">WhatsApp opens with the message ready. Tap its send button. WhatsApp needs one tap per person.</div>
+  <div class="actions"><button class="cancel" id="sdClose">Close</button></div>
+</div></div>
+
+<!-- voice sheet -->
+<div class="sheet" id="voiceSheet"><div class="panel">
+  <h3>🎤 Add a task by voice</h3>
+  <div class="vl" id="vLang"></div>
+  <button class="vmic" id="vMic">🎤</button>
+  <div id="vHint" style="text-align:center;font-size:13px;color:#666;min-height:18px">Tap the mic and speak</div>
+  <label>What I heard (you can edit or type here)</label>
+  <textarea id="vText" rows="2" placeholder="e.g. Rahul evening 7 pm homework daily"></textarea>
+  <div id="vEx" style="font-size:12px;color:#666;margin-top:4px"></div>
+  <div id="vCard"></div>
+  <div class="actions"><button class="cancel" id="vCancel">Cancel</button><button class="save" id="vSave">Save task</button></div>
+</div></div>
+
+<!-- notifications list -->
+<div class="sheet" id="bellSheet"><div class="panel">
+  <h3>🔔 Notifications</h3><div id="bellList"></div>
+  <div class="actions"><button class="cancel" id="bellClose">Close</button><button class="save" id="bellRead">Mark all read</button></div>
+</div></div>
+
+<!-- schedule sheet (repeat + due date for an existing task) -->
+<div class="sheet" id="schSheet"><div class="panel">
+  <h3 id="schTitle">Schedule</h3>
+  <label>Due date (first due on)</label><input id="sDue" type="date">
+  <label>Repeat</label>
+  <select id="sRep">
+    <option value="none">Does not repeat (only on this date)</option>
+    <option value="days">Every … days</option><option value="weeks">Every … weeks</option><option value="months">Every … months</option>
+    <option value="wd">Weekly on chosen days</option>
+  </select>
+  <div id="sNBox" class="hidden"><label>Every how many?</label><input id="sN" type="number" min="1" max="365" value="1"></div>
+  <div id="sDaysBox" class="hidden"><label>On which days?</label><div class="days" id="sDays"></div></div>
+  <label>Ends on (optional)</label><input id="sEnd" type="date">
+  <div class="hint">The new schedule starts on the due date. Days before it stay exactly as they were.</div>
+  <div class="actions"><button class="cancel" id="schCancel">Cancel</button><button class="save" id="schApply">Apply</button></div>
+</div></div>
+
+<!-- PIN pad -->
+<div class="sheet" id="pinSheet"><div class="panel" style="text-align:center">
+  <h3 id="pnTitle"></h3>
+  <div class="chips" id="pnWho" style="justify-content:center"></div>
+  <div id="pnDots" style="font-size:30px;letter-spacing:10px;min-height:44px"></div>
+  <div id="pnMsg" style="color:#dc2626;min-height:18px;font-size:13px"></div>
+  <div class="pad" id="pnPad"></div>
+  <div class="actions"><button class="cancel" id="pnCancel">Cancel</button></div>
+</div></div>
+
+<script>
+// ---- PREVIEW ONLY: in-browser demo data (the real app uses a Python/SQLite backend) ----
+const FREQ = {daily:"Daily",alternate:"Alternate days",weekly:"Weekly (choose days)",every15:"Every 15 days",monthly:"Monthly",quarterly:"Quarterly (every 3 months)",once:"Only once",custom:"Custom (every N days/weeks/months)"};
+const pad = n => String(n).padStart(2,"0");
+const isoLocal = d => d.getFullYear()+"-"+pad(d.getMonth()+1)+"-"+pad(d.getDate());
+const dn = s => { const [y,m,d] = s.split("-").map(Number); return Date.UTC(y,m-1,d)/86400000; };
+const dim = (y,m) => new Date(Date.UTC(y,m,0)).getUTCDate();
+function isDue(t, day) {
+  if (day < t.start_date) return false;
+  if (t.end_date && day > t.end_date) return false;
+  const delta = dn(day) - dn(t.start_date);
+  const [y,m,d] = day.split("-").map(Number), [sy,sm,sd] = t.start_date.split("-").map(Number);
+  const wd = (new Date(Date.UTC(y,m-1,d)).getUTCDay()+6)%7;
+  const monthHit = () => d === Math.min(sd, dim(y,m));
+  switch (t.freq_type) {
+    case "once": return delta === 0;
+    case "daily": return true;
+    case "alternate": return delta % 2 === 0;
+    case "every15": return delta % 15 === 0;
+    case "weekly": { const ds = String(t.freq_days||"").split(",").filter(x=>x!=="").map(Number);
+      return (ds.length ? ds : [(new Date(Date.UTC(sy,sm-1,sd)).getUTCDay()+6)%7]).includes(wd); }
+    case "monthly": return monthHit();
+    case "quarterly": return ((y-sy)*12 + (m-sm)) % 3 === 0 && monthHit();
+    case "custom": { const n = Math.max(1, +t.freq_interval||1);
+      if (t.freq_unit === "days") return delta % n === 0;
+      if (t.freq_unit === "weeks") return delta % (7*n) === 0;
+      const mb = (y-sy)*12 + (m-sm); return mb % n === 0 && monthHit(); }
+  }
+  return false;
+}
+const today = isoLocal(new Date());
+let S;
+try { S = JSON.parse(localStorage.getItem("ft_family_v1")||"null"); } catch(e) {}
+if (S && S.settings) S.settings = {digest_enabled:true, digest_time:"07:00", message_lang:"en", digest_last:"", ...S.settings};
+if (S && S.members) S.members.forEach(m => { if (m.phone === undefined) m.phone = ""; });
+if (!S) {
+  const mk = (member_id,title,session,time,must_do,freq_type,extra={}) => ({member_id,title,session,time,must_do,freq_type,freq_interval:1,freq_unit:"days",freq_days:"",start_date:"2026-10-01",end_date:null,active:1,...extra});
+  S = { nextM:5, nextT:1, members:[{id:1,name:"Dad",gender:"Male",age:45,role:"Father"},{id:2,name:"Mom",gender:"Female",age:42,role:"Mother"},{id:3,name:"Rahul",gender:"Male",age:14,role:"Son"},{id:4,name:"Priya",gender:"Female",age:10,role:"Daughter"}], tasks:[].map((t,i)=>({id:i+1,...t})), done:{}, settings:{default_remind_before:15, missed_alerts:true, missed_grace:30, session_times:{morning:"08:00",afternoon:"14:00",evening:"19:00"}, alert_member_ids:null, digest_enabled:true, digest_time:"07:00", message_lang:"en", digest_last:""}, notifs:[], log:{}, snoozes:{}, nextN:1 };
+  S.nextT = S.tasks.length+1;
+}
+const save = () => { try { localStorage.setItem("ft_family_v1", JSON.stringify(S)); } catch(e) {} };
+function dialog(msg, withInput) { return new Promise(res => {
+  const o = document.createElement("div"); o.style.cssText="position:fixed;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;z-index:99;padding:20px";
+  o.innerHTML = `<div style="background:#fff;border-radius:14px;padding:16px;width:100%;max-width:340px;font-family:system-ui"><div style="margin-bottom:10px;font-size:16px">${msg}</div>${withInput?'<input style="width:100%;padding:11px;font-size:16px;border:1px solid #e3e7ee;border-radius:10px">':''}<div style="display:flex;gap:10px;margin-top:14px"><button data-c style="flex:1;padding:12px;border:0;border-radius:10px;background:#e3e7ee;font-size:16px">Cancel</button><button data-o style="flex:1;padding:12px;border:0;border-radius:10px;background:#4f46e5;color:#fff;font-size:16px;font-weight:700">OK</button></div></div>`;
+  document.body.appendChild(o); const inp = o.querySelector("input"); inp && inp.focus();
+  o.querySelector("[data-c]").onclick = () => { o.remove(); res(withInput ? null : false); };
+  o.querySelector("[data-o]").onclick = () => { const v = inp ? inp.value.trim() : true; o.remove(); res(v || (withInput ? null : true)); }; }); }
+const ask = m => dialog(m, true), askYes = m => dialog(m, false);
+
+// ---- achievements (JS twin of app/achievements.py, used only by this preview) ----
+const TIERS = [[90,"🦸","Superhero of the Month",["Capes are optional, completed tasks are not!","Even the to-do list is scared of you.","Is there anything you CAN'T tick off?"]],
+ [75,"🏅","Rockstar",["Tasks tremble when you walk in.","Encore! Encore! One more tick, please.","Almost superhero. Just add a cape."]],
+ [50,"🐢","Steady Turtle",["Slow and steady still wins the race.","Shell on, tasks on. Keep going!","Not fast, but definitely getting there."]],
+ [25,"🦥","Sleepy Sloth",["Zzz... one task at a time, buddy.","The tasks are waiting. Politely. For now.","Even a sloth reaches the tree eventually."]],
+ [0,"🙈","Please Wake Up!",["The tasks are looking for you...","Next month is a brand new chance!","Plot twist: you can still turn this around."]]];
+const WDN = ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"];
+const pyRound = x => { const f = Math.floor(x), d = x - f; return d < .5 ? f : d > .5 ? f+1 : (f % 2 === 0 ? f : f+1); };
+const pctOf = (a, b) => b ? pyRound(100*a/b) : null;
+function dayState(due, done, md, mdone) {
+  if (due === 0) return "none";
+  if ((md > 0 && mdone === md) || (md === 0 && done === due)) return "perfect";
+  const p = done/due; return p >= .7 ? "good" : p >= .4 ? "ok" : done > 0 ? "low" : "zero";
+}
+function monthStats(mem, y, mo, todayStr) {
+  const last = dim(y, mo), first = `${y}-${pad(mo)}-01`, mend = `${y}-${pad(mo)}-${pad(last)}`;
+  const tasks = S.tasks.filter(t => t.member_id === mem.id && t.start_date <= mend && (t.active || t.end_date >= first));
+  const tot = {due:0, done:0, must_due:0, must_done:0, opt_done:0};
+  const sess = {morning:{due:0,done:0}, afternoon:{due:0,done:0}, evening:{due:0,done:0}};
+  const wk = [0,0,0,0,0,0,0], days = []; let perfect = 0, best = 0, cur = 0, prev = null, comeback = false, bestDay = null;
+  for (let n = 1; n <= last; n++) {
+    const ds = `${y}-${pad(mo)}-${pad(n)}`;
+    if (ds > todayStr) { days.push({n, state:"future", done:0, due:0}); continue; }
+    let due = 0, done = 0, md = 0, mdone = 0;
+    tasks.forEach(t => { if (!isDue(t, ds)) return;
+      const yes = (S.done[t.id+"|"+ds] || {}).status === "yes"; due++; sess[t.session].due++; if (t.must_do) md++;
+      if (yes) { done++; sess[t.session].done++; if (t.must_do) mdone++; else tot.opt_done++; } });
+    tot.due += due; tot.done += done; tot.must_due += md; tot.must_done += mdone;
+    const wd = (new Date(Date.UTC(y, mo-1, n)).getUTCDay()+6)%7; wk[wd] += done;
+    const st = dayState(due, done, md, mdone); days.push({n, state:st, done, due});
+    if (due === 0) continue;
+    const pc = done/due;
+    if (st === "perfect") { perfect++; cur++; best = Math.max(best, cur); if (prev !== null && prev < .5) comeback = true; if (bestDay === null || done > bestDay[1]) bestDay = [n, done]; }
+    else if (ds !== todayStr) cur = 0;
+    if (ds !== todayStr || st === "perfect") prev = pc;
+  }
+  const points = 10*tot.must_done + 5*tot.opt_done + 20*perfect, pct = pctOf(tot.done, tot.due), mpct = pctOf(tot.must_done, tot.must_due);
+  const so = {}; for (const k in sess) so[k] = {...sess[k], pct: pctOf(sess[k].done, sess[k].due)};
+  const sp = k => so[k].pct !== null && so[k].due >= 5 && so[k].pct >= 80, mx = Math.max(...wk);
+  const B = [["early","🌅","Early Bird","Finish 80%+ of morning tasks (5+ tasks)",sp("morning")],["owl","🌙","Night Owl","Finish 80%+ of evening tasks (5+ tasks)",sp("evening")],
+    ["fire","🔥","On Fire","7 perfect days in a row",best>=7],["perfect","💯","Perfectionist","10 perfect days in a month",perfect>=10],
+    ["master","🎯","Must-Do Master","90%+ of must-do tasks done",mpct!==null&&mpct>=90],["bonus","🎁","Bonus Hunter","Complete 10 optional tasks",tot.opt_done>=10],
+    ["comeback","🦸","Comeback Kid","A perfect day right after a tough day",comeback]];
+  let title = {emoji:"😴", name:"No tasks yet", line:"Add some tasks and the fun begins!"};
+  if (pct !== null) { const t = TIERS.find(t => pct >= t[0]); title = {emoji:t[1], name:t[2], line:t[3][(mem.id+mo) % t[3].length]}; }
+  return {id:mem.id, name:mem.name, year:y, month:mo, ...tot, pct, must_pct:mpct, points, level:Math.floor(points/150)+1, level_progress:pyRound((points%150)/150*100),
+    perfect_days:perfect, current_streak:cur, best_streak:best, sessions:so, best_weekday: mx > 0 ? WDN[wk.indexOf(mx)] : null, best_day: bestDay ? bestDay[0] : null,
+    title, first_weekday:(new Date(Date.UTC(y, mo-1, 1)).getUTCDay()+6)%7, days, badges:B.map(([id,emoji,name,desc,ok]) => ({id,emoji,name,desc,earned:!!ok}))};
+}
+
+// ---- reminder engine (JS twin of app/reminders.py, used only by this preview) ----
+const CATCHUP = 10, MISSED_H = 3;
+const hmOf = x => { const m = /^(\d{1,2}):(\d{2})/.exec(x || ""); if (!m) return null; const h = +m[1], mi = +m[2]; return h < 24 && mi < 60 ? h*60+mi : null; };
+const stamp = d => `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+function cleanPhone(raw, fail) {
+  let d = (raw||"").replace(/\D/g, ""); if (!d) return "";
+  if (d.length === 11 && d[0] === "0") d = d.replace(/^0+/, "");
+  if (d.length === 10) d = "91" + d;
+  if (d.length < 11 || d.length > 15) fail("Please enter a valid mobile number (10 digits, or with country code)");
+  return d;
+}
+function alertIds() { let ids = S.settings.alert_member_ids; if (ids === null) ids = S.members.filter(m => m.role === "Father" || m.role === "Mother").map(m => m.id); return ids.filter(i => S.members.some(m => m.id === i)); }
+function once(tid, day, kind) { const k = tid+"|"+day+"|"+kind; if (S.log[k]) return false; S.log[k] = 1; return true; }
+function notify(member_id, kind, t, day, title, body, owner, now) { const n = {id:S.nextN++, member_id, kind, task_id:t?t.id:null, day, title, body, owner, created_at:stamp(now), read:0}; S.notifs.push(n); return n; }
+function engineTick(now) {
+  const day = isoLocal(now), st = S.settings, out = [], alerts = alertIds(), t0 = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime(), nowMs = now.getTime();
+  S.tasks.filter(t => t.active || t.end_date >= day).forEach(t => {
+    const status = (S.done[t.id+"|"+day] || {}).status;
+    if (status === "yes" || !isDue(t, day)) return;
+    const owner = S.members.find(m => m.id === t.member_id).name;
+    const dm = hmOf(t.time) ?? hmOf(st.session_times[t.session]) ?? 480, dueMs = t0 + dm*60000, at = pad(Math.floor(dm/60))+":"+pad(dm%60);
+    const rb = (t.remind_before === null || t.remind_before === undefined) ? st.default_remind_before : t.remind_before, lead = rb < 0 ? null : rb, no = status === "no";
+    if (lead !== null && !no && dueMs - lead*60000 <= nowMs && nowMs < dueMs + CATCHUP*60000 && once(t.id, day, "remind")) {
+      const mins = Math.ceil((dueMs - nowMs)/60000);
+      out.push(notify(t.member_id, "remind", t, day, `⏰ ${t.title} at ${at}`, `${owner} · ${t.must_do ? "Must do" : "Optional"} · ${mins > 0 ? "Due in "+mins+" min" : "Due now"}`, owner, now)); }
+    const sn = S.snoozes[t.id+"|"+day];
+    if (sn && !sn.fired && !no && sn.until <= nowMs) { sn.fired = 1; out.push(notify(t.member_id, "snooze", t, day, `⏰ Reminder again: ${t.title}`, `${owner} · due ${at}`, owner, now)); }
+    if (t.must_do && st.missed_alerts) {
+      const missedMs = dueMs + st.missed_grace*60000;
+      if (missedMs <= nowMs && nowMs < missedMs + MISSED_H*3600000) {
+        const targets = alerts.filter(m => m !== t.member_id);
+        if (targets.length && once(t.id, day, "missed")) targets.forEach(m => out.push(notify(m, "missed", t, day, `⚠️ ${owner} hasn't done: ${t.title}`, `Must-do · was due ${at}`, owner, now))); }
+    }
+  });
+  if (st.digest_enabled && st.digest_last !== day && alerts.length) {
+    const dgm = hmOf(st.digest_time) ?? 420, startMs = t0 + dgm*60000;
+    if (startMs <= nowMs && nowMs < startMs + 3*3600000) {
+      st.digest_last = day;
+      alerts.forEach(m => out.push(notify(m, "digest", null, day, "📤 Send today's task lists", "Tap Open to send each person's list on WhatsApp", "", now)));
+    }
+  }
+  if (out.length) save();
+  return out;
+}
+
+// ---- reports (JS twin of app/reports.py build, preview only) ----
+const SESS_ORD = {morning:0, afternoon:1, evening:2};
+function repBuild(ids, start, end) {
+  const rows = [], summary = [];
+  S.members.filter(m => ids === "all" || ids.includes(m.id)).forEach(m => {
+    const sm = {member:m.name, role:m.role||"", due:0, done:0, no:0, none:0, planned:0, open_today:0, must_due:0, must_done:0};
+    for (let n = dn(start); n <= dn(end); n++) {
+      const dd = new Date(n*86400000); const ds = dd.getUTCFullYear()+"-"+pad(dd.getUTCMonth()+1)+"-"+pad(dd.getUTCDate());
+      S.tasks.filter(t => t.member_id === m.id && t.start_date <= end && (t.active || t.end_date >= start)).forEach(t => {
+        if (!isDue(t, ds)) return;
+        const c = S.done[t.id+"|"+ds], st = c && (c.status === "yes" || c.status === "no") ? c.status : null;
+        let key;
+        if (ds > today) { key = "plan"; sm.planned++; }
+        else if (ds === today && !st) { key = "open"; sm.open_today++; }
+        else { key = st || "none"; sm.due++; if (t.must_do) sm.must_due++;
+          if (key === "yes") { sm.done++; if (t.must_do) sm.must_done++; } else if (key === "no") sm.no++; else sm.none++; }
+        rows.push({day:ds, weekday:dd.toLocaleString("en-US",{weekday:"short", timeZone:"UTC"}), member:m.name, session:t.session, time:t.time||"", task:t.title, must:!!t.must_do,
+          repeat:FREQ[t.freq_type].split(" (")[0], status:key, status_label:{yes:"Done",no:"Not done",none:"Not marked",open:"Open today",plan:"Planned"}[key], updated_by:(c&&c.updated_by)||"", note:(c&&c.note)||""});
+      });
+    }
+    sm.pct = sm.due ? Math.round(100*sm.done/sm.due) : null; sm.must_pct = sm.must_due ? Math.round(100*sm.must_done/sm.must_due) : null; summary.push(sm);
+  });
+  rows.sort((a,b) => a.day<b.day?-1:a.day>b.day?1 : a.member<b.member?-1:a.member>b.member?1 : SESS_ORD[a.session]-SESS_ORD[b.session] || (a.time||"99:99").localeCompare(b.time||"99:99") || a.task.toLowerCase().localeCompare(b.task.toLowerCase()));
+  return {start, end, today, summary, rows};
+}
+const realFetch = window.fetch.bind(window);
+window.fetch = async (url, o) => {
+  const u = new URL(url, location.href);
+  if (u.pathname !== "/api/reports") return realFetch(url, o);
+  const q = u.searchParams, kind = q.get("kind"), t = new Date(today+"T00:00:00");
+  const add = (d, n) => { const x = new Date(d); x.setDate(x.getDate()+n); return isoLocal(x); };
+  let s, e;
+  if (kind === "past") { s = add(t,-30); e = add(t,-1); }
+  else if (kind === "current") { s = today.slice(0,8)+"01"; e = today.slice(0,8)+pad(dim(t.getFullYear(), t.getMonth()+1)); }
+  else if (kind === "future") { s = today; e = add(t,30); }
+  else { s = q.get("start"); e = q.get("end"); }
+  const bad = m => new Response(JSON.stringify({detail:m}), {status:400});
+  if (!s || !e) return bad("Please choose both From and To dates");
+  if (e < s) return bad("'To' date must not be before 'From' date");
+  if (dn(e)-dn(s)+1 > 366) return bad("Please choose at most 366 days");
+  const mem = q.get("member"), rep = repBuild(mem === "all" ? "all" : [+mem], s, e);
+  rep.who = mem === "all" ? "Family" : (S.members.find(m => m.id === +mem)||{}).name;
+  return new Response(JSON.stringify(rep), {status:200});
+};
+document.addEventListener("click", async ev => {
+  const a = ev.target.closest && ev.target.closest("a[href^='/api/reports']"); if (!a) return;
+  ev.preventDefault();
+  const fmt = new URL(a.href).searchParams.get("format");
+  if (fmt === "pdf") { toast("PDF is not available in the offline version – use the CSV file or the on-screen report"); return; }
+  const rep = await (await fetch(a.getAttribute("href").replace("format=xlsx","format=json"))).json();
+  const csv = ["Date,Day,Member,Session,Time,Task,Type,Repeat,Status,Updated by,Note"].concat(rep.rows.map(x => [x.day,x.weekday,x.member,x.session,x.time,x.task,x.must?"Must do":"Optional",x.repeat,x.status_label,x.updated_by,x.note].map(v => '"'+String(v).replace(/"/g,'""')+'"').join(","))).join("\n");
+  const l = document.createElement("a"); l.href = URL.createObjectURL(new Blob(["﻿"+csv], {type:"text/csv"})); l.download = "family_tasks_report.csv"; l.click();
+  toast("Saved as a CSV file (opens in Excel)");
+}, true);
+const apiRoot = async (url, opts, quiet) => { try { return await apiInner(url, opts, quiet); } catch (e) { if (quiet) return null; throw e; } };
+async function apiInner(url, opts, quiet) {
+  const u = new URL(url, "http://x"), p = u.pathname, method = (opts && opts.method) || "GET";
+  const body = opts && opts.body ? JSON.parse(opts.body) : {};
+  const fail = m => { if (!quiet) toast(m); throw new Error(m); };
+  let r;
+  if (p === "/api/settings/reminders") {
+    if (method === "PUT") {
+      if (body.session_times) for (const k in body.session_times) if (!["morning","afternoon","evening"].includes(k) || hmOf(body.session_times[k]) === null) fail("Session times must look like 08:00");
+      if ("digest_time" in body && hmOf(body.digest_time) === null) fail("Daily send time must look like 07:00");
+      if ("message_lang" in body && !["en","hi"].includes(body.message_lang)) fail("Please check the form");
+      for (const k of ["default_remind_before","missed_alerts","missed_grace","alert_member_ids","digest_enabled","digest_time","message_lang"]) if (k in body) S.settings[k] = body[k];
+      if (body.session_times) S.settings.session_times = {...S.settings.session_times, ...body.session_times}; save(); }
+    return {...S.settings, auto_alerts: S.settings.alert_member_ids === null, alert_member_ids_resolved: alertIds()}; }
+  if ((r = p.match(/^\/api\/tasks\/(\d+)\/reminder$/)) && method === "PUT") { const t = S.tasks.find(t => t.id === +r[1] && t.active); if (!t) fail("Task not found"); t.remind_before = body.remind_before ?? null; save(); return {ok:true}; }
+  if ((r = p.match(/^\/api\/tasks\/(\d+)\/snooze$/)) && method === "POST") {
+    const t = S.tasks.find(t => t.id === +r[1]), day = body.day || today; if (!t || !isDue(t, day)) fail("Task is not scheduled on that day");
+    const until = Date.now() + (body.minutes || 10)*60000; S.snoozes[t.id+"|"+day] = {until, fired:0}; save(); return {until:stamp(new Date(until))}; }
+  if (p === "/api/feedback" && method === "GET") {
+    S.feedback = S.feedback || [];
+    return {items: S.feedback.slice().sort((a,b) => (a.status==="done") - (b.status==="done") || b.id - a.id).map(f => ({...f, member:(S.members.find(m => m.id === f.member_id)||{}).name || ""}))}; }
+  if (p === "/api/feedback" && method === "POST") {
+    S.feedback = S.feedback || []; const text = (body.text||"").trim(); if (!text) fail("Please write something");
+    const f = {id:(S.feedback.reduce((a,x) => Math.max(a,x.id), 0))+1, member_id: body.member_id ?? null, kind: body.kind||"bug", text, screen: body.screen||"", status:"open", created_at: isoLocal(new Date())+"T"+new Date().toTimeString().slice(0,8)};
+    S.feedback.push(f); save(); return {id:f.id}; }
+  if ((r = p.match(/^\/api\/feedback\/(\d+)$/)) && method === "PUT") { const f = (S.feedback||[]).find(x => x.id === +r[1]); if (!f) fail("Not found"); f.status = body.status; save(); return {ok:true}; }
+  if (p === "/api/notifications" && method === "GET") {
+    engineTick(new Date());          // the real server does this every 30 s on its own
+    const ids = (u.searchParams.get("members") || "").split(",").filter(Boolean).map(Number), after = u.searchParams.get("after"), lim = +(u.searchParams.get("limit") || 30);
+    let rows = S.notifs.filter(n => !ids.length || ids.includes(n.member_id));
+    const unread = rows.filter(n => !n.read).length;
+    rows = after === null ? rows.slice(-lim) : rows.filter(n => n.id > +after).slice(0, lim);
+    return {items: rows, unread, max_id: S.notifs.length ? S.notifs[S.notifs.length-1].id : 0}; }
+  if (p === "/api/notifications/read") { S.notifs.forEach(n => { if (body.ids ? body.ids.includes(n.id) : (!body.members || body.members.includes(n.member_id))) n.read = 1; }); save(); return {ok:true}; }
+  if (p === "/api/auth/status") return {pin_mode:false, has_pin:[], unlocked:[], admin:true, parent_authed:false, parent_pin_set:false};
+  if (p === "/api/push/key") return {enabled:false, key:null};
+  if (p === "/api/reminders/test") { const now = new Date(); const made = body.member_ids.map(id => S.members.find(m => m.id === id)).filter(Boolean).map(m => notify(m.id, "test", null, isoLocal(now), "🔔 Test reminder", "If you can see this, reminders work on this phone.", m.name, now)); save(); return {notified:made.length, pushed:0}; }
+  if (p === "/api/frequencies") return FREQ;
+  if (p === "/api/achievements") {
+    const mm = u.searchParams.get("month") || today.slice(0,7), [yy, mo] = mm.split("-").map(Number);
+    const stats = S.members.map(m => monthStats(m, yy, mo, today));
+    const ranking = stats.filter(x => x.pct !== null).sort((a,b) => b.pct-a.pct || b.points-a.points || a.name.toLowerCase().localeCompare(b.name.toLowerCase())).map(x => x.id);
+    return {month:mm, today, members:stats, ranking}; }
+  if (p === "/api/members" && method === "GET") return S.members;
+  if (p === "/api/members" && method === "POST") {
+    if (S.members.find(m => m.name === body.name.trim())) fail("A member with this name already exists");
+    const m = {id:S.nextM++, name:body.name.trim(), gender:body.gender||"Other", age:body.age ?? null, role:(body.role||"").trim(), phone:cleanPhone(body.phone||"", fail)}; S.members.push(m); save(); return m; }
+  if ((r = p.match(/^\/api\/members\/(\d+)$/))) {
+    const id = +r[1], m = S.members.find(x => x.id === id); if (!m) fail("Member not found");
+    if (method === "PUT") {
+      const nm = body.name.trim();
+      if (S.members.find(x => x.id !== id && x.name === nm)) fail("A member with this name already exists");
+      Object.keys(S.done).forEach(k => { if (S.done[k].updated_by === m.name) S.done[k].updated_by = nm; });
+      Object.assign(m, {name:nm, gender:body.gender||"Other", age:body.age ?? null, role:(body.role||"").trim(), phone: body.phone == null ? (m.phone||"") : cleanPhone(body.phone, fail)}); save(); return m; }
+    if (method === "DELETE") {
+      const ids = S.tasks.filter(t => t.member_id === id).map(t => t.id);
+      S.tasks = S.tasks.filter(t => t.member_id !== id); ids.forEach(i => Object.keys(S.done).forEach(k => { if (k.startsWith(i+"|")) delete S.done[k]; }));
+      S.members = S.members.filter(x => x.id !== id); save(); return {ok:true}; } }
+  if ((r = p.match(/^\/api\/members\/(\d+)\/day$/))) {
+    const id = +r[1], day = u.searchParams.get("day") || today, out = {morning:[],afternoon:[],evening:[]};
+    S.tasks.filter(t => t.member_id===id && (t.active || t.end_date >= day)).forEach(t => {
+      if (isDue(t, day)) { const c = S.done[t.id+"|"+day] || {}; out[t.session].push({...t, must_do:!!t.must_do, status:(c.status && c.status!=="pending")?c.status:null, updated_by:c.updated_by||"", note:c.note||""}); } });
+    for (const k in out) out[k].sort((a,b) => (a.time||"99:99").localeCompare(b.time||"99:99") || (b.must_do-a.must_do));
+    return {member:S.members.find(m=>m.id===id), day, sessions:out}; }
+  if (p === "/api/tasks" && method === "POST") {
+    if (body.end_date && body.end_date < (body.start_date||today)) fail("End date is before start date");
+    const t = {...body, id:S.nextT++, active:1, start_date: body.start_date||today}; t.must_do = body.must_do?1:0; S.tasks.push(t); save(); return {id:t.id}; }
+  if ((r = p.match(/^\/api\/tasks\/(\d+)\/frequency$/)) && method === "PUT") {
+    const old = S.tasks.find(t => t.id === +r[1] && t.active); if (!old) fail("Task not found");
+    const eff = body.effective_from || today, chg = body.change_from || eff;
+    if (!FREQ[body.freq_type]) fail("Unknown frequency");
+    if (chg > eff) fail("change_from must not be after the due date");
+    if (body.end_date && body.end_date < eff) fail("End date is before the due date");
+    const f = {freq_type:body.freq_type, freq_interval:body.freq_interval||1, freq_unit:body.freq_unit||"days", freq_days: body.freq_type==="weekly" ? (body.freq_days||"") : ""};
+    if (chg <= old.start_date) { Object.assign(old, f, {start_date:eff, end_date:body.end_date||null}); save(); return {id:old.id}; }
+    const pd = new Date((dn(chg)-1)*86400000), prev = pd.getUTCFullYear()+"-"+pad(pd.getUTCMonth()+1)+"-"+pad(pd.getUTCDate());
+    const keep = (old.end_date && old.end_date < prev) ? old.end_date : prev;
+    const nt = {...old, ...f, id:S.nextT++, start_date:eff, end_date:body.end_date||null, active:1};
+    old.end_date = keep; S.tasks.push(nt);
+    Object.keys(S.done).forEach(k => { const [tid, d] = k.split("|"); if (+tid === old.id && d >= chg) { S.done[nt.id+"|"+d] = S.done[k]; delete S.done[k]; } });
+    save(); return {id:nt.id}; }
+  if ((r = p.match(/^\/api\/tasks\/(\d+)$/)) && method === "DELETE") {
+    const t = S.tasks.find(t => t.id===+r[1]); if (t) { t.active = 0; t.end_date = today; save(); } return {ok:true}; }
+  if ((r = p.match(/^\/api\/tasks\/(\d+)\/mark$/))) {
+    const t = S.tasks.find(t => t.id===+r[1]), day = body.day || today;
+    if (!t || !isDue(t, day)) fail("Task is not scheduled on that day");
+    const k = t.id+"|"+day, c = S.done[k] || {status:"pending", updated_by:"", note:""};
+    if (body.status != null) c.status = body.status; if (body.updated_by != null) c.updated_by = body.updated_by; if (body.note != null) c.note = body.note.trim();
+    S.done[k] = c; save(); return {ok:true}; }
+  fail("Not found");
+}
+const api = apiRoot;
+</script>
+<script>/* Voice sentence -> task fields.  Works for English, Hindi (Devanagari or typed in English letters),
+   Marathi, Gujarati, Tamil, Telugu, Bengali, Kannada, Punjabi key words.  Pure function, no page access. */
+(function (root) {
+  const N = s => s.normalize("NFC");
+  const LET = "\\p{L}\\p{M}\\p{N}";
+  const re = (alts, flags = "giu") => new RegExp(`(?<![${LET}])(?:${N(alts)})(?![${LET}])`, flags);
+
+  // ---- digits in other scripts -> 0-9 ----
+  const ZEROS = [0x966, 0x9E6, 0xA66, 0xAE6, 0xBE6, 0xC66, 0xCE6];
+  const dig = s => [...s].map(ch => { const c = ch.codePointAt(0); for (const z of ZEROS) if (c >= z && c < z + 10) return String(c - z); return ch; }).join("");
+
+  // ---- number words (time only) ----
+  const NUMW = { one:1, two:2, three:3, four:4, five:5, six:6, seven:7, eight:8, nine:9, ten:10, eleven:11, twelve:12,
+    "एक":1, "दो":2, "तीन":3, "चार":4, "पांच":5, "पाँच":5, "पाच":5, "छह":6, "छः":6, "छ":6, "सात":7, "आठ":8, "नौ":9, "नऊ":9, "दस":10, "दहा":10,
+    "ग्यारह":11, "अकरा":11, "बारह":12, "बारा":12, "दोन":2, "सहा":6,
+    ek:1, do:2, teen:3, char:4, paanch:5, panch:5, chhe:6, chhah:6, saat:7, aath:8, nau:9, das:10, gyarah:11, barah:12 };
+  const numAlt = Object.keys(NUMW).sort((a, b) => b.length - a.length).map(w => N(w)).join("|");
+  const numOf = s => { s = N(s.toLowerCase()); return /^\d+$/.test(s) ? +s : NUMW[s]; };
+  const BAJE = "बजे|baje|bajey|o'?clock|वाजता|વાગ્યે|વાગે|மணிக்கு|மணி|గంటలకు|గంటకు|টায়|টার|ಗಂಟೆಗೆ|ಗಂಟೆ|ਵਜੇ";
+
+  // ---- key words ----
+  const SESS = {
+    morning: "morning|subah|subha|सुबह|सवेरे|सकाळी|सकाळ|સવાર|સવારે|காலை|ఉదయం|সকাল|ಬೆಳಗ್ಗೆ|ਸਵੇਰ|ਸਵੇਰੇ",
+    afternoon: "afternoon|dopahar|दोपहर|दुपारी|दुपार|બપોર|બપોરે|மதியம்|మధ్యాహ్నం|দুপুর|ಮಧ್ಯಾಹ್ನ|ਦੁਪਹਿਰ",
+    evening: "evening|night|shaam|sham|raat|शाम|रात|रात्री|संध्याकाळी|संध्याकाळ|संध्या|સાંજ|સાંજે|રાત|રાત્રે|மாலை|இரவு|సాయంత్రం|రాత్రి|সন্ধ্যা|বিকাল|রাত|ಸಂಜೆ|ರಾತ್ರಿ|ਸ਼ਾਮ|ਰਾਤ",
+  };
+  const FREQ = [
+    ["alternate", "alternate days?|alternate|every other day|har dusre din|हर दूसरे दिन|एक दिन छोड़कर|एक दिन छोड़ के|दर दोन दिवसांनी|एकांतर|એકાંતરે"],
+    ["every15", "fortnightly|every fortnight|पखवाड़ा|पंद्रह दिन|पन्द्रह दिन|पंधरा दिवस|pandrah din"],
+    ["quarterly", "quarterly|every three months|three months|तिमाही|त्रैमासिक|हर तीन महीने|दर तीन महिन्यांनी|teen mahine"],
+    ["monthly", "monthly|every month|once a month|each month|हर महीने|हर माह|मासिक|महीने में एक बार|दर महिन्याला|दरमहा|દર મહિને|ஒவ்வொரு மாதமும்|மாதம்தோறும்|ప్రతి నెల|প্রতি মাসে|ಪ್ರತಿ ತಿಂಗಳು|ਹਰ ਮਹੀਨੇ|har mahine|prati mahine"],
+    ["weekly", "weekly|every week|once a week|each week|हर हफ्ते|हर हफ़्ते|हर सप्ताह|साप्ताहिक|हफ्ते में एक बार|दर आठवड्याला|દર અઠવાડિયે|ஒவ்வொரு வாரமும்|ప్రతి వారం|প্রতি সপ্তাহে|ಪ್ರತಿ ವಾರ|ਹਰ ਹਫ਼ਤੇ|har hafte"],
+    ["daily", "daily|every ?day|everyday|each day|all days|roz|roj|rozana|रोज़|रोज|रोजाना|रोज़ाना|हर दिन|हर रोज़|हर रोज|प्रतिदिन|दैनिक|दररोज|रोजच|દરરોજ|રોજ|தினமும்|தினசரி|ప్రతిరోజు|ప్రతి రోజు|প্রতিদিন|রোজ|ಪ್ರತಿದಿನ|ಪ್ರತಿ ದಿನ|ਰੋਜ਼|ਹਰ ਰੋਜ਼|ਰੋਜ਼ਾਨਾ|har din"],
+  ];
+  const UNIT_DAY = "days?|din|दिन|दिवस|दिवसांनी|દિવસ|நாள்|రోజులు|দিন|ದಿನ|ਦਿਨ";
+  const UNIT_WEEK = "weeks?|hafte|हफ्ते|हफ़्ते|सप्ताह|आठवडे|आठवड्यांनी|અઠવાડિયા|வாரம்|వారాలు|সপ্তাহ|ವಾರ|ਹਫ਼ਤੇ";
+  const UNIT_MONTH = "months?|mahine|महीने|महिने|माह|महिन्यांनी|મહિના|மாதம்|నెలలు|মাস|ತಿಂಗಳು|ਮਹੀਨੇ";
+  const EVERY = "every|each|हर|दर|har|प्रत्येक|ਹਰ|દર|ప్రతి|প্রতি|ಪ್ರತಿ";
+  const WEEKDAYS = [
+    "monday|somvar|somwar|सोमवार|सोम|ਸੋਮਵਾਰ|સોમવાર", "tuesday|mangalvar|mangalwar|मंगलवार|मंगळवार|ਮੰਗਲਵਾਰ|મંગળવાર",
+    "wednesday|budhvar|budhwar|बुधवार|ਬੁੱਧਵਾਰ|બુધવાર", "thursday|guruvar|guruwar|veervar|गुरुवार|बृहस्पतिवार|वीरवार|ਵੀਰਵਾਰ|ગુરુવાર",
+    "friday|shukravar|shukrawar|शुक्रवार|ਸ਼ੁੱਕਰਵਾਰ|શુક્રવાર", "saturday|shanivar|shaniwar|शनिवार|ਸ਼ਨੀਵਾਰ|શનિવાર",
+    "sunday|ravivar|raviwar|itwar|रविवार|इतवार|ਐਤਵਾਰ|રવિવાર",
+  ];
+  const MUST = "must do|must|compulsory|compulsary|mandatory|important|necessary|zaroor|zaroori|jaroori|jarur|जरूरी|ज़रूरी|ज़रूर|जरूर|अनिवार्य|आवश्यक|महत्वपूर्ण|જરૂરી|கட்டாயம்|తప్పనిసరి|ಕಡ್ಡಾಯ|বাধ্যতামূলক|ਜ਼ਰੂਰੀ";
+  const OPT = "optional|if time permits|if possible|if you want|vaikalpik|वैकल्पिक|ऐच्छिक|चाहें तो|चाहे तो|पर्यायी|વૈકલ્પિક|விருப்ப|ఐచ్ఛిక|ಐಚ್ಛಿಕ|ঐচ্ছিক|ਵਿਕਲਪਿਕ|ਚੋਣਵਾਂ";
+  const D0 = "today|aaj|आज|आजच|આજે|இன்று|ఈ రోజు|আজ|ಇಂದು|ਅੱਜ";
+  const D1 = "tomorrow|kal|कल|उद्या|આવતીકાલે|நாளை|రేపు|কাল|ನಾಳೆ|ਕੱਲ੍ਹ|ਕੱਲ";
+  const D2 = "day after tomorrow|parso|परसों|परसो|परवा";
+  const MIN_W = "min(?:ute)?s?|मिनट|मिनिट|મિનિટ|நிமிடம்|నిమిషాలు|মিনিট|ನಿಮಿಷ|ਮਿੰਟ";
+  const HR_W = "hours?|hrs?|घंटा|घंटे|तास|કલાક|மணி நேரம்|గంట|ঘণ্টা|ಗಂಟೆ|ਘੰਟੇ";
+  const BEFORE = "before|early|पहले|आधी|आधीच|પહેલા|முன்|ముందు|আগে|ಮೊದಲು|ਪਹਿਲਾਂ|pehle|pahle";
+  const FILLER = "add|create|new task|task|please|kindly|kripya|कृपया|टास्क|जोड़ो|जोड़ें|जोड़|जोडा|ऐड|add kar(?:o|na)?|jodo|remind me to|remind me|reminder|remind|set|every|each|हर|दर|नया|नई|करवाओ|करो";
+  const EDGE = new Set(("for to at on in the a an by and of with " +
+    "के लिए की का को से में पर और एक तथा साठी ला ची चा आणि मध्ये માટે ને અને ke liye lie liye ko ka ki se par mein me aur").split(" "));
+
+  // ---- Devanagari -> rough Latin, used to match spoken Hindi names with names typed in English ----
+  const C = { "क":"k","ख":"kh","ग":"g","घ":"gh","ङ":"n","च":"ch","छ":"chh","ज":"j","झ":"jh","ञ":"n","ट":"t","ठ":"th","ड":"d","ढ":"dh","ण":"n","त":"t","थ":"th","द":"d","ध":"dh","न":"n","प":"p","फ":"ph","ब":"b","भ":"bh","म":"m","य":"y","र":"r","ल":"l","व":"v","श":"sh","ष":"sh","स":"s","ह":"h","ळ":"l" };
+  const V = { "अ":"a","आ":"aa","इ":"i","ई":"ii","उ":"u","ऊ":"uu","ऋ":"ri","ए":"e","ऐ":"ai","ओ":"o","औ":"au" };
+  const M = { "ा":"aa","ि":"i","ी":"ii","ु":"u","ू":"uu","े":"e","ै":"ai","ो":"o","ौ":"au","ृ":"ri","ॉ":"o","ं":"n","ँ":"n","ः":"h" };
+  function deva2lat(w) {
+    const cs = [...N(w)]; let out = "";
+    for (let i = 0; i < cs.length; i++) {
+      const ch = cs[i];
+      if (C[ch]) {
+        let c = C[ch];
+        if (cs[i + 1] === "़") { c = { "ड": "r", "ढ": "rh", "ज": "z", "फ": "f", "क": "q" }[ch] || c; i++; }
+        const nx = cs[i + 1];
+        if (nx === "्") { out += c; i++; }
+        else if (nx && M[nx]) { out += c; }
+        else out += c + (i === cs.length - 1 ? "" : "a");
+      } else if (V[ch]) out += V[ch];
+      else if (M[ch]) out += M[ch];
+    }
+    return out;
+  }
+  const key = s => s.toLowerCase().replace(/aa|ee|ii/g, m => (m === "ee" || m === "ii" ? "i" : "a")).replace(/oo|uu/g, "u").replace(/w/g, "v").replace(/[^a-z]/g, "");
+  const tokKey = tok => /[ऀ-ॿ]/.test(tok) ? key(deva2lat(tok)) : key(tok);
+
+  const ROLES = [
+    ["father", "dad|daddy|papa|father|पापा|पिताजी|पिता|बाबा|वडील|બાપુ|પપ્પા"],
+    ["mother", "mom|mummy|mommy|mother|mama|मम्मी|मां|माँ|माता|आई|मॉम|मम्मा|अम्मा|મમ્મી|મા"],
+    ["son", "son|beta|बेटा|मुलगा"],
+    ["daughter", "daughter|beti|बेटी|मुलगी"],
+  ];
+
+  const pad = n => String(n).padStart(2, "0");
+  const isoD = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  const addDays = (d, n) => { const x = new Date(d.getFullYear(), d.getMonth(), d.getDate() + n); return x; };
+  const snapRemind = m => [0, 5, 10, 15, 30, 60, 120].reduce((a, b) => Math.abs(b - m) < Math.abs(a - m) ? b : a);
+
+  function parse(raw, members, curId, today) {
+    today = today || new Date();
+    let t = " " + dig(N(String(raw || "")))
+      .replace(/\b([ap])\.\s?m\.?/g, "$1m").replace(/[,;!?।"“”]+/g, " ").replace(/\.(?=\s|$)/g, " ").replace(/'s\b/g, " ") + " ";
+    const out = { member_id: null, title: "", session: null, time: "", must_do: null, freq_type: null, freq_interval: 1, freq_unit: "days",
+      freq_days: "", start_date: null, remind_before: null, assumed: [] };
+    const take = (rx) => { const m = rx.exec(t); rx.lastIndex = 0; if (!m) return null; t = t.slice(0, m.index) + " " + t.slice(m.index + m[0].length); return m; };
+    const hint = k => re(SESS[k]).test(t);
+
+    // reminder: "10 minutes before", "1 hour before"
+    let m = take(new RegExp(`(?<![${LET}])(\\d{1,3})\\s*(${N(MIN_W)})\\s*(?:${N(BEFORE)})(?![${LET}])`, "iu"));
+    if (m) out.remind_before = snapRemind(+m[1]);
+    else if ((m = take(new RegExp(`(?<![${LET}])(\\d{1,2})\\s*(?:${N(HR_W)})\\s*(?:${N(BEFORE)})(?![${LET}])`, "iu")))) out.remind_before = snapRemind(+m[1] * 60);
+
+    // repeat: every N days/weeks/months
+    m = take(new RegExp(`(?<![${LET}])(?:${N(EVERY)})\\s*(\\d{1,3})\\s*(${N(UNIT_DAY)}|${N(UNIT_WEEK)}|${N(UNIT_MONTH)})(?![${LET}])`, "iu"));
+    if (m) {
+      const n = +m[1], u = m[2];
+      const unit = re(UNIT_WEEK).test(u) ? "weeks" : re(UNIT_MONTH).test(u) ? "months" : "days";
+      if (unit === "days" && n === 1) out.freq_type = "daily";
+      else if (unit === "days" && n === 2) out.freq_type = "alternate";
+      else if (unit === "days" && n === 15) out.freq_type = "every15";
+      else if (unit === "months" && n === 1) out.freq_type = "monthly";
+      else if (unit === "months" && n === 3) out.freq_type = "quarterly";
+      else if (unit === "weeks" && n === 1) out.freq_type = "weekly";
+      else { out.freq_type = "custom"; out.freq_interval = Math.max(1, n); out.freq_unit = unit; }
+    }
+    if (!out.freq_type) {
+      m = take(new RegExp(`(?<![${LET}])(\\d{1,2})\\s*(?:${N(UNIT_DAY)})(?![${LET}])`, "iu")); // "15 days" alone
+      if (m && +m[1] === 15) out.freq_type = "every15"; else if (m) { t += ` ${m[0]} `; }
+    }
+    if (!out.freq_type) for (const [k, alts] of FREQ) { if (take(re(alts))) { out.freq_type = k; break; } }
+
+    // weekdays
+    const days = [];
+    if (take(re("weekdays|सोम से शुक्र"))) days.push(0, 1, 2, 3, 4);
+    if (take(re("weekends?|वीकेंड"))) days.push(5, 6);
+    WEEKDAYS.forEach((alts, i) => { while (take(re(alts))) { if (!days.includes(i)) days.push(i); } });
+    if (days.length) { out.freq_days = days.sort().join(","); if (!out.freq_type || out.freq_type === "daily") out.freq_type = "weekly"; }
+
+    // date words
+    if (take(re(D2))) out.start_date = isoD(addDays(today, 2));
+    else if (take(re(D1))) out.start_date = isoD(addDays(today, 1));
+    else if (take(re(D0))) out.start_date = isoD(today);
+
+    // time
+    const sessHint = hint("morning") ? "morning" : hint("afternoon") ? "afternoon" : hint("evening") ? "evening" : null;
+    let h = null, mi = 0, mer = null;
+    if ((m = take(new RegExp(`(?<![${LET}])(डेढ़|डेढ|dedh)(?![${LET}])\\s*(?:${BAJE})?`, "iu")))) { h = 1; mi = 30; }
+    else if ((m = take(new RegExp(`(?<![${LET}])(ढाई|dhai|adhai)(?![${LET}])\\s*(?:${BAJE})?`, "iu")))) { h = 2; mi = 30; }
+    else if ((m = take(new RegExp(`(?<![${LET}])(सवा|sawa|savva|पौने|पौन|paune|साढ़े|साढे|साडे|sadhe|sade|half past|quarter past|quarter to)\\s+(\\d{1,2}|${numAlt})(?![${LET}])\\s*(?:${BAJE})?`, "iu")))) {
+      const w = N(m[1].toLowerCase()), n = numOf(m[2]);
+      if (/^(सवा|sawa|savva|quarter past)$/.test(w)) { h = n; mi = 15; }
+      else if (/^(पौने|पौन|paune|quarter to)$/.test(w)) { h = n - 1 || 12; mi = 45; }
+      else { h = n; mi = 30; }
+    } else if ((m = take(new RegExp(`(?<![${LET}])(\\d{1,2})\\s*[:.]\\s*(\\d{2})\\s*(am|pm)?(?![${LET}])`, "iu")))) {
+      h = +m[1]; mi = +m[2]; mer = m[3] ? m[3].toLowerCase() : null;
+    } else if ((m = take(new RegExp(`(?<![${LET}])(\\d{1,2}|${numAlt})\\s*(am|pm|${N(BAJE)})(?![${LET}])`, "iu")))) {
+      h = numOf(m[1]); const tok = m[2].toLowerCase(); mer = tok === "am" || tok === "pm" ? tok : null;
+    } else if ((m = take(new RegExp(`(?<![${LET}])at\\s+(\\d{1,2})(?![\\d:${LET}])`, "iu")))) { h = +m[1]; }
+    if (h != null && h <= 24 && mi < 60) {
+      if (mer === "pm") h = h < 12 ? h + 12 : h;
+      else if (mer === "am") h = h === 12 ? 0 : h;
+      else if (h >= 1 && h <= 12) {
+        if (sessHint === "morning") h = h;
+        else if (sessHint === "afternoon") h = h <= 6 ? h + 12 : h;
+        else if (sessHint === "evening") h = h < 12 ? h + 12 : h;
+        else h = (h <= 4 || h === 12) ? (h === 12 ? 12 : h + 12) : h;
+      }
+      if (h === 24) h = 0;
+      out.time = `${pad(h)}:${pad(mi)}`;
+    }
+
+    // session
+    for (const k of ["morning", "afternoon", "evening"]) if (take(re(SESS[k]))) { if (!out.session) out.session = k; while (take(re(SESS[k]))); }
+    if (!out.session) {
+      if (out.time) { const hh = +out.time.slice(0, 2); out.session = hh < 12 ? "morning" : hh < 17 ? "afternoon" : "evening"; }
+      else { out.session = "morning"; out.assumed.push("session"); }
+    }
+
+    // importance
+    if (take(re(OPT))) out.must_do = false;
+    else if (take(re(MUST))) out.must_do = true;
+    else { out.must_do = true; out.assumed.push("importance"); }
+
+    // repeat default
+    if (!out.freq_type) {
+      if (out.start_date) out.freq_type = "once"; else { out.freq_type = "daily"; }
+      out.assumed.push("repeat");
+    }
+    if (out.freq_type === "weekly" && !out.freq_days) {
+      const d0 = out.start_date ? new Date(out.start_date + "T00:00:00") : today;
+      out.freq_days = String((d0.getDay() + 6) % 7);
+    }
+    if (!out.start_date) out.start_date = isoD(today);
+
+    // member: names, then roles (Hindi names are matched by sound)
+    const toks = t.split(/\s+/).filter(Boolean);
+    let hit = -1;
+    for (const mem of members || []) {
+      const k = key(mem.name || "");
+      if (!k) continue;
+      const i = toks.findIndex(x => tokKey(x) === k);
+      if (i >= 0) { out.member_id = mem.id; hit = i; break; }
+    }
+    if (out.member_id == null) {
+      for (const [role, alts] of ROLES) {
+        const rx = re(alts);
+        const mm = (members || []).find(x => (x.role || "").toLowerCase().includes(role) || re(alts).test((x.name || "").toLowerCase()));
+        const i = toks.findIndex(x => { rx.lastIndex = 0; return rx.test(x) && !/^(a|ma)$/.test(x); });
+        if (mm && i >= 0) { out.member_id = mm.id; hit = i; break; }
+      }
+    }
+    if (hit >= 0) toks.splice(hit, 1);
+    if (out.member_id == null) { out.member_id = curId ?? null; out.assumed.push("member"); }
+
+    // title: what is left
+    t = " " + toks.join(" ") + " ";
+    t = t.replace(re(FILLER), " ");
+    let words = t.split(/\s+/).filter(Boolean);
+    const isEdge = w => EDGE.has(N(w.toLowerCase()));
+    while (words.length && isEdge(words[0])) words.shift();
+    while (words.length && isEdge(words[words.length - 1])) words.pop();
+    let title = words.join(" ").replace(/\s+/g, " ").trim();
+    if (/^[a-z]/.test(title)) title = title[0].toUpperCase() + title.slice(1);
+    out.title = title.slice(0, 120);
+    return out;
+  }
+
+  const api = { parse, deva2lat, key };
+  if (typeof module !== "undefined" && module.exports) module.exports = api; else root.VoiceParser = api;
+})(typeof window !== "undefined" ? window : globalThis);
+</script>
+<script>/* WhatsApp message text for a member's day (also a whole-family version). Pure functions, no page access. */
+(function (root) {
+  const EN = { days: ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"], months: ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"],
+    sess: { morning: "🌅 Morning", afternoon: "☀️ Afternoon", evening: "🌙 Evening" },
+    hi: n => `Hi ${n}! 👋`, head: (d, rel) => `Your tasks for ${rel || d}:`, optional: "optional", none: "No tasks scheduled 🎉",
+    legend: "⭐ must do · • optional · ✅ done · ❌ not done", foot: "Please reply YES when each one is done ✅",
+    fam: d => `👨‍👩‍👧 Family plan for ${d}`, today: "today", tomorrow: "tomorrow" };
+  const HI = { days: ["रविवार","सोमवार","मंगलवार","बुधवार","गुरुवार","शुक्रवार","शनिवार"],
+    months: ["जनवरी","फ़रवरी","मार्च","अप्रैल","मई","जून","जुलाई","अगस्त","सितंबर","अक्टूबर","नवंबर","दिसंबर"],
+    sess: { morning: "🌅 सुबह", afternoon: "☀️ दोपहर", evening: "🌙 शाम" },
+    hi: n => `नमस्ते ${n}! 🙏`, head: (d, rel) => `${rel ? rel + " (" + d + ")" : d} के आपके काम:`, optional: "वैकल्पिक", none: "आज कोई काम नहीं 🎉",
+    legend: "⭐ ज़रूरी · • वैकल्पिक · ✅ हो गया · ❌ नहीं हुआ", foot: "हर काम पूरा होने पर बताएँ ✅",
+    fam: d => `👨‍👩‍👧 परिवार की योजना – ${d}`, today: "आज", tomorrow: "कल" };
+
+  const parse = s => { const [y, m, d] = s.split("-").map(Number); return new Date(y, m - 1, d); };
+  const iso = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  function dateLabel(dayStr, lang) {
+    const L = lang === "hi" ? HI : EN, d = parse(dayStr);
+    return lang === "hi" ? `${L.days[d.getDay()]} ${d.getDate()} ${L.months[d.getMonth()]}` : `${L.days[d.getDay()]} ${d.getDate()} ${L.months[d.getMonth()]} ${d.getFullYear()}`;
+  }
+  function relWord(dayStr, todayStr, lang) {
+    const L = lang === "hi" ? HI : EN, t = parse(todayStr), d = parse(dayStr);
+    const diff = Math.round((d - t) / 86400000);
+    return diff === 0 ? L.today : diff === 1 ? L.tomorrow : "";
+  }
+  const mark = x => x.status === "yes" ? "✅" : x.status === "no" ? "❌" : x.must_do ? "⭐" : "•";
+  function lines(sessions, L) {
+    const out = [];
+    for (const s of ["morning", "afternoon", "evening"]) {
+      const list = (sessions && sessions[s]) || [];
+      if (!list.length) continue;
+      out.push(L.sess[s]);
+      for (const x of list) out.push(`${mark(x)} ${x.time ? x.time + " " : ""}${x.title}${x.must_do ? "" : ` (${L.optional})`}`);
+      out.push("");
+    }
+    return out;
+  }
+  function personMessage(member, dayData, lang, todayStr) {
+    const L = lang === "hi" ? HI : EN, ls = lines(dayData.sessions, L);
+    const rel = relWord(dayData.day, todayStr || dayData.day, lang);
+    const head = [L.hi(member.name), L.head(dateLabel(dayData.day, lang), rel), ""];
+    if (!ls.length) return head.concat([L.none]).join("\n").trim();
+    return head.concat(ls, [L.legend, L.foot]).join("\n").trim();
+  }
+  function familyMessage(entries, day, lang) {      // entries: [{member, sessions}]
+    const L = lang === "hi" ? HI : EN, out = [L.fam(dateLabel(day, lang)), ""];
+    for (const e of entries) {
+      out.push(`👤 ${e.member.name}`);
+      const ls = lines(e.sessions, L);
+      out.push(...(ls.length ? ls : [L.none, ""]));
+    }
+    out.push(L.legend);
+    return out.join("\n").trim();
+  }
+  function waLink(phone, text) {
+    const digits = String(phone || "").replace(/\D/g, "");
+    return `https://wa.me/${digits}?text=${encodeURIComponent(text)}`;
+  }
+  const api = { personMessage, familyMessage, waLink, dateLabel, relWord, iso };
+  if (typeof module !== "undefined" && module.exports) module.exports = api; else root.WaMsg = api;
+})(typeof window !== "undefined" ? window : globalThis);
+</script>
+<script>
+const $ = s => document.querySelector(s);
+const SESSIONS = [["morning","🌅 Morning"],["afternoon","☀️ Afternoon"],["evening","🌙 Evening"]];
+const DAYN = ["M","T","W","T","F","S","S"];
+let taskMap = {}, members = [], current = null, day = new Date();
+const iso = d => new Date(d.getTime() - d.getTimezoneOffset()*60000).toISOString().slice(0,10);
+async function api_unused(url, opts, quiet) {
+  let r;
+  try { r = await fetchAuth(url, opts && {headers:{"Content-Type":"application/json"}, ...opts}); }
+  catch (e) { if (quiet) return null; throw e; }
+  if (!r.ok) {
+    if (quiet) return null;
+    let m = "Error"; try { m = (await r.json()).detail; } catch(e){}
+    toast(typeof m === "string" ? m : "Please check the form"); throw new Error(m);
+  }
+  return r.json();
+}
+const avatar = m => { const a = m.age, g = m.gender;
+  if (a == null || g === "Other") return a != null && a < 13 ? "🧒" : a != null && a >= 60 ? "🧓" : "🧑";
+  return a < 13 ? (g === "Male" ? "👦" : "👧") : a >= 60 ? (g === "Male" ? "👴" : "👵") : (g === "Male" ? "👨" : "👩"); };
+async function loadMembers() {
+  await loadAuth();
+  members = await api("/api/members");
+  if (!members.length) current = "fam";                      // brand-new install: start on the Family tab
+  else if (!current || (typeof current === "number" && !members.find(m => m.id === current))) current = members[0].id;
+  const tab = (id, label, cls = "") => `<button class="tab ${cls} ${current===id?'active':''}" data-id="${id}">${label}</button>`;
+  $("#tabs").innerHTML = tab("fam", "👨‍👩‍👧 Family", "special") + members.map(m => tab(m.id, `${isLocked(m.id) ? "🔒" : avatar(m)} ${esc(m.name)}`)).join("") + tab("ach", "🏆 Achievements", "special") + tab("rep", "📄 Reports", "special");
+  document.querySelectorAll(".tab").forEach(b => b.onclick = async () => { const v = b.dataset.id; if (!(await ensureTab(v))) return; current = (v === "fam" || v === "ach" || v === "rep") ? v : +v; loadMembers(); });
+  const act = document.querySelector(".tab.active"); if (act) act.scrollIntoView({inline:"center", block:"nearest"});
+  if (!lastWho && members.length) lastWho = members[0].name;
+  refresh();
+}
+function toast(msg) { const e = document.createElement("div"); e.textContent = msg;
+  e.style.cssText = "position:fixed;left:50%;top:70px;transform:translateX(-50%);background:#1d2430;color:#fff;padding:10px 16px;border-radius:10px;z-index:99;font:15px system-ui;max-width:85vw";
+  document.body.appendChild(e); setTimeout(() => e.remove(), 2400); }
+function esc(s){ return String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
+async function render() {
+  $("#dateLabel").textContent = (iso(day)===iso(new Date())?"Today · ":"") + day.toDateString();
+  const data = await api(`/api/members/${current}/day?day=${iso(day)}`);
+  taskMap = {}; SESSIONS.forEach(([k]) => data.sessions[k].forEach(t => taskMap[t.id] = t));
+  $("#content").innerHTML = SESSIONS.map(([k,label]) => {
+    const list = data.sessions[k];
+    return `<div class="session"><h2>${label}</h2>` + (list.length ? list.map(t => card(t)).join("") : `<div class="empty">Nothing scheduled</div>`) + `</div>`;
+  }).join("");
+}
+function card(t) {
+  const cls = t.status==="yes" ? "done" : t.status==="no" ? "skipped" : "";
+  const who = t.updated_by || lastWho;
+  const opts = members.map(m => `<option ${m.name===who?'selected':''}>${esc(m.name)}</option>`).join("");
+  return `<div class="task ${cls} ${t.must_do?'m':'o'}" data-id="${t.id}"><div class="line">
+    <div class="tt" onclick="this.closest('.task').querySelector('.info').classList.toggle('hidden')"><span class="tn">${esc(t.title)}</span>${t.time?`<i>⏰ ${t.time}</i>`:''}</div>
+    <select class="fq" title="Repeat" onchange="setFreq(${t.id},this)">${Object.entries(FQ).map(([k,v]) => `<option value="${k}" ${k===t.freq_type?'selected':''}>${v}</option>`).join("")}</select>
+    <button class="yn yes ${t.status==='yes'?'on':''}" onclick="mark(${t.id},'yes',this)">✔</button>
+    <button class="yn no ${t.status==='no'?'on':''}" onclick="mark(${t.id},'no',this)">✘</button>
+    <select class="who" title="Updated by" onchange="setWho(${t.id},this)">${opts}</select>
+    <input class="nt" placeholder="Note" maxlength="200" value="${esc(t.note)}" onchange="send(${t.id},{note:this.value})"></div>
+    <div class="info hidden">${t.must_do?'Must do':'Optional'} · ${freqText(t)}${t.updated_by?' · updated by '+esc(t.updated_by):''}
+    <div style="margin-top:4px">🔔 Remind: <select class="rm" onchange="setRemind(${t.id},this.value)">${RMD.map(([v,l]) => `<option value="${v}" ${(t.remind_before==null?"":String(t.remind_before))===v?'selected':''}>${l}</option>`).join("")}</select></div>
+    <button class="lnk" onclick="openSchedule(${t.id})">✏️ Edit schedule</button>
+    <button class="del" style="color:#d64545;font-size:13px" onclick="removeTask(${t.id},'${esc(t.title).replace(/'/g,"")}')">🗑 Remove task</button></div></div>`;
+}
+function freqText(t) {
+  const m = {once:"Once",daily:"Daily",alternate:"Alternate days",every15:"Every 15 days",monthly:"Monthly",quarterly:"Quarterly"};
+  if (t.freq_type==="weekly") return "Weekly: " + (t.freq_days||"").split(",").filter(x=>x!=="").map(i=>["Mon","Tue","Wed","Thu","Fri","Sat","Sun"][i]).join(", ");
+  if (t.freq_type==="custom") return `Every ${t.freq_interval} ${t.freq_unit}`;
+  return (m[t.freq_type] || t.freq_type) + " · from " + t.start_date;
+}
+let lastWho = ""; try { lastWho = localStorage.getItem("ft_who") || ""; } catch(e) {}
+let queue = Promise.resolve();
+function send(id, fields) { queue = queue.then(() => api(`/api/tasks/${id}/mark`, {method:"POST", body:JSON.stringify({day:iso(day), ...fields})})).catch(()=>{}); return queue; }
+function setWho(id, sel) { lastWho = sel.value; try { localStorage.setItem("ft_who", lastWho); } catch(e) {} send(id, {updated_by: sel.value}); }
+async function mark(id, status, btn) {
+  const row = btn.closest(".task");
+  const again = btn.classList.contains("on");          // tapping the active answer again clears it
+  await send(id, {status: again ? "pending" : status,
+                  updated_by: row.querySelector(".who").value, note: row.querySelector(".nt").value});
+  render();
+}
+async function removeTask(id, title) {
+  if (!await askYes(`Remove "${title}"? Past history is kept in reports.`)) return;
+  await api(`/api/tasks/${id}`, {method:"DELETE"}); render();
+}
+$("#prev").onclick = () => { day.setDate(day.getDate()-1); render(); };
+$("#next").onclick = () => { day.setDate(day.getDate()+1); render(); };
+$("#dateLabel").onclick = () => { day = new Date(); render(); };
+// ---- add-task sheet ----
+function seg(id, cb) { document.querySelectorAll(`#${id} button`).forEach(b => b.onclick = () => {
+  document.querySelectorAll(`#${id} button`).forEach(x => x.classList.remove("sel")); b.classList.add("sel"); cb && cb(b.dataset.v); }); }
+seg("fSession"); seg("fMust");
+const val = id => document.querySelector(`#${id} .sel`).dataset.v;
+$("#fDays").innerHTML = DAYN.map((d,i) => `<button data-i="${i}">${d}</button>`).join("");
+document.querySelectorAll("#fDays button").forEach(b => b.onclick = () => b.classList.toggle("sel"));
+(async () => {
+  const f = await api("/api/frequencies");
+  $("#fFreq").innerHTML = Object.entries(f).map(([k,v]) => `<option value="${k}" ${k==='daily'?'selected':''}>${v}</option>`).join("");
+})();
+$("#fFreq").onchange = () => { const v = $("#fFreq").value;
+  $("#weeklyBox").classList.toggle("hidden", v!=="weekly"); $("#customBox").classList.toggle("hidden", v!=="custom"); };
+$("#addTaskBtn").onclick = () => { $("#fStart").value = iso(day); $("#taskSheet").classList.add("open"); };
+$("#cancelTask").onclick = () => $("#taskSheet").classList.remove("open");
+$("#saveTask").onclick = async () => {
+  const title = $("#fTitle").value.trim(); if (!title) return toast("Please type the task");
+  const days = [...document.querySelectorAll("#fDays .sel")].map(b => b.dataset.i).join(",");
+  await api("/api/tasks", {method:"POST", body:JSON.stringify({
+    member_id: current, title, session: val("fSession"), time: $("#fTime").value, must_do: val("fMust")==="1",
+    freq_type: $("#fFreq").value, freq_interval: +$("#fInterval").value || 1, freq_unit: $("#fUnit").value,
+    freq_days: days, start_date: $("#fStart").value || iso(day), end_date: $("#fEnd").value || null,
+    remind_before: $("#fRemind").value === "" ? null : +$("#fRemind").value })});
+  $("#taskSheet").classList.remove("open"); $("#fTitle").value = ""; $("#fTime").value = ""; $("#fEnd").value = ""; render();
+};
+
+// ---------- PINs, import, backup ----------
+let AUTH = {pin_mode:false, has_pin:[], unlocked:[], admin:true, parent_authed:false, parent_pin_set:false};
+function getTokens() { try { return JSON.parse(localStorage.getItem("ft_tokens") || "{}"); } catch(e) { return {}; } }
+function setTokens(t) { try { localStorage.setItem("ft_tokens", JSON.stringify(t)); } catch(e) {} }
+function tokenHeader() { return Object.values(getTokens()).join(","); }
+async function fetchAuth(url, opts = {}) {
+  let r;
+  for (let attempt = 0; attempt < 2; attempt++) {
+    r = await fetch(url, {...opts, headers: {...(opts.headers || {}), "X-Tokens": tokenHeader()}});
+    const lk = r.status === 403 && r.headers.get("X-Locked");
+    if (lk && attempt === 0 && await askLocked(lk)) continue;
+    break;
+  }
+  return r;
+}
+const isParentRole = m => /father|mother/i.test(m.role || "");
+const isLocked = id => AUTH.has_pin.includes(id) && !AUTH.unlocked.includes(id) && !AUTH.parent_authed;
+async function loadAuth() {
+  const a = await api("/api/auth/status", undefined, true); if (a) AUTH = a;
+  const t = getTokens(); let changed = false;
+  Object.keys(t).forEach(k => { if (!AUTH.unlocked.includes(+k)) { delete t[k]; changed = true; } });
+  if (changed) setTokens(t);
+  $("#lockBtn").classList.toggle("hidden", !(AUTH.pin_mode && Object.keys(t).length));
+}
+async function lockPhone() {
+  try { await fetch("/api/auth/logout", {method:"POST", headers:{"X-Tokens": tokenHeader()}}); } catch(e) {}
+  setTokens({}); await loadAuth(); toast("🔒 Locked");
+  const open = members.find(m => !isLocked(m.id)) || members[0]; if (open) current = open.id;      // never stay on a screen that now needs a PIN
+  await loadMembers();
+}
+$("#lockBtn").onclick = lockPhone;
+
+let pnState = null, pnBusy = null;
+function pinAsk({title, cands, mode}) {
+  if (pnBusy) return pnBusy;
+  pnBusy = new Promise(resolve => {
+    pnState = {resolve, mode, cands: cands || [], who: (cands || [])[0] ?? null, buf: "", step: 0, first: "", title};
+    $("#pinSheet").classList.add("open"); pnDraw();
+  }).finally(() => { pnBusy = null; pnState = null; $("#pinSheet").classList.remove("open"); });
+  return pnBusy;
+}
+function pnDraw() {
+  const st = pnState; if (!st) return;
+  $("#pnTitle").textContent = st.mode === "new" ? (st.step ? "Type the PIN again" : st.title) : st.title;
+  $("#pnWho").innerHTML = st.mode === "login" && st.cands.length > 1 ? st.cands.map(id => { const m = members.find(x => x.id === id); return `<button class="chip ${id === st.who ? "sel" : ""}" data-id="${id}">${m ? avatar(m) + " " + esc(m.name) : id}</button>`; }).join("") : "";
+  $("#pnWho").querySelectorAll(".chip").forEach(b => b.onclick = () => { st.who = +b.dataset.id; st.buf = ""; $("#pnMsg").textContent = ""; pnDraw(); });
+  $("#pnDots").textContent = "●".repeat(st.buf.length) + "○".repeat(Math.max(0, 4 - st.buf.length));
+  $("#pnPad").innerHTML = [1,2,3,4,5,6,7,8,9,"⌫",0,"✓"].map(k => `<button data-k="${k}" class="${k === "✓" ? "ok" : ""}">${k}</button>`).join("");
+  $("#pnPad").querySelectorAll("button").forEach(b => b.onclick = () => pnKey(b.dataset.k));
+}
+async function pnKey(k) {
+  const st = pnState; if (!st) return;
+  if (k === "⌫") st.buf = st.buf.slice(0, -1);
+  else if (k === "✓") return pnSubmit();
+  else if (st.buf.length < 6) st.buf += k;
+  $("#pnMsg").textContent = ""; pnDraw();
+}
+async function pnSubmit() {
+  const st = pnState; if (!st || st.buf.length < 4) { $("#pnMsg").textContent = "A PIN has 4 to 6 digits"; return; }
+  if (st.mode === "new") {
+    if (!st.step) { st.first = st.buf; st.buf = ""; st.step = 1; pnDraw(); return; }
+    if (st.buf !== st.first) { st.buf = ""; st.step = 0; st.first = ""; $("#pnMsg").textContent = "The two PINs were not the same. Start again."; pnDraw(); return; }
+    return st.resolve(st.buf);
+  }
+  const r = await fetch("/api/auth/login", {method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({member_id: st.who, pin: st.buf})});
+  if (r.ok) { const j = await r.json(); const t = getTokens(); t[j.member_id] = j.token; setTokens(t); await loadAuth(); return st.resolve(true); }
+  let m = "Wrong PIN"; try { m = (await r.json()).detail; } catch(e) {}
+  st.buf = ""; $("#pnMsg").textContent = m; pnDraw();
+}
+$("#pnCancel").onclick = () => pnState && pnState.resolve(mode_cancel());
+const mode_cancel = () => pnState && pnState.mode === "new" ? null : false;
+document.addEventListener("keydown", e => { if (!pnState) return; if (/^\d$/.test(e.key)) pnKey(e.key); else if (e.key === "Backspace") pnKey("⌫"); else if (e.key === "Enter") pnKey("✓"); });
+
+async function askLocked(kind) {
+  const withPin = AUTH.has_pin, parents = members.filter(m => withPin.includes(m.id) && isParentRole(m)).map(m => m.id);
+  let cands, title;
+  if (kind.startsWith("member:")) { const id = +kind.slice(7), m = members.find(x => x.id === id); cands = [id, ...parents.filter(p => p !== id)]; title = `🔒 ${m ? m.name : "This tab"} is locked`; }
+  else if (kind === "admin") { cands = parents; title = "🔒 Parents only"; }
+  else { cands = withPin; title = "🔒 Enter your PIN"; }
+  if (!cands.length) return false;
+  return !!(await pinAsk({title, cands, mode: "login"}));
+}
+async function ensureTab(v) {
+  if (v === "fam") return AUTH.admin || askLocked("admin");
+  if (v === "ach" || v === "rep") return !AUTH.pin_mode || AUTH.unlocked.length || askLocked("any");
+  return !isLocked(+v) || askLocked("member:" + v);
+}
+function lockedView() {
+  [".datebar", ".legend", "#addTaskBtn", "#micBtn"].forEach(q => document.querySelector(q).classList.add("hidden"));
+  const m = members.find(x => x.id === current);
+  $("#content").innerHTML = `<div class="empty" style="padding:40px 10px">🔒 ${esc(m ? m.name : "")} is locked<br><br><button class="rmbtn" id="unl">Enter PIN</button></div>`;
+  $("#unl").onclick = async () => { if (await askLocked("member:" + current)) loadMembers(); };
+}
+async function downloadAuth(url) {
+  const r = await fetchAuth(url); if (!r.ok) { let m = "Download failed"; try { m = (await r.json()).detail; } catch(e) {} toast(m); return; }
+  const cd = r.headers.get("Content-Disposition") || "", name = (/filename="?([^";]+)"?/.exec(cd) || [])[1] || "download";
+  const a = document.createElement("a"); a.href = URL.createObjectURL(await r.blob()); a.download = name; document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1500);
+}
+document.addEventListener("click", e => { const a = e.target.closest && e.target.closest("a[data-dl]"); if (!a) return; e.preventDefault(); downloadAuth(a.getAttribute("href")); });
+
+// --- Family tab cards: PINs, import, backup ---
+function fillPinCard() { { const c = document.getElementById("pinCard"); if (c) c.innerHTML = "<h3>🔒 PIN lock</h3><div style='font-size:13px;color:#888;margin-top:6px'>Not in the offline version (it needs a server).</div>"; return; }
+  const box = $("#pinCard"); if (!box) return;
+  box.innerHTML = `<h3>🔐 PINs</h3><div class="hint" style="font-size:12px;color:#666">A PIN keeps a person's tab private. Parents' PINs open every tab and the family settings. Set the parents' PINs first. Forgot a PIN? A parent can set a new one here.</div>`
+    + members.map(m => `<div class="lockrow"><span>${avatar(m)} <b>${esc(m.name)}</b> <span style="color:#888">${m.has_pin ? "PIN set" : "no PIN"}</span></span><span>
+        <button data-a="set" data-id="${m.id}">${m.has_pin ? "Change" : "Set PIN"}</button>${m.has_pin ? ` <button data-a="del" data-id="${m.id}">Remove</button>` : ""}</span></div>`).join("");
+  box.querySelectorAll("button[data-a]").forEach(b => b.onclick = async () => {
+    const m = members.find(x => x.id === +b.dataset.id);
+    if (b.dataset.a === "del") { if (!await askYes(`Remove ${m.name}'s PIN?`)) return; await api(`/api/members/${m.id}/pin`, {method:"PUT", body: JSON.stringify({pin: null})}); toast("PIN removed"); }
+    else {
+      const pin = await pinAsk({title: `New PIN for ${m.name}`, mode: "new"}); if (!pin) return;
+      await api(`/api/members/${m.id}/pin`, {method:"PUT", body: JSON.stringify({pin})});
+      const r = await fetch("/api/auth/login", {method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({member_id: m.id, pin})});
+      if (r.ok) { const j = await r.json(); const t = getTokens(); t[m.id] = j.token; setTokens(t); }      // the phone that sets a PIN is signed in with it
+      toast("PIN saved ✔");
+    }
+    await loadMembers();
+  });
+}
+let impFile = null;
+function fillImportCard() { { const c = document.getElementById("impCard"); if (c) c.innerHTML = "<h3>📥 Import tasks</h3><div style='font-size:13px;color:#888;margin-top:6px'>Not in the offline version (it needs a server).</div>"; return; }
+  const box = $("#impCard"); if (!box) return;
+  box.innerHTML = `<h3>📥 Import my existing tasks</h3><div class="hint" style="font-size:12px;color:#666">1. Download the Excel template and fill it in (see its Help sheet). 2. Choose the file. 3. Check the preview, then import. Rows with a problem are skipped and explained; nothing is half-added.</div>
+    <div style="display:flex;gap:8px;margin-top:8px"><a class="rmbtn" data-dl href="/api/import/template" style="flex:1;text-align:center;text-decoration:none;margin:0">⬇ Template</a>
+    <label class="rmbtn" style="flex:1;text-align:center;margin:0">📂 Choose file<input type="file" id="impIn" accept=".xlsx,.csv" style="display:none"></label></div><div id="impOut"></div>`;
+  $("#impIn").onchange = async e => { impFile = e.target.files[0]; if (impFile) impPreview(); };
+}
+async function impSend(url) {
+  const fd = new FormData(); fd.append("file", impFile);
+  return fetchAuth(url, {method:"POST", body: fd});
+}
+async function impPreview() {
+  const out = $("#impOut"); out.innerHTML = `<div class="empty">Checking…</div>`;
+  const r = await impSend("/api/import/preview"); let j = null; try { j = await r.json(); } catch(e) {}
+  if (!r.ok) { out.innerHTML = `<div class="empty" style="color:#dc2626">${esc((j && j.detail) || "Could not read the file")}</div>`; return; }
+  const c = j.counts, bad = j.rows.filter(x => x.status !== "ok"), good = j.rows.filter(x => x.status === "ok");
+  const row = x => `<tr><td>${x.line}</td><td>${esc(x.member)}</td><td>${esc(x.title)}</td><td>${x.status === "ok" ? `${esc(x.session)} ${esc(x.time || "")} · ${esc(x.repeat)}` : ""}</td><td>${x.status === "ok" ? "✅" : x.status === "duplicate" ? "⏭" : "❌"} ${esc(x.message)}</td></tr>`;
+  out.innerHTML = `<div style="margin-top:8px;font-size:14px"><b>${c.ok}</b> ready · <b style="color:#dc2626">${c.error}</b> with problems · <b>${c.duplicate}</b> already there${c.new_members ? ` · <b>${c.new_members}</b> new people` : ""}</div>
+    ${j.member_errors.length ? `<div style="color:#dc2626;font-size:12px">Members sheet: ${j.member_errors.map(m => `line ${m.line}: ${esc(m.error)}`).join("; ")}</div>` : ""}
+    <div style="overflow-x:auto"><table class="imptbl"><tr><th>Line</th><th>Who</th><th>Task</th><th>When</th><th></th></tr>${bad.slice(0, 40).map(row).join("")}${good.slice(0, 40).map(row).join("")}</table></div>
+    ${j.rows.length > 80 ? `<div style="font-size:12px;color:#888">Showing part of ${j.rows.length} rows.</div>` : ""}
+    <button class="rmbtn" id="impGo" ${c.ok || c.new_members ? "" : "disabled"}>Import ${c.ok} tasks</button>`;
+  $("#impGo").onclick = async () => {
+    $("#impGo").disabled = true; const r2 = await impSend("/api/import/commit"); const k = await r2.json();
+    if (!r2.ok) { toast(k.detail || "Import failed"); return; }
+    impFile = null; await loadMembers();
+    toast(`✅ Added ${k.added} tasks${k.members_added ? ` and ${k.members_added} people` : ""}.\nSkipped: ${k.skipped_errors} with problems, ${k.skipped_duplicates} duplicates.`);
+  };
+}
+async function fillBackupCard() {
+  const bx = document.getElementById("bakCard"); if (!bx) return;
+  const last = localStorage.getItem("ft_last_backup");
+  bx.innerHTML = `<h3>💾 Backup &amp; restore</h3>
+   <div style="font-size:13px;color:#666;margin:6px 0">All your data is saved only on this phone. If you clear the app data or lose the phone it is gone, so save a backup file now and then and keep it in Google Drive or WhatsApp.${last ? "<br>Last backup: " + esc(last) : "<br><b>No backup saved yet.</b>"}</div>
+   <div style="display:flex;gap:8px"><button class="rmbtn" id="bkSave" style="flex:1">⬇ Save backup file</button><button class="rmbtn alt" id="bkRest" style="flex:1">⬆ Restore</button></div>
+   <div style="font-size:13px;color:#444;margin-top:12px"><b>Automatic daily copies</b> (taken at 01:00, or when you first open the app after it; last 5 days; kept inside this phone):</div>
+   ${snapKeys().reverse().map(k => { const d = JSON.parse(localStorage.getItem(k) || "{}"); return `<div style="display:flex;justify-content:space-between;align-items:center;border-top:1px solid #eee;padding:6px 0;font-size:13px"><span>${k.slice(8, 18)} ${k.slice(19, 21)}:${k.slice(21)} · ${(d.tasks || []).length} tasks</span><button class="rmbtn alt" data-snap="${k}" style="margin:0;padding:6px 10px">Restore</button></div>`; }).join("") || `<div style="font-size:13px;color:#888">None yet. The first one appears after 01:00.</div>`}
+   <div style="font-size:12px;color:#888;margin-top:6px">These copies live in the same place as your data, so they protect against mistakes, not against losing the phone. Use "Save backup file" for that and keep the file in Google Drive. A phone web app cannot write to a folder of its own choice, so the save button lets you pick where the file goes (Downloads, Drive...).</div>
+   <input type="file" id="bkFile" accept=".json,application/json" style="display:none">`;
+  bx.querySelectorAll("[data-snap]").forEach(b => b.onclick = async () => {
+    const d = JSON.parse(localStorage.getItem(b.dataset.snap) || "null"); if (!d) return;
+    if (!await askYes("Replace ALL data on this phone with the copy from " + b.dataset.snap.slice(8, 18) + "?")) return;
+    S = d; save(); toast("Restored ✔"); setTimeout(() => location.reload(), 600); });
+  document.getElementById("bkSave").onclick = () => {
+    const d = new Date(), name = "familytasks-backup-" + isoLocal(d) + "_" + pad(d.getHours()) + pad(d.getMinutes()) + ".json";
+    const l = document.createElement("a"); l.href = URL.createObjectURL(new Blob([JSON.stringify({app:"familytasks-offline", version:1, data:S})], {type:"application/json"})); l.download = name; l.click();
+    localStorage.setItem("ft_last_backup", d.toLocaleString()); toast("Backup saved ✔"); setTimeout(fillBackupCard, 300); };
+  document.getElementById("bkRest").onclick = () => document.getElementById("bkFile").click();
+  document.getElementById("bkFile").onchange = async e => {
+    const f = e.target.files[0]; if (!f) return;
+    let j; try { j = JSON.parse(await f.text()); } catch(x) { toast("That is not a valid backup file"); return; }
+    const d = j && j.data;
+    if (!d || !Array.isArray(d.members) || !Array.isArray(d.tasks) || typeof d.done !== "object") { toast("That is not a Family Tasks backup"); return; }
+    if (!await askYes("Replace ALL data on this phone with this backup (" + d.members.length + " members, " + d.tasks.length + " tasks)?")) return;
+    S = d; save(); toast("Restored ✔"); setTimeout(() => location.reload(), 600); };
+  return;
+
+  const box = $("#bakCard"); if (!box) return;
+  const r = await api("/api/backups", undefined, true); const items = (r && r.items) || [];
+  const cf = (await api("/api/backup-settings", undefined, true)) || {backup_dir:"", backup_time:"01:00", backup_keep_days:5, folder:""};
+  bx.innerHTML = `<h3>💾 Backup</h3><div class="hint" style="font-size:12px;color:#666">A copy of everything is saved automatically every night at the time below, and the last ${cf.backup_keep_days} days are kept. Backups are saved on the computer that runs the app, in this folder:<br><b style="word-break:break-all">${esc(cf.folder)}</b></div>
+    <label style="font-size:12px;color:#666;display:block;margin-top:8px">Backup folder (leave empty for the default)</label>
+    <input id="bkDir" type="text" value="${esc(cf.backup_dir)}" placeholder="e.g. D:\\FamilyBackups" style="width:100%;box-sizing:border-box;padding:8px;border:1px solid #ddd;border-radius:8px">
+    <div style="display:flex;gap:8px;margin-top:8px"><div style="flex:1"><label style="font-size:12px;color:#666">Every night at</label><input id="bkTime" type="time" value="${esc(cf.backup_time)}" style="width:100%;box-sizing:border-box;padding:8px"></div>
+    <div style="flex:1"><label style="font-size:12px;color:#666">Keep days</label><input id="bkDays" type="number" min="1" max="60" value="${cf.backup_keep_days}" style="width:100%;box-sizing:border-box;padding:8px"></div></div>
+    <button class="rmbtn" id="bkSet">Save backup settings</button><button class="rmbtn alt" id="bakNow">💾 Back up now</button>
+    ${items.slice(0, 5).map(b => `<div class="lockrow"><span>${esc(b.created.replace("T", " "))} <span style="color:#888">${Math.max(1, Math.round(b.size / 1024))} KB</span></span><a data-dl href="/api/backups/${encodeURIComponent(b.name)}" style="font-size:13px">⬇ Download</a></div>`).join("") || `<div style="font-size:13px;color:#888;margin-top:6px">No backups yet.</div>`}`;
+  $("#bakNow").onclick = async () => { await api("/api/backups", {method:"POST"}); toast("Backup saved ✔"); fillBackupCard(); };
+  $("#bkSet").onclick = async () => {
+    try { await api("/api/backup-settings", {method:"PUT", body: JSON.stringify({backup_dir: $("#bkDir").value, backup_time: $("#bkTime").value || "01:00", backup_keep_days: +$("#bkDays").value || 5})}); toast("Saved ✔"); fillBackupCard(); } catch (e) {}
+  };
+}
+
+async function fillWaCard() {
+  const box = $("#waCard"); if (!box) return;
+  const w = await api("/api/wa-auto", undefined, true); if (!w) { box.innerHTML = ""; return; }
+  const last = w.last || {}, names = Object.fromEntries((w.recipients || []).map(x => [x.id, x.name]));
+  const status = !w.configured ? "Not set up yet" : w.wa_auto_enabled ? "On: sends every day at " + w.wa_auto_time : "Set up, but switched off";
+  const res = last.day ? `<div style="font-size:12px;color:#666;margin-top:8px">Last run ${esc(last.day)}: ${(last.sent || []).map(i => "✔ " + esc(names[i] || i)).join(", ") || "nothing sent"}${Object.entries(last.errors || {}).map(([i, m]) => `<br><span style="color:#dc2626">✖ ${esc(names[i] || i)}: ${esc(m)}</span>`).join("")}</div>` : "";
+  box.innerHTML = `<h3>📲 Automatic WhatsApp</h3><div class="hint" style="font-size:12px;color:#666">Sends today's plan for the whole family to ${esc((w.recipients || []).map(x => x.name).join(" and ") || "the parents")} by itself, every morning. Needs a free WhatsApp Business (Meta) setup. Steps are in WHATSAPP_AUTO.md. <b>${status}</b></div>
+    <div style="display:flex;gap:8px;margin-top:8px"><select id="waOn" style="flex:1;padding:8px"><option value="0" ${w.wa_auto_enabled ? "" : "selected"}>Off</option><option value="1" ${w.wa_auto_enabled ? "selected" : ""}>On</option></select><input id="waTime" type="time" value="${esc(w.wa_auto_time)}" style="flex:1;padding:8px"></div>
+    <input id="waPid" type="text" inputmode="numeric" placeholder="Phone number ID" value="${esc(w.wa_phone_id)}" style="width:100%;box-sizing:border-box;padding:8px;margin-top:8px;border:1px solid #ddd;border-radius:8px">
+    <input id="waTok" type="password" placeholder="${w.has_token ? "Access token saved (type to replace, - to remove)" : "Access token"}" style="width:100%;box-sizing:border-box;padding:8px;margin-top:8px;border:1px solid #ddd;border-radius:8px">
+    <div style="display:flex;gap:8px;margin-top:8px"><input id="waTpl" type="text" placeholder="Template name" value="${esc(w.wa_template)}" style="flex:2;padding:8px;border:1px solid #ddd;border-radius:8px;min-width:0"><input id="waLang" type="text" placeholder="en" value="${esc(w.wa_lang)}" style="flex:1;padding:8px;border:1px solid #ddd;border-radius:8px;min-width:0"></div>
+    <button class="rmbtn" id="waSave">Save</button><button class="rmbtn alt" id="waTest">▶ Send today's plan now (test)</button>${res}`;
+  $("#waSave").onclick = async () => {
+    try { await api("/api/wa-auto", {method:"PUT", body: JSON.stringify({wa_auto_enabled: $("#waOn").value === "1", wa_auto_time: $("#waTime").value || "05:00", wa_phone_id: $("#waPid").value, wa_token: $("#waTok").value, wa_template: $("#waTpl").value, wa_lang: $("#waLang").value})}); toast("Saved ✔"); fillWaCard(); } catch (e) {}
+  };
+  $("#waTest").onclick = async () => {
+    try { const j = await api("/api/wa-auto/test", {method:"POST"}); toast((j.results || []).map(x => (x.ok ? "✔ Sent to " : "✖ " + x.name + ": ") + (x.ok ? x.name : x.error)).join("\n") || "No recipients"); } catch (e) {}
+  };
+}
+
+// ---------- testing week: checklist + feedback ----------
+const CHECKS = ["Open the app from the home-screen icon", "See my own tab and today's tasks", "Mark one task Yes and another No",
+  "Choose who updated it and write a note", "Add a new task with a repeat", "Add a task by voice (English or Hindi)", "Change how often a task repeats",
+  "Remove a task", "Get a reminder before a task", "Snooze a reminder", "Parents: get a missed must-do alert", "Look at Achievements and my rank",
+  "Download a PDF and an Excel report", "Send my list on WhatsApp", "Use it for one full day without help"];
+const FB_KINDS = [["bug","🐞 Something is wrong"],["idea","💡 Idea"],["question","❓ I am confused"]];
+let fbKind = "bug";
+const getChecks = () => { try { return new Set(JSON.parse(localStorage.getItem("ft_checks") || "[]")); } catch(e) { return new Set(); } };
+function fbChecks() {
+  const done = getChecks();
+  $("#fbProg").textContent = `(${done.size}/${CHECKS.length})`;
+  $("#fbItems").innerHTML = CHECKS.map((c, i) => `<label style="display:flex;gap:8px;align-items:flex-start;padding:5px 0;font-size:14px"><input type="checkbox" data-i="${i}" ${done.has(i) ? "checked" : ""} style="margin-top:3px"> <span>${esc(c)}</span></label>`).join("");
+  $("#fbItems").querySelectorAll("input").forEach(cb => cb.onchange = () => { const d = getChecks(); cb.checked ? d.add(+cb.dataset.i) : d.delete(+cb.dataset.i);
+    try { localStorage.setItem("ft_checks", JSON.stringify([...d])); } catch(e) {} $("#fbProg").textContent = `(${d.size}/${CHECKS.length})`; });
+}
+const screenName = () => current === "fam" ? "Family" : current === "ach" ? "Achievements" : current === "rep" ? "Reports" : ((members.find(m => m.id === current) || {}).name || "");
+async function fbRender() {
+  $("#fbKind").innerHTML = FB_KINDS.map(([k,l]) => `<button class="chip ${k===fbKind?"sel":""}" data-k="${k}">${l}</button>`).join("");
+  $("#fbKind").querySelectorAll(".chip").forEach(b => b.onclick = () => { fbKind = b.dataset.k; fbRender(); });
+  const me = (typeof devIds === "function" ? devIds()[0] : null) || (members[0] || {}).id, keep = $("#fbWho").value;
+  $("#fbWho").innerHTML = members.map(m => `<option value="${m.id}" ${String(m.id) === (keep || String(me)) ? "selected" : ""}>${esc(m.name)}</option>`).join("");
+  const r = await api("/api/feedback", undefined, true); const items = (r && r.items) || [];
+  $("#fbList").innerHTML = items.length ? items.map(i => `<div style="border-top:1px solid #eee;padding:7px 0;font-size:13px;${i.status==="done"?"opacity:.55":""}">
+      <div>${{bug:"🐞",idea:"💡",question:"❓"}[i.kind]} <b>${esc(i.member || "Someone")}</b> <span style="color:#888">${esc((i.created_at||"").slice(5,16).replace("T"," "))}${i.screen ? " · " + esc(i.screen) : ""}</span></div>
+      <div>${esc(i.text)}</div><button class="chip" data-id="${i.id}" data-s="${i.status==="done"?"open":"done"}" style="font-size:12px;margin-top:4px">${i.status==="done" ? "↩ Reopen" : "✓ Mark fixed"}</button></div>`).join("") : `<div style="color:#888;font-size:13px">Nothing yet. Be the first!</div>`;
+  $("#fbList").querySelectorAll("button[data-id]").forEach(b => b.onclick = async () => { await api(`/api/feedback/${b.dataset.id}`, {method:"PUT", body:JSON.stringify({status:b.dataset.s})}); fbRender(); });
+  $("#fbCopy").onclick = async () => { const t = items.map(i => `[${i.status}] ${i.kind} - ${i.member || "?"} (${i.screen || "-"}): ${i.text}`).join("\n") || "(no notes)";
+    try { await navigator.clipboard.writeText(t); toast("Copied ✔"); } catch(e) { await ask("Copy this:", t); } };
+}
+$("#fbBtn").onclick = async () => { if (!(!AUTH.pin_mode || AUTH.unlocked.length || await askLocked("any"))) return; fbChecks(); fbRender(); $("#fbSheet").classList.add("open"); };
+$("#fbClose").onclick = () => $("#fbSheet").classList.remove("open");
+$("#fbSend").onclick = async () => {
+  const text = $("#fbText").value.trim(); if (!text) return toast("Please write a few words");
+  await api("/api/feedback", {method:"POST", body:JSON.stringify({member_id: +$("#fbWho").value || null, kind: fbKind, text, screen: screenName()})});
+  $("#fbText").value = ""; toast("Thank you! Noted ✔"); fbRender();
+};
+
+// ---------- WhatsApp send list ----------
+let sdOffset = 0, sdLang = "en", sdData = [];
+const sentKey = (d, id) => `ft_sent_${d}_${id}`;
+const wasSent = (d, id) => { try { return !!localStorage.getItem(sentKey(d, id)); } catch(e) { return false; } };
+async function openSend() {
+  if (!members.length) return toast("Add a family member first (Family tab)");
+  try { const st = await api("/api/settings/reminders", undefined, true); if (st && st.message_lang) sdLang = st.message_lang; } catch(e) {}
+  $("#sendSheet").classList.add("open"); await sdRender();
+}
+async function sdRender() {
+  const base = new Date(); const d = new Date(base.getFullYear(), base.getMonth(), base.getDate() + sdOffset), ds = iso(d), today = iso(base);
+  $("#sdDay").innerHTML = [[0,"Today"],[1,"Tomorrow"]].map(([o,l]) => `<button class="chip ${o===sdOffset?"sel":""}" data-o="${o}">${l}</button>`).join("");
+  $("#sdLang").innerHTML = [["en","English message"],["hi","हिन्दी संदेश"]].map(([c,l]) => `<button class="chip ${c===sdLang?"sel":""}" data-c="${c}">${l}</button>`).join("");
+  $("#sdDay").querySelectorAll(".chip").forEach(b => b.onclick = () => { sdOffset = +b.dataset.o; sdRender(); });
+  $("#sdLang").querySelectorAll(".chip").forEach(b => b.onclick = () => { sdLang = b.dataset.c; api("/api/settings/reminders", {method:"PUT", body:JSON.stringify({message_lang: sdLang})}, true); sdRender(); });
+  sdData = await Promise.all(members.map(async m => ({ m, day: await api(`/api/members/${m.id}/day?day=${ds}`) })));
+  const famText = WaMsg.familyMessage(sdData.map(x => ({ member: x.m, sessions: x.day.sessions })), ds, sdLang);
+  const card = (m, text, id, sent, phone) => `<div class="sendcard ${sent ? "sent" : ""}" data-id="${id}">
+      <div style="display:flex;justify-content:space-between;align-items:center"><b>${id === "fam" ? "👨‍👩‍👧 Family group message" : avatar(m) + " " + esc(m.name)}</b><span class="sentmark" style="font-size:12px;color:#16a34a">${sent ? "✓ sent" : ""}</span></div>
+      ${id === "fam" ? "" : `<input class="ph" inputmode="tel" placeholder="WhatsApp number (10 digits)" value="${esc(phone || "")}">`}
+      <details style="margin-top:6px"><summary style="font-size:13px;color:#555">Preview / edit message</summary><textarea rows="9">${esc(text)}</textarea></details>
+      <a class="wabtn" target="_blank" rel="noopener">${id === "fam" ? "Send to a group or contact" : "Send on WhatsApp"}</a></div>`;
+  $("#sdList").innerHTML = card(null, famText, "fam", false, "") + sdData.map(x => card(x.m, WaMsg.personMessage(x.m, x.day, sdLang, today), x.m.id, wasSent(ds, x.m.id), x.m.phone)).join("");
+  $("#sdList").querySelectorAll(".sendcard").forEach(el => {
+    const id = el.dataset.id, ta = el.querySelector("textarea"), a = el.querySelector(".wabtn"), ph = el.querySelector(".ph");
+    const link = () => { a.href = WaMsg.waLink(ph ? ph.value : "", ta.value); };
+    link(); ta.oninput = link;
+    a.onclick = () => { if (id === "fam") return; try { localStorage.setItem(sentKey(ds, id), "1"); } catch(e) {} el.classList.add("sent"); el.querySelector(".sentmark").textContent = "✓ sent"; };
+    if (ph) { ph.oninput = link; ph.onchange = async () => {
+      const m = members.find(x => x.id === +id);
+      try { const r = await api(`/api/members/${m.id}`, {method:"PUT", body:JSON.stringify({name:m.name, gender:m.gender, age:m.age, role:m.role, phone:ph.value.trim()})}); m.phone = r.phone; ph.value = r.phone; link(); toast(r.phone ? "Number saved" : "Number removed"); }
+      catch(e) { ph.value = m.phone || ""; link(); } }; }
+  });
+}
+$("#sendBtn").onclick = async () => { if (await (AUTH.admin || askLocked("admin"))) openSend(); }; $("#sdClose").onclick = () => $("#sendSheet").classList.remove("open");
+
+// ---------- voice input ----------
+const V_LANGS = [["en-IN","English"],["hi-IN","हिन्दी"],["mr-IN","मराठी"],["gu-IN","ગુજરાતી"],["ta-IN","தமிழ்"],["te-IN","తెలుగు"],["bn-IN","বাংলা"],["kn-IN","ಕನ್ನಡ"],["pa-IN","ਪੰਜਾਬੀ"]];
+const V_EX = {"en-IN":"Rahul evening 7 pm homework daily must do", "hi-IN":"राहुल शाम 7 बजे होमवर्क रोज़ जरूरी", "mr-IN":"रोज सकाळी 7 वाजता व्यायाम",
+  "gu-IN":"દરરોજ સવારે 6 વાગ્યે ચાલવા જવું", "ta-IN":"Priya morning 6 am yoga daily", "te-IN":"Priya morning 6 am yoga daily", "bn-IN":"Priya morning 6 am yoga daily",
+  "kn-IN":"Priya morning 6 am yoga daily", "pa-IN":"Priya morning 6 am yoga daily"};
+let vLang = "en-IN", vRec = null, vParsed = null;
+try { vLang = localStorage.getItem("ft_voice_lang") || "en-IN"; } catch(e) {}
+const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+const vOK = !!SR && window.isSecureContext;
+function vLangChips() {
+  $("#vLang").innerHTML = V_LANGS.map(([c,l]) => `<button class="chip ${c===vLang?"sel":""}" data-c="${c}">${l}</button>`).join("");
+  $("#vLang").querySelectorAll(".chip").forEach(b => b.onclick = () => { vLang = b.dataset.c; try { localStorage.setItem("ft_voice_lang", vLang); } catch(e) {} vStop(); vLangChips(); vExample(); });
+}
+function vExample() {
+  const ex = V_EX[vLang]; $("#vEx").innerHTML = `Try: <a href="#" id="vExA" style="color:var(--accent)">${esc(ex)}</a>`;
+  $("#vExA").onclick = e => { e.preventDefault(); $("#vText").value = ex; vUpdate(); };
+}
+function vStop() { if (vRec) { try { vRec.stop(); } catch(e) {} vRec = null; } $("#vMic").classList.remove("on"); }
+function vListen() {
+  if (!vOK) { $("#vHint").textContent = SR ? "The mic needs the secure (https) address. Use the 🎤 on your keyboard and speak into the box below." : "This browser has no voice input. Use Chrome, or the 🎤 on your keyboard."; $("#vText").focus(); return; }
+  if (vRec) { vStop(); return; }
+  const r = vRec = new SR(); r.lang = vLang; r.interimResults = true; r.continuous = false; r.maxAlternatives = 1;
+  r.onstart = () => { $("#vMic").classList.add("on"); $("#vHint").textContent = "Listening… speak now"; };
+  r.onresult = e => { let txt = ""; for (const x of e.results) txt += x[0].transcript; $("#vText").value = txt; vUpdate(); };
+  r.onerror = e => { $("#vHint").textContent = e.error === "not-allowed" ? "Microphone is blocked. Allow it in the browser settings, or type below." : e.error === "no-speech" ? "I did not hear anything. Tap the mic and try again." : e.error === "language-not-supported" ? "This language is not supported on this phone. Pick another." : "Voice problem (" + e.error + "). You can type below."; };
+  r.onend = () => { if (vRec === r) vRec = null; $("#vMic").classList.remove("on"); if ($("#vHint").textContent.startsWith("Listening")) $("#vHint").textContent = "Check the details below, then Save"; };
+  try { r.start(); } catch(e) { vRec = null; }
+}
+const SESS_LBL = {morning:"🌅 Morning", afternoon:"☀️ Afternoon", evening:"🌙 Evening"};
+function vUpdate() {
+  const txt = $("#vText").value.trim();
+  if (!txt) { vParsed = null; $("#vCard").innerHTML = ""; return; }
+  vParsed = VoiceParser.parse(txt, members, typeof current === "number" ? current : (members[0] || {}).id, new Date());
+  vParsed.freq_days_arr = vParsed.freq_days ? vParsed.freq_days.split(",") : [];
+  vDraw();
+}
+function vDraw() {
+  const p = vParsed, as = k => p.assumed.includes(k) ? ` <span class="asm">(guessed)</span>` : "";
+  const f = FQ;
+  $("#vCard").innerHTML = `<div class="vcard">
+    <label>Task</label><input id="vTitle" value="${esc(p.title)}">
+    <div class="vgrid">
+      <div><label>For${as("member")}</label><select id="vMem">${members.map(m => `<option value="${m.id}" ${m.id===p.member_id?"selected":""}>${esc(m.name)}</option>`).join("")}</select></div>
+      <div><label>Session${as("session")}</label><select id="vSess">${Object.entries(SESS_LBL).map(([k,l]) => `<option value="${k}" ${k===p.session?"selected":""}>${l}</option>`).join("")}</select></div>
+      <div><label>Time (optional)</label><input id="vTime" type="time" value="${p.time}"></div>
+      <div><label>Importance${as("importance")}</label><select id="vMust"><option value="1" ${p.must_do?"selected":""}>Must do</option><option value="0" ${p.must_do?"":"selected"}>Optional</option></select></div>
+      <div><label>Repeat${as("repeat")}</label><select id="vFreq">${Object.entries(f).map(([k,v]) => `<option value="${k}" ${k===p.freq_type?"selected":""}>${v}</option>`).join("")}</select></div>
+      <div><label>First due date</label><input id="vStart" type="date" value="${p.start_date}"></div>
+    </div>
+    ${p.freq_type==="custom" ? `<div style="font-size:13px;margin-top:6px">Every ${p.freq_interval} ${p.freq_unit}</div>` : ""}
+    ${p.freq_type==="weekly" ? `<div style="font-size:13px;margin-top:6px">On: ${p.freq_days_arr.map(i => ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"][+i]).join(", ")}</div>` : ""}
+    ${p.remind_before != null ? `<div style="font-size:13px;margin-top:6px">🔔 Reminder: ${p.remind_before === 0 ? "at the time" : p.remind_before + " min before"}</div>` : ""}
+  </div>`;
+  const bind = (id, fn) => { $("#"+id).onchange = $("#"+id).oninput = e => fn(e.target.value); };
+  bind("vTitle", v => p.title = v); bind("vMem", v => { p.member_id = +v; p.assumed = p.assumed.filter(x => x !== "member"); }); bind("vSess", v => p.session = v);
+  bind("vTime", v => p.time = v); bind("vMust", v => p.must_do = v === "1"); bind("vStart", v => p.start_date = v);
+  $("#vFreq").onchange = e => { p.freq_type = e.target.value; if (p.freq_type === "weekly" && !p.freq_days_arr.length) { const d = new Date((p.start_date || iso(new Date())) + "T00:00:00"); p.freq_days_arr = [String((d.getDay()+6)%7)]; } vDraw(); };
+}
+function openVoice() {
+  if (!members.length) return toast("Add a family member first (Family tab)");
+  $("#vText").value = ""; $("#vCard").innerHTML = ""; vParsed = null;
+  $("#vHint").textContent = vOK ? "Tap the mic and speak" : (SR ? "The mic needs the secure (https) address. Use the 🎤 on your keyboard and speak into the box." : "Voice input works in Chrome. Or use the 🎤 on your keyboard.");
+  vLangChips(); vExample(); $("#voiceSheet").classList.add("open");
+}
+$("#micBtn").onclick = openVoice; $("#vMic").onclick = vListen;
+$("#vText").oninput = vUpdate;
+$("#vCancel").onclick = () => { vStop(); $("#voiceSheet").classList.remove("open"); };
+$("#vSave").onclick = async () => {
+  const p = vParsed; if (!p) return toast("Say or type a task first");
+  const title = ($("#vTitle") ? $("#vTitle").value : p.title).trim(); if (!title) return toast("Please type the task name");
+  if (!p.member_id) return toast("Choose who the task is for");
+  await api("/api/tasks", {method:"POST", body:JSON.stringify({
+    member_id: p.member_id, title, session: p.session, time: p.time || "", must_do: !!p.must_do,
+    freq_type: p.freq_type, freq_interval: p.freq_interval || 1, freq_unit: p.freq_unit || "days",
+    freq_days: p.freq_type === "weekly" ? (p.freq_days_arr || []).join(",") : "", start_date: p.start_date || iso(new Date()), end_date: null,
+    remind_before: p.remind_before })});
+  vStop(); $("#voiceSheet").classList.remove("open");
+  current = p.member_id; day = new Date(p.start_date + "T00:00:00"); await loadMembers();
+  toast("✅ Added: " + title);
+};
+
+// ---------- reports ----------
+const REP = {kind:"current", member:"all", start:"", end:""};
+const REP_KINDS = [["past","⏪ Past 30 days"],["current","📅 This month"],["future","⏩ Next 30 days"],["custom","✏️ Choose dates"]];
+const REP_ST = {yes:"✅ Done", no:"❌ Not done", none:"⏳ Not marked", open:"🕒 Open today", plan:"🗓 Planned"};
+function repUrl(fmt) {
+  const q = new URLSearchParams({kind:REP.kind, member:REP.member, format:fmt});
+  if (REP.kind === "custom") { q.set("start", REP.start); q.set("end", REP.end); }
+  return "/api/reports?" + q;
+}
+async function renderRep() {
+  const el = $("#rep");
+  if (!members.length) { el.innerHTML = `<div class="empty">Add family members first (Family tab).</div>`; return; }
+  if (!REP.start) { const t = new Date(); REP.end = iso(t); REP.start = iso(new Date(t.getFullYear(), t.getMonth(), 1)); }
+  const head = `<div class="card" style="padding:10px;margin:8px 0">
+    <label style="font-size:13px;color:#666">Report for</label>
+    <select id="repWho" style="width:100%;padding:9px;font-size:15px;margin:4px 0 10px">
+      <option value="all">👨‍👩‍👧 Whole family</option>${members.map(m => `<option value="${m.id}" ${String(m.id)===REP.member?"selected":""}>${esc(m.name)}</option>`).join("")}</select>
+    <div style="display:flex;gap:6px;flex-wrap:wrap">${REP_KINDS.map(([k,l]) => `<button class="chip ${REP.kind===k?"on":""}" data-k="${k}" style="padding:8px 11px;border-radius:18px;border:1px solid #c7c7d9;background:${REP.kind===k?"#4f46e5":"#fff"};color:${REP.kind===k?"#fff":"#333"};font-size:13px">${l}</button>`).join("")}</div>
+    ${REP.kind === "custom" ? `<div style="display:flex;gap:8px;margin-top:10px"><label style="flex:1;font-size:12px;color:#666">From<input type="date" id="repFrom" value="${REP.start}" style="width:100%;padding:8px;font-size:14px"></label><label style="flex:1;font-size:12px;color:#666">To<input type="date" id="repTo" value="${REP.end}" style="width:100%;padding:8px;font-size:14px"></label></div>` : ""}
+  </div>`;
+  el.innerHTML = head + `<div class="empty">Loading…</div>`;
+  const bind = () => {
+    $("#repWho").onchange = e => { REP.member = e.target.value; renderRep(); };
+    el.querySelectorAll(".chip").forEach(b => b.onclick = () => { REP.kind = b.dataset.k; renderRep(); });
+    if ($("#repFrom")) { $("#repFrom").onchange = e => { REP.start = e.target.value; renderRep(); }; $("#repTo").onchange = e => { REP.end = e.target.value; renderRep(); }; }
+  };
+  bind();
+  if (REP.kind === "custom" && (!REP.start || !REP.end)) return;
+  let r;
+  try { r = await fetchAuth(repUrl("json")); } catch (e) { return; }
+  if (!r.ok) { let m = "Could not build the report"; try { m = (await r.json()).detail; } catch(e){} el.innerHTML = head + `<div class="empty">${esc(m)}</div>`; bind(); return; }
+  const rep = await r.json();
+  const pc = v => v == null ? "–" : v + "%";
+  const sum = `<div class="card" style="padding:10px;margin:8px 0;overflow-x:auto"><b>${esc(rep.who)} · ${rep.start} to ${rep.end}</b>
+    <table style="width:100%;border-collapse:collapse;font-size:13px;margin-top:8px"><tr style="text-align:left;color:#666"><th>Member</th><th>Due</th><th>Done</th><th>Missed</th><th>Done %</th><th>Today open</th><th>Planned</th></tr>
+    ${rep.summary.map(x => `<tr><td style="padding:4px 0"><b>${esc(x.member)}</b></td><td>${x.due}</td><td>${x.done}</td><td>${x.no + x.none}</td><td><b>${pc(x.pct)}</b></td><td>${x.open_today}</td><td>${x.planned}</td></tr>`).join("")}</table>
+    <div style="font-size:11px;color:#888;margin-top:6px">Missed = marked No + not marked on a past day. Today's open tasks and future dates are never counted as missed.</div></div>`;
+  const rows = rep.rows.slice(0, 60);
+  const list = rows.length ? `<div class="card" style="padding:10px;margin:8px 0"><b>Task list</b>${rows.map(x => `<div style="border-top:1px solid #eee;padding:6px 0;font-size:13px"><div><b>${esc(x.task)}</b> ${x.must ? "<span style='color:var(--must)'>●</span>" : ""}</div><div style="color:#666">${x.day} ${x.weekday} · ${x.session}${x.time ? " " + x.time : ""}${REP.member === "all" ? " · " + esc(x.member) : ""} · ${REP_ST[x.status]}${x.updated_by ? " · by " + esc(x.updated_by) : ""}</div>${x.note ? `<div style="color:#888">📝 ${esc(x.note)}</div>` : ""}</div>`).join("")}${rep.rows.length > 60 ? `<div style="font-size:12px;color:#888;padding-top:6px">Showing first 60 of ${rep.rows.length} lines. Download for the full list.</div>` : ""}</div>` : `<div class="empty">No tasks in this period.</div>`;
+  const dl = `<div class="noprint" style="display:flex;gap:10px;margin:8px 0"><a href="${repUrl("pdf")}" data-dl download style="flex:1;text-align:center;padding:13px;border-radius:12px;background:#dc2626;color:#fff;text-decoration:none;font-weight:600">⬇ PDF</a><a href="${repUrl("xlsx")}" data-dl download style="flex:1;text-align:center;padding:13px;border-radius:12px;background:#16a34a;color:#fff;text-decoration:none;font-weight:600">⬇ Excel</a></div><button class="noprint" id="repPrint" style="width:100%;margin:0 0 8px;padding:12px;border-radius:12px;border:1px solid #c7d2fe;background:#eef2ff;color:#3730a3;font-weight:600">🖨 Print / Save as PDF (shows Hindi correctly)</button>`;
+  el.innerHTML = head + dl + sum + list;
+  const pb = document.getElementById("repPrint"); if (pb) pb.onclick = () => window.print();
+  bind();
+}
+
+// ---------- achievements ----------
+let month = iso(new Date()).slice(0,7);
+function layout() {
+  const isMember = typeof current === "number";
+  [".datebar",".legend","#content","#addTaskBtn","#micBtn"].forEach(q => document.querySelector(q).classList.toggle("hidden", !isMember));
+  $("#ach").classList.toggle("hidden", current !== "ach");
+  $("#fam").classList.toggle("hidden", current !== "fam");
+  $("#rep").classList.toggle("hidden", current !== "rep");
+}
+function refresh() { layout(); if (typeof current === "number" && isLocked(current)) return lockedView(); if (current === "fam") renderFam(); else if (current === "ach") renderAch(); else if (current === "rep") renderRep(); else render(); }
+function shiftMonth(n) { const [y,m] = month.split("-").map(Number); const d = new Date(y, m-1+n, 1); month = d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0"); renderAch(); }
+const TIER_COL = p => p>=90 ? ["#16a34a","#0d9488"] : p>=75 ? ["#2563eb","#7c3aed"] : p>=50 ? ["#d97706","#ea580c"] : p>=25 ? ["#ea580c","#db2777"] : ["#dc2626","#9f1239"];
+const CELL = {perfect:"🌟", good:"😎", ok:"🙂", low:"😴", zero:"🙈", none:"·", future:""};
+const MEDAL = ["🥇","🥈","🥉"], AWARD = ["Family Champion","Almost there!","On the podium"];
+async function renderAch() {
+  const data = await api(`/api/achievements?month=${month}`);
+  const M = data.members, [y, mo] = month.split("-").map(Number);
+  const label = new Date(y, mo-1, 1).toLocaleString("en-IN", {month:"long", year:"numeric"});
+  const nowM = iso(new Date()).slice(0,7);
+  const nav = `<div class="mnav"><button onclick="shiftMonth(-1)">‹</button><b>${label}</b><button onclick="shiftMonth(1)" ${month>=nowM?'disabled':''}>›</button></div>`;
+  if (!M.length) { $("#ach").innerHTML = nav + `<div class="empty">Add family members first (Family tab).</div>`; return; }
+
+  const byId = id => M.find(m => m.id === id), rank = m => data.ranking.indexOf(m.id);
+  const champ = data.ranking.length ? byId(data.ranking[0]) : null, last = data.ranking.length > 2 ? byId(data.ranking[data.ranking.length-1]) : null;
+  const confetti = champ ? Array.from({length:12}, (_, i) =>
+    `<span class="conf" style="left:${(i*8+3)%96}%;animation-duration:${2.2+(i%5)*.5}s;animation-delay:${(i%7)*.4}s">${["🎉","✨","🎊","⭐"][i%4]}</span>`).join("") : "";
+  const banner = champ ? `<div class="champ">${confetti}🥇 <b>${esc(champ.name)}</b> is the Family Champion of ${label.split(" ")[0]}! 🎉
+      <small>${champ.pct}% of tasks done · ${champ.points} points${last && last.id !== champ.id ? ` · ${esc(last.name)}: every champion started somewhere 💪` : ""}</small></div>` : "";
+
+  const n = M.length, grp = t => `<tr class="grp"><td colspan="${n+1}">${t}</td></tr>`;
+  const num = (lab, vals, fmt = v => v == null ? "–" : v, hi = true) => {
+    const nums = vals.filter(v => typeof v === "number"), max = nums.length ? Math.max(...nums) : 0, same = nums.every(v => v === max);
+    return `<tr><td class="lab">${lab}</td>${vals.map(v => `<td class="${hi && typeof v === "number" && max > 0 && !same && v === max ? "best" : ""}">${fmt(v)}</td>`).join("")}</tr>`;
+  };
+  const pc = v => v == null ? "–" : v + "%";
+  const txt = (lab, vals) => `<tr><td class="lab">${lab}</td>${vals.map(v => `<td>${v}</td>`).join("")}</tr>`;
+  const bdg = M[0].badges.map((b, i) => `<tr><td class="lab">${b.emoji} ${b.name}</td>${M.map(m => m.badges[i].earned ? `<td>${b.emoji}</td>` : `<td class="off">🔒</td>`).join("")}</tr>`).join("");
+
+  const head = `<tr><th class="lab"></th>${M.map(m => { const r = rank(m);
+    return `<th><div class="av">${avatar(m)}</div><div class="nm">${esc(m.name)}</div><div class="md">${r < 0 ? "" : (MEDAL[r] || "#" + (r+1))}</div></th>`; }).join("")}</tr>`;
+  const body =
+    grp("🏆 Overall")
+    + txt("Title", M.map(m => `<div>${m.title.emoji}</div><small>${m.title.name}</small>`))
+    + num("Completion", M.map(m => m.pct), pc)
+    + num("Points ⭐", M.map(m => m.points))
+    + num("Level", M.map(m => m.level))
+    + grp("✅ Tasks")
+    + txt("Done / due", M.map(m => `${m.done}/${m.due}`))
+    + num("Must-do %", M.map(m => m.must_pct), pc)
+    + num("Optional done 🎁", M.map(m => m.opt_done))
+    + grp("🔥 Consistency")
+    + num("Perfect days 🌟", M.map(m => m.perfect_days))
+    + num("Streak now", M.map(m => m.current_streak))
+    + num("Best streak", M.map(m => m.best_streak))
+    + grp("⏰ Time of day")
+    + num("🌅 Morning", M.map(m => m.sessions.morning.pct), pc)
+    + num("☀️ Afternoon", M.map(m => m.sessions.afternoon.pct), pc)
+    + num("🌙 Evening", M.map(m => m.sessions.evening.pct), pc)
+    + grp("🏅 Badges")
+    + bdg
+    + num("Badges earned", M.map(m => m.badges.filter(b => b.earned).length))
+    + grp("🎈 Fun facts")
+    + txt("Best weekday", M.map(m => m.best_weekday ? m.best_weekday.slice(0, 3) : "–"))
+    + txt("Best day", M.map(m => m.best_day ? m.best_day + " " + label.split(" ")[0].slice(0, 3) : "–"));
+  // day-by-day emoji grid: one column per member
+  const dayRows = M[0].days.map((d0, i) => {
+    const ds = month + "-" + String(i+1).padStart(2, "0"), wd = new Date(y, mo-1, i+1).toLocaleDateString("en-IN", {weekday:"short"}).slice(0, 2);
+    return `<tr class="${data.today === ds ? "today" : ""}"><td class="lab">${i+1} ${wd}</td>${M.map(m => { const d = m.days[i], td = data.today === ds;
+      return `<td title="${d.done}/${d.due} done">${d.state === "future" ? "" : td && d.state !== "perfect" ? "⏳" : CELL[d.state]}</td>`; }).join("")}</tr>`; }).join("");
+  const medals = data.ranking.map((id, i) => { const m = byId(id); return `${MEDAL[i] || "#" + (i+1)} ${m.name} – ${m.pct}% · ${m.points} pts`; });
+  const text = `🏆 Family Achievements – ${label}\n` + medals.join("\n") + (champ ? `\n🎉 ${champ.name} is the Family Champion!` : "");
+  $("#ach").innerHTML = nav + banner
+    + `<div class="cmpwrap"><table class="cmp"><thead>${head}</thead><tbody>${body}</tbody></table></div>`
+    + `<div class="legend2"><b>green</b> = best in the family · 🔒 = badge not earned yet · ranking uses completion % first, then points</div>`
+    + `<details class="cmpd" open><summary>📅 Day by day</summary><div class="cmpwrap"><table class="cmp days"><thead>${head.replace(/<div class="md">.*?<\/div>/g, "")}</thead><tbody>${dayRows}</tbody></table></div>
+        <div class="legend2">🌟 all must-dos done · 😎 70%+ · 🙂 40%+ · 😴 some · 🙈 none · ⏳ today, still going · · no tasks</div></details>`
+    + `<a class="sharebtn" target="_blank" rel="noopener" href="https://wa.me/?text=${encodeURIComponent(text)}">📲 Share on WhatsApp</a>`;
+}
+// ---------- change a task's repeat / due date ----------
+const FQ = {daily:"Daily", alternate:"Alt. days", weekly:"Weekly", every15:"15 days", monthly:"Monthly", quarterly:"Quarterly", once:"Once", custom:"Custom…"};
+const niceDate = d => new Date(d + "T00:00:00").toLocaleDateString("en-IN", {day:"numeric", month:"short"});
+async function putFreq(id, body) { return api(`/api/tasks/${id}/frequency`, {method:"PUT", body:JSON.stringify(body)}); }
+async function setFreq(id, sel) {
+  const v = sel.value;
+  if (v === "custom") { sel.value = taskMap[id].freq_type; return openSchedule(id); }
+  await putFreq(id, {freq_type: v, effective_from: iso(day), freq_days: v === "weekly" ? String((day.getDay()+6)%7) : ""});
+  toast(`${FQ[v]} – starting ${niceDate(iso(day))}. Earlier days unchanged.`); render();
+}
+let schTask = null;
+function repeatOf(t) {
+  return {daily:["days",1], alternate:["days",2], every15:["days",15], monthly:["months",1], quarterly:["months",3], once:["none",1], weekly:["wd",1]}[t.freq_type] || [t.freq_unit, t.freq_interval];
+}
+function openSchedule(id) {
+  const t = taskMap[id]; schTask = t;
+  const [rep, n] = repeatOf(t);
+  $("#schTitle").textContent = "Schedule: " + t.title;
+  $("#sDue").min = iso(day); $("#sDue").value = iso(day); $("#sRep").value = rep; $("#sN").value = n; $("#sEnd").value = t.end_date && t.active ? t.end_date : "";
+  const days = (t.freq_days || String((day.getDay()+6)%7)).split(",");
+  document.querySelectorAll("#sDays button").forEach(b => b.classList.toggle("sel", days.includes(b.dataset.i)));
+  schToggle(); $("#schSheet").classList.add("open");
+}
+function schToggle() { const r = $("#sRep").value;
+  $("#sNBox").classList.toggle("hidden", !["days","weeks","months"].includes(r)); $("#sDaysBox").classList.toggle("hidden", r !== "wd"); }
+$("#sDays").innerHTML = DAYN.map((d,i) => `<button data-i="${i}">${d}</button>`).join("");
+document.querySelectorAll("#sDays button").forEach(b => b.onclick = () => b.classList.toggle("sel"));
+$("#sRep").onchange = schToggle;
+$("#schCancel").onclick = () => { $("#schSheet").classList.remove("open"); render(); };
+$("#schApply").onclick = async () => {
+  const due = $("#sDue").value; if (!due) return toast("Please choose the due date");
+  const rep = $("#sRep").value, n = Math.max(1, +$("#sN").value || 1), end = $("#sEnd").value || null;
+  let body;
+  if (rep === "none") body = {freq_type:"once"};
+  else if (rep === "wd") {
+    const ds = [...document.querySelectorAll("#sDays .sel")].map(b => b.dataset.i).join(",");
+    if (!ds) return toast("Choose at least one day");
+    body = {freq_type:"weekly", freq_days:ds};
+  } else {
+    const named = {"days|1":"daily","days|2":"alternate","days|15":"every15","months|1":"monthly","months|3":"quarterly"}[rep+"|"+n];
+    body = named ? {freq_type:named} : {freq_type:"custom", freq_interval:n, freq_unit:rep};
+  }
+  const viewed = iso(day); if (due < viewed) return toast("Due date can't be before the day you're viewing");
+  const nd = new Date(day); nd.setDate(nd.getDate() + 1);
+  // old schedule stops after the viewed day when the new first due date is later (nothing shows in between)
+  await putFreq(schTask.id, {...body, effective_from: due, change_from: due > viewed ? iso(nd) : due, end_date: end});
+  $("#schSheet").classList.remove("open"); toast(`Saved – first due ${niceDate(due)}`); render();
+};
+
+// ---------- family tab (add / edit / remove members, one line each) ----------
+const ROLES = ["Father","Mother","Son","Daughter","Grandpa","Grandma","Other"];
+function famRow(m, isNew) {
+  const known = ROLES.includes(m.role), role = known ? m.role : (m.role ? "Other" : "");
+  const custom = !known && m.role ? m.role : "";
+  const gopt = ["Male","Female","Other"].map(g => `<option ${m.gender===g?'selected':''}>${g}</option>`).join("");
+  const ropt = `<option value="" ${role===""?'selected':''} disabled>Role…</option>` + ROLES.map(r => `<option ${role===r?'selected':''}>${r}</option>`).join("");
+  return `<div class="frow ${isNew?'new':''}" ${isNew?'':`data-id="${m.id}"`} oninput="this.classList.add('dirty')" onchange="this.classList.add('dirty')">
+    <span class="fav2">${isNew?'➕':avatar(m)}</span>
+    <input class="f-name" maxlength="40" placeholder="Name" value="${esc(m.name||'')}">
+    <input class="f-age" type="number" inputmode="numeric" min="0" max="120" placeholder="Age" value="${m.age==null?'':m.age}">
+    <select class="f-gender" title="Gender">${gopt}</select>
+    <div class="rcell"><select class="f-role ${role==='Other'?'hidden':''}" title="Role in family" onchange="roleSel(this)">${ropt}</select>
+      <input class="f-role2 ${role==='Other'?'':'hidden'}" maxlength="30" placeholder="Role" value="${esc(custom)}" onblur="roleBlur(this)"></div>
+    <div class="fbtns">${isNew ? `<button class="fadd" title="Add member" onclick="saveMember(null,this)">＋</button>`
+      : `<button class="fsv" title="Save changes" onclick="saveMember(${m.id},this)">💾</button><button class="fdl" title="Remove" onclick="deleteMember(${m.id})">🗑</button>`}</div></div>`;
+}
+function roleSel(sel) { if (sel.value !== "Other") return; const c = sel.closest(".rcell"); sel.classList.add("hidden"); const i = c.querySelector(".f-role2"); i.classList.remove("hidden"); i.focus(); }
+function roleBlur(inp) { if (inp.value.trim()) return; const c = inp.closest(".rcell"), s = c.querySelector(".f-role"); inp.classList.add("hidden"); s.classList.remove("hidden"); s.value = ""; }
+async function renderFam() {
+  members = await api("/api/members");
+  const intro = members.length ? "" : `<div class="card" style="background:#eef;border-color:#c7d2fe"><b>Welcome! 👋</b><br>Add your family members below. Then tap a member's tab to start adding tasks.</div>`;
+  $("#fam").innerHTML = `<div style="padding:10px 2px 4px;font-size:16px"><b>Family members</b> <span style="color:var(--mute)">(${members.length})</span></div>`
+    + `<div id="famhint">Edit a line and tap 💾 (it lights up when something changed).</div>` + intro
+    + `<div class="frow fhdr"><span class="fav2"></span><span>Name</span><span>Age</span><span>Gender</span><span>Role</span><span></span></div>`
+    + famRow({gender:"Male"}, true) + members.map(m => famRow(m, false)).join("") + `<div class="card" id="rmCard"></div><div class="card" id="pinCard"></div><div class="card" id="impCard"></div><div class="card" id="waCard"></div><div class="card" id="bakCard"></div>`;
+  fillReminderCard(); fillPinCard(); fillImportCard(); fillWaCard(); fillBackupCard();
+}
+$("#fam").addEventListener("keydown", e => { if (e.key === "Enter" && e.target.tagName === "INPUT") { const b = e.target.closest(".frow").querySelector(".fsv, .fadd"); b && b.click(); } });
+function readRow(row) {
+  const name = row.querySelector(".f-name").value.trim(), age = row.querySelector(".f-age").value.trim();
+  const inp = row.querySelector(".f-role2"), sel = row.querySelector(".f-role");
+  if (!name) { toast("Please enter a name"); return null; }
+  if (age === "" || !Number.isInteger(+age) || +age < 0 || +age > 120) { toast("Please enter a valid age (0–120)"); return null; }
+  const role = inp.classList.contains("hidden") ? sel.value : inp.value.trim();
+  if (!role) { toast("Please choose the role in family"); return null; }
+  return {name, age: +age, gender: row.querySelector(".f-gender").value, role};
+}
+async function saveMember(id, btn) {
+  const body = readRow(btn.closest(".frow")); if (!body) return;
+  await api(id ? `/api/members/${id}` : "/api/members", {method: id ? "PUT" : "POST", body: JSON.stringify(body)});
+  toast(id ? "Saved ✔" : `${body.name} added 🎉`);
+  await loadMembers();
+}
+async function deleteMember(id) {
+  const m = members.find(x => x.id === id);
+  if (!await askYes(`Remove ${m.name}? Their tasks and history will be deleted for good.`)) return;
+  await api(`/api/members/${id}`, {method:"DELETE"}); toast(`${m.name} removed`); await loadMembers();
+}
+
+// ---------- reminders: banners, bell, phone notifications, settings ----------
+const RMD = [["","Family default"],["-1","Off"],["0","At the time"],["5","5 min before"],["10","10 min before"],["15","15 min before"],["30","30 min before"],["60","1 hour before"],["120","2 hours before"]];
+$("#fRemind").innerHTML = RMD.map(([v,l]) => `<option value="${v}">${l}</option>`).join("");
+async function setRemind(id, v) { await api(`/api/tasks/${id}/reminder`, {method:"PUT", body:JSON.stringify({remind_before: v === "" ? null : +v})}); toast("Reminder saved ✔"); }
+
+let devMembers = null; try { devMembers = JSON.parse(localStorage.getItem("ft_dev_members") || "null"); } catch(e) {}
+const devIds = () => { const all = members.map(m => m.id); return devMembers ? devMembers.filter(i => all.includes(i)) : all; };
+let lastNid = null; try { const v = localStorage.getItem("ft_last_nid"); lastNid = v == null ? null : +v; } catch(e) {}
+const setLastNid = n => { lastNid = n; try { localStorage.setItem("ft_last_nid", n); } catch(e) {} };
+const shownKeys = new Set();
+const hhmm = iso8 => { const d = new Date(iso8), t = d.toTimeString().slice(0,5); return d.toDateString() === new Date().toDateString() ? t : d.toLocaleDateString("en-IN", {day:"numeric", month:"short"}) + " " + t; };
+function setBell(n) { const b = $("#bellN"); b.textContent = n > 99 ? "99+" : n; b.classList.toggle("hidden", !n); }
+
+async function pollNotifs() {
+  if (!members.length || !devIds().length) return;
+  const ids = devIds().join(",");
+  const r = await api(lastNid == null ? `/api/notifications?members=${ids}&limit=1` : `/api/notifications?members=${ids}&after=${lastNid}`, null, true);
+  if (!r) return;
+  setBell(r.unread);
+  if (lastNid == null) return setLastNid(r.max_id);          // first run on this phone: don't replay history
+  if (r.items.length) { r.items.forEach(showBanner); setLastNid(Math.max(...r.items.map(i => i.id))); }
+}
+function showBanner(n) {
+  const key = (n.kind === "test" || n.kind === "snooze") ? n.kind + n.id : `${n.kind}-${n.task_id}-${n.day}`;
+  if (shownKeys.has(key)) return; shownKeys.add(key);
+  const box = $("#banners"); while (box.children.length >= 4) box.firstChild.remove();
+  const el = document.createElement("div"); el.className = "bn " + n.kind; el.dataset.id = n.id;
+  const acts = n.kind === "remind" || n.kind === "snooze"
+    ? `<button class="bd" onclick="bannerDone(${n.id},${n.task_id},'${n.day}','${esc(n.owner).replace(/'/g,"")}',this)">✔ Done</button><button class="bs" onclick="bannerSnooze(${n.id},${n.task_id},'${n.day}',this)">⏰ 10 min</button>`
+    : n.kind === "digest" ? `<button class="bd" onclick="bannerSend(${n.id},this)">📤 Open send list</button>`
+    : n.kind === "missed" ? `<button class="bs" onclick="bannerOpen(${n.id},'${esc(n.owner).replace(/'/g,"")}',this)">Open ${esc(n.owner)}'s tasks</button>` : "";
+  el.innerHTML = `<b>${esc(n.title)}</b><div class="bb">${esc(n.body)}</div><div class="ba">${acts}<button class="bx" onclick="bannerClose(${n.id},this)">✕</button></div>`;
+  box.appendChild(el);
+  try { navigator.vibrate && navigator.vibrate([200, 100, 200]); } catch(e) {}
+}
+const bannerEl = b => b.closest(".bn");
+function bannerClose(id, btn) { bannerEl(btn).remove(); api("/api/notifications/read", {method:"POST", body:JSON.stringify({ids:[id]})}, true).then(pollNotifs); }
+async function bannerDone(id, taskId, d, owner, btn) {
+  await api(`/api/tasks/${taskId}/mark`, {method:"POST", body:JSON.stringify({day:d, status:"yes", updated_by: owner || lastWho})});
+  toast("Marked done ✔"); bannerClose(id, btn); if (typeof current === "number") refresh();
+}
+async function bannerSnooze(id, taskId, d, btn) { const r = await api(`/api/tasks/${taskId}/snooze`, {method:"POST", body:JSON.stringify({day:d, minutes:10})}); toast("Snoozed for 10 minutes"); bannerClose(id, btn); }
+function bannerSend(id, btn) { bannerClose(id, btn); openSend(); }
+function bannerOpen(id, owner, btn) { const m = members.find(x => x.name === owner); bannerClose(id, btn); if (m) { current = m.id; day = new Date(); loadMembers(); } }
+
+$("#bellBtn").onclick = async () => {
+  const r = await api(`/api/notifications?members=${devIds().join(",")}&limit=30`);
+  const seen = new Set(), items = r.items.slice().reverse().filter(n => { const k = (n.kind === "test" || n.kind === "snooze") ? n.kind + n.id : `${n.kind}-${n.task_id}-${n.day}`; return seen.has(k) ? false : (seen.add(k), true); });
+  $("#bellList").innerHTML = items.length ? items.map(n => `<div class="nli ${n.read?'':'unread'}"><b>${esc(n.title)}</b><small>${esc(n.body)} · ${hhmm(n.created_at)}</small></div>`).join("")
+    : `<div class="empty">No notifications yet. Reminders will appear here.</div>`;
+  $("#bellSheet").classList.add("open");
+};
+$("#bellClose").onclick = () => $("#bellSheet").classList.remove("open");
+$("#bellRead").onclick = async () => { await api("/api/notifications/read", {method:"POST", body:JSON.stringify({members: devIds()})}); setBell(0); $("#bellSheet").classList.remove("open"); };
+
+// ----- phone notifications (needs https or localhost, a service worker and the Push API) -----
+const b64ToU8 = b => { const p = "=".repeat((4 - b.length % 4) % 4), raw = atob((b + p).replace(/-/g, "+").replace(/_/g, "/")); return Uint8Array.from([...raw].map(c => c.charCodeAt(0))); };
+if ("serviceWorker" in navigator) {
+  navigator.serviceWorker.register("/sw.js").catch(() => {});
+  navigator.serviceWorker.addEventListener("message", e => { if (e.data && e.data.type === "push") pollNotifs(); });
+}
+function pushSupport() {
+  if (!("serviceWorker" in navigator) || !("PushManager" in window) || !("Notification" in window)) return "This browser can't show phone notifications. Reminders still pop up inside the app while it is open.";
+  if (!window.isSecureContext) return "Phone notifications need a secure (https) address. They will work once the app is published. Until then, reminders pop up inside the app while it is open.";
+  return "";
+}
+async function pushState() {
+  if (pushSupport()) return "unsupported";
+  if (Notification.permission === "denied") return "denied";
+  try { const reg = await navigator.serviceWorker.getRegistration(); return reg && (await reg.pushManager.getSubscription()) ? "on" : "off"; } catch(e) { return "off"; }
+}
+async function syncSub() {            // tell the server which family members this phone wants reminders for
+  try { const reg = await navigator.serviceWorker.getRegistration(), sub = reg && await reg.pushManager.getSubscription(); if (!sub) return;
+    const j = sub.toJSON(); await api("/api/push/subscribe", {method:"POST", body:JSON.stringify({endpoint:j.endpoint, keys:j.keys, member_ids:devIds()})}, true); } catch(e) {}
+}
+async function enablePush() {
+  const msg = $("#pushMsg"), why = pushSupport(); if (why) { msg.textContent = why; return; }
+  const k = await api("/api/push/key"); if (!k.enabled) { msg.textContent = "Phone notifications are not available on this server (pywebpush is not installed)."; return; }
+  try {
+    if ((await Notification.requestPermission()) !== "granted") { msg.textContent = "Notifications are blocked. Allow them in the browser's site settings, then try again."; return; }
+    await navigator.serviceWorker.register("/sw.js");
+    const reg = await navigator.serviceWorker.ready;
+    const sub = (await reg.pushManager.getSubscription()) || await reg.pushManager.subscribe({userVisibleOnly:true, applicationServerKey:b64ToU8(k.key)});
+    const j = sub.toJSON(); await api("/api/push/subscribe", {method:"POST", body:JSON.stringify({endpoint:j.endpoint, keys:j.keys, member_ids:devIds()})});
+    msg.textContent = "✔ On. This phone gets reminders even when the app is closed."; $("#rmPush").textContent = "🔔 Phone notifications are on";
+  } catch (e) { msg.textContent = "Couldn't turn on phone notifications: " + (e && e.message || e); }
+}
+
+// ----- Family tab: reminder settings -----
+let rmAlert = {auto:true, ids:new Set()};
+async function fillReminderCard() {
+  const st = await api("/api/settings/reminders"), box = $("#rmCard"); if (!box) return;
+  rmAlert = {auto: st.auto_alerts, ids: new Set(st.auto_alerts ? [] : st.alert_member_ids_resolved)};
+  const leadOpts = RMD.filter(([v]) => v !== "").map(([v,l]) => `<option value="${v}" ${+v===st.default_remind_before?'selected':''}>${v==="-1"?"No reminders by default":l}</option>`).join("");
+  const graceOpts = [15,30,60,120].map(g => `<option value="${g}" ${g===st.missed_grace?'selected':''}>${g} min</option>`).join("");
+  const ps = await pushState();
+  box.innerHTML = `<h4>🔔 Reminders</h4>
+    <div class="rmsec"><b>This phone gets reminders for</b><div class="chips" id="rmDev">${members.map(m => `<button class="chip ${devIds().includes(m.id)?'sel':''}" data-id="${m.id}">${avatar(m)} ${esc(m.name)}</button>`).join("")}</div>
+      <button class="rmbtn" id="rmPush">${ps==="on"?"🔔 Phone notifications are on":"🔔 Turn on phone notifications"}</button>
+      <div class="hint" id="pushMsg">${ps==="unsupported"?pushSupport():ps==="denied"?"Notifications are blocked for this site in the browser settings.":"iPhone: first tap Share → Add to Home Screen, then open the app from the home screen."}</div>
+      <button class="rmbtn alt" id="rmTest">Send a test reminder</button></div>
+    <div class="rmsec"><b>Family settings</b>
+      <label>Remind before each task</label><select id="rmLead">${leadOpts}</select>
+      <label>Tasks without a time use</label>
+      <div class="rm3"><label>🌅 Morning<input type="time" id="rmMorning" value="${st.session_times.morning}"></label><label>☀️ Afternoon<input type="time" id="rmAfternoon" value="${st.session_times.afternoon}"></label><label>🌙 Evening<input type="time" id="rmEvening" value="${st.session_times.evening}"></label></div>
+      <label>⚠️ Missed must-do alert</label>
+      <div style="display:flex;gap:8px"><select id="rmMissedOn"><option value="1" ${st.missed_alerts?'selected':''}>On</option><option value="0" ${st.missed_alerts?'':'selected'}>Off</option></select><select id="rmGrace">${graceOpts}</select></div>
+      <div class="hint">Alert is sent when a must-do task is still not done this long after its time.</div>
+      <label>Tell these people</label><div class="chips" id="rmAlert"></div>
+      <label>📤 Daily "send the task lists" prompt</label>
+      <div style="display:flex;gap:8px"><select id="rmDigOn"><option value="1" ${st.digest_enabled?'selected':''}>On</option><option value="0" ${st.digest_enabled?'':'selected'}>Off</option></select><input type="time" id="rmDigTime" value="${st.digest_time}"></div>
+      <div class="hint">At this time the parents get a notification that opens the Send screen (📤 at the top).</div>
+      <button class="rmbtn" id="rmSave">💾 Save reminder settings</button></div>`;
+  const paintAlert = () => { $("#rmAlert").innerHTML = `<button class="chip ${rmAlert.auto?'sel':''}" data-id="auto">Automatic (Father & Mother)</button>` + members.map(m => `<button class="chip ${!rmAlert.auto&&rmAlert.ids.has(m.id)?'sel':''}" data-id="${m.id}">${avatar(m)} ${esc(m.name)}</button>`).join("");
+    document.querySelectorAll("#rmAlert .chip").forEach(c => c.onclick = () => { const v = c.dataset.id;
+      if (v === "auto") { rmAlert = {auto:true, ids:new Set()}; } else { rmAlert.auto = false; const i = +v; rmAlert.ids.has(i) ? rmAlert.ids.delete(i) : rmAlert.ids.add(i); if (!rmAlert.ids.size) rmAlert.auto = true; }
+      paintAlert(); }); };
+  paintAlert();
+  document.querySelectorAll("#rmDev .chip").forEach(c => c.onclick = () => { const i = +c.dataset.id, cur = new Set(devIds());
+    cur.has(i) ? cur.delete(i) : cur.add(i); if (!cur.size) return toast("Choose at least one person");
+    devMembers = [...cur]; try { localStorage.setItem("ft_dev_members", JSON.stringify(devMembers)); } catch(e) {}
+    c.classList.toggle("sel"); syncSub(); setLastNid(null); pollNotifs(); });
+  $("#rmPush").onclick = enablePush;
+  $("#rmTest").onclick = async () => { await api("/api/reminders/test", {method:"POST", body:JSON.stringify({member_ids:[devIds()[0]]})}); pollNotifs(); };
+  $("#rmSave").onclick = async () => {
+    await api("/api/settings/reminders", {method:"PUT", body:JSON.stringify({
+      default_remind_before: +$("#rmLead").value, missed_alerts: $("#rmMissedOn").value === "1", missed_grace: +$("#rmGrace").value,
+      session_times: {morning:$("#rmMorning").value, afternoon:$("#rmAfternoon").value, evening:$("#rmEvening").value},
+      digest_enabled: $("#rmDigOn").value === "1", digest_time: $("#rmDigTime").value || "05:00",
+      alert_member_ids: rmAlert.auto ? null : [...rmAlert.ids] })});
+    toast("Reminder settings saved ✔");
+  };
+}
+setInterval(pollNotifs, 15000);
+document.addEventListener("visibilitychange", () => { if (!document.hidden) pollNotifs(); });
+loadMembers().then(pollNotifs);
+</script>
+
+<script>
+pushSupport = () => "Reminders pop up inside the app while it is open. This offline version has no server, so it cannot notify you when the app is closed.";
+setInterval(pollNotifs, 6000);
+try { navigator.storage && navigator.storage.persist && navigator.storage.persist(); } catch(e) {}
+// automatic daily snapshot: first time the app is open after 01:00, keep the last 5 days (inside this phone's app storage)
+const SNAP_KEEP = 5, snapKeys = () => Object.keys(localStorage).filter(k => k.startsWith("ft_snap_")).sort();
+function snapTick() {
+  try {
+    const n = new Date(); if (n.getHours() < 1) return;
+    const key = "ft_snap_" + isoLocal(n) + "_" + pad(n.getHours()) + pad(n.getMinutes());
+    if (!snapKeys().some(k => k.startsWith("ft_snap_" + isoLocal(n)))) localStorage.setItem(key, JSON.stringify(S));
+    snapKeys().slice(0, -SNAP_KEEP).forEach(k => localStorage.removeItem(k));
+  } catch(e) {}
+}
+snapTick(); setInterval(snapTick, 600000);
+if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => {});
+</script>
+</body>
+</html>
