@@ -40,7 +40,19 @@ ISA Prep Pro is a web app that lets candidates:
 - Free and Pro access tiers
 
 ## 6. Screenshots
-_(Screenshots to be added: home page, test screen, result page, progress dashboard.)_
+
+### Without login (free access)
+| Home | Topic-wise practice | Dashboard |
+|---|---|---|
+| ![Home](no_login_home.png) | ![Topic-wise](no_login_topicwise.png) | ![Dashboard](no_login_dashboard.png) |
+
+### After login (progress tracking)
+| Home | Topic-wise practice | Dashboard |
+|---|---|---|
+| ![Home](login_home.png) | ![Topic-wise](login_topicwise.png) | ![Dashboard](login_dashboard.png) |
+
+### Mixed mock test
+![Mixed test](mixedscreen.png)
 
 ## 7. How to Use
 1. Visit https://isa.tranzcape.in/
