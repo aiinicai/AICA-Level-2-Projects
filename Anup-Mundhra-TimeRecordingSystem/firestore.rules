@@ -1,0 +1,537 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Global safety net: default deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // --- Primitive Helpers ---
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isEmailVerified() {
+      return isSignedIn()
+        && request.auth.token.email is string
+        && request.auth.token.email_verified == true;
+    }
+
+    function authEmail() {
+      return request.auth.token.email.lower();
+    }
+
+    function isBootstrappedAdmin() {
+      return isEmailVerified() && authEmail() == 'anup.mundhra15@gmail.com';
+    }
+
+    function isAdmin() {
+      return isBootstrappedAdmin()
+        || (isEmailVerified() && exists(/databases/$(database)/documents/admins/$(request.auth.uid)));
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isValidEmailStr(val) {
+      return val is string && val.size() >= 3 && val.size() <= 160 && val.matches('^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$');
+    }
+
+    function isValidDateStr(val) {
+      return val is string && val.size() == 10 && val.matches('^\\d{4}-\\d{2}-\\d{2}$');
+    }
+
+    // --- Entity Validation Blueprints ---
+    function isValidEmployee(data) {
+      return data.keys().hasAll([
+          'name', 'email', 'designation', 'department', 'managerEmail',
+          'managerName', 'isManager', 'isAdmin', 'status', 'joiningDate',
+          'source', 'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'employeeCode', 'name', 'email', 'designation', 'department', 'managerEmail',
+          'managerName', 'isManager', 'isAdmin', 'status', 'joiningDate',
+          'source', 'updatedAt'
+        ])
+        && (!('employeeCode' in data.keys()) || (data.employeeCode is string && data.employeeCode.size() <= 40))
+        && data.name is string && data.name.size() >= 1 && data.name.size() <= 120
+        && isValidEmailStr(data.email)
+        && data.designation is string && data.designation.size() >= 1 && data.designation.size() <= 120
+        && data.department is string && data.department.size() <= 100
+        && data.managerEmail is string && data.managerEmail.size() <= 160
+        && (data.managerEmail == '' || isValidEmailStr(data.managerEmail))
+        && data.managerName is string && data.managerName.size() <= 120
+        && data.isManager is bool
+        && data.isAdmin is bool
+        && data.status in ['active', 'resigned']
+        && data.joiningDate is string && data.joiningDate.size() <= 20
+        && data.source in ['google_sheet', 'excel', 'manual']
+        && data.updatedAt is timestamp && data.updatedAt == request.time;
+    }
+
+    function isValidLeaveCategory(data) {
+      return data.keys().hasAll([
+          'name', 'code', 'defaultOpening', 'monthlyAccrual',
+          'allowNegative', 'requiresReason', 'active', 'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'name', 'code', 'defaultOpening', 'monthlyAccrual',
+          'allowNegative', 'requiresReason', 'active', 'updatedAt'
+        ])
+        && data.name is string && data.name.size() >= 1 && data.name.size() <= 80
+        && data.code is string && data.code.size() >= 1 && data.code.size() <= 16 && data.code.matches('^[A-Z0-9_\\-]+$')
+        && data.defaultOpening is number && data.defaultOpening >= 0 && data.defaultOpening <= 365
+        && data.monthlyAccrual is number && data.monthlyAccrual >= 0 && data.monthlyAccrual <= 31
+        && data.allowNegative is bool
+        && data.requiresReason is bool
+        && data.active is bool
+        && data.updatedAt is timestamp && data.updatedAt == request.time;
+    }
+
+    function isValidLeaveBalance(data) {
+      return data.keys().hasAll([
+          'employeeId', 'employeeEmail', 'employeeName', 'managerEmail',
+          'year', 'categoryId', 'categoryName', 'opening', 'accrued',
+          'availed', 'closing', 'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'employeeId', 'employeeEmail', 'employeeName', 'managerEmail',
+          'year', 'categoryId', 'categoryName', 'opening', 'accrued',
+          'availed', 'closing', 'updatedAt'
+        ])
+        && isValidId(data.employeeId)
+        && isValidEmailStr(data.employeeEmail)
+        && data.employeeName is string && data.employeeName.size() >= 1 && data.employeeName.size() <= 120
+        && data.managerEmail is string && data.managerEmail.size() <= 160
+        && (data.managerEmail == '' || isValidEmailStr(data.managerEmail))
+        && data.year is number && data.year >= 2020 && data.year <= 2100
+        && isValidId(data.categoryId) && data.categoryId.size() <= 64
+        && data.categoryName is string && data.categoryName.size() >= 1 && data.categoryName.size() <= 80
+        && data.opening is number && data.opening >= -365 && data.opening <= 365
+        && data.accrued is number && data.accrued >= 0 && data.accrued <= 365
+        && data.availed is number && data.availed >= 0 && data.availed <= 365
+        && data.closing is number && data.closing >= -365 && data.closing <= 730
+        && (data.closing - (data.opening + data.accrued - data.availed)) > -0.001
+        && (data.closing - (data.opening + data.accrued - data.availed)) < 0.001
+        && data.updatedAt is timestamp && data.updatedAt == request.time;
+    }
+
+    function isValidLeaveRequest(data) {
+      return data.keys().hasAll([
+          'employeeId', 'employeeEmail', 'employeeName', 'employeeDesignation',
+          'managerEmail', 'categoryId', 'categoryName', 'startDate', 'endDate',
+          'halfDay', 'workingDays', 'reason', 'status', 'managerComment',
+          'reviewedBy', 'createdAt', 'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'employeeId', 'employeeEmail', 'employeeName', 'employeeDesignation',
+          'managerEmail', 'categoryId', 'categoryName', 'startDate', 'endDate',
+          'halfDay', 'workingDays', 'reason', 'status', 'managerComment',
+          'reviewedBy', 'reviewedAt', 'createdAt', 'updatedAt'
+        ])
+        && isValidId(data.employeeId)
+        && isValidEmailStr(data.employeeEmail)
+        && data.employeeName is string && data.employeeName.size() >= 1 && data.employeeName.size() <= 120
+        && data.employeeDesignation is string && data.employeeDesignation.size() <= 120
+        && isValidEmailStr(data.managerEmail)
+        && isValidId(data.categoryId) && data.categoryId.size() <= 64
+        && data.categoryName is string && data.categoryName.size() >= 1 && data.categoryName.size() <= 80
+        && isValidDateStr(data.startDate)
+        && isValidDateStr(data.endDate)
+        && data.halfDay in ['none', 'first_half', 'second_half']
+        && data.workingDays is number && data.workingDays > 0 && data.workingDays <= 365
+        && data.reason is string && data.reason.size() >= 1 && data.reason.size() <= 500
+        && data.status in ['pending', 'approved', 'rejected', 'cancelled']
+        && data.managerComment is string && data.managerComment.size() <= 500
+        && data.reviewedBy is string && data.reviewedBy.size() <= 160
+        && (data.reviewedBy == '' || isValidEmailStr(data.reviewedBy))
+        && (!('reviewedAt' in data.keys()) || data.reviewedAt is timestamp)
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp && data.updatedAt == request.time;
+    }
+
+    function isValidHoliday(data) {
+      return data.keys().hasAll(['date', 'name', 'updatedAt'])
+        && data.keys().hasOnly(['date', 'name', 'updatedAt'])
+        && isValidDateStr(data.date)
+        && data.name is string && data.name.size() >= 1 && data.name.size() <= 100
+        && data.updatedAt is timestamp && data.updatedAt == request.time;
+    }
+
+    function isValidRosterSyncConfig(data) {
+      return data.keys().hasAll([
+          'spreadsheetId', 'spreadsheetTitle', 'sheetName',
+          'lastSyncedBy', 'activeCount', 'resignedCount', 'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'spreadsheetId', 'spreadsheetTitle', 'sheetName',
+          'lastSyncedBy', 'activeCount', 'resignedCount', 'updatedAt'
+        ])
+        && data.spreadsheetId is string && data.spreadsheetId.size() <= 200
+        && data.spreadsheetTitle is string && data.spreadsheetTitle.size() <= 160
+        && data.sheetName is string && data.sheetName.size() <= 120
+        && data.lastSyncedBy is string && data.lastSyncedBy.size() <= 160
+        && data.activeCount is number && data.activeCount >= 0 && data.activeCount <= 50000
+        && data.resignedCount is number && data.resignedCount >= 0 && data.resignedCount <= 50000
+        && data.updatedAt is timestamp && data.updatedAt == request.time;
+    }
+
+    function isValidAdminRole(data) {
+      return data.keys().hasAll(['email', 'grantedBy', 'updatedAt'])
+        && data.keys().hasOnly(['email', 'grantedBy', 'updatedAt'])
+        && isValidEmailStr(data.email)
+        && isValidEmailStr(data.grantedBy)
+        && data.updatedAt is timestamp && data.updatedAt == request.time;
+    }
+
+
+    // --- Timesheet helpers ---
+    // HR admin flagged in the roster sheet (employee doc id = sanitized email)
+    function isSheetAdmin() {
+      return isEmailVerified()
+        && exists(/databases/$(database)/documents/employees/$(authEmail().replace('[^a-z0-9_\\-]', '_')))
+        && get(/databases/$(database)/documents/employees/$(authEmail().replace('[^a-z0-9_\\-]', '_'))).data.isAdmin == true
+        && get(/databases/$(database)/documents/employees/$(authEmail().replace('[^a-z0-9_\\-]', '_'))).data.status == 'active';
+    }
+
+    function isAnyAdmin() {
+      return isAdmin() || isSheetAdmin();
+    }
+
+    function dateAsTimestamp(d) {
+      return timestamp.date(int(d[0:4]), int(d[5:7]), int(d[8:10]));
+    }
+
+    // Client enforces exactly 14 days; rules allow a small buffer for time zone differences.
+    function isWithinOpenWindow(d) {
+      return dateAsTimestamp(d) >= request.time - duration.value(15, 'd')
+        && dateAsTimestamp(d) <= request.time + duration.value(1, 'd');
+    }
+
+    function isValidProject(data) {
+      return data.keys().hasAll([
+          'code', 'name', 'client', 'type', 'active',
+          'partnerName', 'partnerEmail', 'managerName', 'managerEmail', 'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'code', 'name', 'client', 'type', 'active',
+          'partnerName', 'partnerEmail', 'managerName', 'managerEmail', 'updatedAt'
+        ])
+        && data.code is string && data.code.size() >= 1 && data.code.size() <= 32
+        && data.name is string && data.name.size() >= 1 && data.name.size() <= 120
+        && data.client is string && data.client.size() <= 120
+        && data.type in ['chargeable', 'non_chargeable']
+        && data.active is bool
+        && data.partnerName is string && data.partnerName.size() <= 120
+        && data.partnerEmail is string && data.partnerEmail.size() <= 160
+        && data.managerName is string && data.managerName.size() <= 120
+        && data.managerEmail is string && data.managerEmail.size() <= 160
+        && data.updatedAt is timestamp && data.updatedAt == request.time;
+    }
+
+    function isValidTimesheetEntry(data) {
+      return data.keys().hasAll([
+          'employeeId', 'employeeEmail', 'employeeName', 'managerEmail', 'date',
+          'lines', 'totalHours', 'status', 'managerComment', 'reviewedBy',
+          'reopenedBy', 'reopenReason', 'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'employeeId', 'employeeEmail', 'employeeName', 'managerEmail', 'date',
+          'lines', 'totalHours', 'status', 'managerComment', 'reviewedBy',
+          'reopenedBy', 'reopenReason', 'submittedAt', 'reviewedAt', 'updatedAt'
+        ])
+        && isValidId(data.employeeId)
+        && isValidEmailStr(data.employeeEmail)
+        && data.employeeName is string && data.employeeName.size() >= 1 && data.employeeName.size() <= 120
+        && isValidEmailStr(data.managerEmail)
+        && isValidDateStr(data.date)
+        && data.lines is list && data.lines.size() >= 1 && data.lines.size() <= 6
+        && data.totalHours is number && data.totalHours > 0 && data.totalHours <= 8
+        && data.status in ['draft', 'submitted', 'approved', 'rejected']
+        && data.managerComment is string && data.managerComment.size() <= 500
+        && data.reviewedBy is string && data.reviewedBy.size() <= 160
+        && data.reopenedBy is string && data.reopenedBy.size() <= 160
+        && data.reopenReason is string && data.reopenReason.size() <= 300
+        && (!('submittedAt' in data.keys()) || data.submittedAt is timestamp)
+        && (!('reviewedAt' in data.keys()) || data.reviewedAt is timestamp)
+        && data.updatedAt is timestamp && data.updatedAt == request.time;
+    }
+
+    // --- Collection Rules ---
+
+    // Employees: PII isolated to owner, direct reporting manager, or HR Admin
+    match /employees/{empId} {
+      allow get: if isEmailVerified() && isValidId(empId) && (
+        isAdmin()
+        || existing().email == authEmail()
+        || existing().managerEmail == authEmail()
+      );
+      allow list: if isEmailVerified() && (
+        isBootstrappedAdmin()
+        || existing().email == authEmail()
+        || existing().managerEmail == authEmail()
+      );
+      allow create, update: if isAdmin() && isValidId(empId) && isValidEmployee(incoming());
+      allow delete: if isAdmin() && isValidId(empId);
+    }
+
+    // Leave Categories: readable by any verified user, writable only by HR Admin
+    match /leaveCategories/{catId} {
+      allow get: if isEmailVerified() && isValidId(catId) && catId.size() <= 64;
+      allow list: if isEmailVerified();
+      allow create, update: if isAdmin() && isValidId(catId) && catId.size() <= 64 && isValidLeaveCategory(incoming());
+      allow delete: if isAdmin() && isValidId(catId) && catId.size() <= 64;
+    }
+
+    // Leave Balances: owner, reporting manager, or HR Admin
+    match /leaveBalances/{balId} {
+      allow get: if isEmailVerified() && isValidId(balId) && (
+        isAdmin()
+        || existing().employeeEmail == authEmail()
+        || existing().managerEmail == authEmail()
+      );
+      allow list: if isEmailVerified() && (
+        isBootstrappedAdmin()
+        || existing().employeeEmail == authEmail()
+        || existing().managerEmail == authEmail()
+      );
+      allow create: if isEmailVerified() && isValidId(balId) && isValidLeaveBalance(incoming()) && (
+        isAdmin()
+        || (
+          (incoming().employeeEmail == authEmail() || incoming().managerEmail == authEmail())
+          && incoming().accrued == 0
+          && exists(/databases/$(database)/documents/employees/$(incoming().employeeId))
+          && get(/databases/$(database)/documents/employees/$(incoming().employeeId)).data.email == incoming().employeeEmail
+          && get(/databases/$(database)/documents/employees/$(incoming().employeeId)).data.status == 'active'
+          && incoming().managerEmail == get(/databases/$(database)/documents/employees/$(incoming().employeeId)).data.managerEmail
+          && exists(/databases/$(database)/documents/leaveCategories/$(incoming().categoryId))
+          && incoming().opening == get(/databases/$(database)/documents/leaveCategories/$(incoming().categoryId)).data.defaultOpening
+          && ((incoming().employeeEmail == authEmail() && incoming().availed == 0) || (incoming().managerEmail == authEmail() && incoming().availed >= 0))
+        )
+      );
+      allow update: if isEmailVerified() && isValidId(balId) && isValidLeaveBalance(incoming()) && (
+        isAdmin()
+        || (
+          existing().managerEmail == authEmail()
+          && incoming().employeeId == existing().employeeId
+          && incoming().employeeEmail == existing().employeeEmail
+          && incoming().managerEmail == existing().managerEmail
+          && incoming().year == existing().year
+          && incoming().categoryId == existing().categoryId
+          && incoming().opening == existing().opening
+          && incoming().accrued == existing().accrued
+          && incoming().availed >= existing().availed
+          && incoming().diff(existing()).affectedKeys().hasOnly(['availed', 'closing', 'updatedAt'])
+        )
+      );
+      allow delete: if isAdmin() && isValidId(balId);
+    }
+
+    // Leave Requests: employee creates pending; reporting manager approves/rejects; employee can cancel pending
+    match /leaveRequests/{reqId} {
+      allow get: if isEmailVerified() && isValidId(reqId) && (
+        isAdmin()
+        || existing().employeeEmail == authEmail()
+        || existing().managerEmail == authEmail()
+      );
+      allow list: if isEmailVerified() && (
+        isBootstrappedAdmin()
+        || existing().employeeEmail == authEmail()
+        || existing().managerEmail == authEmail()
+      );
+      allow create: if isEmailVerified()
+        && isValidId(reqId)
+        && isValidLeaveRequest(incoming())
+        && incoming().employeeEmail == authEmail()
+        && incoming().status == 'pending'
+        && incoming().managerComment == ''
+        && incoming().reviewedBy == ''
+        && !('reviewedAt' in incoming().keys())
+        && incoming().createdAt == request.time
+        && exists(/databases/$(database)/documents/leaveCategories/$(incoming().categoryId))
+        && (
+          isAdmin()
+          || (
+            exists(/databases/$(database)/documents/employees/$(incoming().employeeId))
+            && get(/databases/$(database)/documents/employees/$(incoming().employeeId)).data.email == authEmail()
+            && get(/databases/$(database)/documents/employees/$(incoming().employeeId)).data.status == 'active'
+            && get(/databases/$(database)/documents/employees/$(incoming().employeeId)).data.managerEmail == incoming().managerEmail
+          )
+        );
+      allow update: if isEmailVerified()
+        && isValidId(reqId)
+        && isValidLeaveRequest(incoming())
+        && incoming().employeeId == existing().employeeId
+        && incoming().employeeEmail == existing().employeeEmail
+        && incoming().createdAt == existing().createdAt
+        && (
+          isAdmin()
+          || (
+            // Action: Manager Approve or Reject (only from pending)
+            existing().status == 'pending'
+            && existing().managerEmail == authEmail()
+            && incoming().status in ['approved', 'rejected']
+            && incoming().reviewedBy == authEmail()
+            && incoming().reviewedAt == request.time
+            && incoming().diff(existing()).affectedKeys().hasOnly([
+              'status', 'managerComment', 'reviewedBy', 'reviewedAt', 'updatedAt'
+            ])
+          )
+          || (
+            // Action: Employee Cancel (only from pending)
+            existing().status == 'pending'
+            && existing().employeeEmail == authEmail()
+            && incoming().status == 'cancelled'
+            && incoming().diff(existing()).affectedKeys().hasOnly(['status', 'updatedAt'])
+          )
+        );
+      allow delete: if isAdmin() && isValidId(reqId);
+    }
+
+    // Holidays: readable by verified users, managed by HR Admin
+    match /holidays/{holidayId} {
+      allow get: if isEmailVerified() && isValidId(holidayId) && holidayId.size() <= 64;
+      allow list: if isEmailVerified();
+      allow create, update: if isAdmin() && isValidId(holidayId) && holidayId.size() <= 64 && isValidHoliday(incoming());
+      allow delete: if isAdmin() && isValidId(holidayId) && holidayId.size() <= 64;
+    }
+
+    // Settings (Google Sheet sync metadata): HR Admin only
+    match /settings/{settingId} {
+      allow get: if isAdmin() && isValidId(settingId) && settingId.size() <= 64;
+      allow list: if isBootstrappedAdmin();
+      allow create, update: if isAdmin() && isValidId(settingId) && settingId.size() <= 64 && isValidRosterSyncConfig(incoming());
+      allow delete: if isAdmin() && isValidId(settingId) && settingId.size() <= 64;
+    }
+
+
+    // Projects (synced from the "Projects" tab): readable by verified users, managed by HR Admin
+    match /projects/{projectId} {
+      allow get: if isEmailVerified() && isValidId(projectId) && projectId.size() <= 64;
+      allow list: if isEmailVerified();
+      allow create, update: if isAnyAdmin() && isValidId(projectId) && projectId.size() <= 64 && isValidProject(incoming());
+      allow delete: if isAnyAdmin() && isValidId(projectId) && projectId.size() <= 64;
+    }
+
+    // Timesheet entries: one document per employee per day (id = employeeId_YYYY-MM-DD).
+    // Employee edits own draft/rejected days inside the open window; reporting manager approves or
+    // rejects submitted days; HR Admin reopens days and approves for employees with no manager.
+    // Note: rules cannot sum the lines array, so the client enforces lines total == totalHours.
+    match /timesheetEntries/{entryDocId} {
+      allow get: if isEmailVerified() && isValidId(entryDocId) && (
+        isAnyAdmin()
+        || existing().employeeEmail == authEmail()
+        || existing().managerEmail == authEmail()
+      );
+      allow list: if isEmailVerified() && (
+        isBootstrappedAdmin()
+        || existing().employeeEmail == authEmail()
+        || existing().managerEmail == authEmail()
+      );
+
+      allow create: if isEmailVerified()
+        && isValidId(entryDocId)
+        && isValidTimesheetEntry(incoming())
+        && entryDocId == incoming().employeeId + '_' + incoming().date
+        && incoming().employeeEmail == authEmail()
+        && incoming().status in ['draft', 'submitted']
+        && (incoming().status == 'draft' || incoming().totalHours == 8)
+        && incoming().managerComment == ''
+        && incoming().reviewedBy == ''
+        && incoming().reopenedBy == ''
+        && incoming().reopenReason == ''
+        && !('reviewedAt' in incoming().keys())
+        && isWithinOpenWindow(incoming().date)
+        && exists(/databases/$(database)/documents/employees/$(incoming().employeeId))
+        && get(/databases/$(database)/documents/employees/$(incoming().employeeId)).data.email == authEmail()
+        && get(/databases/$(database)/documents/employees/$(incoming().employeeId)).data.status == 'active'
+        && (
+          incoming().managerEmail == get(/databases/$(database)/documents/employees/$(incoming().employeeId)).data.managerEmail
+          || incoming().managerEmail == authEmail()
+        );
+
+      allow update: if isEmailVerified()
+        && isValidId(entryDocId)
+        && isValidTimesheetEntry(incoming())
+        && incoming().employeeId == existing().employeeId
+        && incoming().employeeEmail == existing().employeeEmail
+        && incoming().managerEmail == existing().managerEmail
+        && incoming().date == existing().date
+        && (
+          // Employee saves or submits their own draft / rejected day
+          (
+            existing().employeeEmail == authEmail()
+            && existing().status in ['draft', 'rejected']
+            && incoming().status in ['draft', 'submitted']
+            && (incoming().status == 'draft' || incoming().totalHours == 8)
+            && (isWithinOpenWindow(existing().date) || existing().reopenedBy != '')
+            && incoming().diff(existing()).affectedKeys().hasOnly([
+              'lines', 'totalHours', 'status', 'submittedAt', 'updatedAt'
+            ])
+          )
+          // Reporting manager approves or rejects a submitted day (never their own)
+          || (
+            existing().status == 'submitted'
+            && existing().managerEmail == authEmail()
+            && existing().employeeEmail != authEmail()
+            && incoming().status in ['approved', 'rejected']
+            && incoming().reviewedBy == authEmail()
+            && incoming().reviewedAt == request.time
+            && (incoming().status == 'approved' || incoming().managerComment.size() >= 1)
+            && incoming().diff(existing()).affectedKeys().hasOnly([
+              'status', 'managerComment', 'reviewedBy', 'reviewedAt', 'updatedAt'
+            ])
+          )
+          // HR Admin approves or rejects for an employee who has no reporting manager
+          || (
+            isAnyAdmin()
+            && existing().status == 'submitted'
+            && existing().employeeEmail == existing().managerEmail
+            && existing().employeeEmail != authEmail()
+            && incoming().status in ['approved', 'rejected']
+            && incoming().reviewedBy == authEmail()
+            && incoming().reviewedAt == request.time
+            && (incoming().status == 'approved' || incoming().managerComment.size() >= 1)
+            && incoming().diff(existing()).affectedKeys().hasOnly([
+              'status', 'managerComment', 'reviewedBy', 'reviewedAt', 'updatedAt'
+            ])
+          )
+          // HR Admin reopens a day (frozen, submitted, approved or rejected) back to draft
+          || (
+            isAnyAdmin()
+            && incoming().status == 'draft'
+            && incoming().reopenedBy == authEmail()
+            && incoming().reopenReason.size() >= 1
+            && incoming().diff(existing()).affectedKeys().hasOnly([
+              'status', 'reopenedBy', 'reopenReason', 'updatedAt'
+            ])
+          )
+        );
+
+      // Employee can clear their own draft day; HR Admin can remove any entry
+      allow delete: if isEmailVerified() && isValidId(entryDocId) && (
+        isAnyAdmin()
+        || (existing().employeeEmail == authEmail() && existing().status == 'draft')
+      );
+    }
+
+    // Admins registry
+    match /admins/{uid} {
+      allow get: if isEmailVerified() && isValidId(uid) && (isAdmin() || request.auth.uid == uid);
+      allow list: if isBootstrappedAdmin();
+      allow create, update: if isBootstrappedAdmin() && isValidId(uid) && isValidAdminRole(incoming());
+      allow delete: if isBootstrappedAdmin() && isValidId(uid);
+    }
+  }
+}
