@@ -65,6 +65,7 @@ The finished app **does not need AI to run**: the rules are fixed and explainabl
 | `3cd-tally-connector/` | The Tally Connector Chrome / Edge extension (Load unpacked) |
 | `Google Apps Script/` | The Google Drive script the firm installs, with set-up steps |
 | `demo tally prime 5.0 data/100000/` | TallyPrime 5.0 data of the fictional demo company Aeron Medicare Pvt. Ltd. |
+| `3CD_Helper_Clients_Import.csv` | The demo client to import (Clients → Import) |
 
 ## 6. How to see it working
 
