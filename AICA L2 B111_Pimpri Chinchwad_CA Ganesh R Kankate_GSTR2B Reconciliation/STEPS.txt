@@ -1,0 +1,107 @@
+TALLY PURCHASE REGISTER vs GSTR-2B RECONCILIATION - STEPS
+==========================================================
+
+Files in this folder
+--------------------
+  app.py            - the Streamlit application
+  requirements.txt  - Python libraries needed
+  Run_App.bat       - double-click to start the app (Windows)
+  STEPS.txt         - this file
+  README.md         - project overview (AICA Level 2 Capstone)
+  sample_data\      - dummy Tally + GSTR-2B files to try the app
+  tests\            - self_test.py (run: python tests\self_test.py)
+
+Author: CA Ganesh R Kankate (ICAI Membership No. 137798)
+AICA Level 2 - Batch L2B111 - Pimpri Chinchwad
+
+
+ONE-TIME SETUP
+--------------
+1. Install Python 3.10 or newer from https://www.python.org/downloads/
+   (During install, tick "Add Python to PATH".)
+
+2. Open Command Prompt / PowerShell in this folder and run:
+
+       pip install -r requirements.txt
+
+
+EVERY TIME YOU USE IT
+---------------------
+1. Start the app - any ONE of these:
+     a) Double-click  Run_App.bat                       (easiest)
+     b) Open app.py in IDLE and press F5 - it opens a new black window
+        that runs the app (keep that window open while you work)
+     c) In Command Prompt / PowerShell in this folder, run:
+            streamlit run app.py
+
+   NOTE: "missing ScriptRunContext" warnings mean the file was run as a plain
+   Python script without the launcher. Use a), b) or c) above.
+
+2. Your browser opens at http://localhost:8501
+   (if it does not, open that address yourself).
+
+3. Upload the two files:
+     - Tally Purchase Register (.xlsx)
+     - GSTR-2B Excel Sheet (.xlsx)   (as downloaded from the GST portal)
+
+4. Check the sheet pickers (the B2B sheet of GSTR-2B is selected automatically)
+   and the Rounding Tolerance (default Rs 1.00).
+
+5. Click  "Run Reconciliation".
+
+6. Review the on-screen tabs, then click
+   "Download Reconciliation Workbook (.xlsx)".
+
+7. To stop the app, close the black command window (or press Ctrl+C in it).
+
+
+HOW TO EXPORT THE TALLY PURCHASE REGISTER
+-----------------------------------------
+1. Tally: Display More Reports > Account Books > Purchase Register.
+2. Select the month / period.
+3. Press F5 (Columnar) or Alt+F5 (Detailed/Columnar view).
+4. In configuration (F12), make sure these columns are ON:
+     - Voucher No.
+     - Supplier Invoice No.
+     - GSTIN/UIN                <-- REQUIRED
+     - Gross Total
+   (Ledger columns - purchase, IGST, CGST, SGST, TDS, Round Off - come automatically.)
+5. Export (Alt+E) > Format: Excel (.xlsx).
+
+
+OUTPUT WORKBOOK TABS
+--------------------
+  0_Summary                    - counts and values per tier
+  Cleaned_Purchase_Register    - standardised register (Taxable, IGST, CGST, SGST,
+                                 SEZ SALES, TDS, Diff + ledger-wise detail)
+  1_Exact_Matched              - GSTIN + exact invoice no. match
+  2_Normalized_Exact_Matched   - GSTIN + cleaned invoice no. (ignores / - spaces,
+                                 leading zeros, upper/lower case)
+  3_GSTIN_Total_Matched        - GSTIN totals agree within tolerance
+  5_Unregistered_Non_2B        - entries with blank / invalid GSTIN
+  6_Unmatched_Books_vs_2B      - In Books not in 2B, and In 2B not in Books,
+                                 with Remarks (duplicates, probable matches, etc.)
+  GSTR2B_Cleaned               - the 2B data as read (one row per invoice)
+
+
+POINTS TO NOTE
+--------------
+- Books Invoice Value = Gross Total + TDS deducted, so it can be compared with
+  the 2B invoice value (2B is before TDS).
+- Cess, TCS and Round Off are kept out of "Taxable"; they appear in the
+  "Cess / TCS / Round Off" column and therefore in "Diff".
+- Only the B2B sheet of GSTR-2B is reconciled (credit/debit notes are not).
+- Check the "Ledger mapping" tab in the app to confirm each Tally ledger was
+  classified correctly (taxable / igst / cgst / sgst / tds / other).
+- In Cleaned_Purchase_Register, filter "GST Rate Check" for values starting
+  with "CHECK" - these vouchers have mixed rates, IGST + CGST/SGST together,
+  CGST <> SGST, or a ledger posted to the wrong bucket.
+
+
+TROUBLESHOOTING
+---------------
+"'streamlit' is not recognized"  -> run:  python -m streamlit run app.py
+"No 'GSTIN/UIN' column found"     -> enable GSTIN/UIN in Tally (F12) and export again.
+"Could not find the header row"   -> the Tally sheet must have a row with
+                                     "Date" and "Particulars" headings.
+"Could not find ... 'GSTIN'" (2B) -> select the B2B sheet in the GSTR-2B sheet picker.

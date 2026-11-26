@@ -1,0 +1,154 @@
+Act as an Expert Python Developer and Chartered Accountant automation specialist. Build a complete, error-free Streamlit web application in ONE Python file named `app.py` that cleans and standardises a Tally Purchase Register and runs a multi-tier reconciliation against GSTR-2B. Also give me `requirements.txt`, `Run_App.bat` and `STEPS.txt`. Test the logic yourself with sample data before giving me the final files.
+
+==================================================================
+0. TECHNICAL BASE
+==================================================================
+- Python 3.10+, libraries: streamlit, pandas (must work on pandas 2.x AND 3.x), numpy, openpyxl. Do not use xlsxwriter or xlrd.
+- Read every Excel sheet with header=None and dtype=object, then detect headers yourself.
+- Never rely on fixed column positions. Detect every column by its header name, with keyword matching on a "canonical" form (lower-case, letters and digits only).
+- Helper functions needed:
+  * to_str(v): NaN/None -> "", 123.0 -> "123", dates -> "dd-mm-yyyy", trims spaces.
+  * to_number(v): handles commas, ₹, "Rs.", "(1,000)" -> negative, "1,000.00 Cr" -> negative, "1,000 Dr" -> positive. Returns NaN for real text, which is used to tell text columns from amount columns.
+  * parse_date(v): accepts datetime objects, Excel serial numbers, and strings. ISO strings "yyyy-mm-dd" must be parsed as year-month-day (NOT day-first). All other strings are parsed day-first (Indian dd-mm-yyyy).
+- Self-launch: if the user runs `python app.py` or presses F5 in IDLE, the script must NOT show "missing ScriptRunContext" warnings. In `if __name__ == "__main__":` check `streamlit.runtime.exists()`. If true, call main(). If false, start `python -m streamlit run <this file>` with subprocess.Popen in a NEW console window (CREATE_NEW_CONSOLE on Windows; replace pythonw.exe with python.exe because IDLE uses pythonw), and print that the browser will open at http://localhost:8501.
+
+==================================================================
+1. USER INTERFACE (Streamlit, wide layout)
+==================================================================
+- Two file uploaders side by side: (a) Tally Purchase Register (.xlsx), (b) GSTR-2B Excel Sheet (.xlsx).
+- After upload, a sheet selector for each file. For GSTR-2B, select the sheet named "B2B" automatically if present.
+- Number input "Rounding Tolerance Threshold (₹)", default 1.00, step 0.50.
+- "Run Reconciliation" button (disabled until both files are uploaded).
+- Keep results in st.session_state so they do not disappear when the download button is clicked.
+- After the run: success message (header row found, number of junk rows removed), warnings for (i) vouchers with non-zero Diff, (ii) vouchers failing the GST Rate Check, (iii) missing Supplier Invoice No. column. Then 6 metrics (register rows, Tier 1, Tier 2, Tier 3 rows, Unmatched Books/2B, Unregistered), one download button, and preview tabs for every output sheet plus a "Ledger mapping" tab that shows how each Tally ledger column was classified.
+- Wrap processing in try/except and show any error with st.error in plain words.
+
+==================================================================
+2. STAGE 1 – TALLY PURCHASE REGISTER STANDARDISATION
+==================================================================
+2.1 Header row: scan the first 80 rows; the header is the first row that contains both "Date" and "Particulars". If not found, raise a clear error. Make duplicate header names unique; blank headers become Column_1, Column_2...
+
+2.2 Identify columns by name:
+- Date (exclude names containing invoice/supplier/bill/ref), Particulars, Voucher Type / Vch Type, Voucher No. / Vch No.
+- Supplier Invoice No. (also accept "Supplier Inv No", "Bill No", "Reference No", "Ref No"; exclude names with "date")
+- Supplier Invoice Date (optional), GSTIN/UIN (also "GSTIN", "GST No"), Gross Total.
+- If GSTIN/UIN is missing, stop with this message: enable "Show GSTIN/UIN" in Tally (F12) and export again. If Gross Total is missing, stop with an error.
+
+2.3 Remove junk rows: keep only rows that have a valid date, a non-blank Particulars, and Particulars that is not "Total"/"Grand Total"/"Sub Total". This strips title rows, the Grand Total and blank/summary rows. Fallback if no dates parse: keep rows with a Voucher No.
+
+2.4 Every other column: if at least 80% of its non-blank values are numbers, it is a LEDGER (amount) column, otherwise a text column (e.g. Narration) that is carried through as-is.
+
+2.5 LEDGER CLASSIFICATION (most important – this was the IGST bug). Check in this order:
+  a) "Gross Total" -> gross
+  b) value / quantity / qty / rate / alt units / billed qty / actual qty -> info only (not summed)
+  c) TDS or "Tax Deducted" (whole word) -> TDS
+  d) TCS or "Tax Collected" -> other
+  e) Round Off / Rounded Off / Rounding -> other
+  f) Decide whether it is a PURCHASE/EXPENSE ledger:
+     PURCHASE WORDS (regex, case-insensitive): pu+r (covers Pur, Purchase, Purchases, Puurchases), labour/labor, charge, expense, exp/exps, service, job work, freight, cartage, material, consumable, stores, spares, repair, maintenance, rent, hire, fees, commission, goods, inward, interstate/inter state, intrastate/intra state, local, import, stock, asset, machinery, equipment, packing, transport, contract.
+     TAX-LEDGER WORDS (these WIN over purchase words): input, ITC, payable, receivable, output, credit ledger, RCM, reverse charge.
+     is_purchase = (has a purchase word) AND (has NO tax-ledger word).
+  g) If NOT is_purchase:
+       Cess -> other
+       IGST or "Integrated Tax" -> IGST
+       CGST or "Central Tax" -> CGST
+       SGST / UTGST / "State Tax" / "UT Tax" -> SGST
+  h) SEZ (whole word) -> SEZ
+  i) everything else -> TAXABLE
+  Match GST words as whole words (e.g. regex (?<![a-z])igst(?![a-z])).
+  Required results:
+    "Purchase IGST 18%", "Purchases IGST", "IGST Purchases", "IGST puurchases", "Purchase - Interstate (IGST)", "Labour Charges IGST", "Job Work IGST 18%", "Pur IGST 28%", "Purchase 18%", "Purchase Local CGST SGST"  -> TAXABLE
+    "Input IGST", "IGST Input", "Input IGST 18%", "IGST @18%", "IGST", "Input IGST on Purchases", "IGST RCM Payable" -> IGST
+    "Input CGST 9% Local", "CGST Input 2.5%" -> CGST ;  "Input SGST" -> SGST
+    "TDS on Labour Charges 194C" -> TDS ;  "Round Off" -> other
+
+2.6 Standard columns (row-wise sums of the classified ledgers):
+- Taxable = sum of TAXABLE ledgers
+- IGST, CGST, SGST = sum of their ledgers
+- SEZ SALES = sum of SEZ ledgers, 0 if none
+- TDS = -(absolute sum of TDS ledgers)  (always shown negative; add +0.0 so -0.0 shows as 0.0)
+- Diff = Gross Total − (Taxable + IGST + CGST + SGST + SEZ SALES + TDS), rounded to 2 decimals
+- Cess / TCS / Round Off = sum of "other" ledgers (explains any Diff)
+- Books Invoice Value = Gross Total − TDS  (TDS added back, so it compares with the 2B invoice value)
+
+2.7 GST RATE VERIFICATION (extra check):
+- GST Rate % = (IGST + CGST + SGST) ÷ Taxable × 100, rounded to 2 decimals.
+- GST Rate Check (text):
+   * Taxable = 0 and tax = 0 -> "No Tax"
+   * Taxable = 0 but tax > 0 -> "CHECK - Taxable is 0 but tax booked"
+   * tax = 0 -> "No GST (0%)"
+   * IGST and CGST/SGST both booked -> "CHECK - both IGST and CGST/SGST booked"
+   * CGST ≠ SGST (beyond tolerance) -> "CHECK - CGST and SGST differ"
+   * nearest standard slab from (0.1, 0.25, 1.5, 3, 5, 6, 12, 18, 28, 40): if |rate − slab| ≤ 0.1 or |tax − Taxable×slab/100| ≤ ₹ tolerance -> "OK - 18%" (show the slab)
+   * otherwise -> "CHECK - not a standard GST rate (mixed rates / wrong ledger?)"
+
+2.8 Output column order for Cleaned_Purchase_Register:
+Date, Particulars, Voucher Type, Voucher No., Supplier Invoice No. (ALWAYS immediately after Voucher No.), Supplier Invoice Date (if present), GSTIN/UIN (upper-case, no spaces), other text columns, Gross Total, Taxable, IGST, CGST, SGST, SEZ SALES, TDS, Diff, GST Rate %, GST Rate Check, Cess / TCS / Round Off, Books Invoice Value, then every original ledger column for the audit trail (if a ledger name clashes with a standard column name, suffix it with " [Ledger]").
+
+==================================================================
+3. SEGREGATION OF UNREGISTERED / NON-2B
+==================================================================
+- Valid GSTIN regex: ^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][1-9A-Z]Z[0-9A-Z]$
+- Rows with a blank or invalid GSTIN go to "5_Unregistered_Non_2B" BEFORE matching. Only valid-GSTIN rows enter reconciliation.
+
+==================================================================
+4. GSTR-2B PARSING (portal B2B sheet)
+==================================================================
+- Header row = first row (within 80 rows) that has a cell containing "GSTIN" and at least 3 non-blank cells.
+- The portal uses a TWO-ROW header (e.g. "Invoice details" merged over "Invoice number / Invoice type / Invoice Date / Invoice Value(₹)", and "Tax Amount" over "Integrated Tax(₹) / Central Tax(₹) / State/UT Tax(₹) / Cess(₹)"). Detect this when the next row contains invoice number/date/value, integrated/central tax or taxable value. Column name = sub-header if present, else top header (carry merged top headers forward). Also support a flat single-row header.
+- Map by name: GSTIN of supplier, Trade/Legal name, Invoice number (also Document/Note Number), Invoice Date (exclude filing/IRN dates), Invoice Value, Taxable Value, Integrated Tax, Central Tax, State/UT Tax, Cess, ITC Availability, Reverse Charge, GSTR-1/IFF/GSTR-5 Period.
+- Keep only data rows whose GSTIN is 15 letters/digits (this drops totals and notes).
+- The portal shows one row per invoice PER TAX RATE: consolidate by (GSTIN, Invoice No.) – sum Taxable/IGST/CGST/SGST/Cess, take Invoice Value ONCE (max, because it repeats on each rate row), take first name/date/ITC/period. If Invoice Value is missing, use Taxable + taxes + cess.
+- Prefix all 2B columns with "2B " (2B GSTIN, 2B Invoice No., 2B Invoice Value, 2B Taxable, 2B IGST, ...).
+
+==================================================================
+5. MULTI-TIER RECONCILIATION ENGINE
+==================================================================
+Invoice normalisation function: upper-case; strip leading zeros of every numeric block (INV/001 = INV/1); remove "/", "-", spaces and all other non-alphanumeric characters; strip remaining leading zeros.
+
+Matching must be ONE-TO-ONE: give every Books row and every 2B row an internal id; once matched, remove BOTH sides from the pool (by id, never by invoice number alone). For duplicates, add a sequence number (groupby key cumcount) on both sides and include it in the merge key so extras fall through to the next tier.
+
+- Tier 1 Strict Exact: GSTIN + Supplier Invoice No. exactly as typed (outer spaces trimmed).
+- Tier 2 Normalised Exact: remaining items, GSTIN + normalised invoice number.
+- For Tiers 1 and 2 output: Match Tier, voucher details, books invoice no., 2B name / invoice no. / date, Gross Total, TDS, and Books vs 2B vs Diff for Invoice Value, Taxable, IGST, CGST, SGST, plus 2B ITC Availability, 2B Period, and "Value Status" = "Matched" if every difference is within tolerance, else "Matched - Amount Mismatch".
+- Tier 3 GSTIN Total: for the remaining items, total Books Invoice Value per GSTIN vs total 2B Invoice Value per GSTIN. If |difference| ≤ tolerance, all those rows on both sides are matched. Output stacked rows (Source = Books / GSTR-2B) in one common layout with GSTIN Books Total, GSTIN 2B Total and GSTIN Diff.
+- Tier 4 Unmatched: everything left. Stacked with Status "In Books, not in GSTR-2B" or "In GSTR-2B, not in Books", GSTIN Books Total, GSTIN 2B Total, GSTIN Net Variance and a Remarks column:
+   * Books: "Possible duplicate booking" (same GSTIN + normalised invoice appears more than once in books); "Supplier Invoice No. blank in books"; if the GSTIN exists in leftover 2B and an invoice there has the same value within tolerance -> "Probable match - same value in 2B as Inv X"; else if GSTIN exists in 2B -> "GSTIN present in 2B - check invoice no. / amount"; else "Supplier invoice not reflected in 2B - follow up / ITC at risk".
+   * 2B: "GSTIN present in books - check invoice no. / amount" or "Not booked in Tally - verify & account / claim ITC".
+- Internal helper columns (starting with "_") must never appear in previews or the Excel.
+
+==================================================================
+6. EXCEL OUTPUT (in memory, openpyxl, single download button)
+==================================================================
+Sheets in this order:
+ 0_Summary (counts and values per tier for Books and 2B, plus unregistered, plus the tolerance used)
+ Cleaned_Purchase_Register
+ 1_Exact_Matched
+ 2_Normalized_Exact_Matched
+ 3_GSTIN_Total_Matched
+ 5_Unregistered_Non_2B
+ 6_Unmatched_Books_vs_2B
+ GSTR2B_Cleaned
+Formatting: dark-blue header with bold white text, wrapped, freeze panes at A2, auto-filter, column widths auto-fitted (10–45), amounts "#,##0.00", dates "dd-mm-yyyy". An empty sheet still shows headers (or "No records in this category"). File name: GSTR2B_Reconciliation_YYYYMMDD_HHMM.xlsx.
+
+==================================================================
+7. EXTRA FILES
+==================================================================
+- requirements.txt: streamlit>=1.30, pandas>=2.0, numpy, openpyxl>=3.1
+- Run_App.bat: cd to the bat's folder, run "python -m streamlit run app.py", then pause.
+- STEPS.txt: one-time setup (install Python with "Add to PATH", pip install -r requirements.txt); three ways to start (double-click Run_App.bat / open in IDLE and press F5 / "streamlit run app.py"); how to export the Purchase Register from Tally (Columnar view, F12: Voucher No., Supplier Invoice No., GSTIN/UIN, Gross Total ON, Alt+E to Excel); what each output tab means; notes on TDS add-back, Cess/TCS/Round Off in Diff, B2B-only scope, checking the Ledger mapping tab and filtering GST Rate Check = CHECK; troubleshooting ("streamlit not recognized" -> python -m streamlit run app.py; missing GSTIN column; header not found; pick the B2B sheet).
+
+==================================================================
+8. SELF-TEST BEFORE DELIVERY
+==================================================================
+Build sample files in Tally and portal layout and confirm:
+- Title rows and Grand Total removed; Supplier Invoice No. sits right after Voucher No.
+- A voucher with ledgers "Purchase IGST 18%" = 16,800 and "Input IGST 18%" = 3,024 (Gross 19,824) gives Taxable 16,800, IGST 3,024, Diff 0, GST Rate Check "OK - 18%".
+- "Labour Charges IGST" 10,000 + "Input IGST 18%" 1,800 -> Taxable 10,000, IGST 1,800.
+- A 16% effective rate is flagged CHECK.
+- TDS "100.00 Cr" -> TDS -100 and Books Invoice Value = Gross + 100.
+- ISO date "2026-10-03" is read as 3-Oct-2026 (not 10-Mar).
+- Exact match, normalised match ("inv-0005" = "INV/5"), GSTIN-total match within ₹1, 2B-only invoice, books-only duplicate, blank and invalid GSTIN -> Unregistered all land in the correct sheets.
+- The 2B invoice split over two rate rows is consolidated into one invoice.
+- `python app.py` launches the server without ScriptRunContext warnings.
+Give me the final app.py, requirements.txt, Run_App.bat and STEPS.txt.
