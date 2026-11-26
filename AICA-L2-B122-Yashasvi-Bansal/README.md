@@ -4,7 +4,7 @@
 **Submitted by:** CA Yashasvi Bansal, Yash Associates – AICA-L2-B122
 **Live demo app:** https://clause44-3cd-helper.lovable.app  
 **Demo login (for the examiner):** username `demo` · password `Demo@456789` (sign in with "Email or username")
-**Video:** _link to be added_
+**Video:** link submitted in the ICAI Google Form
 
 ---
 
