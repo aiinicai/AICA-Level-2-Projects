@@ -1,0 +1,495 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>RESOLVE 360 | Smart City Command Center</title>
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+<div class="wrap">
+
+  <!-- 1. Header -->
+  <header>
+    <div>
+      <div class="brand">RESOLVE <span>360</span></div>
+      <div class="muted">Smart City &bull; Social Impact Decision Center</div>
+    </div>
+    <span class="pill">OFFLINE DEMONSTRATION &bull; SYNTHETIC DATA</span>
+  </header>
+
+  <!-- 2. Toolbar: data loading, filters, export -->
+  <div class="toolbar">
+    <button id="reload">Reload attached dataset</button>
+    <label>Upload CSV <input type="file" id="upload" accept=".csv,text/csv"></label>
+    <label>Service <select id="category"><option value="">All services</option></select></label>
+    <label>Ward <select id="ward"><option value="">All wards</option></select></label>
+    <label>Status
+      <select id="status">
+        <option value="">All statuses</option>
+        <option>Open</option>
+        <option>In Progress</option>
+        <option>Resolved</option>
+      </select>
+    </label>
+    <label>Minimum priority
+      <input id="threshold" type="range" min="0" max="100" value="0">
+      <span id="thresholdText">0</span>
+    </label>
+    <button id="export">Export filtered CSV</button>
+    <button id="exportXlsx">Export filtered Excel</button>
+    <button id="exportDocx">Export filtered Word</button>
+    <button id="exportPdf">Export filtered PDF</button>
+  </div>
+  <div id="message" role="status" class="message"></div>
+
+  <!-- 3. KPI cards -->
+  <section class="grid">
+    <div class="stat"><div class="muted">Visible cases</div><b id="count">&mdash;</b><small class="muted">Current filter selection</small></div>
+    <div class="stat"><div class="muted">Active high-priority</div><b id="high">&mdash;</b><small class="muted">Score &ge;70, unresolved</small></div>
+    <div class="stat"><div class="muted">Estimated loss exposure</div><b id="loss">&mdash;</b><small class="muted">Illustrative INR; not verified</small></div>
+    <div class="stat"><div class="muted">People affected</div><b id="people">&mdash;</b><small class="muted">Sum of case estimates; may overlap</small></div>
+  </section>
+
+  <!-- 4. Distribution charts -->
+  <div class="layout">
+    <section class="panel"><h2 class="sectiontitle">Service issue distribution</h2><div class="bars" id="categories"></div></section>
+    <section class="panel"><h2 class="sectiontitle">Ward distribution</h2><div class="bars" id="wards"></div></section>
+  </div>
+
+  <!-- 5. Priority queue -->
+  <section class="panel">
+    <h2 class="sectiontitle">Priority queue <span class="muted subtitle">&bull; sorted by score &bull; resolved cases excluded</span></h2>
+    <div class="tablewrap">
+      <table>
+        <thead>
+          <tr><th>Case</th><th>Ward</th><th>Category</th><th>Severity</th><th>People</th><th>Loss (&#8377;)</th><th>Days</th><th>Score</th><th>Risk</th><th>Recommended response</th></tr>
+        </thead>
+        <tbody id="cases"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- 6. Interventions and method -->
+  <div class="layout">
+    <section class="panel"><h2 class="sectiontitle">Suggested interventions</h2><div id="actions" class="notes"></div></section>
+    <section class="panel">
+      <h2 class="sectiontitle">Method and safeguards</h2>
+      <div class="notes">
+        Score = 35 &times; severity/5 + 25 &times; min(people/2500,1) + 20 &times; min(days/45,1) + 20 &times; min(loss/85000,1).
+        <p>Scores are explainable heuristics, <b>not machine-learning predictions</b>. Costs are illustrative estimates, not realized savings. Require field verification and human approval before allocating municipal resources.</p>
+        <p>Uploaded CSV is processed in this browser only. The app does not transmit data to a server. Avoid importing identifiable citizen information.</p>
+      </div>
+    </section>
+  </div>
+
+  <p class="muted footer">RESOLVE 360 capstone prototype &bull; Synthetic sample &bull; Not a live municipal monitoring system</p>
+</div>
+
+<!-- Scripts: order matters (each file uses what the earlier ones define) -->
+<script src="js/config.js"></script>
+<script src="js/data.js"></script>
+<script src="js/csv.js"></script>
+<script src="js/scoring.js"></script>
+<script src="js/app.js"></script>
+
+<!-- Excel export: builds a real .xlsx in the browser (no internet or library needed).
+     It reuses the rows the app's own "Export filtered CSV" produces, so both exports always match. -->
+<script>
+(function () {
+  "use strict";
+
+  /* ---------- CSV parsing ---------- */
+  function parseCsv(text) {
+    text = String(text).replace(/^﻿/, "");
+    var rows = [], row = [], field = "", inQ = false;
+    for (var i = 0; i < text.length; i++) {
+      var c = text[i];
+      if (inQ) {
+        if (c === '"') { if (text[i + 1] === '"') { field += '"'; i++; } else inQ = false; }
+        else field += c;
+      } else if (c === '"') inQ = true;
+      else if (c === ",") { row.push(field); field = ""; }
+      else if (c === "\n" || c === "\r") {
+        if (c === "\r" && text[i + 1] === "\n") i++;
+        row.push(field); rows.push(row); row = []; field = "";
+      } else field += c;
+    }
+    if (field !== "" || row.length) { row.push(field); rows.push(row); }
+    return rows.filter(function (r) { return r.some(function (v) { return v.trim() !== ""; }); });
+  }
+
+  /* ---------- Minimal ZIP writer (stored, no compression) ---------- */
+  var CRC_TABLE = (function () {
+    var t = new Uint32Array(256);
+    for (var n = 0; n < 256; n++) {
+      var c = n;
+      for (var k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1;
+      t[n] = c >>> 0;
+    }
+    return t;
+  })();
+  function crc32(bytes) {
+    var c = 0xFFFFFFFF;
+    for (var i = 0; i < bytes.length; i++) c = CRC_TABLE[(c ^ bytes[i]) & 0xFF] ^ (c >>> 8);
+    return (c ^ 0xFFFFFFFF) >>> 0;
+  }
+  function zip(files, mime) {
+    var enc = new TextEncoder(), parts = [], central = [], offset = 0;
+    var d = new Date();
+    var dosTime = (d.getHours() << 11) | (d.getMinutes() << 5) | (d.getSeconds() >> 1);
+    var dosDate = ((d.getFullYear() - 1980) << 9) | ((d.getMonth() + 1) << 5) | d.getDate();
+    files.forEach(function (f) {
+      var name = enc.encode(f.name), data = enc.encode(f.data), crc = crc32(data);
+      var h = new DataView(new ArrayBuffer(30));
+      h.setUint32(0, 0x04034b50, true); h.setUint16(4, 20, true); h.setUint16(6, 0x0800, true);
+      h.setUint16(8, 0, true); h.setUint16(10, dosTime, true); h.setUint16(12, dosDate, true);
+      h.setUint32(14, crc, true); h.setUint32(18, data.length, true); h.setUint32(22, data.length, true);
+      h.setUint16(26, name.length, true); h.setUint16(28, 0, true);
+      parts.push(new Uint8Array(h.buffer), name, data);
+      var c = new DataView(new ArrayBuffer(46));
+      c.setUint32(0, 0x02014b50, true); c.setUint16(4, 20, true); c.setUint16(6, 20, true);
+      c.setUint16(8, 0x0800, true); c.setUint16(10, 0, true); c.setUint16(12, dosTime, true);
+      c.setUint16(14, dosDate, true); c.setUint32(16, crc, true); c.setUint32(20, data.length, true);
+      c.setUint32(24, data.length, true); c.setUint16(28, name.length, true);
+      c.setUint32(42, offset, true);
+      central.push(new Uint8Array(c.buffer), name);
+      offset += 30 + name.length + data.length;
+    });
+    var cdSize = central.reduce(function (s, p) { return s + p.length; }, 0);
+    var e = new DataView(new ArrayBuffer(22));
+    e.setUint32(0, 0x06054b50, true); e.setUint16(8, files.length, true); e.setUint16(10, files.length, true);
+    e.setUint32(12, cdSize, true); e.setUint32(16, offset, true);
+    return new Blob(parts.concat(central, [new Uint8Array(e.buffer)]),
+      { type: mime || "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+  }
+
+  /* ---------- XLSX building ---------- */
+  function esc(s) {
+    return String(s).replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, "")
+      .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  }
+  function colName(i) { var s = ""; i++; while (i > 0) { var m = (i - 1) % 26; s = String.fromCharCode(65 + m) + s; i = (i - 1 - m) / 26; } return s; }
+  function isNum(v) { return /^-?(0|[1-9]\d*)(\.\d+)?$/.test(String(v).trim()); }
+
+  function sheetXml(rows, opts) {
+    var ncol = rows.reduce(function (m, r) { return Math.max(m, r.length); }, 1);
+    var widths = [];
+    for (var c = 0; c < ncol; c++) {
+      var w = 8;
+      rows.forEach(function (r) { w = Math.max(w, String(r[c] == null ? "" : r[c]).length + 2); });
+      widths.push(Math.min(w, 60));
+    }
+    var x = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+      '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">';
+    if (opts.freeze) x += '<sheetViews><sheetView workbookViewId="0"><pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews>';
+    x += "<cols>" + widths.map(function (w, i) { return '<col min="' + (i + 1) + '" max="' + (i + 1) + '" width="' + w + '" customWidth="1"/>'; }).join("") + "</cols><sheetData>";
+    rows.forEach(function (r, ri) {
+      x += '<row r="' + (ri + 1) + '">';
+      r.forEach(function (v, ci) {
+        var ref = colName(ci) + (ri + 1), style = ri === 0 && opts.header ? ' s="1"' : "";
+        if (v == null || v === "") return;
+        if (!(ri === 0 && opts.header) && isNum(v)) x += '<c r="' + ref + '"' + style + "><v>" + String(v).trim() + "</v></c>";
+        else x += '<c r="' + ref + '"' + style + ' t="inlineStr"><is><t xml:space="preserve">' + esc(v) + "</t></is></c>";
+      });
+      x += "</row>";
+    });
+    x += "</sheetData>";
+    if (opts.autoFilter) x += '<autoFilter ref="' + opts.autoFilter + '"/>';
+    return x + "</worksheet>";
+  }
+
+  function buildXlsx(dataRows, infoRows) {
+    var ncol = dataRows.reduce(function (m, r) { return Math.max(m, r.length); }, 1);
+    var range = "A1:" + colName(ncol - 1) + Math.max(dataRows.length, 1);
+    var absRange = "'Filtered cases'!$" + range.replace(/([A-Z]+)(\d+)/g, "$1$$$2").replace(":", ":$");
+    var NS = 'xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"';
+    return zip([
+      { name: "[Content_Types].xml", data: '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/><Override PartName="/xl/worksheets/sheet2.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/></Types>' },
+      { name: "_rels/.rels", data: '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>' },
+      { name: "xl/workbook.xml", data: '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook ' + NS + ' xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="Filtered cases" sheetId="1" r:id="rId1"/><sheet name="Export info" sheetId="2" r:id="rId2"/></sheets><definedNames><definedName name="_xlnm._FilterDatabase" localSheetId="0" hidden="1">' + esc(absRange) + "</definedName></definedNames></workbook>" },
+      { name: "xl/_rels/workbook.xml.rels", data: '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet2.xml"/><Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>' },
+      { name: "xl/styles.xml", data: '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet ' + NS + '><fonts count="2"><font><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="11"/><color rgb="FFFFFFFF"/><name val="Calibri"/></font></fonts><fills count="3"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FF1F3A5F"/><bgColor indexed="64"/></patternFill></fill></fills><borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="2"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="1" fillId="2" borderId="0" xfId="0" applyFont="1" applyFill="1"/></cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>' },
+      { name: "xl/worksheets/sheet1.xml", data: sheetXml(dataRows, { header: true, freeze: true, autoFilter: range }) },
+      { name: "xl/worksheets/sheet2.xml", data: sheetXml(infoRows, { header: true }) }
+    ]);
+  }
+
+  /* ---------- Getting the filtered rows ---------- */
+  // Runs the app's own CSV export, catches the file before it downloads, and hands back its text.
+  function captureCsvExport() {
+    return new Promise(function (resolve, reject) {
+      var btn = document.getElementById("export");
+      if (!btn) return reject(new Error("no CSV export button"));
+      var blob = null, href = null;
+      var origCreate = URL.createObjectURL, origClick = HTMLAnchorElement.prototype.click;
+      URL.createObjectURL = function (o) { if (o instanceof Blob) blob = o; return origCreate.apply(URL, arguments); };
+      HTMLAnchorElement.prototype.click = function () {
+        if (this.hasAttribute("download")) { href = this.href; return; }
+        return origClick.apply(this, arguments);
+      };
+      function stop(e) {
+        var a = e.target && e.target.closest ? e.target.closest("a[download]") : null;
+        if (a) { href = a.href; e.preventDefault(); }
+      }
+      document.addEventListener("click", stop, true);
+      function restore() {
+        URL.createObjectURL = origCreate;
+        HTMLAnchorElement.prototype.click = origClick;
+        document.removeEventListener("click", stop, true);
+      }
+      try { btn.click(); } catch (err) { restore(); return reject(err); }
+      setTimeout(function () {
+        restore();
+        if (blob) return blob.text().then(resolve, reject);
+        if (href && href.indexOf("data:") === 0) {
+          var i = href.indexOf(","), meta = href.slice(0, i), body = href.slice(i + 1);
+          try { return resolve(/;base64/.test(meta) ? new TextDecoder().decode(Uint8Array.from(atob(body), function (ch) { return ch.charCodeAt(0); })) : decodeURIComponent(body)); }
+          catch (err) { return reject(err); }
+        }
+        if (href && href.indexOf("blob:") === 0) return fetch(href).then(function (r) { return r.text(); }).then(resolve, reject);
+        reject(new Error("CSV export produced no file"));
+      }, 60);
+    });
+  }
+
+  // Fallback: read the on-screen priority queue (note: it leaves out resolved cases).
+  function tableRows() {
+    var head = Array.prototype.map.call(document.querySelectorAll("table thead th"), function (th) { return th.textContent.trim(); });
+    var body = Array.prototype.map.call(document.querySelectorAll("#cases tr"), function (tr) {
+      return Array.prototype.map.call(tr.cells, function (td) { return td.textContent.trim().replace(/^₹\s*/, "").replace(/(\d),(?=\d)/g, "$1"); });
+    }).filter(function (r) { return r.length > 1; });
+    return [head].concat(body);
+  }
+
+  function selectedText(id) {
+    var el = document.getElementById(id);
+    return el && el.selectedIndex >= 0 ? el.options[el.selectedIndex].text : "";
+  }
+  function say(msg) { var m = document.getElementById("message"); if (m) m.textContent = msg; }
+
+  function download(blob, name) {
+    var url = URL.createObjectURL(blob), a = document.createElement("a");
+    a.href = url; a.download = name; document.body.appendChild(a);
+    HTMLAnchorElement.prototype.click.call(a);
+    setTimeout(function () { URL.revokeObjectURL(url); a.remove(); }, 1000);
+  }
+
+  /* ---------- Shared: filtered rows + export details ---------- */
+  function getExportData() {
+    var source = "Same rows as 'Export filtered CSV'";
+    return captureCsvExport().then(parseCsv).catch(function () {
+      source = "On-screen priority queue (resolved cases excluded)";
+      return tableRows();
+    }).then(function (rows) {
+      var now = new Date(), pad = function (n) { return String(n).padStart(2, "0"); };
+      var thr = document.getElementById("threshold");
+      return {
+        rows: rows,
+        stamp: now.getFullYear() + "-" + pad(now.getMonth() + 1) + "-" + pad(now.getDate()),
+        info: [
+          ["Setting", "Value"],
+          ["Exported", now.toLocaleString()],
+          ["Service", selectedText("category") || "All services"],
+          ["Ward", selectedText("ward") || "All wards"],
+          ["Status", selectedText("status") || "All statuses"],
+          ["Minimum priority", thr ? thr.value : ""],
+          ["Rows exported", String(Math.max(rows.length - 1, 0))],
+          ["Data source", source],
+          ["Note", "Synthetic data. Scores are heuristics; costs are illustrative. Verify in the field before allocating resources."]
+        ]
+      };
+    });
+  }
+
+  // Relative column widths, based on how long the content in each column is.
+  function columnWeights(rows) {
+    var ncol = rows.reduce(function (m, r) { return Math.max(m, r.length); }, 1), w = [];
+    for (var c = 0; c < ncol; c++) {
+      var len = 4;
+      rows.forEach(function (r) { len = Math.max(len, String(r[c] == null ? "" : r[c]).length); });
+      w.push(Math.min(len, 38) + 3);
+    }
+    return w;
+  }
+  function infoValue(info, key) { for (var i = 0; i < info.length; i++) if (info[i][0] === key) return info[i][1]; return ""; }
+
+  /* ---------- Word (.docx) ---------- */
+  function buildDocx(rows, info) {
+    var NSW = 'xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"';
+    function run(text, o) {
+      o = o || {};
+      return "<w:r><w:rPr>" + (o.b ? "<w:b/>" : "") + (o.i ? "<w:i/>" : "") + (o.color ? '<w:color w:val="' + o.color + '"/>' : "") +
+        '<w:sz w:val="' + (o.sz || 20) + '"/></w:rPr><w:t xml:space="preserve">' + esc(text) + "</w:t></w:r>";
+    }
+    function para(runs, after) { return '<w:p><w:pPr><w:spacing w:after="' + (after == null ? 80 : after) + '"/></w:pPr>' + runs + "</w:p>"; }
+
+    var total = 16838 - 2 * 720; // A4 landscape width minus margins (twips)
+    var weights = columnWeights(rows), sum = weights.reduce(function (a, b) { return a + b; }, 0);
+    var widths = weights.map(function (w) { return Math.floor(total * w / sum); });
+    var border = 'w:val="single" w:sz="4" w:space="0" w:color="BFC7D1"';
+
+    var body = para(run("RESOLVE 360 — Filtered cases", { b: true, sz: 32, color: "1F3A5F" }), 60);
+    body += para(run("Service: ", { b: true }) + run(infoValue(info, "Service")) + run("    Ward: ", { b: true }) + run(infoValue(info, "Ward")) +
+      run("    Status: ", { b: true }) + run(infoValue(info, "Status")) + run("    Minimum priority: ", { b: true }) + run(infoValue(info, "Minimum priority")), 40);
+    body += para(run("Exported " + infoValue(info, "Exported") + "  •  " + infoValue(info, "Rows exported") + " rows  •  " + infoValue(info, "Data source"), { color: "555555", sz: 18 }), 40);
+    body += para(run(infoValue(info, "Note"), { i: true, color: "777777", sz: 16 }), 160);
+
+    var tbl = '<w:tbl><w:tblPr><w:tblW w:w="' + total + '" w:type="dxa"/><w:tblBorders><w:top ' + border + '/><w:left ' + border + '/><w:bottom ' + border +
+      '/><w:right ' + border + '/><w:insideH ' + border + '/><w:insideV ' + border + '/></w:tblBorders><w:tblLayout w:type="fixed"/>' +
+      '<w:tblCellMar><w:top w:w="30" w:type="dxa"/><w:left w:w="70" w:type="dxa"/><w:bottom w:w="30" w:type="dxa"/><w:right w:w="70" w:type="dxa"/></w:tblCellMar></w:tblPr><w:tblGrid>' +
+      widths.map(function (w) { return '<w:gridCol w:w="' + w + '"/>'; }).join("") + "</w:tblGrid>";
+    rows.forEach(function (r, ri) {
+      var head = ri === 0;
+      tbl += "<w:tr>" + (head ? "<w:trPr><w:tblHeader/></w:trPr>" : "");
+      widths.forEach(function (w, ci) {
+        var v = r[ci] == null ? "" : r[ci], fill = head ? "1F3A5F" : (ri % 2 === 0 ? "F2F5F9" : "");
+        tbl += '<w:tc><w:tcPr><w:tcW w:w="' + w + '" w:type="dxa"/>' + (fill ? '<w:shd w:val="clear" w:color="auto" w:fill="' + fill + '"/>' : "") +
+          '</w:tcPr><w:p><w:pPr><w:spacing w:after="0"/>' + (!head && isNum(v) ? '<w:jc w:val="right"/>' : "") + "</w:pPr>" +
+          run(v, { b: head, color: head ? "FFFFFF" : "", sz: 16 }) + "</w:p></w:tc>";
+      });
+      tbl += "</w:tr>";
+    });
+    tbl += "</w:tbl>";
+    if (rows.length < 2) tbl += para(run("No cases match the current filters.", { i: true }), 0);
+
+    var doc = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document ' + NSW + "><w:body>" + body + tbl +
+      '<w:p/><w:sectPr><w:pgSz w:w="16838" w:h="11906" w:orient="landscape"/><w:pgMar w:top="720" w:right="720" w:bottom="720" w:left="720" w:header="360" w:footer="360" w:gutter="0"/></w:sectPr></w:body></w:document>';
+
+    return zip([
+      { name: "[Content_Types].xml", data: '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/></Types>' },
+      { name: "_rels/.rels", data: '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>' },
+      { name: "word/document.xml", data: doc }
+    ], "application/vnd.openxmlformats-officedocument.wordprocessingml.document");
+  }
+
+  /* ---------- PDF ---------- */
+  function buildPdf(rows, info) {
+    var W = 842, H = 595, M = 30, FS = 7.5, LH = FS * 1.25, PAD = 3;
+    function clean(s) {
+      return String(s == null ? "" : s).replace(/₹/g, "Rs").replace(/[–—]/g, "-").replace(/[‘’]/g, "'")
+        .replace(/[“”]/g, '"').replace(/•/g, "-").replace(/[   ]/g, " ").replace(/[^\x20-\x7E\xA0-\xFF]/g, "?");
+    }
+    function charW(ch) {
+      if (" .,;:'|!iljI".indexOf(ch) >= 0) return 0.278;
+      if ("ftr()[]-".indexOf(ch) >= 0) return 0.333;
+      if ("mwMW@".indexOf(ch) >= 0) return 0.87;
+      if (ch >= "A" && ch <= "Z") return 0.68;
+      return 0.556;
+    }
+    function textW(s, size, bold) { var w = 0; for (var i = 0; i < s.length; i++) w += charW(s[i]); return w * size * (bold ? 1.08 : 1); }
+    function wrap(s, width, size, bold) {
+      var words = clean(s).split(/\s+/).filter(Boolean), lines = [], line = "";
+      words.forEach(function (word) {
+        while (textW(word, size, bold) > width && word.length > 1) {          // break very long words
+          var k = word.length; while (k > 1 && textW(word.slice(0, k), size, bold) > width) k--;
+          if (line) { lines.push(line); line = ""; }
+          lines.push(word.slice(0, k)); word = word.slice(k);
+        }
+        var t = line ? line + " " + word : word;
+        if (textW(t, size, bold) <= width) line = t; else { lines.push(line); line = word; }
+      });
+      if (line || !lines.length) lines.push(line);
+      return lines;
+    }
+    function str(s) { return "(" + s.replace(/\\/g, "\\\\").replace(/\(/g, "\\(").replace(/\)/g, "\\)") + ")"; }
+    function n(x) { return (Math.round(x * 100) / 100).toString(); }
+    function text(x, y, s, size, bold) { return "BT /" + (bold ? "F2" : "F1") + " " + n(size) + " Tf " + n(x) + " " + n(y) + " Td " + str(s) + " Tj ET\n"; }
+
+    var weights = columnWeights(rows), sum = weights.reduce(function (a, b) { return a + b; }, 0);
+    var widths = weights.map(function (w) { return (W - 2 * M) * w / sum; });
+    var header = rows[0] || [], pages = [], ops = "", y;
+
+    function drawRow(r, isHead, zebra) {
+      var cells = widths.map(function (w, ci) { return wrap(r[ci], w - 2 * PAD, FS, isHead); });
+      var h = Math.max.apply(null, cells.map(function (c) { return c.length; })) * LH + 2 * PAD;
+      if (isHead) ops += "0.122 0.227 0.373 rg " + n(M) + " " + n(y - h) + " " + n(W - 2 * M) + " " + n(h) + " re f\n";
+      else if (zebra) ops += "0.949 0.961 0.976 rg " + n(M) + " " + n(y - h) + " " + n(W - 2 * M) + " " + n(h) + " re f\n";
+      var x = M;
+      ops += "0.75 0.78 0.82 RG 0.5 w\n";
+      widths.forEach(function (w, ci) {
+        ops += n(x) + " " + n(y - h) + " " + n(w) + " " + n(h) + " re S\n";
+        ops += isHead ? "1 1 1 rg\n" : "0.1 0.1 0.1 rg\n";
+        var right = !isHead && isNum(r[ci]);
+        cells[ci].forEach(function (line, li) {
+          var tx = right ? x + w - PAD - textW(line, FS, false) : x + PAD;
+          ops += text(tx, y - PAD - FS - li * LH + 1, line, FS, isHead);
+        });
+        x += w;
+      });
+      y -= h;
+      return h;
+    }
+    function rowHeight(r) {
+      return Math.max.apply(null, widths.map(function (w, ci) { return wrap(r[ci], w - 2 * PAD, FS, false).length; })) * LH + 2 * PAD;
+    }
+    function newPage() { if (ops) pages.push(ops); ops = ""; y = H - M; }
+
+    newPage();
+    ops += "0.122 0.227 0.373 rg\n" + text(M, y - 14, "RESOLVE 360 - Filtered cases", 15, true); y -= 30;
+    ops += "0.15 0.15 0.15 rg\n";
+    ops += text(M, y, clean("Service: " + infoValue(info, "Service") + "    Ward: " + infoValue(info, "Ward") + "    Status: " +
+      infoValue(info, "Status") + "    Minimum priority: " + infoValue(info, "Minimum priority")), 9, false); y -= 13;
+    ops += "0.35 0.35 0.35 rg\n" + text(M, y, clean("Exported " + infoValue(info, "Exported") + "  -  " + infoValue(info, "Rows exported") +
+      " rows  -  " + infoValue(info, "Data source")), 8, false); y -= 11;
+    ops += "0.45 0.45 0.45 rg\n" + text(M, y, clean(infoValue(info, "Note")), 7.5, false); y -= 14;
+
+    drawRow(header, true);
+    if (rows.length < 2) ops += "0.3 0.3 0.3 rg\n" + text(M, y - 14, "No cases match the current filters.", 9, false);
+    for (var i = 1; i < rows.length; i++) {
+      if (y - rowHeight(rows[i]) < M + 16) { newPage(); drawRow(header, true); }
+      drawRow(rows[i], false, i % 2 === 0);
+    }
+    pages.push(ops);
+
+    // Assemble the PDF file
+    var objs = [];
+    objs[1] = "<< /Type /Catalog /Pages 2 0 R >>";
+    objs[3] = "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>";
+    objs[4] = "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>";
+    var kids = [];
+    pages.forEach(function (p, pi) {
+      p += "0.45 0.45 0.45 rg\n" + text(M, M - 14, "RESOLVE 360 capstone prototype - Synthetic sample - Not a live municipal monitoring system", 7, false);
+      var label = "Page " + (pi + 1) + " of " + pages.length;
+      p += text(W - M - textW(label, 7, false), M - 14, label, 7, false);
+      var pageId = 5 + pi * 2, contentId = pageId + 1;
+      kids.push(pageId + " 0 R");
+      objs[pageId] = "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 " + W + " " + H + "] /Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> /Contents " + contentId + " 0 R >>";
+      objs[contentId] = "<< /Length " + p.length + " >>\nstream\n" + p + "endstream";
+    });
+    objs[2] = "<< /Type /Pages /Kids [" + kids.join(" ") + "] /Count " + pages.length + " >>";
+    var out = "%PDF-1.4\n%\xE2\xE3\xCF\xD3\n", offsets = [];
+    for (var id = 1; id < objs.length; id++) { offsets[id] = out.length; out += id + " 0 obj\n" + objs[id] + "\nendobj\n"; }
+    var xref = out.length;
+    out += "xref\n0 " + objs.length + "\n0000000000 65535 f \n";
+    for (id = 1; id < objs.length; id++) out += String(offsets[id]).padStart(10, "0") + " 00000 n \n";
+    out += "trailer\n<< /Size " + objs.length + " /Root 1 0 R >>\nstartxref\n" + xref + "\n%%EOF\n";
+    var bytes = new Uint8Array(out.length);
+    for (i = 0; i < out.length; i++) bytes[i] = out.charCodeAt(i) & 0xFF;
+    return new Blob([bytes], { type: "application/pdf" });
+  }
+
+  /* ---------- Buttons ---------- */
+  var FORMATS = {
+    exportXlsx: { label: "Excel", ext: "xlsx", build: buildXlsx },
+    exportDocx: { label: "Word", ext: "docx", build: buildDocx },
+    exportPdf: { label: "PDF", ext: "pdf", build: buildPdf }
+  };
+  Object.keys(FORMATS).forEach(function (id) {
+    var f = FORMATS[id], btn = document.getElementById(id);
+    if (!btn) return;
+    btn.addEventListener("click", function () {
+      getExportData().then(function (d) {
+        if (!d.rows.length) { say("Nothing to export."); return; }
+        download(f.build(d.rows, d.info), "resolve360_filtered_" + d.stamp + "." + f.ext);
+        var count = d.rows.length - 1;
+        say("Exported " + count + " case" + (count === 1 ? "" : "s") + " to " + f.label + ".");
+      }).catch(function (err) { say(f.label + " export failed: " + err.message); });
+    });
+  });
+
+  window.RESOLVE360_export = { buildXlsx: buildXlsx, buildDocx: buildDocx, buildPdf: buildPdf, parseCsv: parseCsv }; // for testing
+})();
+</script>
+</body>
+</html>
