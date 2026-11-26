@@ -1,0 +1,692 @@
+{
+  "entities": {
+    "Employee": {
+      "title": "Employee",
+      "description": "Company employee synced from Google Sheets, Excel, or manual entry, including designation and reporting manager.",
+      "type": "object",
+      "properties": {
+        "employeeCode": {
+          "type": "string",
+          "minLength": 0,
+          "maxLength": 40,
+          "description": "Employee code or badge ID from HR sheet"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120,
+          "description": "Employee full name"
+        },
+        "email": {
+          "type": "string",
+          "format": "email",
+          "minLength": 3,
+          "maxLength": 160,
+          "pattern": "^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$",
+          "description": "Normalized lowercase employee email address"
+        },
+        "designation": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120,
+          "description": "Job title or designation"
+        },
+        "department": {
+          "type": "string",
+          "minLength": 0,
+          "maxLength": 100,
+          "description": "Department or business unit"
+        },
+        "managerEmail": {
+          "type": "string",
+          "minLength": 0,
+          "maxLength": 160,
+          "description": "Reporting manager normalized email address (empty if top-level)"
+        },
+        "managerName": {
+          "type": "string",
+          "minLength": 0,
+          "maxLength": 120,
+          "description": "Reporting manager display name"
+        },
+        "isManager": {
+          "type": "boolean",
+          "description": "Whether this employee has one or more direct reports"
+        },
+        "isAdmin": {
+          "type": "boolean",
+          "description": "Whether this employee has HR admin privileges"
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "active",
+            "resigned"
+          ],
+          "description": "Employment status"
+        },
+        "joiningDate": {
+          "type": "string",
+          "minLength": 0,
+          "maxLength": 20,
+          "description": "Employee joining date (YYYY-MM-DD or text)"
+        },
+        "source": {
+          "type": "string",
+          "enum": [
+            "google_sheet",
+            "excel",
+            "manual"
+          ],
+          "description": "Source that last synced this employee record"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp of last update"
+        }
+      },
+      "required": [
+        "name",
+        "email",
+        "designation",
+        "department",
+        "managerEmail",
+        "managerName",
+        "isManager",
+        "isAdmin",
+        "status",
+        "joiningDate",
+        "source",
+        "updatedAt"
+      ]
+    },
+    "LeaveCategory": {
+      "title": "LeaveCategory",
+      "description": "Leave category definition with opening and monthly accrual rules.",
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80,
+          "description": "Leave category display name"
+        },
+        "code": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 16,
+          "pattern": "^[A-Z0-9_\\-]+$",
+          "description": "Short uppercase category code"
+        },
+        "defaultOpening": {
+          "type": "number",
+          "description": "Default annual opening balance in days"
+        },
+        "monthlyAccrual": {
+          "type": "number",
+          "description": "Days accrued per monthly accrual run"
+        },
+        "allowNegative": {
+          "type": "boolean",
+          "description": "Whether balance may go below zero (e.g. Loss of Pay)"
+        },
+        "requiresReason": {
+          "type": "boolean",
+          "description": "Whether employee must provide a reason"
+        },
+        "active": {
+          "type": "boolean",
+          "description": "Whether category is selectable in leave dropdown"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp of last update"
+        }
+      },
+      "required": [
+        "name",
+        "code",
+        "defaultOpening",
+        "monthlyAccrual",
+        "allowNegative",
+        "requiresReason",
+        "active",
+        "updatedAt"
+      ]
+    },
+    "LeaveBalance": {
+      "title": "LeaveBalance",
+      "description": "Per-employee, per-year, per-category leave balance ledger storing Opening, Accrued, Availed, and Closing.",
+      "type": "object",
+      "properties": {
+        "employeeId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "employeeEmail": {
+          "type": "string",
+          "format": "email",
+          "minLength": 3,
+          "maxLength": 160,
+          "pattern": "^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$"
+        },
+        "employeeName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120
+        },
+        "managerEmail": {
+          "type": "string",
+          "minLength": 0,
+          "maxLength": 160
+        },
+        "year": {
+          "type": "number"
+        },
+        "categoryId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "categoryName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80
+        },
+        "opening": {
+          "type": "number"
+        },
+        "accrued": {
+          "type": "number"
+        },
+        "availed": {
+          "type": "number"
+        },
+        "closing": {
+          "type": "number"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "employeeId",
+        "employeeEmail",
+        "employeeName",
+        "managerEmail",
+        "year",
+        "categoryId",
+        "categoryName",
+        "opening",
+        "accrued",
+        "availed",
+        "closing",
+        "updatedAt"
+      ]
+    },
+    "LeaveRequest": {
+      "title": "LeaveRequest",
+      "description": "Employee leave application routed to reporting manager for approval.",
+      "type": "object",
+      "properties": {
+        "employeeId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "employeeEmail": {
+          "type": "string",
+          "format": "email",
+          "minLength": 3,
+          "maxLength": 160,
+          "pattern": "^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$"
+        },
+        "employeeName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120
+        },
+        "employeeDesignation": {
+          "type": "string",
+          "minLength": 0,
+          "maxLength": 120
+        },
+        "managerEmail": {
+          "type": "string",
+          "format": "email",
+          "minLength": 3,
+          "maxLength": 160,
+          "pattern": "^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$"
+        },
+        "categoryId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "categoryName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80
+        },
+        "startDate": {
+          "type": "string",
+          "minLength": 10,
+          "maxLength": 10,
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+        },
+        "endDate": {
+          "type": "string",
+          "minLength": 10,
+          "maxLength": 10,
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+        },
+        "halfDay": {
+          "type": "string",
+          "enum": [
+            "none",
+            "first_half",
+            "second_half"
+          ]
+        },
+        "workingDays": {
+          "type": "number"
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 500
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "pending",
+            "approved",
+            "rejected",
+            "cancelled"
+          ]
+        },
+        "managerComment": {
+          "type": "string",
+          "minLength": 0,
+          "maxLength": 500
+        },
+        "reviewedBy": {
+          "type": "string",
+          "minLength": 0,
+          "maxLength": 160
+        },
+        "reviewedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "employeeId",
+        "employeeEmail",
+        "employeeName",
+        "employeeDesignation",
+        "managerEmail",
+        "categoryId",
+        "categoryName",
+        "startDate",
+        "endDate",
+        "halfDay",
+        "workingDays",
+        "reason",
+        "status",
+        "managerComment",
+        "reviewedBy",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "Holiday": {
+      "title": "Holiday",
+      "description": "Company holiday excluded from working-day leave counts.",
+      "type": "object",
+      "properties": {
+        "date": {
+          "type": "string",
+          "minLength": 10,
+          "maxLength": 10,
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "date",
+        "name",
+        "updatedAt"
+      ]
+    },
+    "RosterSyncConfig": {
+      "title": "RosterSyncConfig",
+      "description": "Linked Google Sheet configuration and last roster sync summary.",
+      "type": "object",
+      "properties": {
+        "spreadsheetId": {
+          "type": "string",
+          "minLength": 0,
+          "maxLength": 200
+        },
+        "spreadsheetTitle": {
+          "type": "string",
+          "minLength": 0,
+          "maxLength": 160
+        },
+        "sheetName": {
+          "type": "string",
+          "minLength": 0,
+          "maxLength": 120
+        },
+        "lastSyncedBy": {
+          "type": "string",
+          "minLength": 0,
+          "maxLength": 160
+        },
+        "activeCount": {
+          "type": "number"
+        },
+        "resignedCount": {
+          "type": "number"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "spreadsheetId",
+        "spreadsheetTitle",
+        "sheetName",
+        "lastSyncedBy",
+        "activeCount",
+        "resignedCount",
+        "updatedAt"
+      ]
+    },
+    "AdminRole": {
+      "title": "AdminRole",
+      "description": "Trusted HR Admin registry document keyed by Firebase Auth UID.",
+      "type": "object",
+      "properties": {
+        "email": {
+          "type": "string",
+          "format": "email",
+          "minLength": 3,
+          "maxLength": 160,
+          "pattern": "^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$"
+        },
+        "grantedBy": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 160
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "email",
+        "grantedBy",
+        "updatedAt"
+      ]
+    },
+    "Project": {
+      "title": "Project",
+      "description": "Project or client code that timesheet hours are booked against; synced from the Projects tab of the linked Google Sheet.",
+      "type": "object",
+      "properties": {
+        "code": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 32
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120
+        },
+        "client": {
+          "type": "string",
+          "maxLength": 120
+        },
+        "type": {
+          "type": "string",
+          "enum": [
+            "chargeable",
+            "non_chargeable"
+          ]
+        },
+        "active": {
+          "type": "boolean"
+        },
+        "partnerName": {
+          "type": "string",
+          "maxLength": 120
+        },
+        "partnerEmail": {
+          "type": "string",
+          "maxLength": 160
+        },
+        "managerName": {
+          "type": "string",
+          "maxLength": 120
+        },
+        "managerEmail": {
+          "type": "string",
+          "maxLength": 160
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "code",
+        "name",
+        "client",
+        "type",
+        "active",
+        "partnerName",
+        "partnerEmail",
+        "managerName",
+        "managerEmail",
+        "updatedAt"
+      ]
+    },
+    "TimesheetEntry": {
+      "title": "TimesheetEntry",
+      "description": "One employee's hours for one working day, split across projects (max 8 hours). Approved by the reporting manager.",
+      "type": "object",
+      "properties": {
+        "employeeId": {
+          "type": "string"
+        },
+        "employeeEmail": {
+          "type": "string",
+          "format": "email"
+        },
+        "employeeName": {
+          "type": "string",
+          "maxLength": 120
+        },
+        "managerEmail": {
+          "type": "string",
+          "format": "email",
+          "description": "Approver; equals employeeEmail when the employee has no reporting manager (HR admin approves)"
+        },
+        "date": {
+          "type": "string",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+        },
+        "lines": {
+          "type": "array",
+          "maxItems": 6,
+          "items": {
+            "type": "object",
+            "properties": {
+              "projectCode": {
+                "type": "string"
+              },
+              "projectName": {
+                "type": "string"
+              },
+              "clientName": {
+                "type": "string"
+              },
+              "type": {
+                "type": "string",
+                "enum": [
+                  "chargeable",
+                  "non_chargeable"
+                ]
+              },
+              "hours": {
+                "type": "number",
+                "minimum": 0.5,
+                "maximum": 8
+              }
+            }
+          }
+        },
+        "totalHours": {
+          "type": "number",
+          "minimum": 0.5,
+          "maximum": 8
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "draft",
+            "submitted",
+            "approved",
+            "rejected"
+          ]
+        },
+        "managerComment": {
+          "type": "string",
+          "maxLength": 500
+        },
+        "reviewedBy": {
+          "type": "string"
+        },
+        "reopenedBy": {
+          "type": "string"
+        },
+        "reopenReason": {
+          "type": "string",
+          "maxLength": 300
+        },
+        "submittedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "reviewedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "employeeId",
+        "employeeEmail",
+        "employeeName",
+        "managerEmail",
+        "date",
+        "lines",
+        "totalHours",
+        "status",
+        "managerComment",
+        "reviewedBy",
+        "reopenedBy",
+        "reopenReason",
+        "updatedAt"
+      ]
+    }
+  },
+  "firestore": {
+    "/employees/{empId}": {
+      "schema": {
+        "$ref": "#/entities/Employee"
+      },
+      "description": "Employee roster records synced from Google Sheets or Excel."
+    },
+    "/leaveCategories/{catId}": {
+      "schema": {
+        "$ref": "#/entities/LeaveCategory"
+      },
+      "description": "Configured leave categories and accrual defaults."
+    },
+    "/leaveBalances/{balId}": {
+      "schema": {
+        "$ref": "#/entities/LeaveBalance"
+      },
+      "description": "Leave balance ledger documents (Opening, Accrued, Availed, Closing)."
+    },
+    "/leaveRequests/{reqId}": {
+      "schema": {
+        "$ref": "#/entities/LeaveRequest"
+      },
+      "description": "Submitted leave applications and approval workflow state."
+    },
+    "/holidays/{holidayId}": {
+      "schema": {
+        "$ref": "#/entities/Holiday"
+      },
+      "description": "Company public holidays excluded from working-day counts."
+    },
+    "/settings/{settingId}": {
+      "schema": {
+        "$ref": "#/entities/RosterSyncConfig"
+      },
+      "description": "Global application settings including linked Google Sheet metadata."
+    },
+    "/admins/{uid}": {
+      "schema": {
+        "$ref": "#/entities/AdminRole"
+      },
+      "description": "Trusted HR Admin users."
+    },
+    "/projects/{projectId}": {
+      "schema": {
+        "$ref": "#/entities/Project"
+      },
+      "description": "Project master synced from the Projects tab of the linked Google Sheet."
+    },
+    "/timesheetEntries/{entryId}": {
+      "schema": {
+        "$ref": "#/entities/TimesheetEntry"
+      },
+      "description": "Daily timesheet entries (id = employeeId_YYYY-MM-DD)."
+    }
+  }
+}
