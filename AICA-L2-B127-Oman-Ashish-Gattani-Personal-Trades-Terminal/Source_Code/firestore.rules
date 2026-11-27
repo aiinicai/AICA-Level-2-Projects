@@ -1,0 +1,412 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Pillar 0: Global default-deny safety net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Phase 3: Hardened Global Primitives
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isVerified() {
+      return isSignedIn() && request.auth.token.email_verified == true;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isVerifiedOwner(userId) {
+      return isVerified() && request.auth.uid == userId;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function isValidTicker(ticker) {
+      return ticker is string && ticker.size() >= 1 && ticker.size() <= 20 && ticker.matches('^[A-Z0-9&\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    // Master Gate: Verify parent user profile exists and belongs to caller
+    function hasValidParentProfile(userId) {
+      return exists(/databases/$(database)/documents/users/$(userId))
+        && get(/databases/$(database)/documents/users/$(userId)).data.uid == request.auth.uid;
+    }
+
+    // Pillar 2: Validation Blueprints
+    function isValidUserProfile(data, userId) {
+      return data.keys().hasAll([
+          'uid', 'displayName', 'email', 'photoURL', 'theme', 'watchlist',
+          'accountCapitalInr', 'defaultRiskPct', 'nseConnectorEnabled',
+          'bseConnectorEnabled', 'brokerConnectorName', 'createdAt', 'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'uid', 'displayName', 'email', 'photoURL', 'theme', 'watchlist',
+          'accountCapitalInr', 'defaultRiskPct', 'nseConnectorEnabled',
+          'bseConnectorEnabled', 'brokerConnectorName', 'createdAt', 'updatedAt'
+        ])
+        && data.uid == request.auth.uid
+        && data.uid == userId
+        && isValidId(data.uid)
+        && data.displayName is string && data.displayName.size() >= 1 && data.displayName.size() <= 120
+        && data.email is string && data.email.size() >= 3 && data.email.size() <= 254
+        && data.photoURL is string && data.photoURL.size() <= 512
+        && data.theme is string && data.theme in ['dark', 'light']
+        && data.watchlist is list && data.watchlist.size() <= 60
+        && (data.watchlist.size() == 0 || (data.watchlist[0] is string && data.watchlist[0].size() <= 20))
+        && data.accountCapitalInr is number && data.accountCapitalInr >= 10000 && data.accountCapitalInr <= 10000000000
+        && data.defaultRiskPct is number && data.defaultRiskPct >= 0.1 && data.defaultRiskPct <= 10
+        && data.nseConnectorEnabled is bool
+        && data.bseConnectorEnabled is bool
+        && data.brokerConnectorName is string
+        && data.brokerConnectorName in ['Zerodha Kite', 'Dhan HQ', 'Upstox Pro', 'Disconnected']
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidHolding(data, userId) {
+      return data.keys().hasAll([
+          'userId', 'ticker', 'shares', 'avgCostInr', 'targetWeightPct', 'createdAt', 'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'userId', 'ticker', 'shares', 'avgCostInr', 'targetWeightPct', 'stopLossInr', 'createdAt', 'updatedAt'
+        ])
+        && data.userId == request.auth.uid
+        && data.userId == userId
+        && isValidId(data.userId)
+        && isValidTicker(data.ticker)
+        && data.shares is number && data.shares >= 0 && data.shares <= 100000000
+        && data.avgCostInr is number && data.avgCostInr > 0 && data.avgCostInr <= 10000000
+        && data.targetWeightPct is number && data.targetWeightPct >= 0 && data.targetWeightPct <= 100
+        && (!('stopLossInr' in data) || (data.stopLossInr is number && data.stopLossInr >= 0 && data.stopLossInr <= 10000000))
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidSavedScan(data, userId) {
+      return data.keys().hasAll([
+          'userId', 'name', 'lookbackMonths', 'priceBasis', 'minVolumeRatio',
+          'minPriceInr', 'minTurnoverCr', 'capBucket', 'sector',
+          'scheduleEnabled', 'scheduleTimeIst', 'createdAt', 'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'userId', 'name', 'lookbackMonths', 'priceBasis', 'minVolumeRatio',
+          'minPriceInr', 'minTurnoverCr', 'capBucket', 'sector',
+          'scheduleEnabled', 'scheduleTimeIst', 'createdAt', 'updatedAt'
+        ])
+        && data.userId == request.auth.uid
+        && data.userId == userId
+        && isValidId(data.userId)
+        && data.name is string && data.name.size() >= 1 && data.name.size() <= 80
+        && data.lookbackMonths is number && data.lookbackMonths >= 1 && data.lookbackMonths <= 36
+        && data.priceBasis is string && data.priceBasis in ['close', 'high']
+        && data.minVolumeRatio is number && data.minVolumeRatio >= 0 && data.minVolumeRatio <= 20
+        && data.minPriceInr is number && data.minPriceInr >= 0 && data.minPriceInr <= 1000000
+        && data.minTurnoverCr is number && data.minTurnoverCr >= 0 && data.minTurnoverCr <= 50000
+        && data.capBucket is string && data.capBucket.size() >= 1 && data.capBucket.size() <= 20
+        && data.sector is string && data.sector.size() >= 1 && data.sector.size() <= 40
+        && data.scheduleEnabled is bool
+        && data.scheduleTimeIst is string && data.scheduleTimeIst.size() >= 1 && data.scheduleTimeIst.size() <= 20
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidCustomIndicator(data, userId) {
+      return data.keys().hasAll([
+          'userId', 'code', 'name', 'description', 'formula', 'buyRule', 'sellRule',
+          'plotType', 'color', 'param1Name', 'param1Value', 'param2Name', 'param2Value',
+          'createdAt', 'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'userId', 'code', 'name', 'description', 'formula', 'buyRule', 'sellRule',
+          'plotType', 'color', 'param1Name', 'param1Value', 'param2Name', 'param2Value',
+          'createdAt', 'updatedAt'
+        ])
+        && data.userId == request.auth.uid
+        && data.userId == userId
+        && isValidId(data.userId)
+        && data.code is string && data.code.size() >= 1 && data.code.size() <= 16 && data.code.matches('^[A-Z0-9_]+$')
+        && data.name is string && data.name.size() >= 1 && data.name.size() <= 80
+        && data.description is string && data.description.size() <= 400
+        && data.formula is string && data.formula.size() >= 1 && data.formula.size() <= 600
+        && data.buyRule is string && data.buyRule.size() <= 400
+        && data.sellRule is string && data.sellRule.size() <= 400
+        && data.plotType is string && data.plotType in ['overlay', 'subchart']
+        && data.color is string && data.color.size() >= 4 && data.color.size() <= 16
+        && data.param1Name is string && data.param1Name.size() <= 24
+        && data.param1Value is number && data.param1Value >= -100000 && data.param1Value <= 100000
+        && data.param2Name is string && data.param2Name.size() <= 24
+        && data.param2Value is number && data.param2Value >= -100000 && data.param2Value <= 100000
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidAlert(data, userId) {
+      return data.keys().hasAll([
+          'userId', 'ticker', 'category', 'title', 'message', 'read', 'createdAt', 'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'userId', 'ticker', 'category', 'title', 'message', 'read', 'createdAt', 'updatedAt'
+        ])
+        && data.userId == request.auth.uid
+        && data.userId == userId
+        && isValidId(data.userId)
+        && isValidTicker(data.ticker)
+        && data.category is string
+        && data.category in ['breakout_52w', 'trend_template', 'vcp_pivot', 'custom_indicator', 'price', 'news']
+        && data.title is string && data.title.size() >= 1 && data.title.size() <= 140
+        && data.message is string && data.message.size() >= 1 && data.message.size() <= 400
+        && data.read is bool
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidCustomWatchlist(data, userId) {
+      return data.keys().hasAll([
+          'userId', 'name', 'slotIndex', 'notes', 'tickers', 'createdAt', 'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'userId', 'name', 'slotIndex', 'notes', 'tickers', 'createdAt', 'updatedAt'
+        ])
+        && data.userId == request.auth.uid
+        && data.userId == userId
+        && isValidId(data.userId)
+        && data.name is string && data.name.size() >= 1 && data.name.size() <= 48
+        && data.slotIndex is number && data.slotIndex >= 1 && data.slotIndex <= 5
+        && data.notes is string && data.notes.size() <= 240
+        && data.tickers is list && data.tickers.size() <= 60
+        && (data.tickers.size() == 0 || (data.tickers[0] is string && data.tickers[0].size() <= 20))
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    // Collection 1: /users/{userId} (PII Isolated — strictly owner-only get, never list)
+    match /users/{userId} {
+      allow get: if isOwner(userId) && isValidId(userId);
+      allow list: if false;
+
+      allow create: if isVerifiedOwner(userId)
+        && isValidId(userId)
+        && isValidUserProfile(incoming(), userId)
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time;
+
+      allow update: if isVerifiedOwner(userId)
+        && isValidId(userId)
+        && isValidUserProfile(incoming(), userId)
+        && incoming().uid == existing().uid
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && (
+          // Action: Update watchlist
+          incoming().diff(existing()).affectedKeys().hasOnly(['watchlist', 'updatedAt']) ||
+          // Action: Update theme
+          incoming().diff(existing()).affectedKeys().hasOnly(['theme', 'updatedAt']) ||
+          // Action: Update risk preferences
+          incoming().diff(existing()).affectedKeys().hasOnly(['accountCapitalInr', 'defaultRiskPct', 'updatedAt']) ||
+          // Action: Update connector settings
+          incoming().diff(existing()).affectedKeys().hasOnly(['nseConnectorEnabled', 'bseConnectorEnabled', 'brokerConnectorName', 'updatedAt']) ||
+          // Action: Sync Google display profile
+          incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'email', 'photoURL', 'updatedAt'])
+        );
+
+      allow delete: if isVerifiedOwner(userId) && isValidId(userId);
+
+      // Collection 2: /users/{userId}/holdings/{holdingId}
+      match /holdings/{holdingId} {
+        allow get: if isOwner(userId) && isValidId(userId) && isValidId(holdingId);
+        allow list: if isOwner(userId) && resource.data.userId == request.auth.uid;
+
+        allow create: if isVerifiedOwner(userId)
+          && isValidId(userId)
+          && isValidId(holdingId)
+          && isValidHolding(incoming(), userId)
+          && incoming().createdAt == request.time
+          && incoming().updatedAt == request.time
+          && hasValidParentProfile(userId);
+
+        allow update: if isVerifiedOwner(userId)
+          && isValidId(userId)
+          && isValidId(holdingId)
+          && isValidHolding(incoming(), userId)
+          && incoming().userId == existing().userId
+          && incoming().ticker == existing().ticker
+          && incoming().createdAt == existing().createdAt
+          && incoming().updatedAt == request.time
+          && hasValidParentProfile(userId)
+          && (
+            // Action: Edit shares/cost/target weight/stop-loss
+            incoming().diff(existing()).affectedKeys().hasOnly(['shares', 'avgCostInr', 'targetWeightPct', 'stopLossInr', 'updatedAt']) ||
+            // Action: Adjust target weight only
+            incoming().diff(existing()).affectedKeys().hasOnly(['targetWeightPct', 'updatedAt']) ||
+            // Action: Apply rebalance shares update
+            incoming().diff(existing()).affectedKeys().hasOnly(['shares', 'updatedAt'])
+          );
+
+        allow delete: if isVerifiedOwner(userId)
+          && isValidId(userId)
+          && isValidId(holdingId)
+          && hasValidParentProfile(userId);
+      }
+
+      // Collection 3: /users/{userId}/savedScans/{scanId}
+      match /savedScans/{scanId} {
+        allow get: if isOwner(userId) && isValidId(userId) && isValidId(scanId);
+        allow list: if isOwner(userId) && resource.data.userId == request.auth.uid;
+
+        allow create: if isVerifiedOwner(userId)
+          && isValidId(userId)
+          && isValidId(scanId)
+          && isValidSavedScan(incoming(), userId)
+          && incoming().createdAt == request.time
+          && incoming().updatedAt == request.time
+          && hasValidParentProfile(userId);
+
+        allow update: if isVerifiedOwner(userId)
+          && isValidId(userId)
+          && isValidId(scanId)
+          && isValidSavedScan(incoming(), userId)
+          && incoming().userId == existing().userId
+          && incoming().createdAt == existing().createdAt
+          && incoming().updatedAt == request.time
+          && hasValidParentProfile(userId)
+          && (
+            // Action: Toggle daily IST schedule
+            incoming().diff(existing()).affectedKeys().hasOnly(['scheduleEnabled', 'scheduleTimeIst', 'updatedAt']) ||
+            // Action: Edit scan filter criteria
+            incoming().diff(existing()).affectedKeys().hasOnly([
+              'name', 'lookbackMonths', 'priceBasis', 'minVolumeRatio',
+              'minPriceInr', 'minTurnoverCr', 'capBucket', 'sector', 'updatedAt'
+            ])
+          );
+
+        allow delete: if isVerifiedOwner(userId)
+          && isValidId(userId)
+          && isValidId(scanId)
+          && hasValidParentProfile(userId);
+      }
+
+      // Collection 4: /users/{userId}/customIndicators/{indicatorId}
+      match /customIndicators/{indicatorId} {
+        allow get: if isOwner(userId) && isValidId(userId) && isValidId(indicatorId);
+        allow list: if isOwner(userId) && resource.data.userId == request.auth.uid;
+
+        allow create: if isVerifiedOwner(userId)
+          && isValidId(userId)
+          && isValidId(indicatorId)
+          && isValidCustomIndicator(incoming(), userId)
+          && incoming().createdAt == request.time
+          && incoming().updatedAt == request.time
+          && hasValidParentProfile(userId);
+
+        allow update: if isVerifiedOwner(userId)
+          && isValidId(userId)
+          && isValidId(indicatorId)
+          && isValidCustomIndicator(incoming(), userId)
+          && incoming().userId == existing().userId
+          && incoming().createdAt == existing().createdAt
+          && incoming().updatedAt == request.time
+          && hasValidParentProfile(userId)
+          && (
+            // Action: Edit indicator formula, parameters, or signal rules
+            incoming().diff(existing()).affectedKeys().hasOnly([
+              'code', 'name', 'description', 'formula', 'buyRule', 'sellRule',
+              'plotType', 'color', 'param1Name', 'param1Value', 'param2Name', 'param2Value', 'updatedAt'
+            ]) ||
+            // Action: Tune parameters only
+            incoming().diff(existing()).affectedKeys().hasOnly(['param1Value', 'param2Value', 'updatedAt'])
+          );
+
+        allow delete: if isVerifiedOwner(userId)
+          && isValidId(userId)
+          && isValidId(indicatorId)
+          && hasValidParentProfile(userId);
+      }
+
+      // Collection 5: /users/{userId}/alerts/{alertId}
+      match /alerts/{alertId} {
+        allow get: if isOwner(userId) && isValidId(userId) && isValidId(alertId);
+        allow list: if isOwner(userId) && resource.data.userId == request.auth.uid;
+
+        allow create: if isVerifiedOwner(userId)
+          && isValidId(userId)
+          && isValidId(alertId)
+          && isValidAlert(incoming(), userId)
+          && incoming().createdAt == request.time
+          && incoming().updatedAt == request.time
+          && hasValidParentProfile(userId);
+
+        allow update: if isVerifiedOwner(userId)
+          && isValidId(userId)
+          && isValidId(alertId)
+          && isValidAlert(incoming(), userId)
+          && incoming().userId == existing().userId
+          && incoming().ticker == existing().ticker
+          && incoming().category == existing().category
+          && incoming().createdAt == existing().createdAt
+          && incoming().updatedAt == request.time
+          && hasValidParentProfile(userId)
+          && (
+            // Action: Mark alert read/unread
+            incoming().diff(existing()).affectedKeys().hasOnly(['read', 'updatedAt'])
+          );
+
+        allow delete: if isVerifiedOwner(userId)
+          && isValidId(userId)
+          && isValidId(alertId)
+          && hasValidParentProfile(userId);
+      }
+
+      // Collection 6: /users/{userId}/watchlists/{watchlistId} (up to 5 named watchlists)
+      match /watchlists/{watchlistId} {
+        allow get: if isOwner(userId) && isValidId(userId) && isValidId(watchlistId);
+        allow list: if isOwner(userId) && resource.data.userId == request.auth.uid;
+
+        allow create: if isVerifiedOwner(userId)
+          && isValidId(userId)
+          && isValidId(watchlistId)
+          && isValidCustomWatchlist(incoming(), userId)
+          && incoming().createdAt == request.time
+          && incoming().updatedAt == request.time
+          && hasValidParentProfile(userId);
+
+        allow update: if isVerifiedOwner(userId)
+          && isValidId(userId)
+          && isValidId(watchlistId)
+          && isValidCustomWatchlist(incoming(), userId)
+          && incoming().userId == existing().userId
+          && incoming().createdAt == existing().createdAt
+          && incoming().updatedAt == request.time
+          && hasValidParentProfile(userId)
+          && (
+            // Action: Edit name, notes, slotIndex, or tickers
+            incoming().diff(existing()).affectedKeys().hasOnly(['name', 'notes', 'slotIndex', 'tickers', 'updatedAt']) ||
+            // Action: Edit name, notes, and tickers
+            incoming().diff(existing()).affectedKeys().hasOnly(['name', 'notes', 'tickers', 'updatedAt']) ||
+            // Action: Update tickers only
+            incoming().diff(existing()).affectedKeys().hasOnly(['tickers', 'updatedAt']) ||
+            // Action: Rename or update notes only
+            incoming().diff(existing()).affectedKeys().hasOnly(['name', 'notes', 'updatedAt'])
+          );
+
+        allow delete: if isVerifiedOwner(userId)
+          && isValidId(userId)
+          && isValidId(watchlistId)
+          && hasValidParentProfile(userId);
+      }
+    }
+  }
+}
