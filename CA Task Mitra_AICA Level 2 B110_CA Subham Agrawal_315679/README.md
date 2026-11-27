@@ -2,7 +2,7 @@
 
 **ICAI AICA Level 2 – Individual Capstone Project**
 Submitted by: **CA Subham Agrawal, Membership No. 315679**, AICA Level 2, **Batch 110, Bhubaneswar** (Subham Agrawal & Company, Bangomunda, Odisha).
-Video walkthrough: *(add your YouTube unlisted link here)*
+Video walkthrough: https://youtu.be/LjQlvKFo_LA (unlisted)
 
 > All data in this project and its screenshots is **fictional**. No real client, personal or confidential data was entered into any AI tool, as the course requires.
 
