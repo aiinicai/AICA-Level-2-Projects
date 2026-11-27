@@ -1,6 +1,6 @@
 # Hisaab Kitaab: Portfolio Dashboard
 
-*Hisaab kitaab* is Hindi and Urdu for "the books and accounts": a clear account of who owns what and how much. For the investor who is too busy to open every portal.
+*Hisaab kitaab* is Hindi for "the books and accounts": a clear account of who owns what and how much. For the investor who is too busy to open every portal.
 
 AICA Level 2, Batch 127. Individual capstone by Jignesh Sagala.
 
