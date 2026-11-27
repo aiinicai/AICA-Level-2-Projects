@@ -1,0 +1,1840 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+CA Firm - Internal Control & Financial Management System (ICFMS)  |  PHASE 1
+=============================================================================
+Double-click this file (or run:  python CA_Firm_ICFMS.py).
+ * Missing libraries (Flask, openpyxl, reportlab) are installed automatically.
+ * The app starts on http://127.0.0.1:8765 and opens in your browser.
+ * Data lives in the folder "ICFMS_Data" next to this file (SQLite database,
+   daily automatic backups).  Run with --test to execute the self-tests.
+
+Phase 1 = secure login + RBAC, maker-checker approval workflow with configurable
+limits, double-entry accounting (invoices, receipts, expenses), tamper-evident
+audit trail, client/vendor masters, dashboard, reports and CSV/Excel/PDF export.
+Not yet built (Phase 2+): budgeting, bank reconciliation, HR/payroll, compliance
+calendar, documents, litigation, risk, procurement, AI, MFA.
+"""
+import sys, os, subprocess, importlib, importlib.util
+
+REQUIRED = [("flask", "flask"), ("openpyxl", "openpyxl"), ("reportlab", "reportlab")]
+
+
+def bootstrap():
+    """Install any missing third-party library automatically."""
+    missing = [pkg for mod, pkg in REQUIRED if importlib.util.find_spec(mod) is None]
+    if not missing:
+        return
+    print("First run: installing required libraries:", ", ".join(missing))
+    if importlib.util.find_spec("pip") is None:
+        subprocess.call([sys.executable, "-m", "ensurepip", "--upgrade"])
+    base = [sys.executable, "-m", "pip", "install", "--disable-pip-version-check"]
+    for extra in ([], ["--user"], ["--break-system-packages"]):
+        if subprocess.call(base + extra + missing) == 0:
+            break
+    else:
+        raise SystemExit("Could not install %s. Check your internet connection and retry." % missing)
+    importlib.invalidate_caches()
+    try:
+        import site
+        sys.path.append(site.getusersitepackages())
+    except Exception:
+        pass
+
+
+bootstrap()
+
+import sqlite3, json, hashlib, hmac, secrets, io, csv, re, shutil, threading, webbrowser, tempfile
+import datetime as dt
+from contextlib import contextmanager
+from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
+from functools import wraps
+from flask import (Flask, request, session, redirect, g, abort, flash, send_file,
+                   render_template, Response, get_flashed_messages)
+from jinja2 import DictLoader
+from markupsafe import Markup
+from werkzeug.security import generate_password_hash, check_password_hash
+
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+DATA_DIR = os.environ.get("ICFMS_DATA", os.path.join(BASE_DIR, "ICFMS_Data"))
+DB_PATH = os.path.join(DATA_DIR, "icfms.db")
+HOST, PORT = "127.0.0.1", int(os.environ.get("ICFMS_PORT", "8765"))
+
+# --------------------------------------------------------------------------- money & dates
+class M(int):
+    """Money in paise (integer arithmetic only - no floating-point errors)."""
+
+
+def paise(s):
+    try:
+        d = Decimal(str(s or "0").replace(",", "").replace("₹", "").strip() or "0")
+    except InvalidOperation:
+        raise ValueError("Invalid amount: %r" % s)
+    if d < 0:
+        raise ValueError("Amount cannot be negative")
+    return int((d * 100).quantize(Decimal(1), ROUND_HALF_UP))
+
+
+def rupees(p):
+    return "%.2f" % (Decimal(int(p or 0)) / 100)
+
+
+def inr(p):
+    p = int(p or 0)
+    neg, p = p < 0, abs(p)
+    r, ps = divmod(p, 100)
+    s = str(r)
+    if len(s) > 3:
+        head = re.sub(r"(\d)(?=(\d\d)+$)", r"\1,", s[:-3])
+        s = head + "," + s[-3:]
+    return "%s₹%s.%02d" % ("-" if neg else "", s, ps)
+
+
+def fy_of(d):
+    y, m = int(d[:4]), int(d[5:7])
+    s = y if m >= 4 else y - 1
+    return "%d-%02d" % (s, (s + 1) % 100)
+
+
+def fy_range(fy):
+    s = int(fy[:4])
+    return "%d-04-01" % s, "%d-03-31" % (s + 1)
+
+
+def today():
+    return dt.date.today().isoformat()
+
+
+def check_date(s):
+    try:
+        return dt.date.fromisoformat(s).isoformat()
+    except Exception:
+        raise ValueError("Invalid date: %r" % s)
+
+
+def now():
+    return dt.datetime.now().isoformat(timespec="seconds")
+
+# --------------------------------------------------------------------------- schema
+SCHEMA = """
+CREATE TABLE IF NOT EXISTS users(id INTEGER PRIMARY KEY, username TEXT UNIQUE NOT NULL, full_name TEXT NOT NULL,
+  pw TEXT NOT NULL, role TEXT NOT NULL REFERENCES roles(name), active INTEGER NOT NULL DEFAULT 1,
+  fails INTEGER NOT NULL DEFAULT 0, locked_until TEXT, created_at TEXT);
+CREATE TABLE IF NOT EXISTS roles(name TEXT PRIMARY KEY, rank INTEGER NOT NULL);
+CREATE TABLE IF NOT EXISTS perms(role TEXT NOT NULL REFERENCES roles(name), module TEXT NOT NULL, action TEXT NOT NULL,
+  PRIMARY KEY(role,module,action));
+CREATE TABLE IF NOT EXISTS settings(key TEXT PRIMARY KEY, value TEXT);
+CREATE TABLE IF NOT EXISTS approval_matrix(id INTEGER PRIMARY KEY, up_to INTEGER, role TEXT NOT NULL REFERENCES roles(name));
+CREATE TABLE IF NOT EXISTS accounts(id INTEGER PRIMARY KEY, code TEXT UNIQUE NOT NULL, name TEXT NOT NULL,
+  type TEXT NOT NULL CHECK(type IN('Asset','Liability','Equity','Income','Expense')));
+CREATE TABLE IF NOT EXISTS masters(id INTEGER PRIMARY KEY, kind TEXT NOT NULL, name TEXT NOT NULL,
+  account_id INTEGER REFERENCES accounts(id), active INTEGER NOT NULL DEFAULT 1, UNIQUE(kind,name));
+CREATE TABLE IF NOT EXISTS bank_accounts(id INTEGER PRIMARY KEY, name TEXT NOT NULL,
+  account_id INTEGER NOT NULL REFERENCES accounts(id), is_cash INTEGER NOT NULL DEFAULT 0);
+CREATE TABLE IF NOT EXISTS clients(id INTEGER PRIMARY KEY, code TEXT UNIQUE NOT NULL, name TEXT NOT NULL, constitution TEXT,
+  pan TEXT, gstin TEXT, partner TEXT, email TEXT, mobile TEXT, active INTEGER NOT NULL DEFAULT 1);
+CREATE TABLE IF NOT EXISTS vendors(id INTEGER PRIMARY KEY, code TEXT UNIQUE NOT NULL, name TEXT NOT NULL,
+  pan TEXT, gstin TEXT, active INTEGER NOT NULL DEFAULT 1);
+CREATE TABLE IF NOT EXISTS txns(id INTEGER PRIMARY KEY, type TEXT NOT NULL CHECK(type IN('invoice','receipt','expense')),
+  no TEXT UNIQUE NOT NULL, date TEXT NOT NULL, fy TEXT NOT NULL, party_id INTEGER, head TEXT, amount INTEGER NOT NULL CHECK(amount>0),
+  gst INTEGER NOT NULL DEFAULT 0, tds INTEGER NOT NULL DEFAULT 0, net INTEGER NOT NULL, mode TEXT,
+  bank_id INTEGER REFERENCES bank_accounts(id), ref TEXT, invoice_id INTEGER REFERENCES txns(id), dept TEXT, partner TEXT,
+  due TEXT, narration TEXT, status TEXT NOT NULL, maker_id INTEGER NOT NULL REFERENCES users(id),
+  approver_id INTEGER REFERENCES users(id), approved_at TEXT, journal_id INTEGER, reason TEXT, created_at TEXT);
+CREATE INDEX IF NOT EXISTS ix_txn ON txns(type,fy,status);
+CREATE TABLE IF NOT EXISTS journals(id INTEGER PRIMARY KEY, date TEXT NOT NULL, fy TEXT NOT NULL, ref TEXT, narration TEXT,
+  source TEXT, source_id INTEGER, reverses INTEGER, created_by INTEGER, created_at TEXT);
+CREATE TABLE IF NOT EXISTS jlines(id INTEGER PRIMARY KEY, journal_id INTEGER NOT NULL REFERENCES journals(id),
+  account_id INTEGER NOT NULL REFERENCES accounts(id), debit INTEGER NOT NULL DEFAULT 0, credit INTEGER NOT NULL DEFAULT 0,
+  CHECK(debit>=0 AND credit>=0 AND (debit=0 OR credit=0)));
+CREATE INDEX IF NOT EXISTS ix_jl ON jlines(account_id,journal_id);
+CREATE TABLE IF NOT EXISTS approvals(id INTEGER PRIMARY KEY, txn_id INTEGER NOT NULL REFERENCES txns(id), step TEXT NOT NULL,
+  user_id INTEGER NOT NULL, user_name TEXT, ts TEXT NOT NULL, comment TEXT);
+CREATE TABLE IF NOT EXISTS audit(id INTEGER PRIMARY KEY, ts TEXT NOT NULL, user TEXT, action TEXT, entity TEXT, entity_id TEXT,
+  old TEXT, new TEXT, prev_hash TEXT NOT NULL, hash TEXT NOT NULL);
+CREATE TRIGGER IF NOT EXISTS j_upd BEFORE UPDATE ON journals BEGIN SELECT RAISE(ABORT,'Posted journals are immutable'); END;
+CREATE TRIGGER IF NOT EXISTS j_del BEFORE DELETE ON journals BEGIN SELECT RAISE(ABORT,'Posted journals cannot be deleted'); END;
+CREATE TRIGGER IF NOT EXISTS jl_upd BEFORE UPDATE ON jlines BEGIN SELECT RAISE(ABORT,'Posted journal lines are immutable'); END;
+CREATE TRIGGER IF NOT EXISTS jl_del BEFORE DELETE ON jlines BEGIN SELECT RAISE(ABORT,'Posted journal lines cannot be deleted'); END;
+CREATE TRIGGER IF NOT EXISTS a_upd BEFORE UPDATE ON audit BEGIN SELECT RAISE(ABORT,'Audit trail is immutable'); END;
+CREATE TRIGGER IF NOT EXISTS a_del BEFORE DELETE ON audit BEGIN SELECT RAISE(ABORT,'Audit trail cannot be deleted'); END;
+CREATE TRIGGER IF NOT EXISTS ap_upd BEFORE UPDATE ON approvals BEGIN SELECT RAISE(ABORT,'Approval history is immutable'); END;
+CREATE TRIGGER IF NOT EXISTS ap_del BEFORE DELETE ON approvals BEGIN SELECT RAISE(ABORT,'Approval history cannot be deleted'); END;
+"""
+
+ROLES = [("Super Administrator", 100), ("Managing Partner", 90), ("Partner", 80), ("Department Manager", 60),
+         ("Accounts Manager", 50), ("Internal Auditor", 40), ("Accounts Executive", 30), ("Employee", 10)]
+TXM = ["invoice", "receipt", "expense"]
+TXA = ["view", "view_all", "create", "edit", "submit", "approve", "cancel", "export"]
+CAT = ["view", "create", "edit", "export"]
+PERM_CATALOG = {"clients": CAT, "vendors": CAT, "invoice": TXA, "receipt": TXA, "expense": TXA,
+                "reports": ["view", "export"], "audit": ["view"], "admin": ["manage"]}
+TX = {"invoice": dict(label="Invoice", plural="Invoices", pre="INV", party="clients"),
+      "receipt": dict(label="Receipt", plural="Receipts", pre="RCT", party="clients"),
+      "expense": dict(label="Expense Voucher", plural="Expenses", pre="EXP", party="vendors")}
+STATUSES = ["Draft", "Pending Approval", "Approved", "Rejected", "Returned for Correction", "Cancelled"]
+EDITABLE = ("Draft", "Returned for Correction")
+PAY_MODES = ["Bank Transfer", "Cheque", "UPI", "Cash", "Card"]
+INCOME_HEADS = ["Statutory audit fees", "Tax audit fees", "Income-tax consultancy", "Income-tax litigation", "GST consultancy",
+                "GST litigation", "Accounting and bookkeeping", "Corporate compliance", "Project reports", "Other professional income"]
+EXPENSE_HEADS = ["Salaries", "Rent", "Electricity", "Internet", "Travelling", "Conveyance", "Stationery", "Software subscriptions",
+                 "Professional fees", "Staff welfare", "Repairs and maintenance"]
+DEPARTMENTS = ["Audit", "Taxation", "GST", "Accounts", "Administration"]
+
+
+def default_perms(role):
+    s = set()
+
+    def add(mods, acts):
+        s.update((m, a) for m in mods for a in acts)
+    full = ["view", "view_all", "create", "edit", "submit", "approve", "cancel", "export"]
+    if role in ("Managing Partner", "Partner"):
+        add(TXM, [a for a in full if a != "cancel" or role == "Managing Partner"])
+        add(["clients", "vendors"], CAT); add(["reports"], ["view", "export"]); add(["audit"], ["view"])
+    elif role == "Department Manager":
+        add(TXM, ["view", "view_all", "create", "edit", "submit", "approve", "export"]); add(["clients", "vendors"], ["view"])
+        add(["reports"], ["view"])
+    elif role == "Accounts Manager":
+        add(TXM, full); add(["clients", "vendors"], CAT); add(["reports"], ["view", "export"])
+    elif role == "Accounts Executive":
+        add(TXM, ["view", "view_all", "create", "edit", "submit"]); add(["clients", "vendors"], ["view", "create", "edit"])
+    elif role == "Internal Auditor":
+        add(TXM, ["view", "view_all", "export"]); add(["clients", "vendors"], ["view", "export"])
+        add(["reports"], ["view", "export"]); add(["audit"], ["view"])
+    elif role == "Employee":
+        add(["expense"], ["view", "create", "edit", "submit"]); add(["vendors"], ["view"])
+    return s
+
+
+# --------------------------------------------------------------------------- database helpers
+def conn():
+    os.makedirs(DATA_DIR, exist_ok=True)
+    c = sqlite3.connect(DB_PATH, timeout=30, isolation_level=None)
+    c.row_factory = sqlite3.Row
+    c.execute("PRAGMA foreign_keys=ON")
+    c.execute("PRAGMA journal_mode=WAL")
+    return c
+
+
+@contextmanager
+def tx(c):
+    c.execute("BEGIN IMMEDIATE")
+    try:
+        yield c
+        c.execute("COMMIT")
+    except BaseException:
+        if c.in_transaction:
+            c.execute("ROLLBACK")
+        raise
+
+
+def setting(c, key, default=None):
+    r = c.execute("SELECT value FROM settings WHERE key=?", (key,)).fetchone()
+    return r["value"] if r else default
+
+
+def set_setting(c, key, value):
+    c.execute("INSERT INTO settings(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value", (key, str(value)))
+
+
+def _h(prev, ts, user, action, entity, eid, o, n):
+    return hashlib.sha256("|".join([prev, ts, user or "", action, entity, str(eid), o, n]).encode()).hexdigest()
+
+
+def audit(c, user, action, entity, eid, old=None, new=None):
+    """Append to the hash-chained audit trail (each row commits to the previous one)."""
+    row = c.execute("SELECT hash FROM audit ORDER BY id DESC LIMIT 1").fetchone()
+    prev = row["hash"] if row else "GENESIS"
+    ts = now()
+    o = json.dumps(old, default=str, sort_keys=True) if old is not None else ""
+    n = json.dumps(new, default=str, sort_keys=True) if new is not None else ""
+    c.execute("INSERT INTO audit(ts,user,action,entity,entity_id,old,new,prev_hash,hash) VALUES(?,?,?,?,?,?,?,?,?)",
+              (ts, user, action, entity, str(eid), o, n, prev, _h(prev, ts, user, action, entity, eid, o, n)))
+
+
+def verify_audit(c):
+    prev = "GENESIS"
+    for r in c.execute("SELECT * FROM audit ORDER BY id"):
+        if r["prev_hash"] != prev or r["hash"] != _h(prev, r["ts"], r["user"], r["action"], r["entity"], r["entity_id"], r["old"], r["new"]):
+            return False, r["id"]
+        prev = r["hash"]
+    return True, None
+
+
+def A(c, code):
+    r = c.execute("SELECT id FROM accounts WHERE code=?", (code,)).fetchone()
+    if not r:
+        raise ValueError("Account %s missing from chart of accounts" % code)
+    return r["id"]
+
+
+def new_account(c, name, typ, prefix):
+    r = c.execute("SELECT MAX(CAST(code AS INTEGER)) m FROM accounts WHERE code LIKE ?", (prefix + "%",)).fetchone()["m"]
+    code = str((r or int(prefix) * 1000) + 1) if len(prefix) == 1 else str((r or int(prefix + "00")) + 1)
+    return c.execute("INSERT INTO accounts(code,name,type) VALUES(?,?,?)", (code, name, typ)).lastrowid
+
+
+def post_journal(c, date, ref, narration, lines, source, sid, uid, reverses=None):
+    lines = [(a, d, k) for a, d, k in lines if d or k]
+    dr, cr = sum(l[1] for l in lines), sum(l[2] for l in lines)
+    if dr != cr or dr <= 0:
+        raise ValueError("Journal not balanced (Dr %s, Cr %s)" % (dr, cr))
+    jid = c.execute("INSERT INTO journals(date,fy,ref,narration,source,source_id,reverses,created_by,created_at) VALUES(?,?,?,?,?,?,?,?,?)",
+                    (date, fy_of(date), ref, narration, source, sid, reverses, uid, now())).lastrowid
+    for a, d, k in lines:
+        c.execute("INSERT INTO jlines(journal_id,account_id,debit,credit) VALUES(?,?,?,?)", (jid, a, d, k))
+    return jid
+
+
+def init_db():
+    c = conn()
+    c.executescript(SCHEMA)
+    with tx(c):
+        if c.execute("SELECT COUNT(*) n FROM roles").fetchone()["n"] == 0:
+            for n, r in ROLES:
+                c.execute("INSERT INTO roles VALUES(?,?)", (n, r))
+                for m, a in default_perms(n):
+                    c.execute("INSERT INTO perms VALUES(?,?,?)", (n, m, a))
+            for k, v in dict(firm_name="CA Firm", sod="1", credit_days="30", min_pw="10", session_minutes="60",
+                             max_fails="5", lock_minutes="5").items():
+                set_setting(c, k, v)
+            for up, role in [(500000, "Accounts Manager"), (2500000, "Department Manager"), (10000000, "Partner"), (None, "Managing Partner")]:
+                c.execute("INSERT INTO approval_matrix(up_to,role) VALUES(?,?)", (up, role))
+            for code, name, typ in [("1100", "Trade Receivables", "Asset"), ("1150", "TDS Receivable", "Asset"),
+                                    ("1200", "GST Input Credit", "Asset"), ("2001", "Trade Payables", "Liability"),
+                                    ("2100", "GST Output Payable", "Liability"), ("2200", "TDS Payable", "Liability"),
+                                    ("2300", "Advances from Clients", "Liability"), ("3001", "Partners' Capital", "Equity")]:
+                c.execute("INSERT INTO accounts(code,name,type) VALUES(?,?,?)", (code, name, typ))
+            cash = c.execute("INSERT INTO accounts(code,name,type) VALUES('1001','Cash in Hand','Asset')").lastrowid
+            c.execute("INSERT INTO bank_accounts(name,account_id,is_cash) VALUES('Cash in Hand',?,1)", (cash,))
+            for i, n in enumerate(INCOME_HEADS):
+                a = c.execute("INSERT INTO accounts(code,name,type) VALUES(?,?,'Income')", (str(4001 + i), "Fees - " + n)).lastrowid
+                c.execute("INSERT INTO masters(kind,name,account_id) VALUES('income',?,?)", (n, a))
+            for i, n in enumerate(EXPENSE_HEADS):
+                a = c.execute("INSERT INTO accounts(code,name,type) VALUES(?,?,'Expense')", (str(5001 + i), n)).lastrowid
+                c.execute("INSERT INTO masters(kind,name,account_id) VALUES('expense',?,?)", (n, a))
+            for n in DEPARTMENTS:
+                c.execute("INSERT INTO masters(kind,name) VALUES('department',?)", (n,))
+    c.close()
+
+
+# --------------------------------------------------------------------------- app
+app = Flask(__name__)
+
+
+def get_secret():
+    os.makedirs(DATA_DIR, exist_ok=True)
+    p = os.path.join(DATA_DIR, "secret.key")
+    if not os.path.exists(p):
+        with open(p, "w") as f:
+            f.write(secrets.token_hex(32))
+        try:
+            os.chmod(p, 0o600)
+        except Exception:
+            pass
+    return open(p).read().strip()
+
+
+def configure():
+    app.secret_key = get_secret()
+    app.config.update(SESSION_COOKIE_HTTPONLY=True, SESSION_COOKIE_SAMESITE="Lax", MAX_CONTENT_LENGTH=5 * 1024 * 1024)
+
+
+def db():
+    if "db" not in g:
+        g.db = conn()
+    return g.db
+
+
+def cur():
+    if "user" not in g:
+        g.user = None
+        uid = session.get("uid")
+        if uid:
+            r = db().execute("SELECT * FROM users WHERE id=? AND active=1", (uid,)).fetchone()
+            g.user = r
+    return g.user
+
+
+def rank_of(role):
+    r = db().execute("SELECT rank FROM roles WHERE name=?", (role,)).fetchone()
+    return r["rank"] if r else 0
+
+
+def can(mod, act):
+    u = cur()
+    if not u:
+        return False
+    if u["role"] == "Super Administrator":
+        return True
+    if "perms" not in g:
+        g.perms = {(r["module"], r["action"]) for r in db().execute("SELECT module,action FROM perms WHERE role=?", (u["role"],))}
+    return (mod, act) in g.perms
+
+
+def need(mod, act):
+    def deco(f):
+        @wraps(f)
+        def w(*a, **k):
+            if not cur():
+                return redirect("/login")
+            if not can(mod, act):
+                abort(403)
+            return f(*a, **k)
+        return w
+    return deco
+
+
+def login_required(f):
+    @wraps(f)
+    def w(*a, **k):
+        if not cur():
+            return redirect("/login")
+        return f(*a, **k)
+    return w
+
+
+def uname():
+    u = cur()
+    return u["username"] if u else "system"
+
+
+@app.before_request
+def _before():
+    if not os.path.exists(DB_PATH):
+        init_db()
+    if request.method == "POST":
+        tok = session.get("csrf", "")
+        if not tok or not hmac.compare_digest(tok, request.form.get("_csrf", "")):
+            abort(400, "Security token missing or expired. Go back, refresh the page and retry.")
+        db().execute("BEGIN IMMEDIATE")
+    if request.endpoint not in ("login", "setup", "static") and cur() is None and request.endpoint:
+        if db().execute("SELECT COUNT(*) n FROM users").fetchone()["n"] == 0 and request.endpoint != "setup":
+            return redirect("/setup")
+    app.permanent_session_lifetime = dt.timedelta(minutes=int(setting(db(), "session_minutes", "60")))
+    session.permanent = True
+
+
+@app.teardown_request
+def _teardown(exc):
+    c = g.pop("db", None)
+    if c is not None:
+        try:
+            if c.in_transaction:
+                c.execute("ROLLBACK" if exc else "COMMIT")
+        finally:
+            c.close()
+
+
+@app.after_request
+def _headers(r):
+    r.headers["X-Frame-Options"] = "DENY"
+    r.headers["X-Content-Type-Options"] = "nosniff"
+    r.headers["Referrer-Policy"] = "same-origin"
+    r.headers["Cache-Control"] = "no-store"
+    r.headers["Content-Security-Policy"] = "default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; img-src 'self' data:"
+    return r
+
+
+@app.errorhandler(403)
+def _e403(e):
+    return render_template("msg.html", title="Access denied", msg="Your role does not have permission for this action."), 403
+
+
+@app.errorhandler(400)
+def _e400(e):
+    return render_template("msg.html", title="Request rejected", msg=getattr(e, "description", "Bad request")), 400
+
+
+@app.errorhandler(404)
+def _e404(e):
+    return render_template("msg.html", title="Not found", msg="That record or page does not exist."), 404
+
+
+def csrf():
+    if "csrf" not in session:
+        session["csrf"] = secrets.token_hex(16)
+    return session["csrf"]
+
+
+def current_fy():
+    return session.get("fy") or fy_of(today())
+
+
+@app.context_processor
+def _ctx():
+    u = cur()
+    d = dict(user=u, csrf=csrf, can=can, inr=inr, M=M, firm=setting(db(), "firm_name", "CA Firm"), fy=current_fy())
+    if u:
+        fys = {r["fy"] for r in db().execute("SELECT DISTINCT fy FROM journals")} | {fy_of(today()), current_fy()}
+        d["fys"] = sorted(fys, reverse=True)
+        d["nav"] = [("Dashboard", "/", True), ("Invoices", "/t/invoice", can("invoice", "view")), ("Receipts", "/t/receipt", can("receipt", "view")),
+                    ("Expenses", "/t/expense", can("expense", "view")), ("Approvals", "/approvals", any(can(m, "approve") for m in TXM)),
+                    ("Clients", "/clients", can("clients", "view")), ("Vendors", "/vendors", can("vendors", "view")),
+                    ("Reports", "/reports", can("reports", "view")), ("Audit Trail", "/audit", can("audit", "view")),
+                    ("Administration", "/admin", can("admin", "manage"))]
+    return d
+
+
+# --------------------------------------------------------------------------- auth
+@app.route("/setup", methods=["GET", "POST"])
+def setup():
+    c = db()
+    if c.execute("SELECT COUNT(*) n FROM users").fetchone()["n"]:
+        return redirect("/login")
+    if request.method == "POST":
+        f = request.form
+        try:
+            pw_ok(c, f["password"])
+            if f["password"] != f["password2"]:
+                raise ValueError("Passwords do not match")
+            if not f["username"].strip() or not f["full_name"].strip():
+                raise ValueError("Name and username are required")
+            set_setting(c, "firm_name", f["firm"].strip() or "CA Firm")
+            uid = c.execute("INSERT INTO users(username,full_name,pw,role,created_at) VALUES(?,?,?,?,?)",
+                            (f["username"].strip().lower(), f["full_name"].strip(), generate_password_hash(f["password"]),
+                             "Super Administrator", now())).lastrowid
+            audit(c, f["username"], "setup", "users", uid, None, {"role": "Super Administrator"})
+            flash("Setup complete. Please log in.")
+            return redirect("/login")
+        except ValueError as e:
+            flash(str(e), "err")
+    return render_template("setup.html", title="First-time setup")
+
+
+def pw_ok(c, pw):
+    n = int(setting(c, "min_pw", "10"))
+    if len(pw) < n or not re.search(r"[A-Za-z]", pw) or not re.search(r"\d", pw):
+        raise ValueError("Password must be at least %d characters and contain letters and digits" % n)
+
+
+@app.route("/login", methods=["GET", "POST"])
+def login():
+    c = db()
+    if request.method == "POST":
+        u = c.execute("SELECT * FROM users WHERE username=?", (request.form.get("username", "").strip().lower(),)).fetchone()
+        if u and u["locked_until"] and u["locked_until"] > now():
+            flash("Account temporarily locked. Try again later.", "err")
+        elif u and u["active"] and check_password_hash(u["pw"], request.form.get("password", "")):
+            c.execute("UPDATE users SET fails=0, locked_until=NULL WHERE id=?", (u["id"],))
+            session.clear()
+            session["uid"] = u["id"]
+            csrf()
+            audit(c, u["username"], "login", "users", u["id"])
+            return redirect("/")
+        else:
+            if u:
+                fails = u["fails"] + 1
+                lock = None
+                if fails >= int(setting(c, "max_fails", "5")):
+                    lock = (dt.datetime.now() + dt.timedelta(minutes=int(setting(c, "lock_minutes", "5")))).isoformat(timespec="seconds")
+                    fails = 0
+                c.execute("UPDATE users SET fails=?, locked_until=? WHERE id=?", (fails, lock, u["id"]))
+                audit(c, u["username"], "login_failed", "users", u["id"])
+            flash("Invalid username or password.", "err")
+    return render_template("login.html", title="Sign in")
+
+
+@app.route("/logout")
+def logout():
+    session.clear()
+    return redirect("/login")
+
+
+@app.route("/fy", methods=["POST"])
+@login_required
+def set_fy():
+    f = request.form.get("fy", "")
+    if re.fullmatch(r"\d{4}-\d{2}", f):
+        session["fy"] = f
+    return redirect(request.referrer or "/")
+
+
+@app.route("/password", methods=["GET", "POST"])
+@login_required
+def change_password():
+    c, u = db(), cur()
+    if request.method == "POST":
+        try:
+            if not check_password_hash(u["pw"], request.form["old"]):
+                raise ValueError("Current password is incorrect")
+            pw_ok(c, request.form["new"])
+            c.execute("UPDATE users SET pw=? WHERE id=?", (generate_password_hash(request.form["new"]), u["id"]))
+            audit(c, u["username"], "password_change", "users", u["id"])
+            flash("Password changed.")
+            return redirect("/")
+        except ValueError as e:
+            flash(str(e), "err")
+    fields = [dict(name="old", label="Current password", kind="password", req=True),
+              dict(name="new", label="New password", kind="password", req=True)]
+    return render_template("form.html", title="Change password", fields=fields, buttons=[("save", "Change password", "pri")], back="/")
+
+
+# --------------------------------------------------------------------------- generic form helper
+def F(name, label, kind="text", val="", req=False, opts=None, hint=""):
+    return dict(name=name, label=label, kind=kind, val=val if val is not None else "", req=req, opts=opts or [], hint=hint)
+
+
+def sel(rows, key="id", label="name", blank=True):
+    o = [("", "-- select --")] if blank else []
+    return o + [(r[key], r[label]) for r in rows]
+
+
+def masters(kind):
+    return [r["name"] for r in db().execute("SELECT name FROM masters WHERE kind=? AND active=1 ORDER BY name", (kind,))]
+
+
+def partners():
+    return [r["full_name"] for r in db().execute(
+        "SELECT full_name FROM users WHERE active=1 AND role IN('Managing Partner','Partner') ORDER BY full_name")]
+
+
+# --------------------------------------------------------------------------- masters: clients / vendors
+@app.route("/clients")
+@need("clients", "view")
+def clients():
+    rows = db().execute("SELECT * FROM clients ORDER BY name").fetchall()
+    return render_template("list.html", title="Clients", add="/clients/new" if can("clients", "create") else None,
+                           cols=["Code", "Client", "Constitution", "PAN", "GSTIN", "Partner", "Mobile"],
+                           rows=[dict(url="/clients/%d/edit" % r["id"] if can("clients", "edit") else None,
+                                      cells=[r["code"], r["name"], r["constitution"], r["pan"], r["gstin"], r["partner"], r["mobile"]]) for r in rows])
+
+
+def party_form(kind, row=None):
+    r = row or {}
+    f = [F("name", "Name", val=r.get("name"), req=True), F("pan", "PAN", val=r.get("pan")), F("gstin", "GSTIN", val=r.get("gstin"))]
+    if kind == "clients":
+        f[1:1] = [F("constitution", "Constitution", "select", r.get("constitution"), opts=sel([dict(id=x, name=x) for x in
+                  ["Individual", "HUF", "Firm/LLP", "Company", "Trust/Society", "AOP/BOI", "Other"]], "id", "name", False))]
+        f += [F("partner", "Assigned partner", "select", r.get("partner"), opts=sel([dict(id=p, name=p) for p in partners()], "id", "name")),
+              F("email", "Email", val=r.get("email")), F("mobile", "Mobile", val=r.get("mobile"))]
+    return f
+
+
+def save_party(kind, pid=None):
+    c, f = db(), request.form
+    name = f["name"].strip()
+    if not name:
+        raise ValueError("Name is required")
+    pan, gstin = f.get("pan", "").strip().upper(), f.get("gstin", "").strip().upper()
+    if pan and not re.fullmatch(r"[A-Z]{5}\d{4}[A-Z]", pan):
+        raise ValueError("PAN format is invalid (e.g. ABCDE1234F)")
+    if gstin and not re.fullmatch(r"\d{2}[A-Z]{5}\d{4}[A-Z][A-Z\d]Z[A-Z\d]", gstin):
+        raise ValueError("GSTIN format is invalid")
+    if pan and c.execute("SELECT 1 FROM %s WHERE pan=? AND id IS NOT ?" % kind, (pan, pid)).fetchone():
+        raise ValueError("Another record already has this PAN")
+    vals = dict(name=name, pan=pan, gstin=gstin)
+    if kind == "clients":
+        vals.update(constitution=f.get("constitution", ""), partner=f.get("partner", ""), email=f.get("email", "").strip(), mobile=f.get("mobile", "").strip())
+    if pid:
+        old = dict(c.execute("SELECT * FROM %s WHERE id=?" % kind, (pid,)).fetchone())
+        c.execute("UPDATE %s SET %s WHERE id=?" % (kind, ",".join(k + "=?" for k in vals)), list(vals.values()) + [pid])
+        audit(c, uname(), "update", kind, pid, {k: old[k] for k in vals}, vals)
+    else:
+        n = c.execute("SELECT COUNT(*) n FROM %s" % kind).fetchone()["n"] + 1
+        vals["code"] = ("CL" if kind == "clients" else "VN") + "%04d" % n
+        pid = c.execute("INSERT INTO %s(%s) VALUES(%s)" % (kind, ",".join(vals), ",".join("?" * len(vals))), list(vals.values())).lastrowid
+        audit(c, uname(), "create", kind, pid, None, vals)
+    return pid
+
+
+def party_routes(kind, title):
+    def lst():
+        rows = db().execute("SELECT * FROM vendors ORDER BY name").fetchall()
+        return render_template("list.html", title=title, add="/vendors/new" if can("vendors", "create") else None,
+                               cols=["Code", "Vendor", "PAN", "GSTIN"],
+                               rows=[dict(url="/vendors/%d/edit" % r["id"] if can("vendors", "edit") else None,
+                                          cells=[r["code"], r["name"], r["pan"], r["gstin"]]) for r in rows])
+
+    def edit(pid=None):
+        row = None
+        if pid:
+            row = db().execute("SELECT * FROM %s WHERE id=?" % kind, (pid,)).fetchone() or abort(404)
+            row = dict(row)
+        if request.method == "POST":
+            try:
+                save_party(kind, pid)
+                flash("Saved.")
+                return redirect("/" + kind)
+            except ValueError as e:
+                flash(str(e), "err")
+                row = dict(request.form)
+        return render_template("form.html", title=("Edit " if pid else "New ") + title[:-1], fields=party_form(kind, row),
+                               buttons=[("save", "Save", "pri")], back="/" + kind)
+    return lst, edit
+
+
+_, client_edit = party_routes("clients", "Clients")
+vendor_list, vendor_edit = party_routes("vendors", "Vendors")
+app.add_url_rule("/clients/new", "client_new", need("clients", "create")(lambda: client_edit()), methods=["GET", "POST"])
+app.add_url_rule("/clients/<int:pid>/edit", "client_edit", need("clients", "edit")(client_edit), methods=["GET", "POST"])
+app.add_url_rule("/vendors", "vendors", need("vendors", "view")(vendor_list))
+app.add_url_rule("/vendors/new", "vendor_new", need("vendors", "create")(lambda: vendor_edit()), methods=["GET", "POST"])
+app.add_url_rule("/vendors/<int:pid>/edit", "vendor_edit", need("vendors", "edit")(vendor_edit), methods=["GET", "POST"])
+
+
+# --------------------------------------------------------------------------- transactions
+def party_name(t):
+    tab = TX[t["type"]]["party"]
+    r = db().execute("SELECT name FROM %s WHERE id=?" % tab, (t["party_id"],)).fetchone()
+    return r["name"] if r else "-"
+
+
+def outstanding(c, inv_id):
+    inv = c.execute("SELECT net FROM txns WHERE id=? AND type='invoice' AND status='Approved'", (inv_id,)).fetchone()
+    if not inv:
+        return 0
+    got = c.execute("SELECT COALESCE(SUM(amount),0) s FROM txns WHERE type='receipt' AND invoice_id=? AND status='Approved'", (inv_id,)).fetchone()["s"]
+    return inv["net"] - got
+
+
+def required_role(c, gross):
+    for r in c.execute("SELECT * FROM approval_matrix ORDER BY CASE WHEN up_to IS NULL THEN 1 ELSE 0 END, up_to"):
+        if r["up_to"] is None or gross <= r["up_to"]:
+            return r["role"]
+    return "Managing Partner"
+
+
+def can_approve(c, t, u):
+    """Returns (bool, reason)."""
+    if t["status"] != "Pending Approval":
+        return False, "Not pending approval"
+    if not can(t["type"], "approve"):
+        return False, "No approval permission for this module"
+    if setting(c, "sod", "1") == "1" and t["maker_id"] == u["id"]:
+        return False, "Segregation of duties: the maker cannot approve their own transaction"
+    req = required_role(c, t["amount"] + t["gst"])
+    if rank_of(u["role"]) < rank_of(req):
+        return False, "Amount requires approval by %s or higher" % req
+    return True, ""
+
+
+def parse_txn(typ, f, existing=None):
+    c = db()
+    d = dict(date=check_date(f.get("date", "")), amount=paise(f.get("amount")), gst=paise(f.get("gst")), tds=paise(f.get("tds")),
+             mode=f.get("mode", ""), ref=f.get("ref", "").strip(), narration=f.get("narration", "").strip())
+    if d["amount"] <= 0:
+        raise ValueError("Amount must be greater than zero")
+    if d["mode"] not in PAY_MODES:
+        raise ValueError("Select a payment mode")
+    d["fy"] = fy_of(d["date"])
+    pid = int(f.get("party_id") or 0)
+    if not c.execute("SELECT 1 FROM %s WHERE id=? AND active=1" % TX[typ]["party"], (pid,)).fetchone():
+        raise ValueError("Select a valid %s" % ("client" if typ != "expense" else "vendor"))
+    d["party_id"] = pid
+    d.update(head=None, bank_id=None, invoice_id=None, dept=None, partner=None, due=None)
+    if typ == "invoice":
+        if f.get("head") not in masters("income"):
+            raise ValueError("Select a service category")
+        d["head"] = f["head"]
+        d["partner"] = f.get("partner", "")
+        d["due"] = check_date(f.get("due") or (dt.date.fromisoformat(d["date"]) + dt.timedelta(days=int(setting(c, "credit_days", "30")))).isoformat())
+        d["tds"] = 0
+        d["net"] = d["amount"] + d["gst"]
+        d["bank_id"] = None
+    else:
+        if d["tds"] > d["amount"]:
+            raise ValueError("TDS cannot exceed the amount")
+        bid = f.get("bank_id")
+        if typ == "receipt" and not bid:
+            raise ValueError("Select the bank/cash account where the money was received")
+        d["bank_id"] = int(bid) if bid else None
+        if d["bank_id"] and not c.execute("SELECT 1 FROM bank_accounts WHERE id=?", (d["bank_id"],)).fetchone():
+            raise ValueError("Invalid bank account")
+    if typ == "receipt":
+        d["gst"] = 0
+        d["net"] = d["amount"] - d["tds"]
+        iid = int(f.get("invoice_id") or 0)
+        if iid:
+            inv = c.execute("SELECT * FROM txns WHERE id=? AND type='invoice' AND status='Approved'", (iid,)).fetchone()
+            if not inv or inv["party_id"] != pid:
+                raise ValueError("Invoice must be an approved invoice of the same client")
+            if d["amount"] > outstanding(c, iid):
+                raise ValueError("Receipt exceeds the outstanding balance of the invoice (%s)" % inv_fmt(outstanding(c, iid)))
+            d["invoice_id"] = iid
+    if typ == "expense":
+        if f.get("head") not in masters("expense"):
+            raise ValueError("Select an expense head")
+        d["head"], d["dept"] = f["head"], f.get("dept", "")
+        if not d["ref"]:
+            raise ValueError("Vendor invoice number is required (supporting document reference)")
+        if d["tds"] > d["amount"] + d["gst"]:
+            raise ValueError("TDS cannot exceed the invoice value")
+        d["net"] = d["amount"] + d["gst"] - d["tds"]
+        dup = c.execute("SELECT no FROM txns WHERE type='expense' AND party_id=? AND lower(ref)=lower(?) AND status NOT IN('Rejected','Cancelled') AND id IS NOT ?",
+                        (pid, d["ref"], existing["id"] if existing else None)).fetchone()
+        if dup:
+            raise ValueError("Duplicate: this vendor invoice number is already booked in %s" % dup["no"])
+    return d
+
+
+def inv_fmt(p):
+    return inr(p)
+
+
+def txn_fields(typ, v=None):
+    v = v or {}
+    c = db()
+    banks = sel(c.execute("SELECT id,name FROM bank_accounts ORDER BY is_cash DESC,name").fetchall())
+    modes = [(m, m) for m in PAY_MODES]
+    fields = [F("date", "Date", "date", v.get("date") or today(), True)]
+    if typ == "expense":
+        fields += [F("party_id", "Vendor", "select", v.get("party_id"), True, sel(c.execute("SELECT id,name FROM vendors WHERE active=1 ORDER BY name").fetchall())),
+                   F("head", "Expense head", "select", v.get("head"), True, [(x, x) for x in masters("expense")]),
+                   F("ref", "Vendor invoice no.", "text", v.get("ref"), True), F("dept", "Department", "select", v.get("dept"), False, [("", "--")] + [(x, x) for x in masters("department")])]
+    else:
+        fields.append(F("party_id", "Client", "select", v.get("party_id"), True, sel(c.execute("SELECT id,name FROM clients WHERE active=1 ORDER BY name").fetchall())))
+    if typ == "invoice":
+        fields += [F("head", "Service category", "select", v.get("head"), True, [(x, x) for x in masters("income")]),
+                   F("partner", "Responsible partner", "select", v.get("partner"), False, [("", "--")] + [(p, p) for p in partners()]),
+                   F("due", "Due date", "date", v.get("due"), False, hint="Blank = invoice date + default credit days")]
+    if typ == "receipt":
+        invs = c.execute("SELECT t.id,t.no,t.net,c.name FROM txns t JOIN clients c ON c.id=t.party_id WHERE t.type='invoice' AND t.status='Approved' ORDER BY t.date DESC").fetchall()
+        o = [("", "-- advance / not against an invoice --")] + [(r["id"], "%s | %s | outstanding %s" % (r["no"], r["name"], inr(outstanding(c, r["id"])))) for r in invs if outstanding(c, r["id"]) > 0]
+        fields.append(F("invoice_id", "Against invoice", "select", v.get("invoice_id"), False, o))
+    lab = {"invoice": "Fee amount (excl. GST)", "receipt": "Gross amount received/settled (incl. GST)", "expense": "Amount (excl. GST)"}[typ]
+    fields.append(F("amount", lab, "money", rupees(v["amount"]) if v.get("amount") else "", True))
+    if typ != "receipt":
+        fields.append(F("gst", "GST amount", "money", rupees(v["gst"]) if v.get("gst") else ""))
+    if typ != "invoice":
+        fields.append(F("tds", "TDS deducted", "money", rupees(v["tds"]) if v.get("tds") else ""))
+        fields.append(F("bank_id", "Received in" if typ == "receipt" else "Paid from", "select", v.get("bank_id"), typ == "receipt",
+                        banks if typ == "receipt" else [("", "-- on credit (payable) --")] + banks[1:]))
+    fields += [F("mode", "Payment mode", "select", v.get("mode"), True, modes)]
+    if typ == "receipt":
+        fields.append(F("ref", "Cheque / UTR no.", "text", v.get("ref")))
+    fields.append(F("narration", "Narration", "textarea", v.get("narration")))
+    return fields
+
+
+def next_no(c, typ, fy):
+    n = c.execute("SELECT COUNT(*) n FROM txns WHERE type=? AND fy=?", (typ, fy)).fetchone()["n"] + 1
+    return "%s/%s/%04d" % (TX[typ]["pre"], fy, n)
+
+
+def txn_list_query(typ, fy, q="", status=""):
+    sql = ("SELECT t.*, COALESCE(c.name,v.name) party FROM txns t LEFT JOIN clients c ON t.type IN('invoice','receipt') AND c.id=t.party_id "
+           "LEFT JOIN vendors v ON t.type='expense' AND v.id=t.party_id WHERE t.type=? AND t.fy=?")
+    args = [typ, fy]
+    if not can(typ, "view_all"):
+        sql += " AND t.maker_id=?"
+        args.append(cur()["id"])
+    if status:
+        sql += " AND t.status=?"
+        args.append(status)
+    if q:
+        sql += " AND (t.no LIKE ? OR party LIKE ? OR t.ref LIKE ? OR t.head LIKE ?)"
+        args += ["%" + q + "%"] * 4
+    return db().execute(sql + " ORDER BY t.date DESC, t.id DESC LIMIT 300", args).fetchall()
+
+
+class B(str):
+    """Status badge cell."""
+
+
+@app.route("/t/<typ>")
+@login_required
+def txn_list(typ):
+    if typ not in TX:
+        abort(404)
+    if not can(typ, "view"):
+        abort(403)
+    st = request.args.get("status", "")
+    rows = txn_list_query(typ, current_fy(), request.args.get("q", ""), st)
+    return render_template("list.html", title="%s - FY %s" % (TX[typ]["plural"], current_fy()),
+                           add="/t/%s/new" % typ if can(typ, "create") else None, status_filter=STATUSES, cur_status=st,
+                           export="/r/reg_%s" % typ if can(typ, "export") else None,
+                           cols=["No.", "Date", "Party", "Head", "Amount", "GST", "TDS", "Net", "Status"],
+                           rows=[dict(url="/t/%s/%d" % (typ, r["id"]), cells=[r["no"], r["date"], r["party"], r["head"], M(r["amount"]), M(r["gst"]),
+                                                                              M(r["tds"]), M(r["net"]), B(r["status"])]) for r in rows],
+                           note="Showing up to 300 latest records of the selected financial year. Click a column heading to sort.")
+
+
+@app.route("/t/<typ>/new", methods=["GET", "POST"])
+@login_required
+def txn_new(typ):
+    if typ not in TX:
+        abort(404)
+    if not can(typ, "create"):
+        abort(403)
+    c = db()
+    v = None
+    if request.method == "POST":
+        try:
+            d = parse_txn(typ, request.form)
+            submit = request.form.get("action") == "submit"
+            if submit and not can(typ, "submit"):
+                raise ValueError("You do not have permission to submit")
+            d.update(type=typ, no=next_no(c, typ, d["fy"]), status="Pending Approval" if submit else "Draft", maker_id=cur()["id"], created_at=now())
+            tid = c.execute("INSERT INTO txns(%s) VALUES(%s)" % (",".join(d), ",".join("?" * len(d))), list(d.values())).lastrowid
+            audit(c, uname(), "create", "txn:" + typ, tid, None, d)
+            if submit:
+                c.execute("INSERT INTO approvals(txn_id,step,user_id,user_name,ts,comment) VALUES(?,?,?,?,?,?)",
+                          (tid, "Submitted", cur()["id"], cur()["full_name"], now(), request.form.get("narration", "")))
+            flash("%s %s saved as %s." % (TX[typ]["label"], d["no"], d["status"]))
+            return redirect("/t/%s/%d" % (typ, tid))
+        except ValueError as e:
+            flash(str(e), "err")
+            v = dict(request.form)
+            v = {k: (paise(x) if k in ("amount", "gst", "tds") and re.fullmatch(r"[\d.,]*", x or "") else x) for k, x in v.items()}
+    btns = [("draft", "Save as draft", "")] + ([("submit", "Save & submit for approval", "pri")] if can(typ, "submit") else [])
+    return render_template("form.html", title="New " + TX[typ]["label"], fields=txn_fields(typ, v), buttons=btns, back="/t/" + typ)
+
+
+def get_txn(typ, tid):
+    t = db().execute("SELECT * FROM txns WHERE id=? AND type=?", (tid, typ)).fetchone() or abort(404)
+    if not can(typ, "view") or (not can(typ, "view_all") and t["maker_id"] != cur()["id"]):
+        abort(403)
+    return t
+
+
+@app.route("/t/<typ>/<int:tid>")
+@login_required
+def txn_view(typ, tid):
+    c, u = db(), cur()
+    if typ not in TX:
+        abort(404)
+    t = get_txn(typ, tid)
+    ok, why = can_approve(c, t, u)
+    hist = c.execute("SELECT * FROM approvals WHERE txn_id=? ORDER BY id", (tid,)).fetchall()
+    jl = []
+    if t["journal_id"]:
+        jl = c.execute("SELECT a.code,a.name,l.debit,l.credit FROM jlines l JOIN accounts a ON a.id=l.account_id WHERE journal_id=? ORDER BY l.id", (t["journal_id"],)).fetchall()
+    maker = c.execute("SELECT full_name FROM users WHERE id=?", (t["maker_id"],)).fetchone()
+    bank = c.execute("SELECT name FROM bank_accounts WHERE id=?", (t["bank_id"],)).fetchone() if t["bank_id"] else None
+    inv = c.execute("SELECT no FROM txns WHERE id=?", (t["invoice_id"],)).fetchone() if t["invoice_id"] else None
+    return render_template("txn.html", title="%s %s" % (TX[typ]["label"], t["no"]), t=t, typ=typ, party=party_name(t), hist=hist, jl=jl,
+                           maker=maker["full_name"] if maker else "", bank=bank["name"] if bank else "", inv=inv["no"] if inv else "",
+                           req_role=required_role(c, t["amount"] + t["gst"]), approve_ok=ok, approve_why=why,
+                           can_edit=t["status"] in EDITABLE and can(typ, "edit") and (t["maker_id"] == u["id"] or can(typ, "approve")),
+                           can_submit=t["status"] in EDITABLE and can(typ, "submit") and t["maker_id"] == u["id"],
+                           can_cancel=t["status"] == "Approved" and can(typ, "cancel"),
+                           can_cancel_draft=t["status"] in EDITABLE and t["maker_id"] == u["id"],
+                           can_decide=t["status"] == "Pending Approval" and can(typ, "approve"), statuses=STATUSES)
+
+
+@app.route("/t/<typ>/<int:tid>/edit", methods=["GET", "POST"])
+@login_required
+def txn_edit(typ, tid):
+    if typ not in TX:
+        abort(404)
+    c = db()
+    t = get_txn(typ, tid)
+    if t["status"] not in EDITABLE or not can(typ, "edit"):
+        abort(403)
+    v = dict(t)
+    if request.method == "POST":
+        try:
+            d = parse_txn(typ, request.form, t)
+            if d["fy"] != t["fy"]:
+                raise ValueError("Date cannot move the voucher to another financial year; cancel and re-enter it")
+            old = {k: t[k] for k in d}
+            c.execute("UPDATE txns SET %s, status='Draft' WHERE id=?" % ",".join(k + "=?" for k in d), list(d.values()) + [tid])
+            audit(c, uname(), "update", "txn:" + typ, tid, {k: old[k] for k in d if old[k] != d[k]}, {k: d[k] for k in d if old[k] != d[k]})
+            flash("Changes saved.")
+            return redirect("/t/%s/%d" % (typ, tid))
+        except ValueError as e:
+            flash(str(e), "err")
+            v = dict(request.form)
+    return render_template("form.html", title="Edit " + t["no"], fields=txn_fields(typ, v), buttons=[("save", "Save changes", "pri")], back="/t/%s/%d" % (typ, tid))
+
+
+def build_lines(c, t):
+    amt, gst, tds, typ = t["amount"], t["gst"], t["tds"], t["type"]
+    if typ == "invoice":
+        inc = c.execute("SELECT account_id FROM masters WHERE kind='income' AND name=?", (t["head"],)).fetchone()["account_id"]
+        return [(A(c, "1100"), amt + gst, 0), (inc, 0, amt), (A(c, "2100"), 0, gst)]
+    bank = c.execute("SELECT account_id FROM bank_accounts WHERE id=?", (t["bank_id"],)).fetchone()["account_id"] if t["bank_id"] else None
+    if typ == "receipt":
+        return [(bank, amt - tds, 0), (A(c, "1150"), tds, 0), (A(c, "1100") if t["invoice_id"] else A(c, "2300"), 0, amt)]
+    exp = c.execute("SELECT account_id FROM masters WHERE kind='expense' AND name=?", (t["head"],)).fetchone()["account_id"]
+    return [(exp, amt, 0), (A(c, "1200"), gst, 0), (A(c, "2200"), 0, tds), (bank or A(c, "2001"), 0, amt + gst - tds)]
+
+
+def log_step(c, tid, step, comment):
+    u = cur()
+    c.execute("INSERT INTO approvals(txn_id,step,user_id,user_name,ts,comment) VALUES(?,?,?,?,?,?)", (tid, step, u["id"], u["full_name"], now(), comment))
+
+
+@app.route("/t/<typ>/<int:tid>/act", methods=["POST"])
+@login_required
+def txn_act(typ, tid):
+    if typ not in TX:
+        abort(404)
+    c, u = db(), cur()
+    t = get_txn(typ, tid)
+    act, comment = request.form.get("act"), request.form.get("comment", "").strip()
+    try:
+        if act == "submit":
+            if t["status"] not in EDITABLE or not can(typ, "submit") or t["maker_id"] != u["id"]:
+                raise ValueError("Cannot submit this transaction")
+            new = "Pending Approval"
+            log_step(c, tid, "Submitted", comment)
+        elif act in ("approve", "reject", "return"):
+            ok, why = can_approve(c, t, u)
+            if not ok:
+                raise ValueError(why)
+            if act != "approve" and not comment:
+                raise ValueError("A comment is mandatory when rejecting or returning a transaction")
+            if act == "approve":
+                if typ == "receipt" and t["invoice_id"] and t["amount"] > outstanding(c, t["invoice_id"]):
+                    raise ValueError("Receipt now exceeds the invoice's outstanding balance")
+                jid = post_journal(c, t["date"], t["no"], "%s %s - %s" % (TX[typ]["label"], t["no"], t["narration"] or ""), build_lines(c, t), "txn", tid, u["id"])
+                c.execute("UPDATE txns SET status='Approved', approver_id=?, approved_at=?, journal_id=? WHERE id=?", (u["id"], now(), jid, tid))
+                log_step(c, tid, "Approved", comment)
+                audit(c, uname(), "approve", "txn:" + typ, tid, {"status": t["status"]}, {"status": "Approved", "journal": jid})
+                flash("Approved and posted to the ledger.")
+                return redirect("/t/%s/%d" % (typ, tid))
+            new = "Rejected" if act == "reject" else "Returned for Correction"
+            log_step(c, tid, new, comment)
+        elif act == "cancel":
+            if t["status"] in EDITABLE and t["maker_id"] == u["id"]:
+                new = "Cancelled"
+                log_step(c, tid, "Cancelled", comment)
+            elif t["status"] == "Approved" and can(typ, "cancel"):
+                if not comment:
+                    raise ValueError("A reason is mandatory to reverse an approved transaction")
+                if typ == "invoice" and c.execute("SELECT 1 FROM txns WHERE type='receipt' AND invoice_id=? AND status IN('Approved','Pending Approval')", (tid,)).fetchone():
+                    raise ValueError("Cancel the receipts adjusted against this invoice first")
+                lines = [(a, k, d) for a, d, k in build_lines(c, t)]
+                post_journal(c, today(), "REV-" + t["no"], "Reversal of %s: %s" % (t["no"], comment), lines, "reversal", tid, u["id"], t["journal_id"])
+                new = "Cancelled"
+                log_step(c, tid, "Cancelled (ledger reversed)", comment)
+            else:
+                raise ValueError("Cannot cancel this transaction")
+            c.execute("UPDATE txns SET reason=? WHERE id=?", (comment, tid))
+        else:
+            raise ValueError("Unknown action")
+        c.execute("UPDATE txns SET status=? WHERE id=?", (new, tid))
+        audit(c, uname(), act, "txn:" + typ, tid, {"status": t["status"]}, {"status": new, "comment": comment})
+        flash("Status: %s." % new)
+    except ValueError as e:
+        flash(str(e), "err")
+    return redirect("/t/%s/%d" % (typ, tid))
+
+
+@app.route("/approvals")
+@login_required
+def approvals():
+    c, u = db(), cur()
+    rows = []
+    for typ in TXM:
+        if not can(typ, "approve"):
+            continue
+        for t in c.execute("SELECT * FROM txns WHERE type=? AND status='Pending Approval' ORDER BY date", (typ,)):
+            ok, why = can_approve(c, t, u)
+            rows.append(dict(url="/t/%s/%d" % (typ, t["id"]), cells=[t["no"], t["date"], TX[typ]["label"], party_name(t), M(t["amount"] + t["gst"]),
+                                                                     required_role(c, t["amount"] + t["gst"]), "You can approve" if ok else why]))
+    return render_template("list.html", title="Pending approvals", cols=["No.", "Date", "Type", "Party", "Gross value", "Approver needed", "For you"], rows=rows,
+                           note="Approval authority follows the configurable approval matrix (Administration).")
+
+
+# --------------------------------------------------------------------------- reports
+def mk(title, headers, rows, note=""):
+    return dict(title=title, headers=headers, rows=rows, note=note)
+
+
+def r_trial_balance(c, fy, **k):
+    s, e = fy_range(fy)
+    q = """SELECT a.code,a.name,a.type,
+      COALESCE(SUM(CASE WHEN (a.type IN('Income','Expense') AND j.fy=?) OR (a.type NOT IN('Income','Expense') AND j.date<=?) THEN l.debit END),0) dr,
+      COALESCE(SUM(CASE WHEN (a.type IN('Income','Expense') AND j.fy=?) OR (a.type NOT IN('Income','Expense') AND j.date<=?) THEN l.credit END),0) cr
+      FROM accounts a LEFT JOIN jlines l ON l.account_id=a.id LEFT JOIN journals j ON j.id=l.journal_id GROUP BY a.id ORDER BY a.code"""
+    rows, td, tc = [], 0, 0
+    for r in c.execute(q, (fy, e, fy, e)):
+        n = r["dr"] - r["cr"]
+        if n == 0 and r["dr"] == 0:
+            continue
+        d_, c_ = (n, 0) if n > 0 else (0, -n)
+        rows.append([r["code"], r["name"], r["type"], M(d_), M(c_)])
+        td += d_; tc += c_
+    ps = c.execute("SELECT COALESCE(SUM(l.credit-l.debit),0) s FROM jlines l JOIN journals j ON j.id=l.journal_id JOIN accounts a ON a.id=l.account_id "
+                   "WHERE a.type IN('Income','Expense') AND j.date<?", (s,)).fetchone()["s"]
+    if ps:
+        d_, c_ = (0, ps) if ps > 0 else (-ps, 0)
+        rows.append(["-", "Accumulated surplus/(deficit) b/f from prior years", "Equity", M(d_), M(c_)])
+        td += d_; tc += c_
+    rows.append(["", "TOTAL", "", M(td), M(tc)])
+    return mk("Trial Balance - FY %s" % fy, ["Code", "Account", "Type", "Debit", "Credit"], rows,
+              "Balanced: debits equal credits." if td == tc else "WARNING: trial balance does not agree - investigate immediately.")
+
+
+def r_income_exp(c, fy, **k):
+    def tot(typ):
+        return c.execute("""SELECT a.code,a.name,COALESCE(SUM(l.credit-l.debit),0) v FROM accounts a JOIN jlines l ON l.account_id=a.id JOIN journals j ON j.id=l.journal_id
+                            WHERE a.type=? AND j.fy=? GROUP BY a.id ORDER BY a.code""", (typ, fy)).fetchall()
+    inc, exp = tot("Income"), tot("Expense")
+    rows = [["INCOME", "", ""]] + [[r["code"], r["name"], M(r["v"])] for r in inc]
+    ti = sum(r["v"] for r in inc)
+    rows += [["", "Total income", M(ti)], ["EXPENDITURE", "", ""]] + [[r["code"], r["name"], M(-r["v"])] for r in exp]
+    te = -sum(r["v"] for r in exp)
+    rows += [["", "Total expenditure", M(te)], ["", "NET SURPLUS / (DEFICIT)", M(ti - te)]]
+    return mk("Income & Expenditure Statement - FY %s" % fy, ["Code", "Particulars", "Amount"], rows, "Derived directly from approved ledger postings (accrual basis).")
+
+
+def r_ageing(c, fy, **k):
+    td = dt.date.today()
+    buckets = [30, 60, 90, 180]
+    per = {}
+    for r in c.execute("SELECT t.id,t.date,t.party_id,c.name FROM txns t JOIN clients c ON c.id=t.party_id WHERE t.type='invoice' AND t.status='Approved'"):
+        o = outstanding(c, r["id"])
+        if o <= 0:
+            continue
+        days = (td - dt.date.fromisoformat(r["date"])).days
+        i = next((i for i, b in enumerate(buckets) if days <= b), 4)
+        row = per.setdefault(r["name"], [0] * 5)
+        row[i] += o
+    rows = [[n] + [M(x) for x in v] + [M(sum(v))] for n, v in sorted(per.items())]
+    tot = [sum(v[i] for v in per.values()) for i in range(5)]
+    rows.append(["TOTAL"] + [M(x) for x in tot] + [M(sum(tot))])
+    return mk("Client Receivables Ageing (as on %s)" % td.isoformat(), ["Client", "0-30 days", "31-60", "61-90", "91-180", "Above 180", "Total"], rows,
+              "Age counted from invoice date; only approved invoices net of approved receipts.")
+
+
+def r_ledger(c, fy, acct=None, **k):
+    if not acct:
+        return mk("Ledger", ["Date", "Reference", "Narration", "Debit", "Credit", "Balance"], [], "Choose an account.")
+    a = c.execute("SELECT * FROM accounts WHERE id=?", (acct,)).fetchone() or abort(404)
+    s, e = fy_range(fy)
+    pl = a["type"] in ("Income", "Expense")
+    lo = s if pl else "0000-00-00"
+    op = c.execute("SELECT COALESCE(SUM(l.debit-l.credit),0) b FROM jlines l JOIN journals j ON j.id=l.journal_id WHERE l.account_id=? AND j.date<?", (acct, s)).fetchone()["b"] if not pl else 0
+    rows, bal = [], op
+    if op:
+        rows.append([s, "", "Opening balance", M(max(op, 0)), M(max(-op, 0)), M(op)])
+    for r in c.execute("SELECT j.date,j.ref,j.narration,l.debit,l.credit FROM jlines l JOIN journals j ON j.id=l.journal_id WHERE l.account_id=? AND j.date BETWEEN ? AND ? ORDER BY j.date,j.id,l.id", (acct, s, e)):
+        bal += r["debit"] - r["credit"]
+        rows.append([r["date"], r["ref"], r["narration"], M(r["debit"]), M(r["credit"]), M(bal)])
+    return mk("Ledger: %s %s - FY %s" % (a["code"], a["name"], fy), ["Date", "Reference", "Narration", "Debit", "Credit", "Running balance (Dr+/Cr-)"], rows)
+
+
+def r_register(typ):
+    def f(c, fy, **k):
+        rows = [[r["no"], r["date"], r["party"], r["head"], r["ref"], M(r["amount"]), M(r["gst"]), M(r["tds"]), M(r["net"]), r["status"]]
+                for r in txn_list_query(typ, fy)]
+        return mk("%s Register - FY %s" % (TX[typ]["label"], fy), ["No.", "Date", "Party", "Head", "Reference", "Amount", "GST", "TDS", "Net", "Status"], rows)
+    return f
+
+
+def r_exceptions(c, fy, **k):
+    rows = []
+    for r in c.execute("SELECT v.name,t.ref,GROUP_CONCAT(t.no) nos FROM txns t JOIN vendors v ON v.id=t.party_id WHERE t.type='expense' AND t.status NOT IN('Rejected','Cancelled') GROUP BY t.party_id,lower(t.ref) HAVING COUNT(*)>1"):
+        rows.append(["Duplicate vendor invoice", r["nos"], "%s - invoice %s booked more than once" % (r["name"], r["ref"])])
+    for r in c.execute("SELECT t.id,t.no,t.date,c.name FROM txns t JOIN clients c ON c.id=t.party_id WHERE t.type='invoice' AND t.status='Approved' AND t.due<?", (today(),)):
+        o = outstanding(c, r["id"])
+        if o > 0:
+            rows.append(["Overdue receivable", r["no"], "%s - %s outstanding, invoice dated %s" % (r["name"], inr(o), r["date"])])
+    for r in c.execute("SELECT t.no,t.amount,c.name FROM txns t JOIN clients c ON c.id=t.party_id WHERE t.type='receipt' AND t.status='Approved' AND t.invoice_id IS NULL"):
+        rows.append(["Unadjusted advance", r["no"], "%s - %s received without invoice" % (r["name"], inr(r["amount"]))])
+    for r in c.execute("SELECT no FROM txns WHERE status='Approved' AND maker_id=approver_id"):
+        rows.append(["Segregation-of-duties breach", r["no"], "Maker and approver are the same user"])
+    limit = (dt.date.today() - dt.timedelta(days=7)).isoformat()
+    for r in c.execute("SELECT t.no,t.date FROM txns t WHERE t.status='Pending Approval' AND t.created_at<?", (limit,)):
+        rows.append(["Approval pending > 7 days", r["no"], "Created before %s" % limit])
+    for r in c.execute("SELECT t.no FROM txns t JOIN journals j ON j.id=t.journal_id WHERE t.status='Approved' AND (SELECT SUM(debit)-SUM(credit) FROM jlines WHERE journal_id=j.id)<>0"):
+        rows.append(["Unbalanced journal", r["no"], "Debit and credit differ"])
+    ok, bad = verify_audit(c)
+    rows.append(["Audit trail integrity", "-", "Hash chain intact" if ok else "TAMPERING DETECTED at audit record %s" % bad])
+    return mk("Exception Report", ["Exception", "Reference", "Details"], rows)
+
+
+REPORTS = {"trial_balance": ("Trial Balance", r_trial_balance), "income_exp": ("Income & Expenditure", r_income_exp),
+           "ageing": ("Receivables Ageing", r_ageing), "ledger": ("Account Ledger", r_ledger), "exceptions": ("Exception Report", r_exceptions),
+           "reg_invoice": ("Invoice Register", r_register("invoice")), "reg_receipt": ("Receipt (Income) Register", r_register("receipt")),
+           "reg_expense": ("Expense Register", r_register("expense"))}
+
+
+@app.route("/reports")
+@need("reports", "view")
+def reports():
+    return render_template("reports.html", title="Reports", reps=[(k, v[0]) for k, v in REPORTS.items()],
+                           accts=db().execute("SELECT id,code,name FROM accounts ORDER BY code").fetchall())
+
+
+def run_report(name):
+    if name not in REPORTS:
+        abort(404)
+    typ = name.split("_", 1)[1] if name.startswith("reg_") else None
+    if typ and not can(typ, "view"):
+        abort(403)
+    if not typ and not can("reports", "view"):
+        abort(403)
+    acct = request.args.get("acct", type=int)
+    return REPORTS[name][1](db(), request.args.get("fy") or current_fy(), acct=acct)
+
+
+@app.route("/r/<name>")
+@login_required
+def report_view(name):
+    rep = run_report(name)
+    return render_template("report.html", title=rep["title"], rep=rep, name=name, qs=request.query_string.decode(), can_export=can("reports", "export") or can("invoice", "export"))
+
+
+def safe(s):
+    s = "" if s is None else str(s)
+    return "'" + s if s[:1] in ("=", "+", "-", "@") else s
+
+
+@app.route("/r/<name>/export/<fmt>")
+@login_required
+def report_export(name, fmt):
+    typ = name.split("_", 1)[1] if name.startswith("reg_") else None
+    if not (can(typ, "export") if typ else can("reports", "export")):
+        abort(403)
+    rep = run_report(name)
+    audit(db(), uname(), "export_" + fmt, "report", name)
+    db().execute("COMMIT") if db().in_transaction else None
+    return build_export(rep, fmt, name)
+
+
+def build_export(rep, fmt, name):
+    H, R, title = rep["headers"], rep["rows"], rep["title"]
+    stamp = "Generated %s by %s" % (now().replace("T", " "), uname())
+    fn = "%s_%s" % (name, dt.date.today().isoformat())
+    if fmt == "csv":
+        o = io.StringIO()
+        w = csv.writer(o)
+        w.writerow([title]); w.writerow([stamp]); w.writerow(H)
+        for r in R:
+            w.writerow([rupees(x) if isinstance(x, M) else safe(x) for x in r])
+        return Response("\ufeff" + o.getvalue(), mimetype="text/csv", headers={"Content-Disposition": "attachment; filename=%s.csv" % fn})
+    if fmt == "xlsx":
+        from openpyxl import Workbook
+        from openpyxl.styles import Font
+        wb = Workbook(); ws = wb.active; ws.title = "Report"
+        ws.append([title]); ws["A1"].font = Font(bold=True, size=13); ws.append([stamp]); ws.append([])
+        ws.append(H)
+        for cell in ws[4]:
+            cell.font = Font(bold=True)
+        for r in R:
+            ws.append([float(Decimal(x) / 100) if isinstance(x, M) else safe(x) for x in r])
+            for cell, x in zip(ws[ws.max_row], r):
+                if isinstance(x, M):
+                    cell.number_format = "#,##0.00"
+        for i, h in enumerate(H, 1):
+            ws.column_dimensions[chr(64 + i)].width = max(14, min(50, max([len(str(h))] + [len(str(r[i - 1])) for r in R if len(r) >= i]) + 2))
+        o = io.BytesIO(); wb.save(o); o.seek(0)
+        return send_file(o, as_attachment=True, download_name=fn + ".xlsx", mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+    if fmt == "pdf":
+        from reportlab.lib.pagesizes import A4, landscape
+        from reportlab.lib import colors
+        from reportlab.lib.styles import getSampleStyleSheet
+        from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+        o = io.BytesIO()
+        doc = SimpleDocTemplate(o, pagesize=landscape(A4), leftMargin=24, rightMargin=24, topMargin=24, bottomMargin=24)
+        st = getSampleStyleSheet()
+        data = [H] + [[("Rs. " + inr(x)[1:]) if isinstance(x, M) else Paragraph(str(x if x is not None else "")[:200].replace("&", "&amp;").replace("<", "&lt;"), st["BodyText"]) for x in r] for r in R]
+        t = Table(data, repeatRows=1)
+        t.setStyle(TableStyle([("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#1f3a5f")), ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+                               ("FONTSIZE", (0, 0), (-1, -1), 8), ("GRID", (0, 0), (-1, -1), 0.25, colors.grey), ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                               ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#f2f5f9")])]))
+        doc.build([Paragraph(setting(conn(), "firm_name", ""), st["Title"]), Paragraph(title, st["Heading2"]), Paragraph(stamp, st["Normal"]), Spacer(1, 8), t]
+                  + ([Spacer(1, 8), Paragraph(rep["note"], st["Italic"])] if rep.get("note") else []))
+        o.seek(0)
+        return send_file(o, as_attachment=True, download_name=fn + ".pdf", mimetype="application/pdf")
+    abort(404)
+
+
+# --------------------------------------------------------------------------- dashboard
+def pl_total(c, typ, fy, month=None):
+    q = "SELECT COALESCE(SUM(l.credit-l.debit),0) v FROM jlines l JOIN journals j ON j.id=l.journal_id JOIN accounts a ON a.id=l.account_id WHERE a.type=? AND j.fy=?"
+    a = [typ, fy]
+    if month:
+        q += " AND substr(j.date,1,7)=?"
+        a.append(month)
+    v = c.execute(q, a).fetchone()["v"]
+    return v if typ == "Income" else -v
+
+
+def bal(c, code):
+    return c.execute("SELECT COALESCE(SUM(l.debit-l.credit),0) b FROM jlines l JOIN accounts a ON a.id=l.account_id WHERE a.code=?", (code,)).fetchone()["b"]
+
+
+def chart_svg(months, inc, exp):
+    mx = max(inc + exp + [1])
+    W, H, pad = 760, 250, 30
+    bw = (W - 2 * pad) / 12
+    out = ['<svg viewBox="0 0 %d %d" class="chart" role="img" aria-label="Monthly income and expenditure">' % (W, H)]
+    for i, m in enumerate(months):
+        x = pad + i * bw
+        hi, he = (H - 50) * inc[i] / mx, (H - 50) * exp[i] / mx
+        out.append('<rect class="bi" x="%.1f" y="%.1f" width="%.1f" height="%.1f"><title>%s income %s</title></rect>' % (x + 4, H - 25 - hi, bw / 2 - 5, hi, m, inr(inc[i])))
+        out.append('<rect class="be" x="%.1f" y="%.1f" width="%.1f" height="%.1f"><title>%s expenditure %s</title></rect>' % (x + bw / 2, H - 25 - he, bw / 2 - 5, he, m, inr(exp[i])))
+        out.append('<text x="%.1f" y="%d" text-anchor="middle">%s</text>' % (x + bw / 2, H - 8, dt.date.fromisoformat(m + "-01").strftime("%b")))
+    out.append('</svg>')
+    return Markup("".join(out))
+
+
+@app.route("/")
+@login_required
+def dashboard():
+    c, u, fy = db(), cur(), current_fy()
+    mine = c.execute("SELECT type,no,status,id FROM txns WHERE maker_id=? AND status IN('Draft','Returned for Correction') ORDER BY id DESC LIMIT 10", (u["id"],)).fetchall()
+    if not can("reports", "view"):
+        return render_template("dashboard.html", title="Dashboard", full=False, mine=mine)
+    s, _ = fy_range(fy)
+    y = int(s[:4])
+    months = ["%d-%02d" % (y if m >= 4 else y + 1, m) for m in list(range(4, 13)) + [1, 2, 3]]
+    inc = [pl_total(c, "Income", fy, m) for m in months]
+    exp = [pl_total(c, "Expense", fy, m) for m in months]
+    ti, te = pl_total(c, "Income", fy), pl_total(c, "Expense", fy)
+    banks = [(b["name"], c.execute("SELECT COALESCE(SUM(debit-credit),0) b FROM jlines WHERE account_id=?", (b["account_id"],)).fetchone()["b"], b["is_cash"])
+             for b in c.execute("SELECT * FROM bank_accounts ORDER BY is_cash DESC,name")]
+    overdue = sum(outstanding(c, r["id"]) for r in c.execute("SELECT id FROM txns WHERE type='invoice' AND status='Approved' AND due<?", (today(),)))
+    pend = c.execute("SELECT COUNT(*) n FROM txns WHERE status='Pending Approval'").fetchone()["n"]
+    return render_template("dashboard.html", title="Management Dashboard - FY " + fy, full=True, mine=mine, chart=chart_svg(months, inc, exp),
+                           cards=[("Total income", ti), ("Total expenditure", te), ("Net surplus / (deficit)", ti - te), ("Receivables", bal(c, "1100")),
+                                  ("Payables", -bal(c, "2001")), ("Overdue client fees", overdue)], banks=banks, pend=pend,
+                           by_head=c.execute("""SELECT t.head, SUM(t.amount) v FROM txns t WHERE t.type='invoice' AND t.status='Approved' AND t.fy=? GROUP BY t.head ORDER BY v DESC""", (fy,)).fetchall())
+
+
+# --------------------------------------------------------------------------- audit trail
+@app.route("/audit")
+@need("audit", "view")
+def audit_view():
+    c = db()
+    ok, bad = verify_audit(c)
+    q = request.args.get("q", "")
+    sql, a = "SELECT * FROM audit", []
+    if q:
+        sql += " WHERE user LIKE ? OR action LIKE ? OR entity LIKE ? OR entity_id LIKE ?"
+        a = ["%" + q + "%"] * 4
+    rows = c.execute(sql + " ORDER BY id DESC LIMIT 300", a).fetchall()
+    return render_template("list.html", title="Audit Trail", cols=["#", "Time", "User", "Action", "Entity", "ID", "Previous values", "New values"],
+                           rows=[dict(cells=[r["id"], r["ts"].replace("T", " "), r["user"], r["action"], r["entity"], r["entity_id"], (r["old"] or "")[:160], (r["new"] or "")[:160]]) for r in rows],
+                           note=("Hash chain verified: no tampering detected." if ok else "TAMPERING DETECTED at audit record #%s." % bad) + " Showing latest 300 records.", search=True)
+
+
+# --------------------------------------------------------------------------- administration
+@app.route("/admin")
+@need("admin", "manage")
+def admin():
+    c = db()
+    perms = {}
+    for r in c.execute("SELECT * FROM perms"):
+        perms.setdefault(r["role"], set()).add((r["module"], r["action"]))
+    return render_template("admin.html", title="Administration",
+                           users=c.execute("SELECT * FROM users ORDER BY username").fetchall(), roles=c.execute("SELECT * FROM roles ORDER BY rank DESC").fetchall(),
+                           perms=perms, catalog=PERM_CATALOG, matrix=c.execute("SELECT * FROM approval_matrix ORDER BY CASE WHEN up_to IS NULL THEN 1 ELSE 0 END, up_to").fetchall(),
+                           rupees=rupees, st={k: setting(c, k) for k in ("firm_name", "sod", "credit_days", "min_pw", "session_minutes", "max_fails", "lock_minutes")},
+                           masters=c.execute("SELECT * FROM masters ORDER BY kind,name").fetchall(),
+                           banks=c.execute("SELECT b.*,a.code FROM bank_accounts b JOIN accounts a ON a.id=b.account_id").fetchall(),
+                           sel_role=request.args.get("role", "Accounts Executive"))
+
+
+def admin_post(f):
+    @wraps(f)
+    @need("admin", "manage")
+    def w(*a, **k):
+        try:
+            f(*a, **k)
+        except (ValueError, sqlite3.IntegrityError) as e:
+            flash(str(e), "err")
+        return redirect(request.form.get("next") or "/admin")
+    return w
+
+
+@app.route("/admin/user/add", methods=["POST"])
+@admin_post
+def admin_user_add():
+    c, f = db(), request.form
+    pw_ok(c, f["password"])
+    if f["role"] not in [r["name"] for r in c.execute("SELECT name FROM roles")]:
+        raise ValueError("Invalid role")
+    uid = c.execute("INSERT INTO users(username,full_name,pw,role,created_at) VALUES(?,?,?,?,?)",
+                    (f["username"].strip().lower(), f["full_name"].strip(), generate_password_hash(f["password"]), f["role"], now())).lastrowid
+    audit(c, uname(), "create", "users", uid, None, {"username": f["username"], "role": f["role"]})
+    flash("User created.")
+
+
+@app.route("/admin/user/<int:uid>/update", methods=["POST"])
+@admin_post
+def admin_user_update(uid):
+    c, f = db(), request.form
+    old = c.execute("SELECT * FROM users WHERE id=?", (uid,)).fetchone() or abort(404)
+    if uid == cur()["id"] and (f.get("role") != old["role"] or f.get("active") != "1"):
+        raise ValueError("You cannot change your own role or deactivate yourself")
+    if f.get("password"):
+        pw_ok(c, f["password"])
+        c.execute("UPDATE users SET pw=?, fails=0, locked_until=NULL WHERE id=?", (generate_password_hash(f["password"]), uid))
+        audit(c, uname(), "password_reset", "users", uid)
+    c.execute("UPDATE users SET role=?, active=? WHERE id=?", (f["role"], 1 if f.get("active") == "1" else 0, uid))
+    audit(c, uname(), "update", "users", uid, {"role": old["role"], "active": old["active"]}, {"role": f["role"], "active": f.get("active")})
+    flash("User updated.")
+
+
+@app.route("/admin/perms", methods=["POST"])
+@admin_post
+def admin_perms():
+    c, f = db(), request.form
+    role = f["role"]
+    if role == "Super Administrator":
+        raise ValueError("Super Administrator always holds all permissions")
+    old = sorted("%s.%s" % (r["module"], r["action"]) for r in c.execute("SELECT * FROM perms WHERE role=?", (role,)))
+    c.execute("DELETE FROM perms WHERE role=?", (role,))
+    new = []
+    for m, acts in PERM_CATALOG.items():
+        for a in acts:
+            if f.get("p_%s_%s" % (m, a)):
+                c.execute("INSERT INTO perms VALUES(?,?,?)", (role, m, a))
+                new.append("%s.%s" % (m, a))
+    audit(c, uname(), "permissions", "roles", role, {"perms": old}, {"perms": sorted(new)})
+    flash("Permissions saved for %s." % role)
+    request.form = f
+
+
+@app.route("/admin/matrix", methods=["POST"])
+@admin_post
+def admin_matrix():
+    c, f = db(), request.form
+    old = [dict(r) for r in c.execute("SELECT up_to,role FROM approval_matrix ORDER BY id")]
+    rows = []
+    for i in range(1, 7):
+        role, lim = f.get("role%d" % i, ""), f.get("limit%d" % i, "").strip()
+        if role:
+            rows.append((paise(lim) if lim else None, role))
+    if not rows or rows[-1][0] is not None:
+        raise ValueError("The last slab must have a blank limit (= above all previous limits)")
+    lims = [r[0] for r in rows[:-1]]
+    if any(x is None for x in lims) or lims != sorted(lims):
+        raise ValueError("Limits must be filled and ascending; only the last slab may be blank")
+    c.execute("DELETE FROM approval_matrix")
+    for up, role in rows:
+        c.execute("INSERT INTO approval_matrix(up_to,role) VALUES(?,?)", (up, role))
+    audit(c, uname(), "approval_matrix", "settings", "matrix", old, [dict(up_to=u_, role=r_) for u_, r_ in rows])
+    flash("Approval matrix saved.")
+
+
+@app.route("/admin/settings", methods=["POST"])
+@admin_post
+def admin_settings():
+    c, f = db(), request.form
+    old = {k: setting(c, k) for k in ("firm_name", "sod", "credit_days", "min_pw", "session_minutes", "max_fails", "lock_minutes")}
+    new = dict(firm_name=f["firm_name"].strip() or "CA Firm", sod="1" if f.get("sod") else "0")
+    for k, lo in (("credit_days", 0), ("min_pw", 8), ("session_minutes", 5), ("max_fails", 3), ("lock_minutes", 1)):
+        v = int(f[k])
+        if v < lo:
+            raise ValueError("%s must be at least %d" % (k, lo))
+        new[k] = str(v)
+    for k, v in new.items():
+        set_setting(c, k, v)
+    audit(c, uname(), "settings", "settings", "system", old, new)
+    flash("Settings saved.")
+
+
+@app.route("/admin/master/add", methods=["POST"])
+@admin_post
+def admin_master_add():
+    c, f = db(), request.form
+    kind, name = f["kind"], f["name"].strip()
+    if kind not in ("income", "expense", "department") or not name:
+        raise ValueError("Invalid input")
+    acc = None
+    if kind in ("income", "expense"):
+        acc = new_account(c, ("Fees - " if kind == "income" else "") + name, "Income" if kind == "income" else "Expense", "4" if kind == "income" else "5")
+    mid = c.execute("INSERT INTO masters(kind,name,account_id) VALUES(?,?,?)", (kind, name, acc)).lastrowid
+    audit(c, uname(), "create", "masters", mid, None, {"kind": kind, "name": name})
+    flash("Added.")
+
+
+@app.route("/admin/bank/add", methods=["POST"])
+@admin_post
+def admin_bank_add():
+    c, f = db(), request.form
+    name, op = f["name"].strip(), paise(f.get("opening"))
+    if not name:
+        raise ValueError("Name required")
+    acc = new_account(c, "Bank - " + name, "Asset", "10")
+    bid = c.execute("INSERT INTO bank_accounts(name,account_id) VALUES(?,?)", (name, acc)).lastrowid
+    if op:
+        d = check_date(f.get("opening_date") or today())
+        post_journal(c, d, "OPENING-%d" % bid, "Opening balance - " + name, [(acc, op, 0), (A(c, "3001"), 0, op)], "opening", bid, cur()["id"])
+    audit(c, uname(), "create", "bank_accounts", bid, None, {"name": name, "opening": op})
+    flash("Bank account added.")
+
+
+@app.route("/admin/backup")
+@need("admin", "manage")
+def admin_backup():
+    p = make_backup("manual")
+    audit(db(), uname(), "backup", "system", os.path.basename(p))
+    return send_file(p, as_attachment=True, download_name=os.path.basename(p))
+
+
+def make_backup(tag):
+    d = os.path.join(DATA_DIR, "backups")
+    os.makedirs(d, exist_ok=True)
+    p = os.path.join(d, "icfms_%s_%s.db" % (tag, dt.datetime.now().strftime("%Y%m%d_%H%M%S")))
+    src, dst = sqlite3.connect(DB_PATH), sqlite3.connect(p)
+    with dst:
+        src.backup(dst)
+    src.close(); dst.close()
+    return p
+
+
+def daily_backup():
+    d = os.path.join(DATA_DIR, "backups")
+    if os.path.exists(DB_PATH) and not any(x.startswith("icfms_auto_" + dt.date.today().strftime("%Y%m%d")) for x in (os.listdir(d) if os.path.isdir(d) else [])):
+        make_backup("auto")
+        files = sorted(x for x in os.listdir(d) if x.startswith("icfms_auto_"))
+        for x in files[:-30]:
+            os.remove(os.path.join(d, x))
+
+
+# --------------------------------------------------------------------------- templates
+CSS = """
+:root{--bg:#f5f7fa;--card:#fff;--ink:#1b2430;--mut:#6b778a;--line:#e2e7ee;--pri:#1f3a5f;--pri2:#2f5d96;--ok:#1d7a4c;--warn:#b7791f;--bad:#b3261e;--inc:#2f5d96;--exp:#d98c2b}
+[data-theme=dark]{--bg:#12171e;--card:#1b222c;--ink:#e6ebf2;--mut:#93a0b4;--line:#2b3441;--pri:#4a7fc1;--pri2:#6e9ad2;--inc:#6e9ad2;--exp:#e0a24a}
+*{box-sizing:border-box}body{margin:0;font:14px/1.45 system-ui,Segoe UI,Roboto,sans-serif;background:var(--bg);color:var(--ink)}
+a{color:var(--pri2);text-decoration:none}aside{position:fixed;inset:0 auto 0 0;width:220px;background:var(--pri);color:#fff;padding:16px 0;overflow:auto}
+[data-theme=dark] aside{background:#0d1219;border-right:1px solid var(--line)}
+.brand{padding:0 18px 14px;font-weight:700;font-size:16px}.brand small{display:block;font-weight:400;opacity:.7;font-size:11px}
+aside a{display:block;color:#dbe5f3;padding:9px 18px}aside a.on,aside a:hover{background:rgba(255,255,255,.12);color:#fff}
+main{margin-left:220px;padding:0 24px 40px}.noside main{margin:0}
+.top{display:flex;align-items:center;gap:12px;padding:14px 0;position:sticky;top:0;background:var(--bg);z-index:5;flex-wrap:wrap}.top h1{font-size:19px;margin:0}.sp{flex:1}.u{color:var(--mut);font-size:12px}
+#menu{display:none}.inl{display:inline}select,input,textarea,button{font:inherit;color:var(--ink);background:var(--card);border:1px solid var(--line);border-radius:6px;padding:7px 9px}
+button,.btn{cursor:pointer}button.pri,.btn.pri{background:var(--pri);color:#fff;border-color:var(--pri)}button.bad{background:var(--bad);color:#fff;border-color:var(--bad)}button.ok{background:var(--ok);color:#fff;border-color:var(--ok)}button.ghost{background:none}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:16px;margin-bottom:16px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px;margin-bottom:16px}.kpi{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px}
+.kpi small{color:var(--mut)}.kpi b{display:block;font-size:20px;margin-top:4px}
+table{width:100%;border-collapse:collapse;background:var(--card)}th,td{padding:8px 10px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}th{font-size:12px;color:var(--mut);cursor:pointer;white-space:nowrap}
+td.n,th.n{text-align:right;font-variant-numeric:tabular-nums}.tw{overflow-x:auto;border:1px solid var(--line);border-radius:10px}tr[data-u]{cursor:pointer}tr[data-u]:hover td{background:rgba(47,93,150,.07)}
+.badge{padding:2px 8px;border-radius:99px;font-size:12px;background:var(--line)}.b-Approved{background:#d8f1e3;color:#14532d}.b-Pending{background:#fdf0cf;color:#7a5a05}.b-Rejected,.b-Cancelled{background:#f9d9d6;color:#7f1d17}.b-Draft{background:var(--line)}.b-Returned{background:#e3e0fb;color:#3b2d96}
+.msg{padding:10px 14px;border-radius:8px;margin-bottom:12px;background:#e1ecf9;color:#16365f}.msg.err{background:#f9d9d6;color:#7f1d17}
+.form label{display:block;margin-bottom:12px;font-weight:600}.form input,.form select,.form textarea{display:block;width:100%;max-width:520px;margin-top:4px;font-weight:400}.form small{display:block;color:var(--mut);font-weight:400}
+.btns{display:flex;gap:10px;align-items:center;flex-wrap:wrap}.tools{display:flex;gap:10px;margin-bottom:12px;flex-wrap:wrap;align-items:center}.note{color:var(--mut);font-size:12px;margin-top:8px}
+.chart{width:100%;height:auto}.chart text{font-size:11px;fill:var(--mut)}.bi{fill:var(--inc)}.be{fill:var(--exp)}.lg i{display:inline-block;width:10px;height:10px;margin:0 4px 0 12px}
+dl{display:grid;grid-template-columns:170px 1fr;gap:6px 12px;margin:0}dt{color:var(--mut)}dd{margin:0}.row{display:flex;gap:16px;flex-wrap:wrap}.row>*{flex:1;min-width:300px}.perm{columns:2}
+@media(max-width:800px){aside{transform:translateX(-100%);z-index:9}body.open aside{transform:none}main{margin-left:0;padding:0 12px}#menu{display:inline-block}.perm{columns:1}}
+@media print{aside,.top,.tools,.btns{display:none}main{margin:0}}
+"""
+
+JS = """
+function toggleTheme(){var d=document.documentElement,t=d.dataset.theme==='dark'?'':'dark';if(t)d.dataset.theme=t;else delete d.dataset.theme;try{localStorage.setItem('theme',t)}catch(e){}}
+try{var t=localStorage.getItem('theme');if(t)document.documentElement.dataset.theme=t}catch(e){}
+document.addEventListener('click',function(e){var tr=e.target.closest('tr[data-u]');if(tr&&!e.target.closest('a,button'))location=tr.dataset.u;
+var th=e.target.closest('th');if(th&&th.closest('table.sort')){var tb=th.closest('table'),i=[].indexOf.call(th.parentNode.children,th),rows=[].slice.call(tb.tBodies[0].rows),d=th.dataset.d=th.dataset.d==='1'?'-1':'1';
+var val=function(r){var s=r.cells[i].innerText.replace(/[₹,]/g,'');return isNaN(parseFloat(s))||!/^-?[\\d.]+$/.test(s.trim())?r.cells[i].innerText.toLowerCase():parseFloat(s)};
+rows.sort(function(a,b){var x=val(a),y=val(b);return (x>y?1:x<y?-1:0)*d});rows.forEach(function(r){tb.tBodies[0].appendChild(r)})}});
+function filt(v){v=v.toLowerCase();[].forEach.call(document.querySelectorAll('table.sort tbody tr'),function(r){r.style.display=r.innerText.toLowerCase().indexOf(v)<0?'none':''})}
+"""
+
+T = {
+"base.html": """<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>{{ title }} · {{ firm }}</title><style>{{ css|safe }}</style><script>{{ js|safe }}</script></head>
+<body class="{{ '' if user else 'noside' }}">
+{% if user %}<aside><div class="brand">{{ firm }}<small>Internal Control &amp; Financial Management</small></div><nav>
+{% for label,url,show in nav if show %}<a href="{{ url }}" class="{{ 'on' if (url=='/' and request.path=='/') or (url!='/' and request.path.startswith(url)) }}">{{ label }}</a>{% endfor %}</nav></aside>{% endif %}
+<main>{% if user %}<header class="top"><button id="menu" onclick="document.body.classList.toggle('open')">☰</button><h1>{{ title }}</h1><span class="sp"></span>
+<form method="post" action="/fy" class="inl"><input type="hidden" name="_csrf" value="{{ csrf() }}"><select name="fy" onchange="this.form.submit()" title="Financial year">{% for f in fys %}<option {{ 'selected' if f==fy }}>{{ f }}</option>{% endfor %}</select></form>
+<button class="ghost" onclick="toggleTheme()" title="Light/dark mode">◐</button><span class="u">{{ user.full_name }} · {{ user.role }}</span><a href="/password">Password</a><a href="/logout">Logout</a></header>
+{% else %}<header class="top"><h1>{{ firm }}</h1></header>{% endif %}
+{% for cat,m in get_flashed_messages(with_categories=true) %}<div class="msg {{ 'err' if cat=='err' }}">{{ m }}</div>{% endfor %}
+{% block body %}{% endblock %}</main></body></html>""",
+
+"msg.html": """{% extends 'base.html' %}{% block body %}<div class="card"><h2>{{ title }}</h2><p>{{ msg }}</p><a href="/">Back to dashboard</a></div>{% endblock %}""",
+
+"login.html": """{% extends 'base.html' %}{% block body %}<form method="post" class="card form" style="max-width:420px"><h2>Sign in</h2><input type="hidden" name="_csrf" value="{{ csrf() }}">
+<label>Username<input name="username" autofocus required autocomplete="username"></label><label>Password<input type="password" name="password" required autocomplete="current-password"></label>
+<div class="btns"><button class="pri">Sign in</button></div></form>{% endblock %}""",
+
+"setup.html": """{% extends 'base.html' %}{% block body %}<form method="post" class="card form" style="max-width:480px"><h2>Welcome - create the Super Administrator</h2>
+<p class="note">This account manages users, roles and settings. Choose a strong password (letters + digits, min 10 characters).</p><input type="hidden" name="_csrf" value="{{ csrf() }}">
+<label>Firm name<input name="firm" placeholder="e.g. S.K. Agrawalla &amp; Associates"></label><label>Your full name<input name="full_name" required></label>
+<label>Username<input name="username" required autocomplete="username"></label><label>Password<input type="password" name="password" required autocomplete="new-password"></label>
+<label>Confirm password<input type="password" name="password2" required></label><div class="btns"><button class="pri">Create &amp; continue</button></div></form>{% endblock %}""",
+
+"form.html": """{% extends 'base.html' %}{% block body %}<form method="post" class="card form"><input type="hidden" name="_csrf" value="{{ csrf() }}">
+{% for f in fields %}<label>{{ f.label }}{% if f.req %} *{% endif %}
+{% if f.kind=='select' %}<select name="{{ f.name }}" {{ 'required' if f.req }}>{% for v,l in f.opts %}<option value="{{ v }}" {{ 'selected' if (v|string)==(f.val|string) }}>{{ l }}</option>{% endfor %}</select>
+{% elif f.kind=='textarea' %}<textarea name="{{ f.name }}" rows="3">{{ f.val }}</textarea>
+{% elif f.kind=='money' %}<input name="{{ f.name }}" inputmode="decimal" value="{{ f.val }}" {{ 'required' if f.req }} placeholder="0.00">
+{% else %}<input type="{{ f.kind }}" name="{{ f.name }}" value="{{ f.val }}" {{ 'required' if f.req }}>{% endif %}{% if f.hint %}<small>{{ f.hint }}</small>{% endif %}</label>{% endfor %}
+<div class="btns">{% for v,l,cls in buttons %}<button name="action" value="{{ v }}" class="{{ cls }}">{{ l }}</button>{% endfor %}<a href="{{ back }}">Cancel</a></div></form>{% endblock %}""",
+
+"list.html": """{% extends 'base.html' %}{% block body %}<div class="tools">
+{% if add %}<a class="btn pri" style="padding:7px 12px;border-radius:6px;background:var(--pri);color:#fff" href="{{ add }}">+ New</a>{% endif %}
+<input placeholder="Filter this table..." oninput="filt(this.value)">{% if status_filter %}<form method="get" class="inl"><select name="status" onchange="this.form.submit()"><option value="">All statuses</option>{% for s in status_filter %}<option {{ 'selected' if s==cur_status }}>{{ s }}</option>{% endfor %}</select></form>{% endif %}
+{% if search %}<form method="get" class="inl"><input name="q" placeholder="Server search (user/action/entity)"><button>Search</button></form>{% endif %}
+{% if export %}<span class="sp"></span><a href="{{ export }}/export/xlsx">Excel</a><a href="{{ export }}/export/pdf">PDF</a><a href="{{ export }}/export/csv">CSV</a>{% endif %}</div>
+<div class="tw"><table class="sort"><thead><tr>{% for c in cols %}<th>{{ c }}</th>{% endfor %}</tr></thead><tbody>
+{% for r in rows %}<tr {% if r.url %}data-u="{{ r.url }}"{% endif %}>{% for x in r.cells %}{% if x is instanceof M %}<td class="n">{{ inr(x) }}</td>{% elif x.__class__.__name__=='B' %}<td><span class="badge b-{{ x.split(' ')[0] }}">{{ x }}</span></td>{% else %}<td>{{ '' if x is none else x }}</td>{% endif %}{% endfor %}</tr>
+{% else %}<tr><td colspan="{{ cols|length }}" style="color:var(--mut)">Nothing to show yet.</td></tr>{% endfor %}</tbody></table></div>{% if note %}<p class="note">{{ note }}</p>{% endif %}{% endblock %}""",
+
+"txn.html": """{% extends 'base.html' %}{% block body %}<div class="row"><div class="card"><dl>
+<dt>Status</dt><dd><span class="badge b-{{ t.status.split(' ')[0] }}">{{ t.status }}</span></dd><dt>Number</dt><dd>{{ t.no }}</dd><dt>Date / FY</dt><dd>{{ t.date }} / {{ t.fy }}</dd>
+<dt>{{ 'Vendor' if typ=='expense' else 'Client' }}</dt><dd>{{ party }}</dd>{% if t.head %}<dt>Head</dt><dd>{{ t.head }}</dd>{% endif %}{% if inv %}<dt>Against invoice</dt><dd>{{ inv }}</dd>{% endif %}
+{% if t.ref %}<dt>Reference</dt><dd>{{ t.ref }}</dd>{% endif %}{% if t.dept %}<dt>Department</dt><dd>{{ t.dept }}</dd>{% endif %}{% if t.partner %}<dt>Partner</dt><dd>{{ t.partner }}</dd>{% endif %}
+{% if t.due %}<dt>Due date</dt><dd>{{ t.due }}</dd>{% endif %}<dt>Amount</dt><dd>{{ inr(t.amount) }}</dd><dt>GST</dt><dd>{{ inr(t.gst) }}</dd><dt>TDS</dt><dd>{{ inr(t.tds) }}</dd><dt>Net</dt><dd><b>{{ inr(t.net) }}</b></dd>
+<dt>Mode</dt><dd>{{ t.mode }}{% if bank %} · {{ bank }}{% endif %}</dd><dt>Maker</dt><dd>{{ maker }}</dd><dt>Approver needed</dt><dd>{{ req_role }} or higher (per approval matrix)</dd>
+{% if t.narration %}<dt>Narration</dt><dd>{{ t.narration }}</dd>{% endif %}{% if t.reason %}<dt>Cancel reason</dt><dd>{{ t.reason }}</dd>{% endif %}</dl></div>
+<div class="card"><h3 style="margin-top:0">Actions</h3>
+{% if can_edit %}<p><a href="/t/{{ typ }}/{{ t.id }}/edit">Edit</a></p>{% endif %}
+<form method="post" action="/t/{{ typ }}/{{ t.id }}/act"><input type="hidden" name="_csrf" value="{{ csrf() }}">
+<label class="form" style="display:block"><textarea name="comment" rows="2" placeholder="Comment (mandatory for reject / return / cancel of approved)" style="width:100%"></textarea></label>
+<div class="btns" style="margin-top:8px">
+{% if can_submit %}<button name="act" value="submit" class="pri">Submit for approval</button>{% endif %}
+{% if can_decide %}<button name="act" value="approve" class="ok" {{ 'disabled' if not approve_ok }}>Approve &amp; post</button><button name="act" value="return">Return</button><button name="act" value="reject" class="bad">Reject</button>{% endif %}
+{% if can_cancel or can_cancel_draft %}<button name="act" value="cancel" class="bad">{{ 'Cancel (reverse ledger)' if t.status=='Approved' else 'Cancel' }}</button>{% endif %}</div></form>
+{% if can_decide and not approve_ok %}<p class="note">You cannot approve: {{ approve_why }}.</p>{% endif %}</div></div>
+{% if jl %}<div class="card"><h3 style="margin-top:0">Ledger posting</h3><div class="tw"><table><tr><th>Account</th><th class="n">Debit</th><th class="n">Credit</th></tr>
+{% for l in jl %}<tr><td>{{ l.code }} {{ l.name }}</td><td class="n">{{ inr(l.debit) if l.debit }}</td><td class="n">{{ inr(l.credit) if l.credit }}</td></tr>{% endfor %}</table></div></div>{% endif %}
+<div class="card"><h3 style="margin-top:0">Approval history</h3><div class="tw"><table><tr><th>When</th><th>Step</th><th>User</th><th>Comment</th></tr>
+{% for h in hist %}<tr><td>{{ h.ts.replace('T',' ') }}</td><td>{{ h.step }}</td><td>{{ h.user_name }}</td><td>{{ h.comment or '' }}</td></tr>{% else %}<tr><td colspan="4" style="color:var(--mut)">No workflow steps yet.</td></tr>{% endfor %}</table></div></div>{% endblock %}""",
+
+"reports.html": """{% extends 'base.html' %}{% block body %}<div class="card"><p>Reports reconcile to the approved ledger postings. Financial year: <b>{{ fy }}</b> (change at top right).</p><ul>
+{% for k,n in reps if k!='ledger' %}<li><a href="/r/{{ k }}">{{ n }}</a></li>{% endfor %}</ul>
+<form method="get" action="/r/ledger" class="form"><label>Account ledger<select name="acct">{% for a in accts %}<option value="{{ a.id }}">{{ a.code }} - {{ a.name }}</option>{% endfor %}</select></label><button class="pri">View ledger</button></form></div>{% endblock %}""",
+
+"report.html": """{% extends 'base.html' %}{% block body %}<div class="tools"><span class="sp"></span>{% if can_export %}<a href="/r/{{ name }}/export/xlsx?{{ qs }}">Excel</a><a href="/r/{{ name }}/export/pdf?{{ qs }}">PDF</a><a href="/r/{{ name }}/export/csv?{{ qs }}">CSV</a>{% endif %}<a href="javascript:print()">Print</a></div>
+<div class="tw"><table class="sort"><thead><tr>{% for h in rep.headers %}<th>{{ h }}</th>{% endfor %}</tr></thead><tbody>
+{% for r in rep.rows %}<tr>{% for x in r %}{% if x is instanceof M %}<td class="n">{{ inr(x) }}</td>{% else %}<td>{{ '' if x is none else x }}</td>{% endif %}{% endfor %}</tr>{% else %}<tr><td colspan="{{ rep.headers|length }}" style="color:var(--mut)">No data for this selection.</td></tr>{% endfor %}</tbody></table></div>
+{% if rep.note %}<p class="note">{{ rep.note }}</p>{% endif %}{% endblock %}""",
+
+"dashboard.html": """{% extends 'base.html' %}{% block body %}
+{% if full %}<div class="grid">{% for l,v in cards %}<div class="kpi"><small>{{ l }}</small><b>{{ inr(v) }}</b></div>{% endfor %}<div class="kpi"><small>Pending approvals</small><b>{{ pend }}</b></div></div>
+<div class="row"><div class="card"><b>Monthly income vs expenditure</b><span class="lg"><i class="bi" style="background:var(--inc)"></i>Income<i style="background:var(--exp)"></i>Expenditure</span>{{ chart }}</div>
+<div class="card"><b>Cash &amp; bank balances</b><table>{% for n,b,c in banks %}<tr><td>{{ n }}</td><td class="n">{{ inr(b) }}</td></tr>{% endfor %}</table>
+<br><b>Revenue by service</b><table>{% for r in by_head %}<tr><td>{{ r.head }}</td><td class="n">{{ inr(r.v) }}</td></tr>{% else %}<tr><td style="color:var(--mut)">No approved invoices yet.</td></tr>{% endfor %}</table></div></div>
+{% else %}<div class="card"><p>Welcome. Use the menu to enter and track your transactions.</p></div>{% endif %}
+{% if mine %}<div class="card"><b>Your drafts / returned items</b><ul>{% for m in mine %}<li><a href="/t/{{ m.type }}/{{ m.id }}">{{ m.no }}</a> - {{ m.status }}</li>{% endfor %}</ul></div>{% endif %}{% endblock %}""",
+
+"admin.html": """{% extends 'base.html' %}{% block body %}
+<div class="card"><h3 style="margin-top:0">Users</h3><div class="tw"><table><tr><th>Username</th><th>Name</th><th>Role</th><th>Active</th><th>New password (optional)</th><th></th></tr>
+{% for u in users %}<tr><form method="post" action="/admin/user/{{ u.id }}/update"><input type="hidden" name="_csrf" value="{{ csrf() }}"><td>{{ u.username }}</td><td>{{ u.full_name }}</td>
+<td><select name="role">{% for r in roles %}<option {{ 'selected' if r.name==u.role }}>{{ r.name }}</option>{% endfor %}</select></td>
+<td><select name="active"><option value="1" {{ 'selected' if u.active }}>Yes</option><option value="0" {{ 'selected' if not u.active }}>No</option></select></td><td><input type="password" name="password" autocomplete="new-password"></td><td><button>Save</button></td></form></tr>{% endfor %}</table></div>
+<form method="post" action="/admin/user/add" class="form" style="margin-top:14px"><input type="hidden" name="_csrf" value="{{ csrf() }}"><b>Add user</b><div class="tools">
+<input name="full_name" placeholder="Full name" required><input name="username" placeholder="Username" required><select name="role">{% for r in roles %}<option>{{ r.name }}</option>{% endfor %}</select><input type="password" name="password" placeholder="Password" required autocomplete="new-password"><button class="pri">Add</button></div></form></div>
+<div class="card"><h3 style="margin-top:0">Role permissions</h3><form method="get" class="tools"><select name="role" onchange="this.form.submit()">{% for r in roles if r.name!='Super Administrator' %}<option {{ 'selected' if r.name==sel_role }}>{{ r.name }}</option>{% endfor %}</select></form>
+<form method="post" action="/admin/perms"><input type="hidden" name="_csrf" value="{{ csrf() }}"><input type="hidden" name="role" value="{{ sel_role }}"><input type="hidden" name="next" value="/admin?role={{ sel_role }}">
+<div class="perm">{% for m,acts in catalog.items() %}<p><b>{{ m }}</b><br>{% for a in acts %}<label style="margin-right:10px"><input type="checkbox" name="p_{{ m }}_{{ a }}" {{ 'checked' if (m,a) in perms.get(sel_role,[]) }}> {{ a }}</label>{% endfor %}</p>{% endfor %}</div>
+<p class="note">view = see own records; view_all = see everyone's. Approve also covers reject/return. Cancel reverses an approved posting.</p><button class="pri">Save permissions</button></form></div>
+<div class="row"><div class="card"><h3 style="margin-top:0">Approval matrix (gross value = amount + GST)</h3><form method="post" action="/admin/matrix"><input type="hidden" name="_csrf" value="{{ csrf() }}">
+<table>{% for i in range(1,7) %}{% set m = matrix[i-1] if i<=matrix|length else None %}<tr><td>Up to ₹ <input name="limit{{ i }}" size="10" inputmode="decimal" value="{{ rupees(m.up_to) if m and m.up_to is not none else '' }}"></td>
+<td><select name="role{{ i }}"><option value="">(unused)</option>{% for r in roles %}<option {{ 'selected' if m and m.role==r.name }}>{{ r.name }}</option>{% endfor %}</select></td></tr>{% endfor %}</table>
+<p class="note">Fill ascending limits; the last used slab must have a blank limit (= above everything). Higher-ranked roles may also approve lower slabs.</p><button class="pri">Save matrix</button></form></div>
+<div class="card"><h3 style="margin-top:0">System settings</h3><form method="post" action="/admin/settings" class="form"><input type="hidden" name="_csrf" value="{{ csrf() }}">
+<label>Firm name<input name="firm_name" value="{{ st.firm_name }}"></label><label><input type="checkbox" name="sod" style="display:inline;width:auto" {{ 'checked' if st.sod=='1' }}> Enforce segregation of duties (maker cannot approve own entry)</label>
+<label>Default client credit days<input name="credit_days" value="{{ st.credit_days }}"></label><label>Minimum password length<input name="min_pw" value="{{ st.min_pw }}"></label>
+<label>Idle session timeout (minutes)<input name="session_minutes" value="{{ st.session_minutes }}"></label><label>Lock after failed logins<input name="max_fails" value="{{ st.max_fails }}"></label><label>Lock duration (minutes)<input name="lock_minutes" value="{{ st.lock_minutes }}"></label><button class="pri">Save settings</button></form></div></div>
+<div class="row"><div class="card"><h3 style="margin-top:0">Income / expense heads &amp; departments</h3><form method="post" action="/admin/master/add" class="tools"><input type="hidden" name="_csrf" value="{{ csrf() }}">
+<select name="kind"><option value="income">Income category</option><option value="expense">Expense head</option><option value="department">Department</option></select><input name="name" placeholder="Name" required><button class="pri">Add</button></form>
+<p class="note">A new income/expense head automatically gets its own ledger account.</p>{% for k in ['income','expense','department'] %}<p><b>{{ k }}</b>: {% for m in masters if m.kind==k %}{{ m.name }}{{ ', ' if not loop.last }}{% endfor %}</p>{% endfor %}</div>
+<div class="card"><h3 style="margin-top:0">Bank &amp; cash accounts</h3><table>{% for b in banks %}<tr><td>{{ b.code }}</td><td>{{ b.name }}</td></tr>{% endfor %}</table>
+<form method="post" action="/admin/bank/add" class="tools" style="margin-top:10px"><input type="hidden" name="_csrf" value="{{ csrf() }}"><input name="name" placeholder="Bank name / account" required><input name="opening" placeholder="Opening balance" inputmode="decimal"><input type="date" name="opening_date"><button class="pri">Add</button></form>
+<h3>Backup</h3><p><a href="/admin/backup">Download a backup of the database now</a><br><span class="note">Automatic daily backups are kept (last 30) in ICFMS_Data/backups. To restore: close the app, replace ICFMS_Data/icfms.db with a backup copy, and start again.</span></p></div></div>{% endblock %}""",
+}
+
+
+def setup_templates():
+    app.jinja_env.loader = DictLoader(T)
+    app.jinja_env.globals.update(css=CSS, js=JS)
+    app.jinja_env.tests["instanceof"] = lambda v, cls: isinstance(v, cls)
+
+
+configure()
+setup_templates()
+
+
+# --------------------------------------------------------------------------- self-tests
+def run_tests():
+    import unittest
+    tmp = tempfile.mkdtemp()
+    global DATA_DIR, DB_PATH
+    DATA_DIR, DB_PATH = tmp, os.path.join(tmp, "icfms.db")
+    configure()
+    app.config["TESTING"] = True
+    PW = "Secret12345"
+
+    class T_(unittest.TestCase):
+        @classmethod
+        def setUpClass(cls):
+            init_db()
+            cls.cl = app.test_client()
+            cls.post(cls.cl, "/setup", firm="Test Firm", full_name="Admin", username="admin", password=PW, password2=PW)
+            cls.login(cls.cl, "admin")
+            for uname_, role in [("exec", "Accounts Executive"), ("mgr", "Accounts Manager"), ("ptr", "Partner"), ("emp", "Employee"), ("aud", "Internal Auditor"), ("mp", "Managing Partner")]:
+                cls.post(cls.cl, "/admin/user/add", full_name=uname_.title(), username=uname_, role=role, password=PW)
+            cls.post(cls.cl, "/clients/new", name="Test Client", constitution="Company", pan="ABCDE1234F")
+            cls.post(cls.cl, "/vendors/new", name="Test Vendor", pan="")
+            cls.post(cls.cl, "/admin/bank/add", name="Test Bank", opening="100000.00", opening_date="2025-04-01")
+
+        @staticmethod
+        def post(cl, url, **data):
+            with cl.session_transaction() as s:
+                s.setdefault("csrf", "tok")
+                data["_csrf"] = s["csrf"]
+            return cl.post(url, data=data, follow_redirects=True)
+
+        @staticmethod
+        def login(cl, user):
+            cl.get("/login")
+            return T_.post(cl, "/login", username=user, password=PW)
+
+        def client_as(self, user):
+            cl = app.test_client()
+            self.login(cl, user)
+            return cl
+
+        def q(self, sql, *a):
+            c = conn(); r = c.execute(sql, a).fetchall(); c.close(); return r
+
+        def new_txn(self, cl, typ, **kw):
+            base = dict(date="2025-06-10", party_id=1, mode="Bank Transfer", action="submit")
+            base.update(kw)
+            self.post(cl, "/t/%s/new" % typ, **base)
+            return self.q("SELECT * FROM txns WHERE type=? ORDER BY id DESC LIMIT 1", typ)[0]
+
+        # ---- unit tests
+        def test_01_money(self):
+            self.assertEqual(paise("1,23,456.789"), 12345679)
+            self.assertEqual(inr(12345678900), "₹12,34,56,789.00")
+            self.assertEqual(fy_of("2026-03-31"), "2025-26")
+            self.assertEqual(fy_of("2026-04-01"), "2026-27")
+            with self.assertRaises(ValueError): paise("abc")
+            with self.assertRaises(ValueError): paise("-5")
+
+        def test_02_journal_must_balance_and_immutable(self):
+            c = conn()
+            with self.assertRaises(ValueError):
+                with tx(c): post_journal(c, "2025-06-01", "x", "x", [(1, 100, 0), (2, 0, 99)], "t", 0, 1)
+            with self.assertRaises(sqlite3.IntegrityError):
+                c.execute("UPDATE jlines SET debit=1 WHERE id=1")
+            with self.assertRaises(sqlite3.IntegrityError):
+                c.execute("DELETE FROM journals")
+            c.close()
+
+        def test_03_auth_and_csrf(self):
+            cl = app.test_client()
+            self.assertEqual(cl.get("/t/invoice").status_code, 302)
+            self.assertEqual(cl.post("/login", data={"username": "admin", "password": PW}).status_code, 400)
+            r = self.post(cl, "/login", username="admin", password="wrong")
+            self.assertIn(b"Invalid username", r.data)
+
+        def test_04_permissions(self):
+            emp = self.client_as("emp")
+            self.assertEqual(emp.get("/t/invoice").status_code, 403)
+            self.assertEqual(emp.get("/admin").status_code, 403)
+            self.assertEqual(emp.get("/r/trial_balance").status_code, 403)
+            aud = self.client_as("aud")
+            self.assertEqual(aud.get("/t/invoice/new").status_code, 403)
+            self.assertEqual(aud.get("/r/trial_balance").status_code, 200)
+
+        def test_05_invoice_maker_checker_and_posting(self):
+            ex, mg = self.client_as("exec"), self.client_as("mgr")
+            t = self.new_txn(ex, "invoice", head="Tax audit fees", amount="4000", gst="720", partner="")
+            self.assertEqual(t["status"], "Pending Approval")
+            ex.get("/t/invoice/%d" % t["id"])
+            self.post(ex, "/t/invoice/%d/act" % t["id"], act="approve")
+            self.assertEqual(self.q("SELECT status FROM txns WHERE id=?", t["id"])[0][0], "Pending Approval")  # no approve permission
+            self.post(mg, "/t/invoice/%d/act" % t["id"], act="approve")
+            t2 = self.q("SELECT * FROM txns WHERE id=?", t["id"])[0]
+            self.assertEqual(t2["status"], "Approved")
+            lines = self.q("SELECT SUM(debit) d, SUM(credit) c FROM jlines WHERE journal_id=?", t2["journal_id"])[0]
+            self.assertEqual((lines["d"], lines["c"]), (472000, 472000))
+
+        def test_06_sod_and_limits(self):
+            mg, pt, mp = self.client_as("mgr"), self.client_as("ptr"), self.client_as("mp")
+            t = self.new_txn(mg, "expense", head="Rent", amount="50000", gst="0", ref="R-1", party_id=1, bank_id="")
+            self.post(mg, "/t/expense/%d/act" % t["id"], act="approve")  # own txn
+            self.assertEqual(self.q("SELECT status FROM txns WHERE id=?", t["id"])[0][0], "Pending Approval")
+            ex = self.client_as("exec")
+            t2 = self.new_txn(ex, "expense", head="Rent", amount="50000", gst="0", ref="R-2")
+            self.post(mg, "/t/expense/%d/act" % t2["id"], act="approve")  # needs Partner (>25,000)
+            self.assertEqual(self.q("SELECT status FROM txns WHERE id=?", t2["id"])[0][0], "Pending Approval")
+            self.post(pt, "/t/expense/%d/act" % t2["id"], act="approve")
+            self.assertEqual(self.q("SELECT status FROM txns WHERE id=?", t2["id"])[0][0], "Approved")
+            t3 = self.new_txn(ex, "expense", head="Rent", amount="200000", ref="R-3")
+            self.post(pt, "/t/expense/%d/act" % t3["id"], act="approve")  # needs Managing Partner
+            self.assertEqual(self.q("SELECT status FROM txns WHERE id=?", t3["id"])[0][0], "Pending Approval")
+            self.post(mp, "/t/expense/%d/act" % t3["id"], act="approve")
+            self.assertEqual(self.q("SELECT status FROM txns WHERE id=?", t3["id"])[0][0], "Approved")
+
+        def test_07_duplicate_vendor_invoice_blocked(self):
+            ex = self.client_as("exec")
+            self.new_txn(ex, "expense", head="Stationery", amount="100", ref="DUP-1")
+            n1 = len(self.q("SELECT 1 FROM txns WHERE ref='DUP-1'"))
+            self.new_txn(ex, "expense", head="Stationery", amount="100", ref="dup-1")
+            self.assertEqual(len(self.q("SELECT 1 FROM txns WHERE lower(ref)='dup-1'")), n1)
+
+        def test_08_receipt_rules_and_ageing(self):
+            ex, mg = self.client_as("exec"), self.client_as("mgr")
+            inv = self.new_txn(ex, "invoice", head="GST consultancy", amount="1000", gst="180")
+            self.post(mg, "/t/invoice/%d/act" % inv["id"], act="approve")
+            bank = self.q("SELECT id FROM bank_accounts WHERE name='Test Bank'")[0][0]
+            self.post(ex, "/t/receipt/new", date="2025-06-10", party_id=1, mode="Bank Transfer", action="submit", amount="2000", tds="0", bank_id=bank, invoice_id=inv["id"])  # exceeds outstanding
+            self.assertEqual(len(self.q("SELECT 1 FROM txns WHERE type='receipt' AND invoice_id=?", inv["id"])), 0)
+            r = self.new_txn(ex, "receipt", amount="1180", tds="10", bank_id=bank, invoice_id=inv["id"])
+            self.post(mg, "/t/receipt/%d/act" % r["id"], act="approve")
+            c = conn(); self.assertEqual(outstanding(c, inv["id"]), 0); c.close()
+
+        def test_09_approved_not_editable_and_reversal(self):
+            ex, mg = self.client_as("exec"), self.client_as("mgr")
+            t = self.new_txn(ex, "invoice", head="Project reports", amount="500", gst="0")
+            self.post(mg, "/t/invoice/%d/act" % t["id"], act="approve")
+            self.assertEqual(ex.get("/t/invoice/%d/edit" % t["id"]).status_code, 403)
+            self.post(mg, "/t/invoice/%d/act" % t["id"], act="cancel", comment="Billed in error")
+            row = self.q("SELECT status FROM txns WHERE id=?", t["id"])[0]
+            self.assertEqual(row[0], "Cancelled")
+            net = self.q("SELECT SUM(l.debit-l.credit) FROM jlines l JOIN journals j ON j.id=l.journal_id WHERE j.source IN('txn','reversal') AND j.source_id=?", t["id"])[0][0]
+            self.assertEqual(net, 0)
+
+        def test_10_trial_balance_balances_and_reports_export(self):
+            ad = self.client_as("admin")
+            c = conn()
+            tb = r_trial_balance(c, "2025-26")
+            self.assertEqual(tb["rows"][-1][3], tb["rows"][-1][4])
+            self.assertIn("Balanced", tb["note"])
+            c.close()
+            for name in REPORTS:
+                self.assertEqual(ad.get("/r/%s" % name).status_code, 200, name)
+            for fmt, mt in (("csv", b"Trial"), ("xlsx", b"PK"), ("pdf", b"%PDF")):
+                r = ad.get("/r/trial_balance/export/" + fmt)
+                self.assertEqual(r.status_code, 200)
+                self.assertIn(mt, r.data[:200] if fmt != "csv" else r.data)
+
+        def test_11_audit_chain_detects_tampering(self):
+            c = conn()
+            self.assertTrue(verify_audit(c)[0])
+            c.execute("DROP TRIGGER a_upd")
+            c.execute("UPDATE audit SET new='tampered' WHERE id=(SELECT MAX(id) FROM audit)")
+            self.assertFalse(verify_audit(c)[0])
+            c.close()
+
+        def test_12_login_lockout(self):
+            cl = app.test_client()
+            for _ in range(5):
+                cl.get("/login"); self.post(cl, "/login", username="emp", password="bad")
+            r = self.post(cl, "/login", username="emp", password=PW)
+            self.assertIn(b"locked", r.data)
+
+    suite = unittest.defaultTestLoader.loadTestsFromTestCase(T_)
+    res = unittest.TextTestRunner(verbosity=2).run(suite)
+    shutil.rmtree(tmp, ignore_errors=True)
+    return res.wasSuccessful()
+
+
+# --------------------------------------------------------------------------- main
+def main():
+    if "--test" in sys.argv:
+        sys.exit(0 if run_tests() else 1)
+    os.makedirs(DATA_DIR, exist_ok=True)
+    init_db()
+    daily_backup()
+    url = "http://%s:%d" % (HOST, PORT)
+    print("=" * 60, "\n  CA Firm ICFMS is running at", url, "\n  Keep this window open while using the application.\n  Press Ctrl+C to stop.\n", "=" * 60)
+    threading.Timer(1.2, lambda: webbrowser.open(url)).start()
+    app.run(host=HOST, port=PORT, debug=False, threaded=True)
+
+
+if __name__ == "__main__":
+    try:
+        main()
+    except SystemExit:
+        raise
+    except BaseException as e:
+        import traceback
+        traceback.print_exc()
+        if not isinstance(e, KeyboardInterrupt):
+            input("\nThe application stopped because of an error. Press Enter to close...")
