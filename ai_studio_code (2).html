@@ -1,0 +1,2544 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Hotel Room Bill Audit & Noting Assistant</title>
+  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
+  <style>
+    :root {
+      --bg: #f4f6f9;
+      --card: #ffffff;
+      --text: #1e293b;
+      --muted: #64748b;
+      --border: #e2e8f0;
+      --primary: #1d4ed8;
+      --primary-hover: #1e40af;
+      --danger: #dc2626;
+      --danger-bg: #fef2f2;
+      --danger-border: #fecaca;
+      --success: #15803d;
+      --success-bg: #f0fdf4;
+      --success-border: #bbf7d0;
+      --warning: #b45309;
+      --warning-bg: #fffbeb;
+      --warning-border: #fde68a;
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.5;
+    }
+
+    header {
+      background: #0f172a;
+      color: #fff;
+      padding: 16px 24px;
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+    }
+    header h1 {
+      margin: 0;
+      font-size: 1.25rem;
+      font-weight: 600;
+    }
+    header p {
+      margin: 2px 0 0;
+      font-size: 0.85rem;
+      color: #94a3b8;
+    }
+    .policy-pills {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      max-width: 780px;
+      justify-content: flex-end;
+    }
+    .pill {
+      background: rgba(255,255,255,0.1);
+      border: 1px solid rgba(255,255,255,0.2);
+      padding: 4px 10px;
+      border-radius: 999px;
+      font-size: 0.77rem;
+      font-weight: 500;
+    }
+
+    .container {
+      max-width: 1360px;
+      margin: 20px auto;
+      padding: 0 16px 40px;
+    }
+
+    /* Summary Cards */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(195px, 1fr));
+      gap: 14px;
+      margin-bottom: 20px;
+    }
+    .stat-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 16px;
+    }
+    .stat-label {
+      font-size: 0.78rem;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+    .stat-value {
+      font-size: 1.55rem;
+      font-weight: 700;
+      margin-top: 4px;
+    }
+    .stat-value.danger { color: var(--danger); }
+    .stat-value.success { color: var(--success); }
+    .stat-value.warn { color: var(--warning); }
+
+    /* Main Workspace */
+    .workspace {
+      display: grid;
+      grid-template-columns: 0.95fr 1.25fr;
+      gap: 20px;
+      align-items: start;
+    }
+    @media (max-width: 980px) {
+      .workspace { grid-template-columns: 1fr; }
+      .policy-pills { justify-content: flex-start; }
+    }
+
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 20px;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.03);
+    }
+    .card h2 {
+      margin: 0 0 14px;
+      font-size: 1.05rem;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 10px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    /* Upload Dropzone */
+    .dropzone {
+      border: 2px dashed #cbd5e1;
+      border-radius: 10px;
+      padding: 24px 16px;
+      text-align: center;
+      cursor: pointer;
+      background: #f8fafc;
+      transition: all 0.2s;
+    }
+    .dropzone:hover, .dropzone.dragover {
+      border-color: var(--primary);
+      background: #eff6ff;
+    }
+    .dropzone input { display: none; }
+    .dropzone strong { color: var(--primary); }
+
+    .preview-wrap {
+      margin-top: 14px;
+      display: none;
+    }
+    .preview-wrap img {
+      width: 100%;
+      max-height: 480px;
+      object-fit: contain;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: #0f172a08;
+    }
+    .preview-caption {
+      font-size: 0.78rem;
+      color: var(--muted);
+      margin-bottom: 6px;
+      font-weight: 600;
+    }
+
+    .ocr-status {
+      margin-top: 12px;
+      font-size: 0.85rem;
+      padding: 10px 12px;
+      border-radius: 8px;
+      background: #f1f5f9;
+      display: none;
+    }
+    .progress-bar {
+      height: 6px;
+      background: #e2e8f0;
+      border-radius: 99px;
+      overflow: hidden;
+      margin-top: 6px;
+    }
+    .progress-fill {
+      height: 100%;
+      width: 0%;
+      background: var(--primary);
+      transition: width 0.2s;
+    }
+
+    .chips-box {
+      margin-top: 12px;
+      display: none;
+    }
+    .chips-title {
+      font-size: 0.78rem;
+      color: var(--muted);
+      margin-bottom: 6px;
+    }
+    .chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+    .chip {
+      background: #eff6ff;
+      color: #1e40af;
+      border: 1px solid #bfdbfe;
+      padding: 3px 9px;
+      border-radius: 6px;
+      font-size: 0.8rem;
+      cursor: pointer;
+    }
+    .chip:hover { background: #dbeafe; }
+
+    details.raw-ocr {
+      margin-top: 12px;
+      font-size: 0.82rem;
+    }
+    details.raw-ocr pre {
+      background: #f8fafc;
+      border: 1px solid var(--border);
+      padding: 10px;
+      border-radius: 6px;
+      max-height: 180px;
+      overflow: auto;
+      white-space: pre-wrap;
+      font-size: 0.78rem;
+    }
+
+    /* PDF Batch Panel */
+    .pdf-batch-card {
+      margin-top: 22px;
+      display: none;
+    }
+    .pdf-summary-strip {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-bottom: 12px;
+      font-size: 0.84rem;
+    }
+    .pdf-pill {
+      padding: 4px 10px;
+      border-radius: 6px;
+      background: #f1f5f9;
+      font-weight: 600;
+    }
+
+    /* Form */
+    .form-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+    @media (max-width: 560px) {
+      .form-grid { grid-template-columns: 1fr; }
+    }
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .form-group.full { grid-column: 1 / -1; }
+    label {
+      font-size: 0.82rem;
+      font-weight: 600;
+      color: #334155;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+    input, select, textarea {
+      padding: 9px 11px;
+      border: 1px solid #cbd5e1;
+      border-radius: 7px;
+      font-size: 0.92rem;
+      font-family: inherit;
+      width: 100%;
+    }
+    input:focus, select:focus, textarea:focus {
+      outline: none;
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px rgba(29, 78, 216, 0.12);
+    }
+    select.needs-attention {
+      border-color: #d97706;
+      background: var(--warning-bg);
+    }
+    select.sig-missing {
+      border-color: var(--danger);
+      background: var(--danger-bg);
+    }
+
+    .detect-note {
+      font-size: 0.76rem;
+      padding: 5px 8px;
+      border-radius: 6px;
+      display: none;
+      margin-top: 2px;
+    }
+    .detect-note.found {
+      display: block;
+      background: var(--success-bg);
+      color: var(--success);
+      border: 1px solid var(--success-border);
+    }
+    .detect-note.missing {
+      display: block;
+      background: var(--warning-bg);
+      color: var(--warning);
+      border: 1px solid var(--warning-border);
+    }
+    .detect-note.danger {
+      display: block;
+      background: var(--danger-bg);
+      color: var(--danger);
+      border: 1px solid var(--danger-border);
+    }
+
+    details.alias-box {
+      margin-top: 4px;
+      font-size: 0.78rem;
+      background: #f8fafc;
+      border: 1px solid var(--border);
+      border-radius: 7px;
+      padding: 6px 10px;
+    }
+    details.alias-box summary {
+      cursor: pointer;
+      color: var(--primary);
+      font-weight: 600;
+    }
+    .alias-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 6px;
+      margin-top: 8px;
+    }
+    .alias-grid input {
+      padding: 6px 8px;
+      font-size: 0.8rem;
+    }
+
+    .timing-section {
+      grid-column: 1 / -1;
+      background: #f8fafc;
+      border: 1px solid var(--border);
+      border-radius: 9px;
+      padding: 12px;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px 12px;
+    }
+    @media (max-width: 560px) {
+      .timing-section { grid-template-columns: 1fr; }
+    }
+    .timing-title {
+      grid-column: 1 / -1;
+      font-size: 0.84rem;
+      font-weight: 700;
+      color: #0f172a;
+      display: flex;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 6px;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 6px;
+    }
+    .timing-title span {
+      font-weight: 500;
+      color: var(--muted);
+      font-size: 0.77rem;
+    }
+    .stay-summary {
+      grid-column: 1 / -1;
+      font-size: 0.8rem;
+      padding: 6px 10px;
+      border-radius: 6px;
+      display: none;
+    }
+    .stay-summary.same-day {
+      display: block;
+      background: #eff6ff;
+      color: #1e40af;
+      border: 1px solid #bfdbfe;
+    }
+    .stay-summary.multi-day {
+      display: block;
+      background: #f1f5f9;
+      color: #334155;
+      border: 1px solid #cbd5e1;
+    }
+    .stay-summary.invalid {
+      display: block;
+      background: var(--danger-bg);
+      color: var(--danger);
+      border: 1px solid var(--danger-border);
+    }
+
+    .time-hint {
+      font-size: 0.73rem;
+      font-weight: 600;
+      padding: 1px 7px;
+      border-radius: 999px;
+    }
+    .time-hint.warn {
+      background: var(--warning-bg);
+      color: var(--warning);
+      border: 1px solid var(--warning-border);
+    }
+    .time-hint.ok {
+      background: var(--success-bg);
+      color: var(--success);
+      border: 1px solid var(--success-border);
+    }
+
+    .rate-mode-toggle {
+      display: flex;
+      gap: 14px;
+      font-size: 0.82rem;
+      margin-bottom: 4px;
+      flex-wrap: wrap;
+    }
+    .rate-mode-toggle label {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      font-weight: 500;
+      cursor: pointer;
+    }
+    .rate-mode-toggle input { width: auto; }
+
+    .btn-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 16px;
+    }
+    button {
+      border: none;
+      border-radius: 8px;
+      padding: 10px 16px;
+      font-size: 0.9rem;
+      font-weight: 600;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: background 0.15s;
+    }
+    .btn-primary { background: var(--primary); color: #fff; }
+    .btn-primary:hover { background: var(--primary-hover); }
+    .btn-secondary { background: #e2e8f0; color: #1e293b; }
+    .btn-secondary:hover { background: #cbd5e1; }
+    .btn-success { background: var(--success); color: #fff; }
+    .btn-success:hover { background: #166534; }
+    .btn-danger { background: var(--danger); color: #fff; }
+    .btn-sm { padding: 6px 10px; font-size: 0.8rem; }
+
+    /* Audit Result Box */
+    .result-box {
+      margin-top: 18px;
+      border-radius: 10px;
+      padding: 16px;
+      display: none;
+    }
+    .result-box.exception {
+      background: var(--danger-bg);
+      border: 1px solid var(--danger-border);
+    }
+    .result-box.compliant {
+      background: var(--success-bg);
+      border: 1px solid var(--success-border);
+    }
+    .result-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 10px;
+    }
+    .badge {
+      padding: 4px 10px;
+      border-radius: 999px;
+      font-size: 0.74rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      display: inline-block;
+    }
+    .badge-danger { background: var(--danger); color: #fff; }
+    .badge-success { background: var(--success); color: #fff; }
+    .badge-warning { background: #d97706; color: #fff; }
+
+    .metrics-strip {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 8px;
+      background: rgba(255,255,255,0.85);
+      padding: 10px;
+      border-radius: 8px;
+      margin-bottom: 12px;
+      font-size: 0.84rem;
+    }
+    @media (max-width: 700px) {
+      .metrics-strip { grid-template-columns: repeat(2, 1fr); }
+    }
+    .metrics-strip span {
+      display: block;
+      color: var(--muted);
+      font-size: 0.73rem;
+    }
+    .metrics-strip strong { font-size: 0.93rem; }
+
+    .noting-box {
+      background: #fff;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px;
+    }
+    .noting-box textarea {
+      border: none;
+      padding: 0;
+      resize: vertical;
+      min-height: 155px;
+      font-size: 0.87rem;
+      line-height: 1.5;
+    }
+    .noting-box textarea:focus { box-shadow: none; }
+
+    /* Tables */
+    .register-card {
+      margin-top: 24px;
+    }
+    .toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 12px;
+    }
+    .filter-tabs {
+      display: flex;
+      gap: 6px;
+    }
+    .tab-btn {
+      background: #f1f5f9;
+      color: #475569;
+      padding: 6px 12px;
+      font-size: 0.82rem;
+    }
+    .tab-btn.active {
+      background: #0f172a;
+      color: #fff;
+    }
+
+    .table-wrap {
+      overflow-x: auto;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.84rem;
+    }
+    th, td {
+      text-align: left;
+      padding: 10px 9px;
+      border-bottom: 1px solid var(--border);
+      vertical-align: top;
+    }
+    th {
+      background: #f8fafc;
+      color: #475569;
+      font-weight: 600;
+      font-size: 0.75rem;
+      text-transform: uppercase;
+    }
+    .noting-cell {
+      max-width: 340px;
+      font-size: 0.79rem;
+      color: #334155;
+    }
+    .empty-state {
+      text-align: center;
+      padding: 28px;
+      color: var(--muted);
+    }
+    .subtext {
+      color: var(--muted);
+      font-size: 0.76rem;
+      display: block;
+    }
+
+    @media print {
+      body { background: #fff; }
+      header { background: #fff; color: #000; border-bottom: 2px solid #000; }
+      header p { color: #333; }
+      .pill { border-color: #000; color: #000; }
+      .no-print, .workspace, .pdf-batch-card { display: none !important; }
+      .register-card { border: none; box-shadow: none; padding: 0; margin-top: 10px; }
+      .action-col { display: none; }
+      .noting-cell { max-width: none; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>Hotel Room Bill Audit Assistant</h1>
+    <p>Batch-audit multi-bill PDFs or images for Room Tariffs, Early Check-in, Late Check-out &amp; Missing Guest Signatures</p>
+  </div>
+  <div class="policy-pills">
+    <span class="pill">DLX Min: ₹4,000</span>
+    <span class="pill">EXE Min: ₹5,000</span>
+    <span class="pill">SUIT Min: ₹6,000</span>
+    <span class="pill">Early C/I (&lt;1 PM): +₹1,000</span>
+    <span class="pill">Next/Later Day C/O (&gt;11 AM): +₹1,000</span>
+    <span class="pill">Guest Signature: Mandatory</span>
+  </div>
+</header>
+
+<div class="container">
+  <!-- Summary Dashboard -->
+  <div class="stats-grid">
+    <div class="stat-card">
+      <div class="stat-label">Bills Audited</div>
+      <div class="stat-value" id="statTotal">0</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Compliant Bills</div>
+      <div class="stat-value success" id="statCompliant">0</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Audit Exceptions</div>
+      <div class="stat-value danger" id="statExceptions">0</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Missing Guest Signs</div>
+      <div class="stat-value warn" id="statMissingSig">0</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Total Revenue Shortfall</div>
+      <div class="stat-value danger" id="statShortfall">₹0</div>
+    </div>
+  </div>
+
+  <!-- Main Workspace -->
+  <div class="workspace">
+    <!-- Left: Bill / PDF Upload & Preview -->
+    <div class="card">
+      <h2>
+        1. Upload Bill Image or Multi-Bill PDF
+        <button type="button" class="btn-secondary btn-sm" id="btnReset">Clear</button>
+      </h2>
+
+      <div class="dropzone" id="dropzone">
+        <input type="file" id="billFile" accept="image/*,application/pdf,.pdf" />
+        <div>📄 <strong>Click to upload</strong> or drag &amp; drop Bill Image or Multi-Bill PDF</div>
+        <div style="font-size: 0.8rem; color: var(--muted); margin-top: 4px;">
+          Supports <strong>PDF (multi-page batch audit)</strong>, JPG, PNG, WEBP
+        </div>
+      </div>
+
+      <div class="ocr-status" id="ocrStatus">
+        <div id="ocrStatusText">Initializing scanner...</div>
+        <div class="progress-bar"><div class="progress-fill" id="ocrProgress"></div></div>
+      </div>
+
+      <div class="preview-wrap" id="previewWrap">
+        <div class="preview-caption" id="previewCaption">Uploaded Bill Preview</div>
+        <img id="billPreview" alt="Uploaded hotel bill preview" />
+      </div>
+
+      <div class="chips-box" id="chipsBox">
+        <div class="chips-title">Detected amounts on bill (click to fill Room Rate Charged):</div>
+        <div class="chips" id="amountChips"></div>
+      </div>
+
+      <details class="raw-ocr" id="rawOcrBox" style="display:none;">
+        <summary style="cursor:pointer; color: var(--primary); font-weight:600;">View Raw Extracted Bill Text</summary>
+        <pre id="rawOcrText"></pre>
+      </details>
+    </div>
+
+    <!-- Right: Verification & Audit Noting -->
+    <div class="card">
+      <h2>
+        2. Verify Bill Details &amp; Audit Rules
+        <span id="reviewingPageTag" style="font-size:0.78rem; color:var(--primary); display:none;"></span>
+      </h2>
+
+      <form id="auditForm">
+        <div class="form-grid">
+          <div class="form-group full">
+            <label for="roomType">Room Category *</label>
+            <select id="roomType" required>
+              <option value="">-- Select / Verify Room Category --</option>
+              <option value="DLX">DLX – Deluxe (Min ₹4,000 / night)</option>
+              <option value="EXE">EXE – Executive (Min ₹5,000 / night)</option>
+              <option value="SUIT">SUIT – Suite (Min ₹6,000 / night)</option>
+            </select>
+            <div class="detect-note" id="roomDetectNote"></div>
+
+            <details class="alias-box">
+              <summary>Custom Bill Keywords / Room No. Rules (optional – click if your bill uses custom codes)</summary>
+              <div class="alias-grid">
+                <div>
+                  <label style="font-size:0.75rem;">DLX Keywords / Room Nos (comma-separated):</label>
+                  <input type="text" id="aliasDlx" placeholder="e.g. STD, STANDARD, 101, 102, SUPER DELUXE" />
+                </div>
+                <div>
+                  <label style="font-size:0.75rem;">EXE Keywords / Room Nos (comma-separated):</label>
+                  <input type="text" id="aliasExe" placeholder="e.g. CLUB, SUPERIOR, 201, 202" />
+                </div>
+                <div>
+                  <label style="font-size:0.75rem;">SUIT Keywords / Room Nos (comma-separated):</label>
+                  <input type="text" id="aliasSuit" placeholder="e.g. ROYAL, MAHARAJA, 301, 302" />
+                </div>
+                <div>
+                  <button type="button" class="btn-secondary btn-sm" id="btnSaveAliases">Save Rules &amp; Re-check Bill</button>
+                </div>
+              </div>
+            </details>
+          </div>
+
+          <div class="form-group">
+            <label for="nights">No. of Nights *</label>
+            <input type="number" id="nights" min="1" step="1" value="1" required />
+          </div>
+
+          <div class="form-group">
+            <label for="roomNo">Room No.</label>
+            <input type="text" id="roomNo" placeholder="e.g. 204" />
+          </div>
+
+          <div class="form-group full">
+            <div class="rate-mode-toggle">
+              <label><input type="radio" name="rateMode" value="perNight" checked /> Bill shows Room Rate Per Night</label>
+              <label><input type="radio" name="rateMode" value="totalRoom" /> Bill shows Total Room Tariff (all nights)</label>
+            </div>
+            <label for="chargedAmount" id="chargedAmountLabel">Room Rate Charged Per Night (₹, excl. GST &amp; early/late fees) *</label>
+            <input type="number" id="chargedAmount" min="0" step="0.01" placeholder="e.g. 5000" required />
+          </div>
+
+          <!-- Early Check-in & Late Check-out Section -->
+          <div class="timing-section">
+            <div class="timing-title">
+              Check-in &amp; Check-out Date / Time Audit
+              <span>Early C/I &lt; 1:00 PM (+₹1,000) | Late C/O &gt; 11:00 AM next/later day (+₹1,000)</span>
+            </div>
+
+            <div class="form-group">
+              <label for="checkInDate">Check-in Date</label>
+              <input type="date" id="checkInDate" />
+            </div>
+
+            <div class="form-group">
+              <label for="checkInTime">
+                Check-in Time
+                <span id="checkInHint"></span>
+              </label>
+              <input type="time" id="checkInTime" />
+            </div>
+
+            <div class="form-group">
+              <label for="checkOutDate">Check-out Date</label>
+              <input type="date" id="checkOutDate" />
+            </div>
+
+            <div class="form-group">
+              <label for="checkOutTime">
+                Check-out Time
+                <span id="checkOutHint"></span>
+              </label>
+              <input type="time" id="checkOutTime" />
+            </div>
+
+            <div class="stay-summary" id="staySummary"></div>
+
+            <div class="form-group">
+              <label for="earlyCheckInCharged">Early Check-in Charged on Bill (₹)</label>
+              <input type="number" id="earlyCheckInCharged" min="0" step="0.01" value="0" />
+            </div>
+
+            <div class="form-group">
+              <label for="lateCheckOutCharged">Late Check-out Charged on Bill (₹)</label>
+              <input type="number" id="lateCheckOutCharged" min="0" step="0.01" value="0" />
+            </div>
+          </div>
+
+          <!-- Guest Signature Verification -->
+          <div class="form-group full">
+            <label for="guestSignature">Guest Signature Verification *</label>
+            <select id="guestSignature" required>
+              <option value="present">Present – Signed by Guest</option>
+              <option value="missing">Missing / Unsigned – Flag as Audit Observation</option>
+            </select>
+            <div class="detect-note" id="sigDetectNote"></div>
+          </div>
+
+          <div class="form-group">
+            <label for="billNo">Bill / Invoice No.</label>
+            <input type="text" id="billNo" placeholder="e.g. INV-2026-104" />
+          </div>
+
+          <div class="form-group">
+            <label for="billDate">Bill Date</label>
+            <input type="date" id="billDate" />
+          </div>
+
+          <div class="form-group full">
+            <label for="guestName">Guest Name</label>
+            <input type="text" id="guestName" placeholder="Optional" />
+          </div>
+
+          <div class="form-group full">
+            <label for="auditorRemarks">Front Office Reason / Supporting Remarks (Optional)</label>
+            <input type="text" id="auditorRemarks" placeholder="e.g. No waiver approval attached on folio" />
+          </div>
+        </div>
+
+        <div class="btn-row">
+          <button type="submit" class="btn-primary">Verify Bill &amp; Generate Audit Noting</button>
+        </div>
+      </form>
+
+      <!-- Verification Output -->
+      <div class="result-box" id="resultBox">
+        <div class="result-header">
+          <strong id="resultTitle" style="font-size:1rem;">Audit Verification Result</strong>
+          <span class="badge" id="resultBadge">STATUS</span>
+        </div>
+
+        <div class="metrics-strip">
+          <div>
+            <span>Tariff Shortfall</span>
+            <strong id="resTariffShortfall">₹0</strong>
+          </div>
+          <div>
+            <span>Early C/I Shortfall</span>
+            <strong id="resEarlyShortfall">₹0</strong>
+          </div>
+          <div>
+            <span>Late C/O Shortfall</span>
+            <strong id="resLateShortfall">₹0</strong>
+          </div>
+          <div>
+            <span>Guest Signature</span>
+            <strong id="resSignatureStatus">Present</strong>
+          </div>
+          <div>
+            <span>Total Shortfall</span>
+            <strong id="resTotalShortfall">₹0</strong>
+          </div>
+        </div>
+
+        <div class="noting-box">
+          <label style="display:block; margin-bottom:6px; font-size:0.8rem; color:var(--muted);">
+            Audit Report Noting (editable before saving/copying):
+          </label>
+          <textarea id="auditNoting"></textarea>
+        </div>
+
+        <div class="btn-row">
+          <button type="button" class="btn-success" id="btnSaveEntry">Save to Audit Register</button>
+          <button type="button" class="btn-secondary" id="btnCopyNoting">Copy Noting</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- PDF Batch Audit Results -->
+  <div class="card pdf-batch-card" id="pdfBatchCard">
+    <div class="toolbar">
+      <h2 style="border:none; padding:0; margin:0;" id="pdfBatchTitle">PDF Batch Audit Results</h2>
+      <div class="btn-row" style="margin:0;">
+        <button type="button" class="btn-success btn-sm" id="btnAddAllPdfToRegister">Add All Audited PDF Bills to Register</button>
+        <button type="button" class="btn-secondary btn-sm" id="btnClearPdfBatch">Close PDF Batch</button>
+      </div>
+    </div>
+
+    <div class="pdf-summary-strip" id="pdfSummaryStrip"></div>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Page</th>
+            <th>Bill No. / Room</th>
+            <th>Category &amp; Nights</th>
+            <th>Tariff (Min vs Billed)</th>
+            <th>Check-in / Check-out</th>
+            <th>Guest Sign</th>
+            <th>Status</th>
+            <th>Total Shortfall</th>
+            <th>Audit Observation</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody id="pdfBatchBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Audit Register -->
+  <div class="card register-card">
+    <div class="toolbar">
+      <h2 style="border:none; padding:0; margin:0;">3. Audit Report Register</h2>
+      <div class="filter-tabs no-print">
+        <button type="button" class="tab-btn active" data-filter="all">All</button>
+        <button type="button" class="tab-btn" data-filter="exception">Exceptions Only</button>
+        <button type="button" class="tab-btn" data-filter="compliant">Compliant</button>
+      </div>
+      <div class="btn-row no-print" style="margin:0;">
+        <button type="button" class="btn-secondary btn-sm" id="btnExportCsv">Export CSV (Excel)</button>
+        <button type="button" class="btn-primary btn-sm" id="btnPrint">Print / Save PDF Report</button>
+        <button type="button" class="btn-danger btn-sm" id="btnClearAll">Clear Register</button>
+      </div>
+    </div>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Bill No. / Date</th>
+            <th>Room / Guest</th>
+            <th>Category &amp; Nights</th>
+            <th>Tariff (Min vs Charged)</th>
+            <th>Check-in / Check-out</th>
+            <th>Guest Sign</th>
+            <th>Status</th>
+            <th>Total Shortfall</th>
+            <th>Audit Report Noting</th>
+            <th class="action-col">Action</th>
+          </tr>
+        </thead>
+        <tbody id="registerBody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script>
+  // Configure PDF.js worker
+  if (window.pdfjsLib) {
+    pdfjsLib.GlobalWorkerOptions.workerSrc =
+      "https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js";
+  }
+
+  // Hotel Audit Rules
+  const MIN_RATES = {
+    DLX: { name: "DLX (Deluxe)", min: 4000 },
+    EXE: { name: "EXE (Executive)", min: 5000 },
+    SUIT: { name: "SUIT (Suite)", min: 6000 }
+  };
+  const STD_CHECKIN_MINS = 13 * 60;  // 1:00 PM (13:00)
+  const STD_CHECKOUT_MINS = 11 * 60; // 11:00 AM (11:00)
+  const EARLY_CHECKIN_FEE = 1000;
+  const LATE_CHECKOUT_FEE = 1000;
+
+  const STORAGE_KEY = "hotel_room_audit_register_v1";
+  const ALIAS_KEY = "hotel_room_category_aliases_v1";
+
+  let auditEntries = JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
+  let customAliases = JSON.parse(localStorage.getItem(ALIAS_KEY) || '{"DLX":"","EXE":"","SUIT":""}');
+  let currentFilter = "all";
+  let lastVerifiedResult = null;
+  let lastExtractedOcrText = "";
+  let pdfBatchResults = [];
+  let activePdfPageIndex = null;
+
+  // DOM elements
+  const dropzone = document.getElementById("dropzone");
+  const billFile = document.getElementById("billFile");
+  const previewWrap = document.getElementById("previewWrap");
+  const previewCaption = document.getElementById("previewCaption");
+  const billPreview = document.getElementById("billPreview");
+  const ocrStatus = document.getElementById("ocrStatus");
+  const ocrStatusText = document.getElementById("ocrStatusText");
+  const ocrProgress = document.getElementById("ocrProgress");
+  const chipsBox = document.getElementById("chipsBox");
+  const amountChips = document.getElementById("amountChips");
+  const rawOcrBox = document.getElementById("rawOcrBox");
+  const rawOcrText = document.getElementById("rawOcrText");
+
+  const auditForm = document.getElementById("auditForm");
+  const reviewingPageTag = document.getElementById("reviewingPageTag");
+  const roomTypeEl = document.getElementById("roomType");
+  const roomDetectNote = document.getElementById("roomDetectNote");
+  const aliasDlxEl = document.getElementById("aliasDlx");
+  const aliasExeEl = document.getElementById("aliasExe");
+  const aliasSuitEl = document.getElementById("aliasSuit");
+
+  const nightsEl = document.getElementById("nights");
+  const chargedAmountEl = document.getElementById("chargedAmount");
+  const chargedAmountLabel = document.getElementById("chargedAmountLabel");
+
+  const checkInDateEl = document.getElementById("checkInDate");
+  const checkInTimeEl = document.getElementById("checkInTime");
+  const checkOutDateEl = document.getElementById("checkOutDate");
+  const checkOutTimeEl = document.getElementById("checkOutTime");
+  const earlyCheckInChargedEl = document.getElementById("earlyCheckInCharged");
+  const lateCheckOutChargedEl = document.getElementById("lateCheckOutCharged");
+  const checkInHint = document.getElementById("checkInHint");
+  const checkOutHint = document.getElementById("checkOutHint");
+  const staySummary = document.getElementById("staySummary");
+
+  const guestSignatureEl = document.getElementById("guestSignature");
+  const sigDetectNote = document.getElementById("sigDetectNote");
+
+  const billNoEl = document.getElementById("billNo");
+  const billDateEl = document.getElementById("billDate");
+  const guestNameEl = document.getElementById("guestName");
+  const roomNoEl = document.getElementById("roomNo");
+  const auditorRemarksEl = document.getElementById("auditorRemarks");
+
+  const resultBox = document.getElementById("resultBox");
+  const resultTitle = document.getElementById("resultTitle");
+  const resultBadge = document.getElementById("resultBadge");
+  const resTariffShortfall = document.getElementById("resTariffShortfall");
+  const resEarlyShortfall = document.getElementById("resEarlyShortfall");
+  const resLateShortfall = document.getElementById("resLateShortfall");
+  const resSignatureStatus = document.getElementById("resSignatureStatus");
+  const resTotalShortfall = document.getElementById("resTotalShortfall");
+  const auditNoting = document.getElementById("auditNoting");
+
+  const pdfBatchCard = document.getElementById("pdfBatchCard");
+  const pdfBatchTitle = document.getElementById("pdfBatchTitle");
+  const pdfSummaryStrip = document.getElementById("pdfSummaryStrip");
+  const pdfBatchBody = document.getElementById("pdfBatchBody");
+
+  // Load custom aliases
+  aliasDlxEl.value = customAliases.DLX || "";
+  aliasExeEl.value = customAliases.EXE || "";
+  aliasSuitEl.value = customAliases.SUIT || "";
+
+  document.getElementById("btnSaveAliases").addEventListener("click", () => {
+    customAliases = {
+      DLX: aliasDlxEl.value.trim(),
+      EXE: aliasExeEl.value.trim(),
+      SUIT: aliasSuitEl.value.trim()
+    };
+    localStorage.setItem(ALIAS_KEY, JSON.stringify(customAliases));
+    if (lastExtractedOcrText) {
+      applyRoomTypeDetection(lastExtractedOcrText);
+    } else {
+      alert("Custom rules saved!");
+    }
+  });
+
+  // Helpers
+  function fmtINR(num) {
+    return "₹" + Number(num || 0).toLocaleString("en-IN", {
+      minimumFractionDigits: num % 1 === 0 ? 0 : 2,
+      maximumFractionDigits: 2
+    });
+  }
+
+  function escapeHtml(str) {
+    return String(str || "")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;");
+  }
+
+  function escapeRegex(s) {
+    return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  }
+
+  function timeToMinutes(hhmm) {
+    if (!hhmm || !hhmm.includes(":")) return null;
+    const [h, m] = hhmm.split(":").map(Number);
+    if (isNaN(h) || isNaN(m)) return null;
+    return h * 60 + m;
+  }
+
+  function format12h(hhmm) {
+    if (!hhmm || !hhmm.includes(":")) return "N/A";
+    let [h, m] = hhmm.split(":").map(Number);
+    const ampm = h >= 12 ? "PM" : "AM";
+    h = h % 12 || 12;
+    return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")} ${ampm}`;
+  }
+
+  function dateDiffDays(ciStr, coStr) {
+    if (!ciStr || !coStr) return null;
+    const ci = new Date(ciStr + "T00:00:00");
+    const co = new Date(coStr + "T00:00:00");
+    if (isNaN(ci) || isNaN(co)) return null;
+    return Math.round((co - ci) / 86400000);
+  }
+
+  function updateTimingHints(autoSyncNights = false) {
+    const ciDate = checkInDateEl.value;
+    const coDate = checkOutDateEl.value;
+    const ciMins = timeToMinutes(checkInTimeEl.value);
+    const coMins = timeToMinutes(checkOutTimeEl.value);
+
+    const daysDiff = dateDiffDays(ciDate, coDate);
+    let isSameDay = false;
+    let isNextOrLaterDay = false;
+
+    if (daysDiff !== null) {
+      if (daysDiff < 0) {
+        staySummary.textContent = "Invalid dates: Check-out Date cannot be earlier than Check-in Date.";
+        staySummary.className = "stay-summary invalid";
+      } else if (daysDiff === 0) {
+        isSameDay = true;
+        staySummary.textContent = "Same-day check-out detected: Late check-out fee (₹1,000) does NOT apply.";
+        staySummary.className = "stay-summary same-day";
+        if (autoSyncNights) nightsEl.value = 1;
+      } else {
+        isNextOrLaterDay = true;
+        staySummary.textContent = `Overnight / multi-day stay (${daysDiff} night${daysDiff > 1 ? "s" : ""}): Late check-out fee (+₹1,000) applies if Check-out is after 11:00 AM.`;
+        staySummary.className = "stay-summary multi-day";
+        if (autoSyncNights) nightsEl.value = daysDiff;
+      }
+    } else {
+      staySummary.className = "stay-summary";
+      staySummary.textContent = "";
+    }
+
+    if (ciMins === null) {
+      checkInHint.textContent = "";
+      checkInHint.className = "";
+    } else if (ciMins < STD_CHECKIN_MINS) {
+      checkInHint.textContent = "Early C/I (+₹1,000 req.)";
+      checkInHint.className = "time-hint warn";
+    } else {
+      checkInHint.textContent = "On-time";
+      checkInHint.className = "time-hint ok";
+    }
+
+    if (coMins === null) {
+      checkOutHint.textContent = "";
+      checkOutHint.className = "";
+    } else if (isSameDay) {
+      checkOutHint.textContent = "Same-day C/O (No Late Fee)";
+      checkOutHint.className = "time-hint ok";
+    } else if (isNextOrLaterDay) {
+      if (coMins > STD_CHECKOUT_MINS) {
+        checkOutHint.textContent = "Late C/O (+₹1,000 req.)";
+        checkOutHint.className = "time-hint warn";
+      } else {
+        checkOutHint.textContent = "On-time (≤11 AM)";
+        checkOutHint.className = "time-hint ok";
+      }
+    } else {
+      if (coMins > STD_CHECKOUT_MINS) {
+        checkOutHint.textContent = "Enter C/I & C/O Dates";
+        checkOutHint.className = "time-hint warn";
+      } else {
+        checkOutHint.textContent = "On-time (≤11 AM)";
+        checkOutHint.className = "time-hint ok";
+      }
+    }
+  }
+
+  checkInDateEl.addEventListener("change", () => updateTimingHints(true));
+  checkOutDateEl.addEventListener("change", () => updateTimingHints(true));
+  checkInTimeEl.addEventListener("input", () => updateTimingHints(false));
+  checkOutTimeEl.addEventListener("input", () => updateTimingHints(false));
+
+  roomTypeEl.addEventListener("change", () => {
+    roomTypeEl.classList.remove("needs-attention");
+  });
+
+  guestSignatureEl.addEventListener("change", () => {
+    guestSignatureEl.classList.toggle("sig-missing", guestSignatureEl.value === "missing");
+  });
+
+  document.querySelectorAll('input[name="rateMode"]').forEach(radio => {
+    radio.addEventListener("change", () => {
+      if (radio.value === "perNight" && radio.checked) {
+        chargedAmountLabel.textContent = "Room Rate Charged Per Night (₹, excl. GST & early/late fees) *";
+      } else {
+        chargedAmountLabel.textContent = "Total Room Tariff on Bill (₹, excl. GST & early/late fees) *";
+      }
+    });
+  });
+
+  // File Upload & Drag/Drop
+  dropzone.addEventListener("click", () => billFile.click());
+  dropzone.addEventListener("dragover", e => {
+    e.preventDefault();
+    dropzone.classList.add("dragover");
+  });
+  dropzone.addEventListener("dragleave", () => dropzone.classList.remove("dragover"));
+  dropzone.addEventListener("drop", e => {
+    e.preventDefault();
+    dropzone.classList.remove("dragover");
+    if (e.dataTransfer.files.length) {
+      handleUploadedFile(e.dataTransfer.files[0]);
+    }
+  });
+  billFile.addEventListener("change", e => {
+    if (e.target.files.length) {
+      handleUploadedFile(e.target.files[0]);
+    }
+  });
+
+  function handleUploadedFile(file) {
+    const isPdf = file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf");
+    if (isPdf) {
+      handlePdfFile(file);
+    } else if (file.type.startsWith("image/")) {
+      handleImageFile(file);
+    } else {
+      alert("Please upload an Image (JPG, PNG, WEBP) or a PDF file.");
+    }
+  }
+
+  // Image canvas helpers
+  function loadImageToCanvas(dataUrl) {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement("canvas");
+        canvas.width = img.width;
+        canvas.height = img.height;
+        canvas.getContext("2d").drawImage(img, 0, 0);
+        resolve(canvas);
+      };
+      img.onerror = reject;
+      img.src = dataUrl;
+    });
+  }
+
+  function enhanceCanvasForOcr(srcCanvas) {
+    const scale = srcCanvas.width < 1500 ? Math.min(2, 1600 / srcCanvas.width) : 1;
+    const w = Math.round(srcCanvas.width * scale);
+    const h = Math.round(srcCanvas.height * scale);
+
+    const canvas = document.createElement("canvas");
+    canvas.width = w;
+    canvas.height = h;
+    const ctx = canvas.getContext("2d");
+    ctx.drawImage(srcCanvas, 0, 0, w, h);
+
+    try {
+      const imgData = ctx.getImageData(0, 0, w, h);
+      const d = imgData.data;
+      const contrast = 1.2;
+      const intercept = 128 * (1 - contrast);
+      for (let i = 0; i < d.length; i += 4) {
+        const gray = 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2];
+        const boosted = Math.max(0, Math.min(255, gray * contrast + intercept));
+        d[i] = d[i + 1] = d[i + 2] = boosted;
+      }
+      ctx.putImageData(imgData, 0, 0);
+    } catch {}
+    return { canvas, scale };
+  }
+
+  // Visual Guest Signature Detector (inspects ink density around "Guest Signature" label)
+  function measureSignatureRegionInk(canvas, box, wordBoxes) {
+    const ctx = canvas.getContext("2d");
+    const x0 = Math.max(0, Math.floor(box.x0));
+    const y0 = Math.max(0, Math.floor(box.y0));
+    const x1 = Math.min(canvas.width, Math.ceil(box.x1));
+    const y1 = Math.min(canvas.height, Math.ceil(box.y1));
+    const bw = x1 - x0;
+    const bh = y1 - y0;
+    if (bw <= 12 || bh <= 10) return { darkCount: 0, ratio: 0 };
+
+    const imgData = ctx.getImageData(x0, y0, bw, bh).data;
+
+    // Build a row mask & col mask to ignore printed horizontal/vertical lines
+    const rowDark = new Uint16Array(bh);
+    const colDark = new Uint16Array(bw);
+    const isDark = new Uint8Array(bw * bh);
+
+    for (let y = 0; y < bh; y++) {
+      for (let x = 0; x < bw; x++) {
+        const idx = (y * bw + x) * 4;
+        const gray = 0.299 * imgData[idx] + 0.587 * imgData[idx + 1] + 0.114 * imgData[idx + 2];
+        if (gray < 150) {
+          isDark[y * bw + x] = 1;
+          rowDark[y]++;
+          colDark[x]++;
+        }
+      }
+    }
+
+    // Mask out known printed text bounding boxes so printed words don't count as signature ink
+    const skipRects = (wordBoxes || []).map(w => ({
+      x0: w.x0 - x0 - 2,
+      y0: w.y0 - y0 - 2,
+      x1: w.x1 - x0 + 2,
+      y1: w.y1 - y0 + 2
+    }));
+
+    let cleanDark = 0;
+    for (let y = 0; y < bh; y++) {
+      if (rowDark[y] > bw * 0.52) continue; // ignore horizontal ruled lines
+      for (let x = 0; x < bw; x++) {
+        if (colDark[x] > bh * 0.55) continue; // ignore vertical borders
+        if (!isDark[y * bw + x]) continue;
+
+        let insidePrintedText = false;
+        for (let r = 0; r < skipRects.length; r++) {
+          const rect = skipRects[r];
+          if (x >= rect.x0 && x <= rect.x1 && y >= rect.y0 && y <= rect.y1) {
+            insidePrintedText = true;
+            break;
+          }
+        }
+        if (!insidePrintedText) cleanDark++;
+      }
+    }
+
+    return { darkCount: cleanDark, ratio: cleanDark / (bw * bh) };
+  }
+
+  function detectGuestSignature(canvas, wordBoxes) {
+    const w = canvas.width;
+    const h = canvas.height;
+    const boxes = (wordBoxes || []).filter(b => b && b.text && b.y0 > h * 0.42);
+
+    // Find "Guest Signature" / "Customer Signature" / standalone "Signature" anchor
+    let anchor = null;
+    for (let i = 0; i < boxes.length; i++) {
+      const t = boxes[i].text.toUpperCase();
+      if (/GUEST|CUSTOMER/.test(t)) {
+        for (let j = i; j < Math.min(boxes.length, i + 5); j++) {
+          const t2 = boxes[j].text.toUpperCase();
+          if (/SIGN|S1GN|SIG\b/.test(t2)) {
+            anchor = {
+              x0: Math.min(boxes[i].x0, boxes[j].x0),
+              y0: Math.min(boxes[i].y0, boxes[j].y0),
+              x1: Math.max(boxes[i].x1, boxes[j].x1),
+              y1: Math.max(boxes[i].y1, boxes[j].y1),
+              label: boxes[i].text + " " + boxes[j].text
+            };
+            break;
+          }
+        }
+        if (anchor) break;
+      }
+    }
+
+    // Fallback: look for "Signature" not preceded by Cashier/Manager/Authorised/Hotel
+    if (!anchor) {
+      for (let i = 0; i < boxes.length; i++) {
+        const t = boxes[i].text.toUpperCase();
+        if (/SIGNATURE|SIGN\b/.test(t)) {
+          const prev = boxes.slice(Math.max(0, i - 3), i).map(b => b.text.toUpperCase()).join(" ");
+          if (!/CASHIER|MANAGER|AUTH|RECEPT|HOTEL|FRONT|PREPARED/.test(prev)) {
+            anchor = { ...boxes[i], label: boxes[i].text };
+            break;
+          }
+        }
+      }
+    }
+
+    if (anchor) {
+      // Inspect Above, Right, and Below the label
+      const above = measureSignatureRegionInk(canvas, {
+        x0: anchor.x0 - w * 0.04,
+        y0: anchor.y0 - h * 0.08,
+        x1: anchor.x1 + w * 0.08,
+        y1: anchor.y0 - 3
+      }, boxes);
+
+      const right = measureSignatureRegionInk(canvas, {
+        x0: anchor.x1 + 6,
+        y0: anchor.y0 - h * 0.03,
+        x1: anchor.x1 + w * 0.24,
+        y1: anchor.y1 + h * 0.02
+      }, boxes);
+
+      const below = measureSignatureRegionInk(canvas, {
+        x0: anchor.x0 - w * 0.03,
+        y0: anchor.y1 + 4,
+        x1: anchor.x1 + w * 0.08,
+        y1: anchor.y1 + h * 0.065
+      }, boxes);
+
+      const best = [above, right, below].sort((a, b) => b.darkCount - a.darkCount)[0];
+      if (best.darkCount >= 110 && best.ratio >= 0.007) {
+        return {
+          status: "present",
+          uncertain: false,
+          note: `Auto-detected ink/signature near "${anchor.label}" (please confirm visually)`
+        };
+      }
+      return {
+        status: "missing",
+        uncertain: false,
+        note: `Auto-detected BLANK signature space near "${anchor.label}" (Guest Signature Missing)`
+      };
+    }
+
+    // No label matched: check bottom-left / bottom-right corners lightly & flag for visual check
+    const bottomLeft = measureSignatureRegionInk(canvas, {
+      x0: w * 0.05, y0: h * 0.78, x1: w * 0.42, y1: h * 0.94
+    }, boxes);
+    const bottomRight = measureSignatureRegionInk(canvas, {
+      x0: w * 0.55, y0: h * 0.78, x1: w * 0.94, y1: h * 0.94
+    }, boxes);
+
+    const hasBottomInk = Math.max(bottomLeft.darkCount, bottomRight.darkCount) >= 220;
+    return {
+      status: hasBottomInk ? "present" : "missing",
+      uncertain: true,
+      note: hasBottomInk
+        ? "No 'Guest Signature' label matched, but handwriting/ink found in footer — verify visually."
+        : "No Guest Signature detected in bill footer — verify visually on preview."
+    };
+  }
+
+  // Single Image OCR Flow
+  async function handleImageFile(file) {
+    activePdfPageIndex = null;
+    reviewingPageTag.style.display = "none";
+
+    const reader = new FileReader();
+    reader.onload = async ev => {
+      const originalDataUrl = ev.target.result;
+      previewCaption.textContent = `Uploaded Image: ${file.name}`;
+      billPreview.src = originalDataUrl;
+      previewWrap.style.display = "block";
+
+      ocrStatus.style.display = "block";
+      ocrStatusText.textContent = "Enhancing image & scanning bill text...";
+      ocrProgress.style.width = "10%";
+      chipsBox.style.display = "none";
+      rawOcrBox.style.display = "none";
+      rawOcrBox.open = false;
+      roomDetectNote.className = "detect-note";
+      sigDetectNote.className = "detect-note";
+      roomTypeEl.classList.remove("needs-attention");
+
+      let worker = null;
+      try {
+        const origCanvas = await loadImageToCanvas(originalDataUrl);
+        const { canvas: enhCanvas, scale } = enhanceCanvasForOcr(origCanvas);
+
+        worker = await Tesseract.createWorker("eng", 1, {
+          logger: m => {
+            if (m.status === "recognizing text") {
+              const pct = Math.round((m.progress || 0) * 100);
+              ocrStatusText.textContent = `Reading bill text... ${pct}%`;
+              ocrProgress.style.width = `${Math.max(15, pct)}%`;
+            }
+          }
+        });
+
+        await worker.setParameters({ tessedit_pageseg_mode: 3, preserve_interword_spaces: "1" });
+        const res1 = await worker.recognize(enhCanvas.toDataURL("image/png"), { rotateAuto: true });
+        let combinedText = res1.data.text || "";
+
+        // Map OCR word boxes back to original canvas coordinates
+        let wordBoxes = (res1.data.words || []).map(w => ({
+          text: w.text,
+          x0: w.bbox.x0 / scale,
+          y0: w.bbox.y0 / scale,
+          x1: w.bbox.x1 / scale,
+          y1: w.bbox.y1 / scale
+        }));
+
+        // Pass 2: Sparse Text (PSM 11) if Room Category wasn't matched
+        if (!detectRoomType(combinedText)) {
+          ocrStatusText.textContent = "Re-scanning boxed/table cells for Room Category...";
+          ocrProgress.style.width = "55%";
+          await worker.setParameters({ tessedit_pageseg_mode: 11, preserve_interword_spaces: "1" });
+          const res2 = await worker.recognize(originalDataUrl, { rotateAuto: true });
+          if ((res2.data.text || "").trim()) {
+            combinedText += "\n--- [Table/Box Scan] ---\n" + res2.data.text;
+          }
+          if (!wordBoxes.length && res2.data.words) {
+            wordBoxes = res2.data.words.map(w => ({
+              text: w.text, x0: w.bbox.x0, y0: w.bbox.y0, x1: w.bbox.x1, y1: w.bbox.y1
+            }));
+          }
+        }
+
+        const sigCheck = detectGuestSignature(origCanvas, wordBoxes);
+        lastExtractedOcrText = combinedText;
+
+        ocrProgress.style.width = "100%";
+        ocrStatusText.textContent = "Scan complete. Please verify Room Category, Dates, Timings, Rate & Guest Signature.";
+        rawOcrText.textContent = combinedText;
+        rawOcrBox.style.display = "block";
+
+        populateFormFromParsed(extractBillFields(combinedText, sigCheck));
+      } catch (err) {
+        console.error(err);
+        ocrStatusText.textContent =
+          "OCR could not run automatically (check internet or run via local HTTP server). You can still read the bill preview and enter details manually.";
+        ocrProgress.style.width = "0%";
+      } finally {
+        if (worker) await worker.terminate();
+      }
+    };
+    reader.readAsDataURL(file);
+  }
+
+  // Multi-Page PDF Upload & Batch Audit Flow
+  async function loadPdfDocumentSafe(arrayBuffer) {
+    try {
+      return await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+    } catch (err) {
+      // Fallback for file:// worker restrictions
+      return await pdfjsLib.getDocument({ data: arrayBuffer, disableWorker: true }).promise;
+    }
+  }
+
+  function reconstructPdfLines(textContent, viewport) {
+    const items = (textContent.items || []).map(item => {
+      const tx = pdfjsLib.Util.transform(viewport.transform, item.transform);
+      const fontH = Math.hypot(tx[2], tx[3]) || (item.height * viewport.scale) || 12;
+      return {
+        text: item.str,
+        x0: tx[4],
+        y1: tx[5],
+        y0: tx[5] - fontH,
+        x1: tx[4] + (item.width || 0) * viewport.scale
+      };
+    }).filter(i => i.text && i.text.trim());
+
+    // Group into horizontal lines by y coordinate
+    const sorted = [...items].sort((a, b) => a.y1 - b.y1 || a.x0 - b.x0);
+    const lines = [];
+    for (const item of sorted) {
+      const last = lines[lines.length - 1];
+      if (last && Math.abs(last.y - item.y1) <= 8) {
+        last.items.push(item);
+      } else {
+        lines.push({ y: item.y1, items: [item] });
+      }
+    }
+
+    const text = lines
+      .map(l => l.items.sort((a, b) => a.x0 - b.x0).map(i => i.text).join(" "))
+      .join("\n");
+
+    return { text, wordBoxes: items };
+  }
+
+  async function handlePdfFile(file) {
+    if (!window.pdfjsLib) {
+      alert("PDF library failed to load. Please check your internet connection and reload.");
+      return;
+    }
+
+    ocrStatus.style.display = "block";
+    ocrStatusText.textContent = `Opening PDF "${file.name}"...`;
+    ocrProgress.style.width = "5%";
+    pdfBatchResults = [];
+    activePdfPageIndex = null;
+    reviewingPageTag.style.display = "none";
+
+    let ocrWorker = null;
+    try {
+      const arrayBuffer = await file.arrayBuffer();
+      const pdf = await loadPdfDocumentSafe(arrayBuffer);
+      const totalPages = pdf.numPages;
+
+      pdfBatchCard.style.display = "block";
+      pdfBatchTitle.textContent = `PDF Batch Audit (${totalPages} Page${totalPages > 1 ? "s" : ""} – ${file.name})`;
+
+      for (let p = 1; p <= totalPages; p++) {
+        ocrStatusText.textContent = `Auditing PDF Bill ${p} of ${totalPages}...`;
+        ocrProgress.style.width = `${Math.round((p / totalPages) * 95)}%`;
+
+        const page = await pdf.getPage(p);
+        const viewport = page.getViewport({ scale: 2.0 });
+
+        const canvas = document.createElement("canvas");
+        canvas.width = viewport.width;
+        canvas.height = viewport.height;
+        const ctx = canvas.getContext("2d");
+        ctx.fillStyle = "#ffffff";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        await page.render({ canvasContext: ctx, viewport }).promise;
+
+        const pageDataUrl = canvas.toDataURL("image/jpeg", 0.92);
+
+        // 1. Try native PDF text first
+        const textContent = await page.getTextContent();
+        let { text: pageText, wordBoxes } = reconstructPdfLines(textContent, viewport);
+
+        // 2. Fallback to OCR if scanned PDF page (very little selectable text)
+        if (pageText.replace(/\s+/g, "").length < 40) {
+          ocrStatusText.textContent = `Running OCR on scanned PDF page ${p} of ${totalPages}...`;
+          if (!ocrWorker) {
+            ocrWorker = await Tesseract.createWorker("eng", 1);
+          }
+          const { canvas: enhCanvas, scale } = enhanceCanvasForOcr(canvas);
+          await ocrWorker.setParameters({ tessedit_pageseg_mode: 3, preserve_interword_spaces: "1" });
+          const res1 = await ocrWorker.recognize(enhCanvas.toDataURL("image/png"));
+          pageText = res1.data.text || "";
+          wordBoxes = (res1.data.words || []).map(w => ({
+            text: w.text,
+            x0: w.bbox.x0 / scale,
+            y0: w.bbox.y0 / scale,
+            x1: w.bbox.x1 / scale,
+            y1: w.bbox.y1 / scale
+          }));
+
+          if (!detectRoomType(pageText)) {
+            await ocrWorker.setParameters({ tessedit_pageseg_mode: 11, preserve_interword_spaces: "1" });
+            const res2 = await ocrWorker.recognize(pageDataUrl);
+            if ((res2.data.text || "").trim()) {
+              pageText += "\n--- [Table/Box Scan] ---\n" + res2.data.text;
+            }
+          }
+        }
+
+        const sigCheck = detectGuestSignature(canvas, wordBoxes);
+        const fields = extractBillFields(pageText, sigCheck);
+        const auditResult = evaluateBillAudit(fields, `PDF Page ${p}`);
+
+        pdfBatchResults.push({
+          pageNum: p,
+          pageDataUrl,
+          rawText: pageText,
+          fields,
+          auditResult
+        });
+
+        renderPdfBatchTable();
+      }
+
+      ocrProgress.style.width = "100%";
+      ocrStatusText.textContent = `Completed auditing all ${totalPages} page(s) in "${file.name}". Click "Review" on any row to inspect visually, or add all to Register.`;
+
+      // Load Page 1 into preview/form automatically for immediate inspection
+      if (pdfBatchResults.length > 0) {
+        loadPdfItemIntoForm(0, false);
+        pdfBatchCard.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Could not read this PDF file: " + (err.message || err));
+      ocrStatusText.textContent = "Failed to process PDF.";
+      ocrProgress.style.width = "0%";
+    } finally {
+      if (ocrWorker) await ocrWorker.terminate();
+    }
+  }
+
+  // Parsing helpers
+  function parseTimeString(rawHour, rawMin, rawAmPm) {
+    let h = parseInt(rawHour, 10);
+    const m = parseInt(rawMin, 10);
+    if (isNaN(h) || isNaN(m) || m > 59 || h > 23) return null;
+    if (rawAmPm) {
+      const ap = rawAmPm.toUpperCase();
+      if (ap === "PM" && h < 12) h += 12;
+      if (ap === "AM" && h === 12) h = 0;
+    }
+    return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+  }
+
+  function parseFlexibleDate(str) {
+    if (!str) return null;
+    let m = str.match(/(\d{4})[\/-](\d{1,2})[\/-](\d{1,2})/);
+    if (m) {
+      return `${m[1]}-${String(m[2]).padStart(2, "0")}-${String(m[3]).padStart(2, "0")}`;
+    }
+    m = str.match(/(\d{1,2})[\/.-](\d{1,2})[\/.-](\d{2,4})/);
+    if (m) {
+      const day = parseInt(m[1], 10);
+      const mon = parseInt(m[2], 10);
+      let yr = parseInt(m[3], 10);
+      if (yr < 100) yr += 2000;
+      if (day >= 1 && day <= 31 && mon >= 1 && mon <= 12) {
+        return `${yr}-${String(mon).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+      }
+    }
+    const months = { JAN:1, FEB:2, MAR:3, APR:4, MAY:5, JUN:6, JUL:7, AUG:8, SEP:9, OCT:10, NOV:11, DEC:12 };
+    m = str.match(/(\d{1,2})[\s\/-]*([A-Za-z]{3})[a-z]*[\s,\/-]*(\d{2,4})/);
+    if (m) {
+      const day = parseInt(m[1], 10);
+      const mon = months[m[2].toUpperCase()];
+      let yr = parseInt(m[3], 10);
+      if (yr < 100) yr += 2000;
+      if (mon && day >= 1 && day <= 31) {
+        return `${yr}-${String(mon).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+      }
+    }
+    return null;
+  }
+
+  function levenshtein(a, b) {
+    const dp = Array.from({ length: a.length + 1 }, () => Array(b.length + 1).fill(0));
+    for (let i = 0; i <= a.length; i++) dp[i][0] = i;
+    for (let j = 0; j <= b.length; j++) dp[0][j] = j;
+    for (let i = 1; i <= a.length; i++) {
+      for (let j = 1; j <= b.length; j++) {
+        dp[i][j] = Math.min(
+          dp[i - 1][j] + 1,
+          dp[i][j - 1] + 1,
+          dp[i - 1][j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1)
+        );
+      }
+    }
+    return dp[a.length][b.length];
+  }
+
+  function detectRoomType(text) {
+    const lines = text.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+
+    const customList = [
+      { type: "SUIT", raw: customAliases.SUIT },
+      { type: "EXE", raw: customAliases.EXE },
+      { type: "DLX", raw: customAliases.DLX }
+    ];
+    for (const c of customList) {
+      if (!c.raw) continue;
+      const tokens = c.raw.split(",").map(t => t.trim()).filter(Boolean);
+      for (const tok of tokens) {
+        const re = new RegExp(`(?:^|[^A-Z0-9])(${escapeRegex(tok)})(?:[^A-Z0-9]|$)`, "i");
+        for (const line of lines) {
+          const hit = line.match(re);
+          if (hit) return { type: c.type, matchedText: hit[1], sourceLine: line };
+        }
+      }
+    }
+
+    const matchers = [
+      {
+        type: "SUIT",
+        patterns: [
+          /(?:^|[^A-Z])(S\s*U\s*[I1L]\s*T\s*E?S?)(?:[^A-Z]|$|ROOM|NO|CAT|TYPE)/i,
+          /(SUIT[ES]*|SUTTE|SUTE|SU1TE?|5UITE?)(?=[^A-Z]|$|ROOM|NO|CAT|TYPE)/i
+        ]
+      },
+      {
+        type: "EXE",
+        patterns: [
+          /(?:^|[^A-Z])(E\s*[\.\s]*X\s*[\.\s]*E\s*C?)(?:[^A-Z]|$|ROOM|NO|CAT|TYPE)/i,
+          /(EXECUTIV[EA]?|EXCUTIV[EA]?|EXCEUTIV[EA]?|EXECTIV[EA]?|EXECU[A-Z]{0,4})/i
+        ]
+      },
+      {
+        type: "DLX",
+        patterns: [
+          /(?:^|[^A-Z])(D\s*[\.\s]*L\s*[\.\s]*X)(?:[^A-Z]|$|ROOM|NO|CAT|TYPE)/i,
+          /(DELUX[EFCS]?|OELUX[EF]?|DELUKE|D[E3]LUXE?)/i
+        ]
+      }
+    ];
+
+    const priorityLines = lines.filter(l =>
+      /room\s*type|category|room\s*cat|plan|tariff|room\s*rent|accommodation|particulars|description|room\s*no|rm\s*no|room\s*charge/i.test(l)
+    );
+
+    const searchPool = [
+      ...priorityLines,
+      ...lines.filter(l => !priorityLines.includes(l) && !/^hotel\b/i.test(l)),
+      ...lines
+    ];
+
+    for (const line of searchPool) {
+      for (const m of matchers) {
+        for (const re of m.patterns) {
+          const hit = line.match(re);
+          if (hit) return { type: m.type, matchedText: hit[1].trim(), sourceLine: line };
+        }
+      }
+    }
+
+    for (const line of priorityLines) {
+      const typoHit = line.match(/(?:^|[^A-Z])(OLX|D1X|DLK)(?:[^A-Z]|$)/i);
+      if (typoHit) return { type: "DLX", matchedText: typoHit[1], sourceLine: line };
+      const exeTypo = line.match(/(?:^|[^A-Z])(FXE|EXF|EKE)(?:[^A-Z]|$)/i);
+      if (exeTypo) return { type: "EXE", matchedText: exeTypo[1], sourceLine: line };
+    }
+
+    const words = text.toUpperCase().match(/[A-Z0-9]{5,12}/g) || [];
+    for (const w of words) {
+      if ((w.startsWith("D") || w.startsWith("O")) && w.length >= 5 && w.length <= 7 && levenshtein(w, "DELUXE") <= 2) {
+        return { type: "DLX", matchedText: w, sourceLine: w };
+      }
+      if (w.startsWith("E") && w.length >= 7 && w.length <= 11 && levenshtein(w, "EXECUTIVE") <= 2) {
+        return { type: "EXE", matchedText: w, sourceLine: w };
+      }
+    }
+
+    return null;
+  }
+
+  function extractAmounts(str) {
+    const matches = str.match(/\b\d{1,3}(?:,\d{2,3})*(?:\.\d{1,2})?\b|\b\d{3,6}(?:\.\d{1,2})?\b/g) || [];
+    return matches
+      .map(s => parseFloat(s.replace(/,/g, "")))
+      .filter(n => !isNaN(n));
+  }
+
+  function extractBillFields(text, sigCheck) {
+    const roomDetection = detectRoomType(text);
+    const invMatch = text.match(/(?:bill|invoice|folio|inv)\s*(?:no\.?|number|#|:)?\s*[:#-]?\s*([A-Z0-9\/-]{3,20})/i);
+    const billNo = (invMatch && invMatch[1] && !/date/i.test(invMatch[1])) ? invMatch[1].trim() : "";
+
+    const roomMatch = text.match(/(?:room\s*(?:no\.?|#)|rm\.?\s*no\.?)\s*[:#-]?\s*([A-Z0-9-]{2,8})/i);
+    const roomNo = (roomMatch && roomMatch[1]) ? roomMatch[1].trim() : "";
+
+    const guestMatch = text.match(/(?:guest\s*name|name\s*of\s*guest|mr\.?\/ms\.?|guest)\s*[:=-]\s*([A-Za-z .]{2,40})/i);
+    const guestName = (guestMatch && guestMatch[1]) ? guestMatch[1].trim() : "";
+
+    const lines = text.split(/\r?\n/);
+    let checkInDate = "", checkInTime = "", checkOutDate = "", checkOutTime = "", billDate = "";
+
+    for (const line of lines) {
+      if (/(?:check[\s-]*in|c\/i|arrival|arr\.?)/i.test(line)) {
+        const dt = parseFlexibleDate(line);
+        if (dt && !checkInDate) checkInDate = dt;
+        const tm = line.match(/(\d{1,2})[:.](\d{2})\s*(AM|PM)?/i);
+        if (tm && !checkInTime) {
+          const parsed = parseTimeString(tm[1], tm[2], tm[3]);
+          if (parsed) checkInTime = parsed;
+        }
+      }
+      if (/(?:check[\s-]*out|c\/o|departure|dep\.?)/i.test(line)) {
+        const dt = parseFlexibleDate(line);
+        if (dt && !checkOutDate) checkOutDate = dt;
+        const tm = line.match(/(\d{1,2})[:.](\d{2})\s*(AM|PM)?/i);
+        if (tm && !checkOutTime) {
+          const parsed = parseTimeString(tm[1], tm[2], tm[3]);
+          if (parsed) checkOutTime = parsed;
+        }
+      }
+      if (/bill\s*date|invoice\s*date|date\s*:/i.test(line) && !billDate) {
+        const dt = parseFlexibleDate(line);
+        if (dt) billDate = dt;
+      }
+    }
+
+    let nights = 1;
+    const nightsMatch = text.match(/(\d{1,2})\s*(?:night|nights|nts)\b/i) ||
+                        text.match(/(?:nights|no\.?\s*of\s*nights)\s*[:=-]?\s*(\d{1,2})/i);
+    if (nightsMatch && Number(nightsMatch[1]) >= 1 && Number(nightsMatch[1]) <= 60) {
+      nights = parseInt(nightsMatch[1], 10);
+    } else {
+      const diff = dateDiffDays(checkInDate, checkOutDate);
+      if (diff !== null && diff >= 1 && diff <= 60) nights = diff;
+    }
+
+    let suggestedRate = null;
+    let earlyCharged = 0;
+    let lateCharged = 0;
+
+    for (const line of lines) {
+      if (/early\s*(?:check[\s-]*in|c\/i)/i.test(line)) {
+        const nums = extractAmounts(line);
+        if (nums.length) earlyCharged = nums[nums.length - 1];
+      } else if (/late\s*(?:check[\s-]*out|c\/o)/i.test(line)) {
+        const nums = extractAmounts(line);
+        if (nums.length) lateCharged = nums[nums.length - 1];
+      } else if (!suggestedRate && /tariff|room\s*rent|room\s*charge|rate|accommodation/i.test(line) && !/gst|tax|cgst|sgst/i.test(line)) {
+        const nums = extractAmounts(line);
+        if (nums.length) suggestedRate = nums[nums.length - 1];
+      }
+    }
+
+    const allAmounts = extractAmounts(text).filter(n => n >= 500 && n <= 500000);
+    const uniqueAmounts = [...new Set(allAmounts)];
+    const chargedAmount = suggestedRate ?? (uniqueAmounts.length ? uniqueAmounts[0] : "");
+
+    return {
+      roomType: roomDetection ? roomDetection.type : "",
+      roomDetection,
+      nights,
+      rateMode: "perNight",
+      chargedAmount,
+      uniqueAmounts,
+      checkInDate,
+      checkInTime,
+      checkOutDate,
+      checkOutTime,
+      earlyCharged,
+      lateCharged,
+      guestSignature: sigCheck ? sigCheck.status : "missing",
+      sigCheck,
+      billNo,
+      billDate,
+      guestName,
+      roomNo,
+      remarks: ""
+    };
+  }
+
+  function applyRoomTypeDetection(text) {
+    const roomDetection = detectRoomType(text);
+    if (roomDetection) {
+      roomTypeEl.value = roomDetection.type;
+      roomTypeEl.classList.remove("needs-attention");
+      roomDetectNote.textContent = `Auto-detected ${roomDetection.type} (matched "${roomDetection.matchedText}" on bill)`;
+      roomDetectNote.className = "detect-note found";
+      return true;
+    } else {
+      roomTypeEl.value = "";
+      roomTypeEl.classList.add("needs-attention");
+      roomDetectNote.textContent = "Could not auto-detect DLX / EXE / SUIT from bill — please select manually.";
+      roomDetectNote.className = "detect-note missing";
+      rawOcrBox.open = true;
+      return false;
+    }
+  }
+
+  function populateFormFromParsed(fields) {
+    if (fields.roomDetection) {
+      roomTypeEl.value = fields.roomType;
+      roomTypeEl.classList.remove("needs-attention");
+      roomDetectNote.textContent = `Auto-detected ${fields.roomType} (matched "${fields.roomDetection.matchedText}" on bill)`;
+      roomDetectNote.className = "detect-note found";
+    } else if (fields.roomType) {
+      roomTypeEl.value = fields.roomType;
+      roomTypeEl.classList.remove("needs-attention");
+      roomDetectNote.className = "detect-note";
+    } else {
+      roomTypeEl.value = "";
+      roomTypeEl.classList.add("needs-attention");
+      roomDetectNote.textContent = "Could not auto-detect DLX / EXE / SUIT from bill — please select manually.";
+      roomDetectNote.className = "detect-note missing";
+      rawOcrBox.open = true;
+    }
+
+    nightsEl.value = fields.nights || 1;
+    chargedAmountEl.value = fields.chargedAmount !== "" ? fields.chargedAmount : "";
+    checkInDateEl.value = fields.checkInDate || "";
+    checkInTimeEl.value = fields.checkInTime || "";
+    checkOutDateEl.value = fields.checkOutDate || "";
+    checkOutTimeEl.value = fields.checkOutTime || "";
+    earlyCheckInChargedEl.value = fields.earlyCharged || 0;
+    lateCheckOutChargedEl.value = fields.lateCharged || 0;
+    billNoEl.value = fields.billNo || "";
+    billDateEl.value = fields.billDate || "";
+    guestNameEl.value = fields.guestName || "";
+    roomNoEl.value = fields.roomNo || "";
+    auditorRemarksEl.value = fields.remarks || "";
+
+    guestSignatureEl.value = fields.guestSignature || "missing";
+    guestSignatureEl.classList.toggle("sig-missing", guestSignatureEl.value === "missing");
+
+    if (fields.sigCheck) {
+      sigDetectNote.textContent = fields.sigCheck.note;
+      if (fields.sigCheck.uncertain) {
+        sigDetectNote.className = "detect-note missing";
+      } else {
+        sigDetectNote.className = fields.sigCheck.status === "missing" ? "detect-note danger" : "detect-note found";
+      }
+    } else {
+      sigDetectNote.className = "detect-note";
+    }
+
+    updateTimingHints(false);
+
+    if (fields.uniqueAmounts && fields.uniqueAmounts.length) {
+      amountChips.innerHTML = "";
+      fields.uniqueAmounts.slice(0, 10).forEach(amt => {
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "chip";
+        btn.textContent = fmtINR(amt);
+        btn.addEventListener("click", () => {
+          chargedAmountEl.value = amt;
+        });
+        amountChips.appendChild(btn);
+      });
+      chipsBox.style.display = "block";
+    } else {
+      chipsBox.style.display = "none";
+    }
+  }
+
+  // Core Audit Evaluation Engine (shared by single bill & PDF batch)
+  function evaluateBillAudit(fields, sourceLabel = "") {
+    const roomType = fields.roomType;
+    const policy = MIN_RATES[roomType];
+    const rawAmount = parseFloat(fields.chargedAmount);
+    const nights = Math.max(1, parseInt(fields.nights, 10) || 1);
+
+    const checkInDate = fields.checkInDate || "";
+    const checkOutDate = fields.checkOutDate || "";
+    const checkInTime = fields.checkInTime || "";
+    const checkOutTime = fields.checkOutTime || "";
+    const daysDiff = dateDiffDays(checkInDate, checkOutDate);
+    const ciMins = timeToMinutes(checkInTime);
+    const coMins = timeToMinutes(checkOutTime);
+
+    const needsTimingDates = (coMins !== null && coMins > STD_CHECKOUT_MINS && daysDiff === null);
+    const missingCoreData = !policy || isNaN(rawAmount) || rawAmount < 0 || (daysDiff !== null && daysDiff < 0) || needsTimingDates;
+
+    // 1. Room Tariff Verification
+    let effectiveRatePerNight = 0, minRate = 0, tariffShortfallPerNight = 0, tariffShortfall = 0, variancePct = "0.00";
+    if (policy && !isNaN(rawAmount) && rawAmount >= 0) {
+      effectiveRatePerNight = fields.rateMode === "totalRoom" ? (rawAmount / nights) : rawAmount;
+      minRate = policy.min;
+      tariffShortfallPerNight = Math.max(0, minRate - effectiveRatePerNight);
+      tariffShortfall = tariffShortfallPerNight * nights;
+      variancePct = tariffShortfall > 0 ? ((tariffShortfallPerNight / minRate) * 100).toFixed(2) : "0.00";
+    }
+    const hasTariffIssue = tariffShortfall > 0;
+
+    // 2. Early Check-in Verification (Before 1:00 PM)
+    const isEarlyCheckIn = ciMins !== null && ciMins < STD_CHECKIN_MINS;
+    const earlyCharged = Math.max(0, parseFloat(fields.earlyCharged) || 0);
+    const earlyRequired = isEarlyCheckIn ? EARLY_CHECKIN_FEE : 0;
+    const earlyShortfall = Math.max(0, earlyRequired - earlyCharged);
+    const hasEarlyIssue = earlyShortfall > 0;
+
+    // 3. Late Check-out Verification (ONLY if checked out next/succeeding day after 11:00 AM)
+    const isSameDayCheckOut = daysDiff === 0;
+    const isNextOrLaterDay = daysDiff !== null && daysDiff > 0;
+    const isLateCheckOut = isNextOrLaterDay && coMins !== null && coMins > STD_CHECKOUT_MINS;
+    const lateCharged = Math.max(0, parseFloat(fields.lateCharged) || 0);
+    const lateRequired = isLateCheckOut ? LATE_CHECKOUT_FEE : 0;
+    const lateShortfall = Math.max(0, lateRequired - lateCharged);
+    const hasLateIssue = lateShortfall > 0;
+
+    // 4. Guest Signature Verification
+    const guestSignature = fields.guestSignature || "missing";
+    const hasSignatureIssue = guestSignature === "missing";
+
+    const totalShortfall = tariffShortfall + earlyShortfall + lateShortfall;
+    const isException = hasTariffIssue || hasEarlyIssue || hasLateIssue || hasSignatureIssue;
+
+    const billNo = (fields.billNo || "").trim() || (sourceLabel || "N/A");
+    const billDate = fields.billDate || "N/A";
+    const guestName = (fields.guestName || "").trim() || "N/A";
+    const roomNo = (fields.roomNo || "").trim() || "N/A";
+    const remarks = (fields.remarks || "").trim();
+
+    let noting = "";
+    if (missingCoreData) {
+      const missingReasons = [];
+      if (!policy) missingReasons.push("Room Category (DLX/EXE/SUIT) not detected");
+      if (isNaN(rawAmount) || rawAmount < 0) missingReasons.push("Room Rate amount not detected");
+      if (needsTimingDates) missingReasons.push("Check-out after 11 AM found, but Check-in/Check-out dates missing");
+      if (daysDiff !== null && daysDiff < 0) missingReasons.push("Invalid Check-in/Check-out dates");
+
+      noting = `NEEDS REVIEW (${missingReasons.join("; ")}). Click "Review" to verify from bill image.`;
+      if (hasEarlyIssue) noting += ` [Early C/I uncharged: ${fmtINR(earlyShortfall)}]`;
+      if (hasSignatureIssue) noting += ` [Guest Signature Missing]`;
+    } else if (isException) {
+      const points = [];
+      let idx = 1;
+
+      if (hasTariffIssue) {
+        points.push(
+          `${idx++}. Undercharging of Room Tariff: ${policy.name} room was billed at an effective rate of ${fmtINR(effectiveRatePerNight)}/night ` +
+          `for ${nights} night(s) against the minimum prescribed tariff of ${fmtINR(minRate)}/night, resulting in a tariff shortfall of ` +
+          `${fmtINR(tariffShortfallPerNight)}/night (${variancePct}% below minimum) = ${fmtINR(tariffShortfall)}.`
+        );
+      }
+      if (hasEarlyIssue) {
+        points.push(
+          `${idx++}. Non-Recovery of Early Check-in Charges: Guest checked in at ${format12h(checkInTime)} (prior to standard 01:00 PM), ` +
+          `attracting mandatory Early Check-in charges of ${fmtINR(EARLY_CHECKIN_FEE)}, whereas only ${fmtINR(earlyCharged)} was billed ` +
+          `(Short recovery: ${fmtINR(earlyShortfall)}).`
+        );
+      }
+      if (hasLateIssue) {
+        points.push(
+          `${idx++}. Non-Recovery of Late Check-out Charges: Guest checked out on a succeeding day (${checkOutDate}) at ${format12h(checkOutTime)} (after standard 11:00 AM), ` +
+          `attracting mandatory Late Check-out charges of ${fmtINR(LATE_CHECKOUT_FEE)}, whereas only ${fmtINR(lateCharged)} was billed ` +
+          `(Short recovery: ${fmtINR(lateShortfall)}).`
+        );
+      }
+      if (hasSignatureIssue) {
+        points.push(
+          `${idx++}. Missing Guest Signature (Internal Control Lapse): Guest signature was not obtained on the hotel bill/folio. ` +
+          `Without guest acknowledgment on record, stay duration, room tariff, and extra charges remain unconfirmed by the guest.`
+        );
+      }
+
+      const recParts = [];
+      if (totalShortfall > 0) {
+        recParts.push(`justify undercharging/non-recovery with valid management approval or recover ${fmtINR(totalShortfall)}`);
+      }
+      if (hasSignatureIssue) {
+        recParts.push("ensure guest signature is mandatorily obtained on all folios at check-out");
+      }
+
+      noting =
+        `AUDIT OBSERVATION – ${totalShortfall > 0 ? "SHORT RECOVERY / CONTROL LAPSE" : "PROCEDURAL CONTROL LAPSE"}:\n` +
+        `During audit verification of Hotel Bill No. ${billNo} (Date: ${billDate}, Guest: ${guestName}, Room No.: ${roomNo}, Category: ${policy.name}), the following observation(s) were noted:\n` +
+        points.join("\n") +
+        (totalShortfall > 0 ? `\nTotal Revenue Shortfall: ${fmtINR(totalShortfall)}.` : "") +
+        (remarks ? `\nRemarks / Observation: ${remarks}.` : "") +
+        `\nAudit Recommendation: Front Office should ${recParts.join(" and ")}.`;
+    } else {
+      const timingNoteParts = [];
+      if (checkInTime) {
+        timingNoteParts.push(
+          isEarlyCheckIn
+            ? `Early Check-in at ${format12h(checkInTime)} duly charged (${fmtINR(earlyCharged)})`
+            : `Check-in at ${format12h(checkInTime)} (within standard 01:00 PM)`
+        );
+      }
+      if (checkOutTime) {
+        if (isSameDayCheckOut) {
+          timingNoteParts.push(`Same-day Check-out on ${checkOutDate} at ${format12h(checkOutTime)} (no late fee applicable)`);
+        } else {
+          timingNoteParts.push(
+            isLateCheckOut
+              ? `Late Check-out on ${checkOutDate} at ${format12h(checkOutTime)} duly charged (${fmtINR(lateCharged)})`
+              : `Check-out${checkOutDate ? " on " + checkOutDate : ""} at ${format12h(checkOutTime)} (within standard 11:00 AM)`
+          );
+        }
+      }
+      const timingSummary = timingNoteParts.length ? ` ${timingNoteParts.join("; ")}.` : "";
+
+      noting =
+        `COMPLIANT – NO AUDIT OBJECTION:\n` +
+        `Bill No. ${billNo} (Date: ${billDate}, Room No.: ${roomNo}, Category: ${policy.name}) was billed at ${fmtINR(effectiveRatePerNight)}/night ` +
+        `for ${nights} night(s), meeting the minimum tariff of ${fmtINR(minRate)}/night, with Guest Signature present.` +
+        timingSummary +
+        (remarks ? ` Remarks: ${remarks}.` : "");
+    }
+
+    return {
+      id: Date.now() + Math.floor(Math.random() * 10000),
+      billNo,
+      billDate,
+      guestName,
+      roomNo,
+      roomType,
+      roomTypeName: policy ? policy.name : "Unknown",
+      nights,
+      minRate,
+      effectiveRatePerNight,
+      checkInDate,
+      checkOutDate,
+      checkInTime,
+      checkOutTime,
+      isSameDayCheckOut,
+      isEarlyCheckIn,
+      isLateCheckOut,
+      earlyCharged,
+      lateCharged,
+      guestSignature,
+      hasSignatureIssue,
+      tariffShortfall,
+      earlyShortfall,
+      lateShortfall,
+      totalShortfall,
+      needsReview: missingCoreData,
+      status: missingCoreData ? "NEEDS_REVIEW" : (isException ? "EXCEPTION" : "COMPLIANT"),
+      noting
+    };
+  }
+
+  // Form Submit (Single Bill / Reviewed PDF Page)
+  auditForm.addEventListener("submit", e => {
+    e.preventDefault();
+
+    const roomType = roomTypeEl.value;
+    if (!roomType || !MIN_RATES[roomType]) {
+      roomTypeEl.classList.add("needs-attention");
+      roomTypeEl.focus();
+      alert("Please select the Room Category (DLX, EXE, or SUIT) shown on the bill.");
+      return;
+    }
+
+    const rawAmount = parseFloat(chargedAmountEl.value);
+    if (isNaN(rawAmount) || rawAmount < 0) {
+      alert("Please enter a valid room rate amount.");
+      return;
+    }
+
+    const daysDiff = dateDiffDays(checkInDateEl.value, checkOutDateEl.value);
+    if (daysDiff !== null && daysDiff < 0) {
+      alert("Check-out Date cannot be earlier than Check-in Date.");
+      return;
+    }
+
+    const coMins = timeToMinutes(checkOutTimeEl.value);
+    if (coMins !== null && coMins > STD_CHECKOUT_MINS && daysDiff === null) {
+      alert("You entered a Check-out Time after 11:00 AM. Please also enter Check-in Date and Check-out Date so the app knows whether it is a same-day check-out (no fee) or next/succeeding-day check-out (+₹1,000 fee).");
+      checkInDateEl.focus();
+      return;
+    }
+
+    const fields = {
+      roomType,
+      nights: nightsEl.value,
+      rateMode: document.querySelector('input[name="rateMode"]:checked').value,
+      chargedAmount: rawAmount,
+      checkInDate: checkInDateEl.value,
+      checkInTime: checkInTimeEl.value,
+      checkOutDate: checkOutDateEl.value,
+      checkOutTime: checkOutTimeEl.value,
+      earlyCharged: earlyCheckInChargedEl.value,
+      lateCharged: lateCheckOutChargedEl.value,
+      guestSignature: guestSignatureEl.value,
+      billNo: billNoEl.value,
+      billDate: billDateEl.value,
+      guestName: guestNameEl.value,
+      roomNo: roomNoEl.value,
+      remarks: auditorRemarksEl.value
+    };
+
+    const res = evaluateBillAudit(fields);
+    lastVerifiedResult = res;
+
+    // If editing a PDF batch page, sync updated audit back to the PDF batch list!
+    if (activePdfPageIndex !== null && pdfBatchResults[activePdfPageIndex]) {
+      pdfBatchResults[activePdfPageIndex].fields = {
+        ...pdfBatchResults[activePdfPageIndex].fields,
+        ...fields
+      };
+      pdfBatchResults[activePdfPageIndex].auditResult = res;
+      renderPdfBatchTable();
+    }
+
+    const isException = res.status === "EXCEPTION";
+    resultBox.style.display = "block";
+    resultBox.className = "result-box " + (isException ? "exception" : "compliant");
+    resultTitle.textContent = isException ? "Audit Exception Flagged" : "Bill Verified: Compliant";
+    resultBadge.textContent = isException ? "AUDIT POINT" : "COMPLIANT";
+    resultBadge.className = "badge " + (isException ? "badge-danger" : "badge-success");
+
+    resTariffShortfall.textContent = fmtINR(res.tariffShortfall);
+    resTariffShortfall.style.color = res.tariffShortfall > 0 ? "var(--danger)" : "var(--success)";
+
+    resEarlyShortfall.textContent = fmtINR(res.earlyShortfall);
+    resEarlyShortfall.style.color = res.earlyShortfall > 0 ? "var(--danger)" : "var(--success)";
+
+    resLateShortfall.textContent = fmtINR(res.lateShortfall);
+    resLateShortfall.style.color = res.lateShortfall > 0 ? "var(--danger)" : "var(--success)";
+
+    resSignatureStatus.textContent = res.hasSignatureIssue ? "Missing" : "Present";
+    resSignatureStatus.style.color = res.hasSignatureIssue ? "var(--danger)" : "var(--success)";
+
+    resTotalShortfall.textContent = fmtINR(res.totalShortfall);
+    resTotalShortfall.style.color = res.totalShortfall > 0 ? "var(--danger)" : "var(--success)";
+
+    auditNoting.value = res.noting;
+    resultBox.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  });
+
+  // Load a PDF page into the main preview & form for review
+  window.loadPdfItemIntoForm = function(index, scroll = true) {
+    const item = pdfBatchResults[index];
+    if (!item) return;
+    activePdfPageIndex = index;
+
+    reviewingPageTag.textContent = `Reviewing PDF Page ${item.pageNum}`;
+    reviewingPageTag.style.display = "inline";
+
+    previewCaption.textContent = `PDF Page ${item.pageNum} Preview`;
+    billPreview.src = item.pageDataUrl;
+    previewWrap.style.display = "block";
+
+    lastExtractedOcrText = item.rawText;
+    rawOcrText.textContent = item.rawText;
+    rawOcrBox.style.display = "block";
+    rawOcrBox.open = item.auditResult.needsReview;
+
+    populateFormFromParsed(item.fields);
+    if (scroll) {
+      auditForm.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  };
+
+  function renderPdfBatchTable() {
+    const total = pdfBatchResults.length;
+    const exc = pdfBatchResults.filter(r => r.auditResult.status === "EXCEPTION").length;
+    const comp = pdfBatchResults.filter(r => r.auditResult.status === "COMPLIANT").length;
+    const rev = pdfBatchResults.filter(r => r.auditResult.status === "NEEDS_REVIEW").length;
+    const missSig = pdfBatchResults.filter(r => r.auditResult.hasSignatureIssue).length;
+    const sumShort = pdfBatchResults.reduce((s, r) => s + (r.auditResult.totalShortfall || 0), 0);
+
+    pdfSummaryStrip.innerHTML = `
+      <span class="pdf-pill">Pages: ${total}</span>
+      <span class="pdf-pill" style="background:var(--danger-bg);color:var(--danger);">Audit Points: ${exc}</span>
+      <span class="pdf-pill" style="background:var(--success-bg);color:var(--success);">Compliant: ${comp}</span>
+      <span class="pdf-pill" style="background:var(--warning-bg);color:var(--warning);">Needs Review: ${rev}</span>
+      <span class="pdf-pill" style="background:var(--warning-bg);color:var(--warning);">Missing Sign: ${missSig}</span>
+      <span class="pdf-pill" style="background:var(--danger-bg);color:var(--danger);">PDF Shortfall: ${fmtINR(sumShort)}</span>
+    `;
+
+    pdfBatchBody.innerHTML = pdfBatchResults.map((item, idx) => {
+      const r = item.auditResult;
+      const ciTime = r.checkInTime ? format12h(r.checkInTime) : "—";
+      const coTime = r.checkOutTime ? format12h(r.checkOutTime) : "—";
+      const ciLabel = `${r.checkInDate ? r.checkInDate + " " : ""}${ciTime}`;
+      const coLabel = `${r.checkOutDate ? r.checkOutDate + " " : ""}${coTime}`;
+
+      let statusBadge = `<span class="badge badge-success">Compliant</span>`;
+      if (r.status === "EXCEPTION") statusBadge = `<span class="badge badge-danger">Audit Point</span>`;
+      if (r.status === "NEEDS_REVIEW") statusBadge = `<span class="badge badge-warning">Needs Review</span>`;
+
+      const sigBadge = r.hasSignatureIssue
+        ? `<span class="badge badge-danger">Missing</span>`
+        : `<span class="badge badge-success">Signed</span>`;
+
+      return `
+        <tr>
+          <td><strong>Pg ${item.pageNum}</strong></td>
+          <td><strong>${escapeHtml(r.billNo)}</strong><span class="subtext">Rm ${escapeHtml(r.roomNo)}</span></td>
+          <td><strong>${escapeHtml(r.roomType || "?")}</strong><span class="subtext">${r.nights} night(s)</span></td>
+          <td>${r.minRate ? "Min: " + fmtINR(r.minRate) : "Min: ?"}<span class="subtext">Billed: ${r.effectiveRatePerNight ? fmtINR(r.effectiveRatePerNight) : "?"}</span></td>
+          <td>C/I: ${escapeHtml(ciLabel)}<span class="subtext">C/O: ${escapeHtml(coLabel)}</span></td>
+          <td>${sigBadge}</td>
+          <td>${statusBadge}</td>
+          <td style="font-weight:700; color:${r.totalShortfall > 0 ? "var(--danger)" : "var(--success)"}">
+            ${r.totalShortfall > 0 ? fmtINR(r.totalShortfall) : "—"}
+          </td>
+          <td class="noting-cell">${escapeHtml(r.noting).replace(/\n/g, "<br>")}</td>
+          <td>
+            <button type="button" class="btn-primary btn-sm" onclick="loadPdfItemIntoForm(${idx})">Review</button>
+          </td>
+        </tr>
+      `;
+    }).join("");
+  }
+
+  document.getElementById("btnAddAllPdfToRegister").addEventListener("click", () => {
+    if (!pdfBatchResults.length) return;
+    const ready = pdfBatchResults.filter(r => r.auditResult.status !== "NEEDS_REVIEW");
+    const unreadyCount = pdfBatchResults.length - ready.length;
+
+    if (!ready.length) {
+      alert("All PDF pages currently need review (missing room category or rate). Please click 'Review' on each row to confirm.");
+      return;
+    }
+
+    if (unreadyCount > 0) {
+      const ok = confirm(`${ready.length} audited bill(s) are ready to add. ${unreadyCount} page(s) still say "Needs Review" and will be skipped until reviewed. Proceed?`);
+      if (!ok) return;
+    }
+
+    for (let i = ready.length - 1; i >= 0; i--) {
+      auditEntries.unshift({ ...ready[i].auditResult, id: Date.now() + i });
+    }
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(auditEntries));
+    renderRegister();
+    alert(`Added ${ready.length} PDF bill(s) to the Audit Report Register.`);
+  });
+
+  document.getElementById("btnClearPdfBatch").addEventListener("click", () => {
+    pdfBatchResults = [];
+    activePdfPageIndex = null;
+    reviewingPageTag.style.display = "none";
+    pdfBatchCard.style.display = "none";
+  });
+
+  // Save to Audit Register
+  document.getElementById("btnSaveEntry").addEventListener("click", () => {
+    if (!lastVerifiedResult) return;
+    lastVerifiedResult.noting = auditNoting.value.trim();
+    if (activePdfPageIndex !== null && pdfBatchResults[activePdfPageIndex]) {
+      pdfBatchResults[activePdfPageIndex].auditResult.noting = lastVerifiedResult.noting;
+      renderPdfBatchTable();
+    }
+    auditEntries.unshift({ ...lastVerifiedResult, id: Date.now() });
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(auditEntries));
+    renderRegister();
+    alert("Saved to Audit Register.");
+  });
+
+  // Copy Noting
+  document.getElementById("btnCopyNoting").addEventListener("click", async () => {
+    try {
+      await navigator.clipboard.writeText(auditNoting.value);
+      alert("Audit noting copied to clipboard!");
+    } catch {
+      auditNoting.select();
+      document.execCommand("copy");
+      alert("Audit noting copied!");
+    }
+  });
+
+  // Reset form
+  document.getElementById("btnReset").addEventListener("click", () => {
+    auditForm.reset();
+    roomTypeEl.value = "";
+    roomTypeEl.classList.remove("needs-attention");
+    guestSignatureEl.value = "present";
+    guestSignatureEl.classList.remove("sig-missing");
+    roomDetectNote.className = "detect-note";
+    sigDetectNote.className = "detect-note";
+    earlyCheckInChargedEl.value = 0;
+    lateCheckOutChargedEl.value = 0;
+    updateTimingHints(false);
+    billFile.value = "";
+    previewWrap.style.display = "none";
+    ocrStatus.style.display = "none";
+    chipsBox.style.display = "none";
+    rawOcrBox.style.display = "none";
+    resultBox.style.display = "none";
+    reviewingPageTag.style.display = "none";
+    activePdfPageIndex = null;
+    lastVerifiedResult = null;
+    lastExtractedOcrText = "";
+  });
+
+  // Filter tabs
+  document.querySelectorAll(".tab-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
+      btn.classList.add("active");
+      currentFilter = btn.dataset.filter;
+      renderRegister();
+    });
+  });
+
+  // Render Dashboard & Register
+  function renderRegister() {
+    const total = auditEntries.length;
+    const exceptions = auditEntries.filter(e => e.status === "EXCEPTION");
+    const compliant = total - exceptions.length;
+    const missingSigs = auditEntries.filter(e => e.guestSignature === "missing" || e.hasSignatureIssue).length;
+    const totalShortfall = exceptions.reduce((sum, e) => sum + Number(e.totalShortfall || 0), 0);
+
+    document.getElementById("statTotal").textContent = total;
+    document.getElementById("statCompliant").textContent = compliant;
+    document.getElementById("statExceptions").textContent = exceptions.length;
+    document.getElementById("statMissingSig").textContent = missingSigs;
+    document.getElementById("statShortfall").textContent = fmtINR(totalShortfall);
+
+    const filtered = auditEntries.filter(e => {
+      if (currentFilter === "exception") return e.status === "EXCEPTION";
+      if (currentFilter === "compliant") return e.status === "COMPLIANT";
+      return true;
+    });
+
+    const tbody = document.getElementById("registerBody");
+    if (!filtered.length) {
+      tbody.innerHTML = `<tr><td colspan="10" class="empty-state">No audited bills recorded under this filter yet.</td></tr>`;
+      return;
+    }
+
+    tbody.innerHTML = filtered.map(e => {
+      const ciTime = e.checkInTime ? format12h(e.checkInTime) : "—";
+      const coTime = e.checkOutTime ? format12h(e.checkOutTime) : "—";
+      const ciLabel = `${e.checkInDate ? e.checkInDate + " " : ""}${ciTime}`;
+      const coLabel = `${e.checkOutDate ? e.checkOutDate + " " : ""}${coTime}`;
+      const ciWarn = (e.earlyShortfall || 0) > 0 ? `<span style="color:var(--danger);font-weight:600;">(Early -₹${e.earlyShortfall})</span>` : "";
+      const coWarn = (e.lateShortfall || 0) > 0 ? `<span style="color:var(--danger);font-weight:600;">(Late -₹${e.lateShortfall})</span>` : "";
+      const sameDayTag = e.isSameDayCheckOut ? `<span style="color:#1d4ed8;font-size:0.74rem;">(Same-day)</span>` : "";
+      const isSigMissing = e.guestSignature === "missing" || e.hasSignatureIssue;
+
+      return `
+        <tr>
+          <td><strong>${escapeHtml(e.billNo)}</strong><span class="subtext">${escapeHtml(e.billDate)}</span></td>
+          <td>Rm ${escapeHtml(e.roomNo)}<span class="subtext">${escapeHtml(e.guestName)}</span></td>
+          <td><strong>${escapeHtml(e.roomType)}</strong><span class="subtext">${e.nights} night(s)</span></td>
+          <td>Min: ${fmtINR(e.minRate)}<span class="subtext">Billed: ${fmtINR(e.effectiveRatePerNight)}</span></td>
+          <td>
+            C/I: ${escapeHtml(ciLabel)} ${ciWarn}
+            <span class="subtext">C/O: ${escapeHtml(coLabel)} ${sameDayTag} ${coWarn}</span>
+          </td>
+          <td>
+            <span class="badge ${isSigMissing ? "badge-danger" : "badge-success"}">
+              ${isSigMissing ? "Missing" : "Signed"}
+            </span>
+          </td>
+          <td>
+            <span class="badge ${e.status === "EXCEPTION" ? "badge-danger" : "badge-success"}">
+              ${e.status === "EXCEPTION" ? "Exception" : "Compliant"}
+            </span>
+          </td>
+          <td style="font-weight:700; color:${(e.totalShortfall || 0) > 0 ? "var(--danger)" : "var(--success)"}">
+            ${(e.totalShortfall || 0) > 0 ? fmtINR(e.totalShortfall) : "—"}
+          </td>
+          <td class="noting-cell">${escapeHtml(e.noting).replace(/\n/g, "<br>")}</td>
+          <td class="action-col">
+            <button type="button" class="btn-secondary btn-sm" onclick="deleteEntry(${e.id})">Delete</button>
+          </td>
+        </tr>
+      `;
+    }).join("");
+  }
+
+  window.deleteEntry = function(id) {
+    auditEntries = auditEntries.filter(e => e.id !== id);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(auditEntries));
+    renderRegister();
+  };
+
+  document.getElementById("btnClearAll").addEventListener("click", () => {
+    if (!auditEntries.length) return;
+    if (confirm("Clear all saved entries from the Audit Register?")) {
+      auditEntries = [];
+      localStorage.removeItem(STORAGE_KEY);
+      renderRegister();
+    }
+  });
+
+  // Export CSV
+  document.getElementById("btnExportCsv").addEventListener("click", () => {
+    if (!auditEntries.length) {
+      alert("No entries to export.");
+      return;
+    }
+    const headers = [
+      "Bill No", "Date", "Guest Name", "Room No", "Room Category", "Nights",
+      "Min Rate", "Charged Per Night", "Check-in Date", "Check-in Time", "Early C/I Charged",
+      "Check-out Date", "Check-out Time", "Same-Day C/O", "Late C/O Charged",
+      "Guest Signature", "Tariff Shortfall", "Early C/I Shortfall", "Late C/O Shortfall",
+      "Total Shortfall", "Status", "Audit Report Noting"
+    ];
+    const rows = auditEntries.map(e => [
+      e.billNo, e.billDate, e.guestName, e.roomNo, e.roomType, e.nights,
+      e.minRate, e.effectiveRatePerNight,
+      e.checkInDate || "", e.checkInTime ? format12h(e.checkInTime) : "", e.earlyCharged || 0,
+      e.checkOutDate || "", e.checkOutTime ? format12h(e.checkOutTime) : "",
+      e.isSameDayCheckOut ? "Yes" : "No", e.lateCharged || 0,
+      (e.guestSignature === "missing" || e.hasSignatureIssue) ? "Missing" : "Present",
+      e.tariffShortfall ?? (e.status === "EXCEPTION" ? e.totalShortfall : 0),
+      e.earlyShortfall || 0, e.lateShortfall || 0, e.totalShortfall,
+      e.status, e.noting.replace(/\r?\n/g, " ")
+    ]);
+
+    const csvContent = [headers, ...rows]
+      .map(r => r.map(cell => `"${String(cell ?? "").replace(/"/g, '""')}"`).join(","))
+      .join("\n");
+
+    const blob = new Blob(["\uFEFF" + csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `Hotel_Room_Audit_Report_${new Date().toISOString().slice(0,10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  });
+
+  // Print / PDF
+  document.getElementById("btnPrint").addEventListener("click", () => window.print());
+
+  // Initial load
+  renderRegister();
+</script>
+</body>
+</html>
