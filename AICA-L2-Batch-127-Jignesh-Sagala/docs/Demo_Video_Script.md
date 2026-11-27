@@ -6,17 +6,19 @@ Length target: under 10 minutes. About 9 minutes 30 seconds at a calm pace. All 
 
 ## Before recording
 
-- Open only `dashboard/HisaabKitaab_Dashboard.html` in a browser. Window about 1440 pixels wide. Light theme. Date set to 25 Nov 2026.
-- Close every other tab and window. Never show a folder, file name or mailbox that belongs to the real data. Show the project folder only.
+- Open these before you press record, in this order, as browser tabs: (1) the dashboard, `dashboard/HisaabKitaab_Dashboard.html` from your project folder, light theme, date 25 Nov 2026; (2) the README from your GitHub fork, top of the page; (3) the same README with `#7-how-it-runs` added to the link, which opens the eleven-step table; (4) `docs/Lovable_Build_Log.md` in your fork; (5) `docs/test_result.md` in your fork. The fork link starts: `github.com/jigneshsagala-creator/AICA-Level-2-Projects/blob/main/AICA-L2-Batch-127-Jignesh-Sagala/`. Also open File Explorer on the project folder only, showing `db_dummy` and `samples`. Switch with Ctrl+Tab or Alt+Tab. Open nothing new while recording.
+- Close every other tab and window. Never show a folder, file name or mailbox that belongs to the real data. Do not open Python files or a database. Show the project folder only.
 - Steps 1 to 3 of the process are described in words. Do not open the real mailbox or the real statements on screen.
+- The submission form requires a video that shows your face and the technical content. Keep your camera on for the whole recording. Zoom shows your face in a small corner while you share the screen.
+- Host the video on YouTube (unlisted) or Google Drive, set so anyone with the link can view. The link goes only into the form, not into GitHub. Only dummy data appears in it, so a public link is safe.
 - Practise once with a timer. Cut words, not the demo.
 
 ## Timing at a glance
 
 | Part | Start | Length |
 |---|---|---|
-| 1. Introduction | 0:00 | 0:35 |
-| 2. Problem | 0:35 | 1:20 |
+| 1. Introduction | 0:00 | 0:55 |
+| 2. Problem | 0:55 | 1:00 |
 | 3. Inputs | 1:55 | 1:25 |
 | 4. Process | 3:20 | 2:30 |
 | 5. Output demo | 5:50 | 2:50 |
@@ -25,32 +27,34 @@ Length target: under 10 minutes. About 9 minutes 30 seconds at a calm pace. All 
 
 ---
 
-## 1. Introduction (0:00 to 0:35)
+## 1. Introduction (0:00 to 0:55)
 
-**Show:** Project folder name on screen, then the Overview page of the dashboard.
-
-**Say:**
-Hello. My name is Jignesh Sagala, from AICA Level 2, Batch 127. This is my capstone project. It is called Hisaab Kitaab, which means accounts and records. It is one dashboard that shows everything an investor in India owns, on any date. I will show the problem, the inputs, how I built it with Claude, Python and Lovable, and then the dashboard itself. All data you see today is dummy data.
-
-## 2. Problem (0:35 to 1:55)
-
-**Show:** Slide-free. Stay on the Overview, or show the README problem section in the project folder.
+**Show:** Your face on camera, then the Overview page of the dashboard.
 
 **Say:**
-An investor in India holds money in many places. Mutual funds with several fund houses. Shares with a broker. Savings accounts. Term deposits. A rented house. Insurance policies.
+I thank the President and the Vice-President of ICAI, and all the faculty of AICA Level 1 and Level 2.
 
-Every institution sends its own statement, in its own layout. Most are locked PDFs that arrive by email each month. To know what everything is worth today, the investor must collect each statement, remember each password, and add the numbers by hand. That takes time, and the investor is busy.
+My name is Jignesh Sagala, AICA Level 2, Batch 127. My project is about all of us. We work in practice, business or industry. Work and family keep us so busy that we, as CAs, rarely track our own investments. So I built an investment tracker dashboard. I named it Hisaab Kitaab, which means accounts and records. We will see it through the eyes of BusyMe. BusyMe could be any one of us. All data you see is dummy data.
 
-The numbers are also not simple. A fund bought through a monthly SIP changes its units and its average cost every month. A share bought in several lots has an average cost that must include brokerage. Value on a past date needs the price of that date, not today's price. And money going out, such as SIPs, premiums and house tax, is easy to forget.
+## 2. Problem (0:55 to 1:55)
 
-So the investor wants one answer. What is everything worth, what did it cost, where does it sit, and what needs attention. That is the problem I solved. It fits any investor in India. For a non-resident Indian there is a bonus, which I will show at the end.
+**Show:** Slide-free. Stay on the Overview, or show the top of the README tab.
+
+**Say:**
+BusyMe holds money in many places. Mutual funds. Shares with a broker. Savings accounts. Term deposits. A rented house. Insurance policies.
+
+Every institution sends its own statement, in its own layout. Most are locked PDFs that arrive by email each month. To track investments and cash flows, and to know what everything is worth, BusyMe must collect each statement, remember each password, and add the numbers by hand. That takes time, and BusyMe is busy.
+
+The numbers are not simple either. A fund bought through a monthly SIP changes its units and average cost every month. Shares bought in lots need an average cost with brokerage. Value on a past date needs that date's price. Money going out, such as SIPs, premiums and house tax, is easy to forget.
+
+So BusyMe wants one answer. What is everything worth, what did it cost, where does it sit, and what needs attention. It fits any investor in India. For a non-resident Indian there is a bonus, which I will show at the end.
 
 ## 3. Inputs (1:55 to 3:20)
 
-**Show:** The `db_dummy` folder with the eleven CSV files, or the table in the README. Then the `samples` folder with the six made-up PDFs.
+**Show:** The `db_dummy` folder (eleven CSV tables and one small helper file, `price_sources.csv`), or the table in the README. Then the `samples` folder with the six made-up PDFs.
 
 **Say:**
-The dashboard reads a small database of eleven CSV tables. Instruments, transactions, prices, bank balances, term deposits, broker cash, SIP plan, owner, properties, rent receipts and insurance. A CSV file is a plain table that opens in Excel.
+The dashboard reads a small database of eleven CSV tables. Instruments, transactions, prices, bank balances, term deposits, broker cash, SIP plan, owner, properties, rent receipts and insurance. A CSV file is a plain table that opens in Excel. A twelfth small file, price sources, only says where each price comes from.
 
 In real life, the data starts as locked PDF statements. A consolidated fund and demat statement. Broker contract notes. A broker funds ledger. Bank statements. Prices come from public sources: fund prices from AMFI, share prices from Yahoo, and the dollar rate.
 
