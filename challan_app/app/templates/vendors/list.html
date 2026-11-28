@@ -1,0 +1,14 @@
+﻿{% extends "base.html" %}{% block title %}Vendors{% endblock %}
+{% block content %}
+<h1>Vendor master <a class="btn" style="float:right" href="{{ url_for('vendors.new') }}">+ New vendor</a></h1>
+<form class="bar" method="get">
+ <div><label>Search</label><input name="q" value="{{ q }}" placeholder="name / number / GSTIN / ERP code"></div>
+ <div><label>ERP status</label><select name="erp"><option value="">All</option><option value="yes" {{ 'selected' if erp=='yes' }}>Set up in ERP</option><option value="no" {{ 'selected' if erp=='no' }}>Not in ERP</option></select></div>
+ <div><button>Filter</button> <a class="btn sec" href="{{ url_for('reports.show', name='vendors', export='xlsx') }}">Export Excel</a></div>
+</form>
+<table><tr><th>Vendor No</th><th>Name</th><th>GSTIN</th><th>State</th><th>ERP code</th><th>Status</th></tr>
+{% for v in rows %}<tr><td><a href="{{ url_for('vendors.view', vid=v.id) }}">{{ v.vendor_no }}</a></td><td>{{ v.name }}</td><td>{{ v.gstin or '-' }}</td>
+<td>{{ gst.state_label(v.state_code) }}</td><td>{% if v.erp_code %}<span class="badge ok">{{ v.erp_code }}</span>{% else %}<span class="badge warn">Not in ERP</span>{% endif %}</td>
+<td>{{ 'Active' if v.active else 'Inactive' }}</td></tr>{% else %}<tr><td colspan="6">No vendors found.</td></tr>{% endfor %}</table>
+<div class="pager">{{ total }} vendor(s){% if page>1 %} <a href="?q={{ q }}&erp={{ erp }}&page={{ page-1 }}">« Prev</a>{% endif %}{% if page*50<total %} <a href="?q={{ q }}&erp={{ erp }}&page={{ page+1 }}">Next »</a>{% endif %}</div>
+{% endblock %}

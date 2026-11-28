@@ -1,0 +1,79 @@
+{% extends "base.html" %}{% block title %}{{ ch.display_no }}{% endblock %}
+{% macro csrf() %}<input type="hidden" name="_csrf" value="{{ csrf_token() }}">{% endmacro %}
+{% block content %}
+<h1>{{ ch.display_no }} <span class="badge {{ ch.status }}">{{ ch.status }}</span>
+ {% if ch.status=='FINAL' %}<span class="badge {{ ch.ewb_status }}">E-way: {{ ch.ewb_status }}</span>{% endif %}
+ {% if ch.return_status %}<span class="badge {{ ch.return_status.split()[0] }}">{{ ch.return_status }}</span>{% endif %}
+ <span style="float:right">
+  {% if ch.status != 'DRAFT' %}<a class="btn" target="_blank" href="{{ url_for('challans.print_', cid=ch.id) }}">Print / PDF (3 copies)</a>{% endif %}
+  {% if can_edit %}<a class="btn sec" href="{{ url_for('challans.edit', cid=ch.id) }}">Edit</a>{% endif %}
+ </span></h1>
+<p class="muted">{{ cfg.title }} · created by {{ ch.created_by }} on {{ ch.created_at|dmyhm }}{% if ch.finalized_by %} · issued by {{ ch.finalized_by }} on {{ ch.finalized_at|dmyhm }}{% endif %}{% if ch.print_count %} · printed {{ ch.print_count }}×{% endif %}{% if ch.is_historical %} · migrated historical record{% endif %}</p>
+
+{% if ch.status=='CANCELLED' %}<div class="flash error"><b>CANCELLED</b> on {{ ch.cancelled_at|dmyhm }} by {{ ch.cancelled_by }}: {{ ch.cancel_reason }}</div>{% endif %}
+{% if ch.status=='DRAFT' and can_edit %}
+<div class="card"><b>Draft - no number yet.</b>
+ <form class="inline" method="post" action="{{ url_for('challans.finalize', cid=ch.id) }}" data-confirm="Issue this challan and assign its number? After this only Admin can edit it.">{{ csrf() }}<button class="ok">Issue (assign number)</button></form>
+ <form class="inline" method="post" action="{{ url_for('challans.delete', cid=ch.id) }}" data-confirm="Delete this draft?">{{ csrf() }}<button class="danger">Delete draft</button></form></div>
+{% endif %}
+
+<div class="grid g2">
+<div class="card"><h2 style="margin-top:0">Consignor</h2><b>{{ consignor.company }}</b><br>{{ consignor.address }}, PIN {{ consignor.pin }}<br>GSTIN {{ consignor.gstin }} · State {{ gst.state_label(consignor.state_code) }}</div>
+<div class="card"><h2 style="margin-top:0">Consignee</h2><b><a href="{{ url_for('vendors.view', vid=ch.vendor_id) }}">{{ consignee.name }}</a></b> ({{ consignee.vendor_no }})<br>{{ consignee.address }}, PIN {{ consignee.pin }}<br>GSTIN {{ consignee.gstin or 'Unregistered' }} · State {{ gst.state_label(consignee.state_code) }}</div>
+</div>
+<div class="card"><div class="grid g3"><dl class="kv"><dt>Date</dt><dd>{{ ch.challan_date|dmy }}</dd><dt>Place of supply</dt><dd>{{ gst.state_label(ch.place_of_supply) }}</dd><dt>Supply type</dt><dd>{{ 'Inter-state (IGST)' if ch.interstate else 'Intra-state (CGST+SGST)' }}</dd><dt>Purpose</dt><dd>{{ ch.purpose }}{% if ch.purpose_text %} - {{ ch.purpose_text }}{% endif %}</dd></dl>
+<dl class="kv"><dt>Reference doc</dt><dd>{{ ch.ref_doc_no or '-' }} {{ ('dated ' ~ (ch.ref_doc_date|dmy)) if ch.ref_doc_date }}</dd><dt>Transport</dt><dd>{{ ch.transport_mode or '-' }} {{ ch.vehicle_no or '' }}</dd><dt>Transporter</dt><dd>{{ ch.transporter_name or '-' }} {{ ch.transporter_id or '' }}</dd><dt>Remarks</dt><dd>{{ ch.remarks or '-' }}</dd></dl>
+<dl class="kv"><dt>Reason</dt><dd>{{ ch.reason }}</dd>
+{% if ch.is_returnable %}<dt>Statutory limit</dt><dd>{{ ch.statutory_due()|dmy }} ({{ '3 yrs capital goods' if ch.goods_category=='CAPITAL' else '1 yr inputs' }})</dd>{% endif %}</dl></div></div>
+
+<table><tr><th>#</th><th>Part no.</th><th>Description</th><th>HSN</th><th class="num">Qty</th><th>UoM</th><th class="num">Rate</th><th class="num">Taxable</th><th class="num">GST%</th><th class="num">CGST</th><th class="num">SGST</th><th class="num">IGST</th><th class="num">Cess</th>{% if ch.is_returnable %}<th class="num">Received</th>{% endif %}</tr>
+{% for l in ch.lines %}<tr><td>{{ l.line_no }}</td><td>{{ l.part_no }}</td><td>{{ l.description }}</td><td>{{ l.hsn }}</td><td class="num">{{ '%g'|format(l.qty) }}</td><td>{{ l.uom }}</td><td class="num">{{ l.rate|inr }}</td><td class="num">{{ l.taxable_value|inr }}</td><td class="num">{{ '%g'|format(l.tax_rate) }}</td><td class="num">{{ l.cgst|inr }}</td><td class="num">{{ l.sgst|inr }}</td><td class="num">{{ l.igst|inr }}</td><td class="num">{{ l.cess|inr }}</td>{% if ch.is_returnable %}<td class="num">{{ '%g'|format(l.qty_received) }}</td>{% endif %}</tr>{% endfor %}
+<tr><th colspan="7" class="num">Total</th><th class="num">{{ ch.taxable_total|inr }}</th><th></th><th class="num">{{ ch.cgst_total|inr }}</th><th class="num">{{ ch.sgst_total|inr }}</th><th class="num">{{ ch.igst_total|inr }}</th><th class="num">{{ ch.cess_total|inr }}</th>{% if ch.is_returnable %}<th></th>{% endif %}</tr></table>
+<p><b>Grand total: ₹ {{ ch.grand_total|inr }}</b> <span class="muted">{{ gst.amount_in_words(ch.grand_total) }}</span></p>
+
+{% if ch.status=='FINAL' %}
+<div class="grid g2">
+<div class="card"><h2 style="margin-top:0">E-way bill</h2>
+ {% if ch.ewb_status=='Updated' %}<p><span class="badge Updated">Updated</span> No. <b>{{ ch.ewb_no }}</b> dated {{ ch.ewb_date|dmy }}, valid up to {{ ch.ewb_valid_upto|dmy }}</p>{% else %}
+ <p class="muted">Generate the e-way bill on the government portal using challan number <b>{{ ch.number }}</b>, then record it here.</p>{% endif %}
+ <form method="post" action="{{ url_for('challans.ewb', cid=ch.id) }}" class="grid g2">{{ csrf() }}
+  <div><label class="req">E-way bill number (12 digits)</label><input name="ewb_no" value="{{ ch.ewb_no or '' }}" maxlength="12"></div>
+  <div><label class="req">E-way bill date</label><input type="date" name="ewb_date" value="{{ ch.ewb_date or '' }}"></div>
+  <div><label class="req">Valid up to</label><input type="date" name="ewb_valid_upto" value="{{ ch.ewb_valid_upto or '' }}"></div>
+  <div style="align-self:end"><button>Save e-way bill</button></div></form>
+ {% if ch.ewb_status=='Updated' and current_user.is_admin %}<form method="post" action="{{ url_for('challans.ewb_clear', cid=ch.id) }}" data-confirm="Reset to Pending?">{{ csrf() }}<button class="sec">Clear (Admin)</button></form>{% endif %}
+</div>
+{% if current_user.is_approver %}
+<div class="card"><h2 style="margin-top:0">Cancel challan</h2>
+ <p class="muted">The number stays reserved and the challan is reported as cancelled.{% if ch.ewb_status=='Updated' %} <b>Also cancel e-way bill {{ ch.ewb_no }} on the portal (allowed within 24 hours of generation).</b>{% endif %}</p>
+ <form method="post" action="{{ url_for('challans.cancel', cid=ch.id) }}" data-confirm="Cancel {{ ch.number }}? This cannot be undone.">{{ csrf() }}
+  <label class="req">Cancellation reason</label><input name="reason"><p><button class="danger">Cancel this challan</button></p></form></div>
+{% endif %}
+</div>
+
+{% if ch.is_returnable %}
+<div class="grid g2">
+<div class="card"><h2 style="margin-top:0">Goods received back</h2>
+ {% if ch.receipts %}<table><tr><th>Date</th><th>Part</th><th class="num">Qty</th><th>Our doc ref</th><th>By</th></tr>{% for r in ch.receipts %}<tr><td>{{ r.received_date|dmy }}</td><td>{{ r.line.part_no }}</td><td class="num">{{ '%g'|format(r.qty) }}</td><td>{{ r.doc_ref }}</td><td>{{ r.created_by }}</td></tr>{% endfor %}</table>{% endif %}
+ {% if ch.return_status != 'Closed' %}
+ <form method="post" action="{{ url_for('challans.receipt', cid=ch.id) }}">{{ csrf() }}
+  <div class="grid g2"><div><label class="req">Date received</label><input type="date" name="received_date" value="{{ today.isoformat() }}"></div><div><label class="req">Our receiving document ref.</label><input name="doc_ref"></div></div>
+  <table style="margin-top:8px"><tr><th>Part</th><th class="num">Sent</th><th class="num">Received so far</th><th>Receiving now</th></tr>
+  {% for l in ch.lines %}<tr><td>{{ l.part_no }} - {{ l.description }}</td><td class="num">{{ '%g'|format(l.qty) }}</td><td class="num">{{ '%g'|format(l.qty_received) }}</td><td><input name="qty_{{ l.id }}" style="width:90px" value="0"></td></tr>{% endfor %}</table>
+  <p><button>Record receipt</button></p></form>{% else %}<p><span class="badge Closed">Closed</span> all goods received.</p>{% endif %}
+</div>
+{% if ch.corrective_action %}<div class="card"><h2 style="margin-top:0">Corrective action</h2>
+ <p><b>{{ ch.corrective_action }}</b><br>Owner: {{ ch.corrective_owner }} · Target: {{ ch.corrective_target_date|dmy }} · Status: <span class="badge {{ ch.corrective_state() }}">{{ ch.corrective_state() }}</span>{% if ch.corrective_done_date %} (done {{ ch.corrective_done_date|dmy }}){% endif %}</p>
+ {% if current_user.is_approver %}<form method="post" action="{{ url_for('challans.corrective', cid=ch.id) }}" class="grid g2">{{ csrf() }}
+  <div><label>Status</label><select name="corrective_status"><option {{ 'selected' if ch.corrective_status=='Open' }}>Open</option><option {{ 'selected' if ch.corrective_status=='Done' }}>Done</option></select></div>
+  <div><label>Completion date</label><input type="date" name="corrective_done_date" value="{{ ch.corrective_done_date or today.isoformat() }}"></div>
+  <div><label>Revised target date</label><input type="date" name="corrective_target_date" value="{{ ch.corrective_target_date or '' }}"></div>
+  <div><label>Remarks</label><input name="corrective_remarks" value="{{ ch.corrective_remarks or '' }}"></div>
+  <div><button>Update</button></div></form>{% endif %}</div>{% endif %}
+</div>
+{% endif %}
+{% endif %}
+
+<h2>History</h2>
+<table><tr><th>When</th><th>Who</th><th>Action</th><th>Details</th></tr>{% for h in history %}<tr><td>{{ h.ts|dmyhm }}</td><td>{{ h.username }}</td><td>{{ h.action }}</td><td>{{ h.details }}</td></tr>{% endfor %}</table>
+{% endblock %}

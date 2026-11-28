@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>{{ ch.number }}</title>
+<style>
+@page{size:A4;margin:10mm}
+*{box-sizing:border-box}body{font:11px/1.35 Arial,Helvetica,sans-serif;color:#000;margin:0}
+.page{position:relative;width:190mm;min-height:275mm;margin:0 auto;padding:2mm;page-break-after:always;border:1px solid #000}
+.page:last-child{page-break-after:auto}
+.lh{display:flex;gap:12px;align-items:center;border-bottom:2px solid #000;padding-bottom:6px}
+.lh img{height:52px}.lh .co{flex:1;text-align:center}.lh h1{margin:0;font-size:18px}
+.copy{float:right;border:1px solid #000;padding:2px 8px;font-weight:bold;font-size:10px}
+.title{text-align:center;font-size:15px;font-weight:bold;margin:8px 0 2px;letter-spacing:1px}
+.sub{text-align:center;margin-bottom:6px;font-size:10px}
+table{width:100%;border-collapse:collapse}th,td{border:1px solid #000;padding:3px 5px;vertical-align:top}
+th{background:#eee;font-size:10px}.num{text-align:right}.nb td,.nb th{border:0;padding:1px 4px}
+.box{border:1px solid #000;padding:5px;margin-top:6px}
+.wm{position:absolute;top:38%;left:8%;font-size:100px;color:rgba(200,0,0,.22);transform:rotate(-30deg);font-weight:bold;pointer-events:none;border:8px solid rgba(200,0,0,.22);padding:0 20px}
+.sig{display:flex;justify-content:space-between;margin-top:36px}.sig div{width:45%;text-align:center;border-top:1px solid #000;padding-top:3px}
+.noprint{background:#16324f;color:#fff;padding:8px 14px;font-family:Arial}.noprint button{margin-left:10px}
+@media print{.noprint{display:none}.page{border:1px solid #000}}
+</style></head><body>
+<div class="noprint">Print preview for {{ ch.number }} - use the browser's Print (Ctrl+P) and choose <b>Save as PDF</b> or a printer.
+ <button onclick="window.print()">Print</button>
+ <a style="color:#fff;margin-left:14px" href="?copy=ORIGINAL&mark=0">Original only</a>
+ <a style="color:#fff;margin-left:8px" href="?copy=all&mark=0">All 3 copies</a></div>
+{% for label, key in copies %}
+<div class="page">
+ {% if ch.status == 'CANCELLED' %}<div class="wm">CANCELLED</div>{% endif %}
+ <div class="lh">{% if logo %}<img src="{{ url_for('static', filename='logo.png') }}" alt="">{% endif %}
+  <div class="co"><h1>{{ cs.company }}</h1>{{ cs.address }}, PIN {{ cs.pin }}<br>GSTIN: <b>{{ cs.gstin }}</b> · State: {{ gst.state_label(cs.state_code) }}
+   {% if cs.phone or cs.email %}<br>{{ cs.phone or '' }} {{ cs.email or '' }}{% endif %}</div></div>
+ <div class="copy">{{ label }}</div>
+ <div class="title">DELIVERY CHALLAN{% if ch.status=='CANCELLED' %} - CANCELLED{% endif %}</div>
+ <div class="sub">{{ 'RETURNABLE (not for sale) - goods to be returned' if ch.is_returnable else 'NON-RETURNABLE' }} · [Rule 55, CGST Rules, 2017]</div>
+
+ <table><tr>
+  <td style="width:50%"><table class="nb"><tr><td>Challan No.</td><td><b>{{ ch.number }}</b></td></tr><tr><td>Challan Date</td><td><b>{{ ch.challan_date|dmy }}</b></td></tr>
+   <tr><td>Purpose</td><td>{{ ch.purpose }}{% if ch.purpose_text %} - {{ ch.purpose_text }}{% endif %}</td></tr>
+   <tr><td>Place of Supply</td><td>{{ gst.state_label(ch.place_of_supply) }} ({{ 'Inter-state' if ch.interstate else 'Intra-state' }})</td></tr>
+   {% if ch.ref_doc_no %}<tr><td>Reference Doc.</td><td>{{ ch.ref_doc_no }} dt. {{ ch.ref_doc_date|dmy }}</td></tr>{% endif %}</table></td>
+  <td><table class="nb"><tr><td>Mode of Transport</td><td>{{ ch.transport_mode or '' }}</td></tr><tr><td>Vehicle No.</td><td>{{ ch.vehicle_no or '' }}</td></tr>
+   <tr><td>Transporter</td><td>{{ ch.transporter_name or '' }} {{ ('(' ~ ch.transporter_id ~ ')') if ch.transporter_id }}</td></tr>
+   <tr><td>E-way Bill No.</td><td>{{ (ch.ewb_no ~ ' dt. ' ~ (ch.ewb_date|dmy)) if ch.ewb_no else '' }}</td></tr>
+   {% if ch.is_returnable %}<tr><td>Return due by (Sec. 143)</td><td><b>{{ ch.statutory_due()|dmy }}</b></td></tr>{% endif %}</table></td></tr></table>
+
+ <div class="box"><b>Consignee (Ship to / Bill to):</b><br><b>{{ cee.name }}</b><br>{{ cee.address }}, PIN {{ cee.pin }}<br>
+  GSTIN / UIN: {{ cee.gstin or 'Unregistered' }} · State: {{ gst.state_label(cee.state_code) }}</div>
+
+ <table style="margin-top:6px"><tr><th>Sl</th><th>Part No.</th><th>Description of goods</th><th>HSN</th><th>Qty</th><th>UoM</th><th>Rate</th><th>Taxable value</th>
+  {% if ch.interstate %}<th>IGST %</th><th>IGST</th>{% else %}<th>CGST %</th><th>CGST</th><th>{{ labels[1] }} %</th><th>{{ labels[1] }}</th>{% endif %}{% if ch.cess_total|float %}<th>Cess</th>{% endif %}</tr>
+ {% for l in ch.lines %}<tr><td>{{ l.line_no }}</td><td>{{ l.part_no }}</td><td>{{ l.description }}</td><td>{{ l.hsn }}</td><td class="num">{{ '%g'|format(l.qty) }}</td><td>{{ l.uom }}</td><td class="num">{{ l.rate|inr }}</td><td class="num">{{ l.taxable_value|inr }}</td>
+  {% if ch.interstate %}<td class="num">{{ '%g'|format(l.tax_rate) }}</td><td class="num">{{ l.igst|inr }}</td>{% else %}<td class="num">{{ '%g'|format(l.tax_rate/2) }}</td><td class="num">{{ l.cgst|inr }}</td><td class="num">{{ '%g'|format(l.tax_rate/2) }}</td><td class="num">{{ l.sgst|inr }}</td>{% endif %}{% if ch.cess_total|float %}<td class="num">{{ l.cess|inr }}</td>{% endif %}</tr>{% endfor %}
+ <tr><th colspan="7" class="num">Total</th><th class="num">{{ ch.taxable_total|inr }}</th>
+  {% if ch.interstate %}<th></th><th class="num">{{ ch.igst_total|inr }}</th>{% else %}<th></th><th class="num">{{ ch.cgst_total|inr }}</th><th></th><th class="num">{{ ch.sgst_total|inr }}</th>{% endif %}{% if ch.cess_total|float %}<th class="num">{{ ch.cess_total|inr }}</th>{% endif %}</tr></table>
+ <div class="box"><b>Total value: ₹ {{ ch.grand_total|inr }}</b> &nbsp; ({{ words }})</div>
+ <div class="box">{% if ch.is_returnable %}Goods are sent on returnable basis and not as a sale. {% endif %}Reason: {{ ch.reason }}{% if ch.remarks %}<br>Remarks: {{ ch.remarks }}{% endif %}</div>
+ <div class="sig"><div>Receiver's signature</div><div>For {{ cs.company }}<br><br>{{ cs.signatory or 'Authorised Signatory' }}</div></div>
+</div>
+{% endfor %}
+</body></html>
