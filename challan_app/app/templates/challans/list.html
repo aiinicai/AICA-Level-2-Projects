@@ -1,0 +1,26 @@
+﻿{% extends "base.html" %}{% block title %}Challans{% endblock %}
+{% block content %}
+<h1>Challans
+ <span style="float:right"><a class="btn" href="{{ url_for('challans.new', ctype='MRC') }}">+ Returnable (MRC)</a> <a class="btn" href="{{ url_for('challans.new', ctype='MNRC') }}">+ Non-returnable (MNRC)</a></span></h1>
+<form class="bar" method="get">
+ <div><label>Number / vendor / e-way no.</label><input name="q" value="{{ a.get('q','') }}"></div>
+ <div><label>Part number</label><input name="part" value="{{ a.get('part','') }}"></div>
+ <div><label>Type</label><select name="ctype"><option value="">All</option><option {{ 'selected' if a.get('ctype')=='MRC' }}>MRC</option><option {{ 'selected' if a.get('ctype')=='MNRC' }}>MNRC</option></select></div>
+ <div><label>Status</label><select name="status"><option value="">All</option>{% for s in ('DRAFT','FINAL','CANCELLED') %}<option {{ 'selected' if a.get('status')==s }}>{{ s }}</option>{% endfor %}</select></div>
+ <div><label>E-way bill</label><select name="ewb"><option value="">All</option>{% for s in ('Pending','Updated') %}<option {{ 'selected' if a.get('ewb')==s }}>{{ s }}</option>{% endfor %}</select></div>
+ <div><label>Return status</label><select name="ret"><option value="">All</option>{% for s in ('Open','Partially Received','Closed') %}<option {{ 'selected' if a.get('ret')==s }}>{{ s }}</option>{% endfor %}</select></div>
+ <div><label>From</label><input type="date" name="from" value="{{ a.get('from','') }}"></div>
+ <div><label>To</label><input type="date" name="to" value="{{ a.get('to','') }}"></div>
+ <div><button>Search</button> <a class="btn sec" href="{{ url_for('challans.list_') }}">Clear</a></div>
+</form>
+<table><tr><th>Number</th><th>Date</th><th>Type</th><th>Vendor</th><th>Purpose</th><th class="num">Value</th><th>Status</th><th>E-way bill</th><th>Return</th></tr>
+{% for c in rows %}<tr class="{{ 'cancelled' if c.status=='CANCELLED' }}">
+ <td class="keep"><a href="{{ url_for('challans.view', cid=c.id) }}">{{ c.display_no }}</a></td><td>{{ c.challan_date|dmy }}</td><td>{{ c.ctype }}</td>
+ <td>{{ c.vendor.name }}</td><td>{{ c.purpose }}</td><td class="num">{{ c.grand_total|inr }}</td>
+ <td class="keep"><span class="badge {{ c.status }}">{{ c.status }}</span></td>
+ <td class="keep">{% if c.status=='FINAL' %}<span class="badge {{ c.ewb_status }}">{{ c.ewb_no or c.ewb_status }}</span>{% endif %}</td>
+ <td class="keep">{% if c.return_status %}<span class="badge {{ c.return_status.split()[0] }}">{{ c.return_status }}</span>{% endif %}</td></tr>
+{% else %}<tr><td colspan="9">No challans match.</td></tr>{% endfor %}</table>
+<div class="pager">{{ total }} challan(s) {% if page>1 %}<a href="?{{ qs }}&page={{ page-1 }}">« Prev</a>{% endif %} {% if page*50<total %}<a href="?{{ qs }}&page={{ page+1 }}">Next »</a>{% endif %}</div>
+{% endblock %}
+

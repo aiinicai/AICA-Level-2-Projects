@@ -1,0 +1,11 @@
+﻿{% extends "base.html" %}{% block title %}Upload {{ b.id }}{% endblock %}
+{% block content %}<h1>Upload #{{ b.id }}: {{ b.filename }} <span class="badge {{ 'ok' if b.status=='COMMITTED' else 'warn' }}">{{ b.status }}</span></h1>
+<div class="card"><b>{{ n }}</b> data row(s) read · <b style="color:#a02318">{{ errors|length }}</b> error(s) · {{ warnings|length }} warning(s)
+{% if b.status=='PENDING' %}
+ {% if errors %}<p class="errors">Nothing can be imported until every error is fixed. Correct the Excel file and upload it again.</p>
+ {% else %}<form method="post" action="{{ url_for('uploads.commit', bid=b.id) }}" data-confirm="Import all rows now?"><input type="hidden" name="_csrf" value="{{ csrf_token() }}"><button class="ok">No errors - commit the import</button></form>{% endif %}
+ <form method="post" action="{{ url_for('uploads.discard', bid=b.id) }}" class="inline"><input type="hidden" name="_csrf" value="{{ csrf_token() }}"><button class="sec">Discard</button></form>
+{% endif %} <a class="btn sec" href="{{ url_for('uploads.error_report', bid=b.id) }}">Download validation report (Excel)</a></div>
+{% if errors %}<h2>Errors</h2><table><tr><th>Excel row</th><th>Problem</th></tr>{% for r, m in errors %}<tr><td>{{ r }}</td><td>{{ m }}</td></tr>{% endfor %}</table>{% endif %}
+{% if warnings %}<h2>Warnings (do not block the import)</h2><table><tr><th>Excel row</th><th>Note</th></tr>{% for r, m in warnings %}<tr><td>{{ r }}</td><td>{{ m }}</td></tr>{% endfor %}</table>{% endif %}
+{% endblock %}

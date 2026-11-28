@@ -1,0 +1,16 @@
+{% extends "base.html" %}{% block title %}{{ rep.title }}{% endblock %}
+{% block content %}
+<h1>{{ rep.title }}</h1>
+<form class="bar" method="get">
+{% if 'month' in rep.filters %}<div><label>Month</label><input type="month" name="month" value="{{ month }}"></div>{% endif %}
+{% if 'from' in rep.filters %}<div><label>From</label><input type="date" name="from" value="{{ a.get('from') or today.replace(day=1).isoformat() }}"></div><div><label>To</label><input type="date" name="to" value="{{ a.get('to') or today.isoformat() }}"></div>{% endif %}
+{% if 'ctype' in rep.filters %}<div><label>Type</label><select name="ctype"><option value="">All</option><option {{ 'selected' if a.get('ctype')=='MRC' }}>MRC</option><option {{ 'selected' if a.get('ctype')=='MNRC' }}>MNRC</option></select></div>{% endif %}
+{% if 'plant' in rep.filters %}<div><label>Plant</label><select name="plant"><option value="">All</option>{% for p in plants %}<option value="{{ p.id }}" {{ 'selected' if a.get('plant')|string==p.id|string }}>{{ p.code }}</option>{% endfor %}</select></div>{% endif %}
+{% if 'only' in rep.filters %}<div><label>Show</label><select name="only"><option value="">All open</option><option value="overdue" {{ 'selected' if a.get('only')=='overdue' }}>Statutory limit exceeded only</option></select></div>{% endif %}<div><button>Show</button> <a class="btn sec" href="?{{ request.query_string.decode() }}{{ '&' if request.query_string }}export=xlsx">Export to Excel</a></div></form>
+{% if rep.note %}<p class="muted">{{ rep.note }}</p>{% endif %}
+<p class="muted">{{ count }} row(s)</p>
+<div style="overflow:auto"><table><tr>{% for h in rep.heads %}<th>{{ h }}</th>{% endfor %}</tr>
+{% for row in rep.rows %}{% set k = loop.index0 %}<tr class="{{ rep.cls[k] }}">
+{% for v in row %}<td class="{{ 'num' if v is number }}">{% if v is none %}{% elif v.strftime is defined %}{{ v|dmy }}{% elif v is number %}{{ ('%.2f'|format(v)) if v is float else v }}{% else %}{{ v }}{% endif %}</td>{% endfor %}</tr>
+{% else %}<tr><td colspan="{{ rep.heads|length }}">No data for this selection.</td></tr>{% endfor %}</table></div>
+{% endblock %}

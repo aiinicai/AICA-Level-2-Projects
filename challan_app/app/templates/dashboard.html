@@ -1,0 +1,34 @@
+﻿{% extends "base.html" %}{% block title %}Dashboard{% endblock %}
+{% block content %}
+<h1>Dashboard</h1>
+<form class="bar" method="get">
+ <div><label>From</label><input type="date" name="from" value="{{ d1.isoformat() }}"></div>
+ <div><label>To</label><input type="date" name="to" value="{{ d2.isoformat() }}"></div>
+ <div><label>Type</label><select name="ctype"><option value="">All</option><option {{ 'selected' if a.get('ctype')=='MRC' }}>MRC</option><option {{ 'selected' if a.get('ctype')=='MNRC' }}>MNRC</option></select></div>
+ <div><label>Plant</label><select name="plant"><option value="">All</option>{% for p in plants %}<option value="{{ p.id }}" {{ 'selected' if a.get('plant')|string==p.id|string }}>{{ p.code }}</option>{% endfor %}</select></div>
+ <div><button>Apply</button> <a class="btn sec" href="{{ url_for('dashboard.index') }}">Reset (current FY)</a></div></form>
+
+<div class="grid g4">
+ <div class="card kpi">{{ n_total }}<small>Manual challans issued ({{ n_mrc }} returnable · {{ n_mnrc }} non-returnable)</small></div>
+ <div class="card kpi">{{ n_cancelled }}<small>Cancelled in period</small></div>
+ <div class="card kpi"><a href="{{ url_for('reports.show', name='pending_ewb') }}">{{ pending_ewb }}</a><small>E-way bills pending</small></div>
+ <div class="card kpi"><a href="{{ url_for('reports.show', name='returnables', only='overdue') }}">{{ open_ret }}</a><small>Open returnables (goods not fully received)</small></div>
+</div>
+
+<div class="card"><h2 style="margin-top:0">Challans per month <span class="legend"><i style="background:#e08a1e"></i>Returnable (MRC)<i style="background:#3b82c4"></i>Non-returnable (MNRC)</span></h2>
+ <div class="chart">{% for b in bars %}<div class="col" title="{{ b.label }}: {{ b.mrc }} MRC, {{ b.mnrc }} MNRC"><span class="muted">{{ b.total or '' }}</span>
+  <div class="stack" style="height:{{ (b.h_mrc + b.h_mnrc) * 0.85 }}%"><div class="s1" style="flex:{{ b.mrc }}"></div><div class="s2" style="flex:{{ b.mnrc }}"></div></div><small>{{ b.label }}</small></div>{% endfor %}</div></div>
+
+<div class="card"><h2 style="margin-top:0">By reason / purpose</h2>
+ {% for p, n in purpose %}<div class="hbar"><span>{{ p }}</span><div class="b" style="width:{{ n / pmax * 55 }}%"></div> {{ n }}</div>{% else %}<p class="muted">No data.</p>{% endfor %}</div>
+
+<div class="grid g2">
+<div class="card"><h2 style="margin-top:0">Vendors with the most manual challans</h2>
+ <table><tr><th>Vendor</th><th class="num">Total</th><th class="num">Returnable</th><th>ERP</th></tr>
+ {% for v, n, m in top_vendors %}<tr><td><a href="{{ url_for('vendors.view', vid=v.id) }}">{{ v.name }}</a></td><td class="num">{{ n }}</td><td class="num">{{ m }}</td><td>{{ v.erp_code or 'Not in ERP' }}</td></tr>{% else %}<tr><td colspan="4">No data.</td></tr>{% endfor %}</table></div>
+<div class="card"><h2 style="margin-top:0">Vendors still not set up in ERP ({{ n_not_in_erp }})</h2>
+ <table><tr><th>Vendor</th><th class="num">Returnable challans</th></tr>
+ {% for v, n in not_in_erp %}<tr><td><a href="{{ url_for('vendors.view', vid=v.id) }}">{{ v.name }}</a></td><td class="num">{{ n }}</td></tr>{% else %}<tr><td colspan="2">All vendors are in ERP.</td></tr>{% endfor %}</table>
+ <p><a href="{{ url_for('vendors.list_', erp='no') }}">All vendors not in ERP →</a></p></div>
+</div>
+{% endblock %}

@@ -1,0 +1,23 @@
+﻿{% extends "base.html" %}{% block title %}Vendor{% endblock %}
+{% block content %}
+<h1>{{ 'Edit ' + v.vendor_no if v else 'New vendor' }}</h1>
+{% if errors %}<ul class="errors">{% for e in errors %}<li>{{ e }}</li>{% endfor %}</ul>{% endif %}
+{% if warnings %}<div class="errors warn">{% for e in warnings %}{{ e }}<br>{% endfor %}</div>{% endif %}
+{% if similar %}<div class="card"><b>Existing similar vendors:</b><ul>{% for s in similar %}<li><a href="{{ url_for('vendors.view', vid=s.id) }}" target="_blank">{{ s.vendor_no }} - {{ s.name }}</a> ({{ s.gstin or 'no GSTIN' }})</li>{% endfor %}</ul>
+<label><input type="checkbox" name="confirm_similar" form="vf" style="width:auto"> I confirm this is a different vendor</label></div>{% endif %}
+<form method="post" id="vf" class="card"><input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+<div class="grid g2">
+ <div><label class="req">Vendor name</label><input name="name" value="{{ data.get('name','') }}" required></div>
+ <div><label>GSTIN (15 characters; leave blank if unregistered)</label><input name="gstin" value="{{ data.get('gstin') or '' }}" maxlength="15" style="text-transform:uppercase"></div>
+ <div style="grid-column:1/-1"><label class="req">Full address</label><textarea name="address" required>{{ data.get('address','') }}</textarea></div>
+ <div><label class="req">State</label><select name="state_code"><option value="">-- select --</option>
+  {% for c,n in gst.STATES.items() %}<option value="{{ c }}" {{ 'selected' if data.get('state_code')==c }}>{{ c }} - {{ n }}</option>{% endfor %}</select></div>
+ <div><label class="req">PIN code</label><input name="pin" value="{{ data.get('pin','') }}" maxlength="6"></div>
+ <div><label>Contact person</label><input name="contact_person" value="{{ data.get('contact_person') or '' }}"></div>
+ <div><label>Phone</label><input name="phone" value="{{ data.get('phone') or '' }}"></div>
+ <div><label>Email</label><input name="email" value="{{ data.get('email') or '' }}"></div>
+</div>
+<p class="muted">PAN is derived automatically from the GSTIN. The ERP vendor code is added later from the vendor page.</p>
+<button>Save vendor</button> <a class="btn sec" href="{{ url_for('vendors.view', vid=v.id) if v else url_for('vendors.list_') }}">Cancel</a>
+</form>
+{% endblock %}

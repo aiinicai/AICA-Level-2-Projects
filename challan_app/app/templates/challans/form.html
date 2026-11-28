@@ -1,0 +1,103 @@
+{% extends "base.html" %}{% block title %}{{ cfg.title }}{% endblock %}
+{% macro f(name, label, req=False, type='text', ph='') %}
+<div><label class="{{ 'req' if req }}">{{ label }}</label><input type="{{ type }}" name="{{ name }}" value="{{ data.get(name,'') or '' }}" placeholder="{{ ph }}"></div>
+{% endmacro %}
+{% block content %}
+<h1>{{ ('Edit ' + ch.display_no) if ch else ('New ' + cfg.title) }}</h1>
+{% if ch and ch.status == 'FINAL' %}<div class="errors warn">This challan is already issued. You are editing it as Admin - every change is recorded in the audit trail.</div>{% endif %}
+{% if lines_locked %}<div class="errors warn">Goods have been received against this challan, so the line items are locked (header details can still be edited).</div>{% endif %}
+{% if errors %}<ul class="errors">{% for e in errors %}<li>{{ e }}</li>{% endfor %}</ul>{% endif %}
+<form method="post" id="challan-form" data-locked="{{ 1 if lines_locked else 0 }}" data-ctype="{{ ctype }}" data-admin="{{ 1 if current_user.is_admin else 0 }}">
+<input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+<div class="card"><h2 style="margin-top:0">Header</h2>
+<div class="grid g4">
+ <div><label class="req">Issuing plant (consignor)</label><select name="plant_id" id="plant_id">
+   {% for p in plants %}<option value="{{ p.id }}" data-state="{{ p.state_code }}" {{ 'selected' if data.get('plant_id')|string==p.id|string }}>{{ p.code }} - {{ p.company_name }} ({{ p.gstin }})</option>{% endfor %}</select></div>
+ <div><label class="req">Challan date</label><input type="date" name="challan_date" value="{{ data.get('challan_date','') }}" max="{{ today.isoformat() }}"></div>
+ <div class="pos" style="grid-column:span 2"><label class="req">Vendor / consignee</label>
+   <input id="vendor_q" autocomplete="off" placeholder="Type to search the vendor master…" value="{{ (vendor.name ~ ' (' ~ vendor.vendor_no ~ ')') if vendor else '' }}"
+     {% if vendor %}data-init='{{ {"id":vendor.id,"vendor_no":vendor.vendor_no,"name":vendor.name,"gstin":vendor.gstin or "","state_code":vendor.state_code,"state":gst.STATES.get(vendor.state_code,""),"erp_code":vendor.erp_code or ""}|tojson|forceescape }}'{% endif %}>
+   <input type="hidden" name="vendor_id" id="vendor_id" value="{{ vendor.id if vendor else '' }}">
+   <div class="sugg" id="vendor_sugg" hidden></div></div>
+ <div id="vendor_info" class="muted" style="grid-column:1/-1"></div>
+ <div><label class="req">Place of supply (state)</label><select name="place_of_supply" id="place_of_supply" data-auto="{{ 0 if data.get('place_of_supply') else 1 }}">
+   <option value="">-- from vendor --</option>{% for c,n in gst.STATES.items() %}<option value="{{ c }}" {{ 'selected' if data.get('place_of_supply')==c }}>{{ c }} - {{ n }}</option>{% endfor %}</select></div>
+ <div style="grid-column:span 3"><label>Supply type</label><div id="supply_type" class="badge warn" style="margin-top:4px"></div></div>
+ <div><label class="req">Purpose</label><select name="purpose"><option value="">-- select --</option>{% for p in purposes %}<option {{ 'selected' if data.get('purpose')==p }}>{{ p }}</option>{% endfor %}</select></div>
+ {{ f('purpose_text','Purpose details (mandatory if Other)') }}
+ {{ f('ref_doc_no','Reference document no. (e.g. customer challan)') }}
+ {{ f('ref_doc_date','Reference document date', type='date') }}
+ <div style="grid-column:1/-1"><label class="req">{{ 'Reason a manual challan is needed instead of an ERP challan' if ctype=='MRC' else 'Reason / business justification' }}</label><textarea name="reason">{{ data.get('reason','') }}</textarea></div>
+</div></div>
+
+{% if ctype == 'MRC' %}
+<div class="card"><h2 style="margin-top:0">Returnable challan - corrective action &amp; return</h2>
+<div class="grid g3">
+ <div style="grid-column:span 3"><label>Corrective action planned (e.g. "Create vendor in ERP")</label><textarea name="corrective_action">{{ data.get('corrective_action','') }}</textarea></div>
+ {{ f('corrective_owner','Corrective action owner', False) }}
+ {{ f('corrective_target_date','Target date for corrective action', False, 'date') }}
+ {{ f('expected_return_date','Expected return date', False, 'date') }}
+ <div><label class="req">Goods category (job-work time limit)</label><select name="goods_category"><option value="">-- select --</option>
+   <option value="INPUTS" {{ 'selected' if data.get('goods_category')=='INPUTS' }}>Inputs / other goods - 1 year</option>
+   <option value="CAPITAL" {{ 'selected' if data.get('goods_category')=='CAPITAL' }}>Capital goods - 3 years</option></select></div>
+</div></div>
+{% endif %}
+
+<div class="card"><h2 style="margin-top:0">Transport</h2>
+<div class="grid g4">
+ <div><label>Mode</label><select name="transport_mode"><option value=""></option>{% for m in modes %}<option {{ 'selected' if data.get('transport_mode')==m }}>{{ m }}</option>{% endfor %}</select></div>
+ {{ f('vehicle_no','Vehicle number', ph='MH12AB1234') }}
+ {{ f('transporter_name','Transporter name') }}
+ {{ f('transporter_id','Transporter ID (GSTIN)') }}
+</div></div>
+
+<div class="card"><h2 style="margin-top:0">Line items</h2>
+<table id="lines"><thead><tr><th>#</th><th>Part no.*</th><th>Description*</th><th>HSN*</th><th>Qty*</th><th>UoM*</th><th>Rate*</th><th>Taxable</th><th>GST %</th><th>Cess %</th><th></th></tr></thead><tbody></tbody></table>
+<p>{% if not lines_locked %}<button type="button" class="sec" id="add-line">+ Add line</button>{% endif %} <span id="tot" class="muted"></span></p>
+<p class="muted">Tax amounts are calculated by the system when you save. Returnable (non-supply) movements normally carry 0% tax - enter the GST rate of the goods anyway if the e-way bill needs it.</p>
+<datalist id="gstrates"><option>0</option><option>0.25</option><option>3</option><option>5</option><option>12</option><option>18</option><option>28</option><option>40</option></datalist>
+<datalist id="uomlist">{% for u in uoms %}<option>{{ u }}</option>{% endfor %}</datalist>
+</div>
+<div class="card"><label>Remarks (printed on challan)</label><input name="remarks" value="{{ data.get('remarks','') or '' }}"></div>
+
+<p>
+ {% if not ch or ch.status == 'DRAFT' %}
+ <button name="action" value="final" class="ok">Save &amp; issue (assign number)</button>
+ <button name="action" value="draft" class="sec">Save as draft</button>
+ {% else %}<button name="action" value="save">Save changes</button>{% endif %}
+ <a class="btn sec" href="{{ url_for('challans.view', cid=ch.id) if ch else url_for('challans.list_') }}">Cancel</a>
+ <span class="muted">The number is assigned only when you issue.</span>
+</p>
+</form>
+
+<template id="line-tpl"><tr>
+ <td class="sl"></td>
+ <td><input data-f="part_no" name="part_no" style="width:110px"></td>
+ <td><input data-f="description" name="description" style="min-width:200px"></td>
+ <td><input data-f="hsn" name="hsn" style="width:80px" maxlength="8"></td>
+ <td><input data-f="qty" name="qty" style="width:80px" inputmode="decimal"></td>
+ <td><input data-f="uom" name="uom" style="width:65px" list="uomlist" value="NOS"></td>
+ <td><input data-f="rate" name="rate" style="width:90px" inputmode="decimal" value="0"></td>
+ <td class="num tv">0.00</td>
+ <td><input data-f="tax_rate" name="tax_rate" style="width:60px" list="gstrates" value="0"></td>
+ <td><input data-f="cess_rate" name="cess_rate" style="width:55px" value="0"></td>
+ <td>{% if not lines_locked %}<button type="button" class="danger rm" title="Remove line">×</button>{% endif %}</td>
+</tr></template>
+<script type="application/json" id="init-lines">{{ lines|tojson }}</script>
+
+<div class="modal-bg" id="vendor-modal"><div class="modal">
+ <h2 style="margin-top:0">Add new vendor to the master</h2>
+ <div id="qa_msg"></div>
+ <div class="grid g2">
+  <div><label class="req">Vendor name</label><input id="qa_name"></div>
+  <div><label>GSTIN (blank if unregistered)</label><input id="qa_gstin" maxlength="15" style="text-transform:uppercase"></div>
+  <div style="grid-column:1/-1"><label class="req">Full address</label><textarea id="qa_address"></textarea></div>
+  <div><label class="req">State</label><select id="qa_state"><option value="">-- select --</option>{% for c,n in gst.STATES.items() %}<option value="{{ c }}">{{ c }} - {{ n }}</option>{% endfor %}</select></div>
+  <div><label class="req">PIN</label><input id="qa_pin" maxlength="6"></div>
+  <div><label>Contact person</label><input id="qa_contact_person"></div><div><label>Phone</label><input id="qa_phone"></div><div><label>Email</label><input id="qa_email"></div>
+ </div>
+ <div id="qa_confirm_row" style="display:none;margin-top:8px"><label><input type="checkbox" id="qa_confirm" style="width:auto"> I confirm this is a different vendor from the similar ones listed</label></div>
+ <p><button type="button" id="qa_save">Save vendor &amp; use it</button> <button type="button" class="sec" id="qa_cancel">Cancel</button></p>
+</div></div>
+{% endblock %}
+

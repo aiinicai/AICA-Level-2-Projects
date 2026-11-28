@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{% block title %}Manual Challans{% endblock %} - Manual Challan Register</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+<meta name="csrf" content="{{ csrf_token() }}">
+</head>
+<body>
+{% if current_user %}
+<header class="top">
+  <a class="brand" href="{{ url_for('dashboard.index') }}">Manual Challan Register</a>
+  <nav>
+    <a href="{{ url_for('dashboard.index') }}">Dashboard</a>
+    <a href="{{ url_for('challans.list_') }}">Challans</a>
+    <span class="dd"><a href="#">+ New</a>
+      <span class="menu">
+        <a href="{{ url_for('challans.new', ctype='MRC') }}">Returnable (MRC)</a>
+        <a href="{{ url_for('challans.new', ctype='MNRC') }}">Non-returnable (MNRC)</a>
+        <a href="{{ url_for('vendors.new') }}">Vendor</a>
+      </span></span>
+    <a href="{{ url_for('vendors.list_') }}">Vendors</a>
+    <a href="{{ url_for('reports.index') }}">Reports</a>
+    <a href="{{ url_for('uploads.index') }}">Excel upload</a>
+    {% if current_user.is_admin %}<a href="{{ url_for('admin.users') }}">Admin</a>{% endif %}
+  </nav>
+  <div class="who">
+    {% if pending_ewb_count %}<a class="badge warn" title="Challans waiting for an e-way bill number"
+       href="{{ url_for('reports.show', name='pending_ewb') }}">E-way pending: {{ pending_ewb_count }}</a>{% endif %}
+    <a href="{{ url_for('auth.change_password') }}">{{ current_user.full_name }} ({{ current_user.role }})</a>
+    <form method="post" action="{{ url_for('auth.logout') }}" class="inline"><input type="hidden" name="_csrf" value="{{ csrf_token() }}"><button class="link">Logout</button></form>
+  </div>
+</header>
+{% endif %}
+<main>
+{% with msgs = get_flashed_messages(with_categories=true) %}
+  {% for cat, m in msgs %}<div class="flash {{ cat }}">{{ m }}</div>{% endfor %}
+{% endwith %}
+{% block content %}{% endblock %}
+</main>
+<script src="{{ url_for('static', filename='app.js') }}"></script>
+{% block scripts %}{% endblock %}
+</body>
+</html>

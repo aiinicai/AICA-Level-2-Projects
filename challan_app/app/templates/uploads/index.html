@@ -1,0 +1,11 @@
+﻿{% extends "base.html" %}{% block title %}Excel upload{% endblock %}
+{% block content %}<h1>Excel upload (data migration)</h1>
+<p class="muted">Every file is validated first. You see a full error report and nothing is saved until you confirm - and a file with errors cannot be committed.</p>
+<div class="grid g2">
+<div class="card"><h2 style="margin-top:0">1. Vendor master</h2><p><a class="btn sec" href="{{ url_for('uploads.template', kind='vendors') }}">Download template</a></p>
+{% if current_user.is_approver %}<form method="post" action="{{ url_for('uploads.upload', kind='vendors') }}" enctype="multipart/form-data"><input type="hidden" name="_csrf" value="{{ csrf_token() }}"><input type="file" name="file" accept=".xlsx"><p><button>Validate file</button></p></form>{% else %}<p class="muted">Approver or Admin rights are needed to upload.</p>{% endif %}</div>
+<div class="card"><h2 style="margin-top:0">2. Historical challans (header + lines)</h2><p><a class="btn sec" href="{{ url_for('uploads.template', kind='challans') }}">Download template</a></p>
+{% if current_user.is_admin %}<form method="post" action="{{ url_for('uploads.upload', kind='challans') }}" enctype="multipart/form-data"><input type="hidden" name="_csrf" value="{{ csrf_token() }}"><input type="file" name="file" accept=".xlsx"><p><button>Validate file</button></p></form>{% else %}<p class="muted">Only Admin can import historical challans.</p>{% endif %}</div></div>
+<h2>Recent uploads</h2><table><tr><th>#</th><th>Kind</th><th>File</th><th>By</th><th>When</th><th>Status</th></tr>
+{% for b in batches %}<tr><td><a href="{{ url_for('uploads.batch', bid=b.id) }}">{{ b.id }}</a></td><td>{{ b.kind }}</td><td>{{ b.filename }}</td><td>{{ b.created_by }}</td><td>{{ b.created_at|dmyhm }}</td><td>{{ b.status }}</td></tr>{% else %}<tr><td colspan="6">None yet.</td></tr>{% endfor %}</table>
+{% endblock %}

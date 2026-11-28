@@ -1,0 +1,20 @@
+﻿{% extends "base.html" %}{% block title %}{{ v.vendor_no }}{% endblock %}
+{% block content %}
+<h1>{{ v.vendor_no }} - {{ v.name }} {% if not v.active %}<span class="badge bad">Inactive</span>{% endif %}
+ {% if current_user.is_approver %}<a class="btn sec" style="float:right" href="{{ url_for('vendors.edit', vid=v.id) }}">Edit</a>{% endif %}</h1>
+<div class="grid g2">
+<div class="card"><dl class="kv"><dt>Address</dt><dd>{{ v.address }}</dd><dt>State</dt><dd>{{ gst.state_label(v.state_code) }}</dd><dt>PIN</dt><dd>{{ v.pin }}</dd>
+<dt>GSTIN</dt><dd>{{ v.gstin or 'Unregistered' }}</dd><dt>PAN</dt><dd>{{ v.pan or '-' }}</dd><dt>Contact</dt><dd>{{ v.contact_person or '-' }}</dd><dt>Phone / Email</dt><dd>{{ v.phone or '-' }} / {{ v.email or '-' }}</dd></dl></div>
+<div class="card"><h2 style="margin-top:0">ERP vendor code</h2>
+{% if v.erp_code %}<p><span class="badge ok">{{ v.erp_code }}</span> <span class="muted">set {{ v.erp_code_updated_at|dmyhm }} by {{ v.erp_code_updated_by }}</span></p>
+<p class="muted">New returnable manual challans to this vendor are blocked{% if current_user.is_admin %} (Admin may still create them){% endif %}. Non-returnable challans are still allowed.</p>
+{% else %}<p><span class="badge warn">Not yet in ERP</span></p>{% endif %}
+<form method="post" action="{{ url_for('vendors.erp', vid=v.id) }}" class="bar"><input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+<div><label>Enter ERP vendor number</label><input name="erp_code" value="{{ v.erp_code or '' }}"></div><div><button>Save</button></div></form>
+{% if current_user.is_admin %}<form method="post" action="{{ url_for('vendors.toggle', vid=v.id) }}" class="inline"><input type="hidden" name="_csrf" value="{{ csrf_token() }}"><button class="sec">{{ 'Deactivate' if v.active else 'Activate' }} vendor</button></form>{% endif %}</div>
+</div>
+<h2>Challans to this vendor</h2>
+<table><tr><th>Number</th><th>Date</th><th>Type</th><th>Purpose</th><th>Status</th><th>E-way</th><th>Return</th></tr>
+{% for c in challans %}<tr class="{{ 'cancelled' if c.status=='CANCELLED' }}"><td class="keep"><a href="{{ url_for('challans.view', cid=c.id) }}">{{ c.display_no }}</a></td><td>{{ c.challan_date|dmy }}</td><td>{{ c.ctype }}</td><td>{{ c.purpose }}</td>
+<td class="keep"><span class="badge {{ c.status }}">{{ c.status }}</span></td><td>{{ c.ewb_status if c.status=='FINAL' else '' }}</td><td>{{ c.return_status or '' }}</td></tr>{% else %}<tr><td colspan="7">None yet.</td></tr>{% endfor %}</table>
+{% endblock %}
