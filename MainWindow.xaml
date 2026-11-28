@@ -1,0 +1,536 @@
+<Window x:Class="AutoBankStatementEntry.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:m="clr-namespace:AutoBankStatementEntry.Models"
+        Title="Auto Bank Statement Entry"
+        Icon="Assets/app.ico"
+        Height="680" Width="1120" MinHeight="560" MinWidth="860"
+        WindowStartupLocation="CenterScreen"
+        Background="{DynamicResource AppBg}"
+        Foreground="{DynamicResource InkBrush}"
+        PreviewKeyDown="Window_PreviewKeyDown"
+        AllowDrop="True" PreviewDragOver="Window_PreviewDragOver" PreviewDrop="Window_PreviewDrop">
+
+    <Window.Resources>
+        <!-- Amounts in Indian grouping: 12,34,567.89 -->
+        <m:IndianAmountConverter x:Key="InrAmount"/>
+        <m:GroupSummaryConverter x:Key="GroupSummary"/>
+        <m:GroupOpenConverter x:Key="GroupOpen"/>
+        <!-- Step bar pill: muted by default; Tag="Now" = current step, Tag="Done" = finished -->
+        <Style x:Key="StepPill" TargetType="Border">
+            <Setter Property="CornerRadius" Value="10"/>
+            <Setter Property="Padding" Value="8,1"/>
+            <Setter Property="Margin" Value="0,0,3,0"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="BorderBrush" Value="#64748B"/>
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="TextElement.Foreground" Value="#CBD5E1"/>
+            <Style.Triggers>
+                <Trigger Property="Tag" Value="Now">
+                    <Setter Property="Background" Value="#1D4ED8"/>
+                    <Setter Property="BorderBrush" Value="#1D4ED8"/>
+                    <Setter Property="TextElement.Foreground" Value="White"/>
+                </Trigger>
+                <Trigger Property="Tag" Value="Now">
+                    <Setter Property="BorderBrush" Value="White"/>
+                </Trigger>
+                <Trigger Property="Tag" Value="Done">
+                    <Setter Property="BorderBrush" Value="#34D399"/>
+                    <Setter Property="TextElement.Foreground" Value="#34D399"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+        <Style x:Key="StepArrow" TargetType="TextBlock">
+            <Setter Property="Text" Value="›"/>
+            <Setter Property="Margin" Value="0,0,3,0"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="Foreground" Value="#94A3B8"/>
+        </Style>
+        <!-- Row state colours (same in light and dark theme) -->
+        <SolidColorBrush x:Key="StateReady" Color="#10B981"/>
+        <SolidColorBrush x:Key="StateCheck" Color="#F59E0B"/>
+        <SolidColorBrush x:Key="StateSkipped" Color="#94A3B8"/>
+        <SolidColorBrush x:Key="StateProblem" Color="#EF4444"/>
+    </Window.Resources>
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- Minimal Header Bar -->
+        <Border Grid.Row="0" Background="{DynamicResource HeaderBg}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,0,0,1" Padding="16,8">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" MinWidth="120"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <TextBlock Grid.Column="0" Text="Auto Bank Statement Entry" FontSize="18" FontWeight="Bold" Foreground="White" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
+                <!-- 4 steps; the current one is highlighted -->
+                <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center" Margin="12,0,12,0" TextElement.FontSize="11.5">
+                    <Border x:Name="Step1" Style="{StaticResource StepPill}"><TextBlock Text="1 Choose file"/></Border>
+                    <TextBlock Style="{StaticResource StepArrow}"/>
+                    <Border x:Name="Step2" Style="{StaticResource StepPill}"><TextBlock Text="2 Analyze"/></Border>
+                    <TextBlock Style="{StaticResource StepArrow}"/>
+                    <Border x:Name="Step3" Style="{StaticResource StepPill}"><TextBlock x:Name="TxtStep3" Text="3 Check ⚠"/></Border>
+                    <TextBlock Style="{StaticResource StepArrow}"/>
+                    <Border x:Name="Step4" Style="{StaticResource StepPill}"><TextBlock Text="4 Post"/></Border>
+                </StackPanel>
+                <WrapPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center" HorizontalAlignment="Right">
+                    <Button x:Name="BtnToggleSetup" Content="▲ Hide setup" Click="BtnToggleSetup_Click" Padding="10,5" Margin="0,0,8,0" Background="#1F2937" Foreground="White" BorderThickness="0"
+                            ToolTip="Hide the Tally and Statement panels to see more rows. Click again to show them."/>
+                    <Button x:Name="BtnTheme" Content="🌙 Dark" Click="BtnTheme_Click" Padding="10,5" Margin="0,0,8,0" Background="#1F2937" Foreground="White" BorderThickness="0"/>
+                    <Button x:Name="BtnDeleteBackups" Content="Delete Backups (0)" Click="BtnDeleteBackups_Click" Padding="10,5" Margin="0,0,8,0" Background="#B45309" Foreground="White" BorderThickness="0"/>
+                    <Button x:Name="BtnClearXml" Content="Clear XML (0)" Click="BtnClearXml_Click" Padding="10,5" Background="#B91C1C" Foreground="White" BorderThickness="0"/>
+                </WrapPanel>
+            </Grid>
+        </Border>
+
+        <!-- Simplified 2-Card Top Bar (can be hidden with "▲ Hide setup" to see more rows) -->
+        <Grid x:Name="SetupPanel" Grid.Row="1" Margin="12,8,12,4">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="1*" MinWidth="360"/>
+                <ColumnDefinition Width="10"/>
+                <ColumnDefinition Width="1.25*" MinWidth="420"/>
+            </Grid.ColumnDefinitions>
+
+            <!-- 1. Tally Connection & Backup -->
+            <Border Grid.Column="0" Background="{DynamicResource CardBg}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="8" Padding="12">
+                <StackPanel>
+                    <Grid Margin="0,0,0,8">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Column="0" Text="1. Tally" FontWeight="Bold" FontSize="13" Margin="0,0,10,0"/>
+                        <TextBlock x:Name="TxtTallyStatus" Grid.Column="1" Text="Detecting..." FontWeight="SemiBold" Foreground="#D97706" FontSize="12" HorizontalAlignment="Right" TextTrimming="CharacterEllipsis"/>
+                    </Grid>
+                    <Grid Margin="0,0,0,6">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <ComboBox x:Name="CmbTallyTargets" Grid.Column="0" Height="28" SelectionChanged="CmbTallyTargets_SelectionChanged" Margin="0,0,6,0"/>
+                        <Button Content="Detect Tally" Grid.Column="1" Click="BtnDetectTally_Click" Style="{StaticResource SecBtn}" Height="28" Margin="0,0,6,0"/>
+                        <Button Content="Connect" Grid.Column="2" Click="BtnConnect_Click" Padding="12,0" Height="28" Background="#1D4ED8" Foreground="White" BorderThickness="0" FontWeight="SemiBold"/>
+                    </Grid>
+                    <Grid Margin="0,0,0,6">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <CheckBox x:Name="ChkBackupBeforePost" Grid.Column="0" Content="Backup Tally" IsChecked="False" Foreground="{DynamicResource InkBrush}" VerticalAlignment="Center" Margin="0,0,8,0" FontSize="12"/>
+                        <TextBox x:Name="TxtBackupFolder" Grid.Column="1" Height="26" FontSize="11.5" ToolTip="Backup destination folder" Margin="0,0,6,0"/>
+                        <Button Grid.Column="2" Content="Browse" Click="BtnBrowseBackup_Click" Style="{StaticResource SecBtn}" Height="26" FontSize="11.5"/>
+                    </Grid>
+                    <!-- Hidden/compact custom host URL only if needed -->
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Column="0" Text="Tally URL:" FontSize="11" Foreground="{DynamicResource MutedBrush}" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                        <TextBox x:Name="TxtTallyHost" Grid.Column="1" Text="http://localhost:9000" Height="24" FontSize="11.5"/>
+                    </Grid>
+                </StackPanel>
+            </Border>
+
+            <!-- 2. Statement Upload & Analyze -->
+            <Border Grid.Column="2" Background="{DynamicResource CardBg}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="8" Padding="12">
+                <StackPanel>
+                    <Grid Margin="0,0,0,8">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Column="0" Text="2. Bank Statement (PDF / Excel / CSV)" FontWeight="Bold" FontSize="13" Margin="0,0,10,0"/>
+                        <TextBlock x:Name="TxtSelectedFiles" Grid.Column="1" Text="No file selected — or drag files onto this window" FontSize="11.5" Foreground="{DynamicResource MutedBrush}" HorizontalAlignment="Right" TextTrimming="CharacterEllipsis"/>
+                    </Grid>
+                    <Grid Margin="0,0,0,8">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="1.2*"/>
+                            <ColumnDefinition Width="8"/>
+                            <ColumnDefinition Width="0.85*"/>
+                            <ColumnDefinition Width="8"/>
+                            <ColumnDefinition Width="0.75*"/>
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Grid.Column="0">
+                            <TextBlock Text="Bank Ledger" FontSize="11" Foreground="{DynamicResource MutedBrush}" Margin="0,0,0,2"/>
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="4"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <ComboBox x:Name="CmbBankLedger" Grid.Column="0" IsEditable="True" Height="28"/>
+                                <Button Grid.Column="2" Content="+ New" Click="BtnNewBankLedger_Click" Style="{StaticResource SecBtn}" Height="28" Padding="8,0" FontSize="11.5" ToolTip="Create a new Bank Account ledger in Tally"/>
+                            </Grid>
+                        </StackPanel>
+                        <StackPanel Grid.Column="2">
+                            <TextBlock Text="Cash Ledger" FontSize="11" Foreground="{DynamicResource MutedBrush}" Margin="0,0,0,2"/>
+                            <ComboBox x:Name="CmbCashLedger" IsEditable="True" Height="28" Text="Cash"/>
+                        </StackPanel>
+                        <StackPanel Grid.Column="4">
+                            <TextBlock Text="File Password (PDF / Excel)" FontSize="11" Foreground="{DynamicResource MutedBrush}" Margin="0,0,0,2"/>
+                            <PasswordBox x:Name="PwdPdf" Height="28"/>
+                        </StackPanel>
+                    </Grid>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock x:Name="TxtOwnBanksInfo" Grid.Column="0" FontSize="11" Foreground="{DynamicResource MutedBrush}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}" Margin="0,0,8,0"/>
+                        <Button Grid.Column="1" Content="🏦 Bank Details" Click="BtnBankDetails_Click" Style="{StaticResource SecBtn}" Height="28" Margin="0,0,6,0" ToolTip="View Tally bank A/c &amp; IFSC or manually add missing ones for Contra detection"/>
+                        <Button Grid.Column="2" Content="📂 Select File(s)" Click="BtnSelectFiles_Click" Height="28" Padding="11,0" Margin="0,0,6,0" Background="#1D4ED8" Foreground="White" FontWeight="SemiBold" BorderThickness="0"/>
+                        <Button Grid.Column="3" x:Name="BtnAnalyze" Content="⚡ Analyze" Click="BtnAnalyze_Click" Height="28" Padding="13,0" Background="#059669" Foreground="White" FontWeight="Bold" BorderThickness="0"/>
+                    </Grid>
+                </StackPanel>
+            </Border>
+        </Grid>
+
+        <!-- Balance Check Banner + Compact Action Toolbar -->
+        <StackPanel Grid.Row="2" Margin="12,2,12,4">
+            <Border x:Name="BalanceBanner" Visibility="Collapsed" BorderThickness="1" CornerRadius="6" Padding="10,6" Margin="0,0,0,6">
+                <TextBlock x:Name="TxtBalanceBanner" FontSize="12.5" FontWeight="SemiBold" TextWrapping="Wrap"/>
+            </Border>
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <WrapPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
+                    <TextBox x:Name="TxtSearch" Width="190" Height="28" Margin="0,0,8,4" ToolTip="Search narration, ledger, or ref no." TextChanged="TxtSearch_TextChanged"/>
+                    <CheckBox x:Name="ChkGroup" Content="Group similar" VerticalAlignment="Center" Margin="0,0,12,4" Foreground="{DynamicResource InkBrush}"
+                              Checked="ChkGroup_Changed" Unchecked="ChkGroup_Changed"
+                              ToolTip="Show rows with the same party, direction and ledger as one line — set the ledger once for all of them. Giving a row another ledger takes it out of its group."/>
+                    <CheckBox x:Name="ChkTidy" Content="Short narration" VerticalAlignment="Center" Margin="0,0,12,4" Foreground="{DynamicResource InkBrush}"
+                              Checked="ChkTidy_Changed" Unchecked="ChkTidy_Changed"
+                              ToolTip="ON: shows 'Party • Mode • Ref' above the bank's text and posts it to Tally as the first narration line, with the bank's original text below it. OFF: only the bank's original text is shown and posted."/>
+                    <ComboBox x:Name="CmbFilter" Width="165" Height="28" SelectionChanged="CmbFilter_SelectionChanged" Margin="0,0,10,4">
+                        <ComboBoxItem Content="All Rows" IsSelected="True"/>
+                        <ComboBoxItem Content="Selected to Post"/>
+                        <ComboBoxItem Content="Contra Entries"/>
+                        <ComboBoxItem Content="Overlaps / Duplicates"/>
+                        <ComboBoxItem Content="Needs Ledger Check"/>
+                        <ComboBoxItem Content="Balance Breaks"/>
+                        <ComboBoxItem Content="Parser Warnings"/>
+                    </ComboBox>
+                </WrapPanel>
+                <WrapPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+                    <Button Content="🕘 Batches" Click="BtnBatchHistory_Click" Style="{StaticResource SecBtn}" Height="28" Margin="0,0,6,4" ToolTip="View posted batches &amp; rollback a batch from Tally"/>
+                    <Button Content="✂ Split Entry" Click="BtnSplit_Click" Style="{StaticResource SecBtn}" Height="28" Margin="0,0,6,4" ToolTip="Post the highlighted bank entry to two or more ledgers (e.g. Rent + GST, or two parties)"/>
+                    <Button Content="Bulk Set Ledger" Click="BtnBulkSetLedger_Click" Style="{StaticResource SecBtn}" Height="28" Margin="0,0,6,4" ToolTip="Highlight multiple rows (Shift+Click / Ctrl+Click) and assign one Tally Ledger to all of them"/>
+                    <Button x:Name="BtnMore" Content="More ▾" Click="BtnMore_Click" Style="{StaticResource SecBtn}" Height="28" Margin="0,0,8,4" ToolTip="Tools you need only now and then">
+                        <Button.ContextMenu>
+                            <ContextMenu>
+                                <MenuItem Header="🧩 Teach Columns…" Click="BtnTeachColumns_Click" ToolTip="Mark the columns of a statement format the app does not read correctly — once. The layout is saved for every PC and used automatically from then on."/>
+                                <MenuItem Header="Export XML (import into Tally by hand)…" Click="BtnExportXml_Click"/>
+                                <MenuItem Header="📋 Debug report…" Click="BtnExportDebug_Click" ToolTip="Save parser diagnostic report to Notepad for troubleshooting"/>
+                                <Separator/>
+                                <MenuItem x:Name="MenuBankDate" Header="Fill bank date (BRS) on posted entries" IsCheckable="True" IsChecked="True" Click="MenuBankDate_Click"
+                                          ToolTip="Posted entries get the statement date as their bank date, so they show as reconciled in Tally's Bank Reconciliation."/>
+                            </ContextMenu>
+                        </Button.ContextMenu>
+                    </Button>
+                    <Button Content="Approve &amp; Push to Tally" Click="BtnPushTally_Click" Padding="14,0" Height="28" Margin="0,0,0,4" Background="#059669" Foreground="White" FontWeight="Bold" BorderThickness="0"/>
+                </WrapPanel>
+            </Grid>
+            <Border x:Name="SelectedTotalsBar" Visibility="Collapsed" Background="{DynamicResource CardBg}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="6" Padding="10,4" Margin="0,2,0,0">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBlock x:Name="TxtSelectedTotals" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource InkBrush}" TextWrapping="Wrap" VerticalAlignment="Center"/>
+                    <TextBlock Grid.Column="1" Text="⌨ Keys" FontSize="11.5" Foreground="{DynamicResource MutedBrush}" Margin="12,0,0,0" VerticalAlignment="Center" Cursor="Help"
+                               ToolTipService.ShowDuration="30000"
+                               ToolTip="Enter = save ledger &amp; next row&#x0a;Tab = autocomplete&#x0a;Ctrl+D = same ledger as the row above&#x0a;Space = tick / untick&#x0a;F8 = next row to check&#x0a;Ctrl+F = search&#x0a;Right-click a row = split / group options"/>
+                </Grid>
+            </Border>
+        </StackPanel>
+
+        <!-- Aligned, High-Contrast Virtualized DataGrid -->
+        <DataGrid x:Name="GridReview" Grid.Row="3" Margin="12,0,12,8"
+                  AutoGenerateColumns="False" CanUserAddRows="False" MinRowHeight="38"
+                  EnableRowVirtualization="True" EnableColumnVirtualization="True"
+                  VirtualizingPanel.IsVirtualizing="True" VirtualizingPanel.VirtualizationMode="Recycling" VirtualizingPanel.IsVirtualizingWhenGrouping="True"
+                  HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto"
+                  GridLinesVisibility="Horizontal" HorizontalGridLinesBrush="{DynamicResource BorderBrush}" HeadersVisibility="Column" RowHeaderWidth="0"
+                  Background="{DynamicResource CardBg}" RowBackground="{DynamicResource RowBg}" AlternatingRowBackground="{DynamicResource RowAltBg}"
+                  Foreground="{DynamicResource InkBrush}" BorderBrush="{DynamicResource BorderBrush}">
+            <DataGrid.Columns>
+                <DataGridTemplateColumn Header="Post" Width="48" MinWidth="46">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <Grid>
+                                <!-- colour strip: green ready, amber check, grey skipped / in Tally, red problem -->
+                                <Border Width="4" HorizontalAlignment="Left" Margin="0,3" CornerRadius="2" ToolTip="{Binding StatusSummary}">
+                                    <Border.Style>
+                                        <Style TargetType="Border">
+                                            <Setter Property="Background" Value="{StaticResource StateReady}"/>
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding RowState}" Value="Check"><Setter Property="Background" Value="{StaticResource StateCheck}"/></DataTrigger>
+                                                <DataTrigger Binding="{Binding RowState}" Value="Skipped"><Setter Property="Background" Value="{StaticResource StateSkipped}"/></DataTrigger>
+                                                <DataTrigger Binding="{Binding RowState}" Value="Problem"><Setter Property="Background" Value="{StaticResource StateProblem}"/></DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </Border.Style>
+                                </Border>
+                                <CheckBox IsChecked="{Binding Selected, UpdateSourceTrigger=PropertyChanged}" Click="PostCheckBox_Click" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            </Grid>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
+                <DataGridTextColumn Header="Date" Binding="{Binding DisplayDate}" IsReadOnly="True" Width="96" MinWidth="92"/>
+                <DataGridTemplateColumn Header="Narration" Width="2.1*" MinWidth="240">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <StackPanel VerticalAlignment="Center">
+                            <TextBlock Text="{Binding TidyNarration}" FontSize="11" FontWeight="SemiBold" Foreground="#2563EB" Margin="2,2,0,1"
+                                       TextTrimming="CharacterEllipsis" ToolTip="Short narration — posted to Tally as the first line, the bank's text below it">
+                                <TextBlock.Style>
+                                    <Style TargetType="TextBlock">
+                                        <Setter Property="Visibility" Value="Collapsed"/>
+                                        <Style.Triggers>
+                                            <MultiDataTrigger>
+                                                <MultiDataTrigger.Conditions>
+                                                    <Condition Binding="{Binding DataContext.ShowTidyNarration, RelativeSource={RelativeSource AncestorType=Window}}" Value="True"/>
+                                                    <Condition Binding="{Binding HasTidyNarration}" Value="True"/>
+                                                </MultiDataTrigger.Conditions>
+                                                <Setter Property="Visibility" Value="Visible"/>
+                                            </MultiDataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBlock.Style>
+                            </TextBlock>
+                            <TextBox Text="{Binding Narration, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                     IsReadOnly="False" TextWrapping="Wrap" AcceptsReturn="False"
+                                     Background="{DynamicResource InputBg}"
+                                     BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1"
+                                     Padding="5,3"
+                                     Foreground="{DynamicResource InputFg}"
+                                     CaretBrush="{DynamicResource InputFg}"
+                                     VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
+                <DataGridTextColumn Header="Mode" Binding="{Binding PaymentMode}" IsReadOnly="True" Width="80" MinWidth="74"/>
+                <!-- Shown as per Tally (bank ledger): money IN = Dr (Receipt), money OUT = Cr (Payment). The bank statement prints the opposite. -->
+                <DataGridTextColumn Header="Dr (₹)" Binding="{Binding Credit, Converter={StaticResource InrAmount}, ConverterParameter=blankZero}" IsReadOnly="True" Width="92" MinWidth="85">
+                    <DataGridTextColumn.HeaderStyle>
+                        <Style TargetType="DataGridColumnHeader" BasedOn="{StaticResource {x:Type DataGridColumnHeader}}">
+                            <Setter Property="ToolTip" Value="Tally Dr to bank ledger = money received (Receipt). Shown in the bank statement's CREDIT / Deposit column."/>
+                        </Style>
+                    </DataGridTextColumn.HeaderStyle>
+                </DataGridTextColumn>
+                <DataGridTextColumn Header="Cr (₹)" Binding="{Binding Debit, Converter={StaticResource InrAmount}, ConverterParameter=blankZero}" IsReadOnly="True" Width="92" MinWidth="85">
+                    <DataGridTextColumn.HeaderStyle>
+                        <Style TargetType="DataGridColumnHeader" BasedOn="{StaticResource {x:Type DataGridColumnHeader}}">
+                            <Setter Property="ToolTip" Value="Tally Cr to bank ledger = money paid (Payment). Shown in the bank statement's DEBIT / Withdrawal column."/>
+                        </Style>
+                    </DataGridTextColumn.HeaderStyle>
+                </DataGridTextColumn>
+
+                <!-- Perfectly Aligned Color-Highlighted Voucher Type Dropdown (Height=26 matching Ledger) -->
+                <DataGridTemplateColumn Header="Voucher Type" Width="110" MinWidth="106">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <ComboBox SelectedItem="{Binding VoucherType, UpdateSourceTrigger=PropertyChanged}"
+                                      ItemsSource="{Binding DataContext.VoucherTypes, RelativeSource={RelativeSource AncestorType=Window}}"
+                                      Height="26" VerticalAlignment="Center" FontWeight="SemiBold" FontSize="12" Foreground="#0F172A">
+                                <ComboBox.Style>
+                                    <Style TargetType="ComboBox" BasedOn="{StaticResource {x:Type ComboBox}}">
+                                        <Setter Property="Background" Value="#FEF3C7"/>
+                                        <Setter Property="BorderBrush" Value="#D97706"/>
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding VoucherType}" Value="Receipt">
+                                                <Setter Property="Background" Value="#D1FAE5"/>
+                                                <Setter Property="BorderBrush" Value="#059669"/>
+                                            </DataTrigger>
+                                            <DataTrigger Binding="{Binding VoucherType}" Value="Contra">
+                                                <Setter Property="Background" Value="#DBEAFE"/>
+                                                <Setter Property="BorderBrush" Value="#2563EB"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </ComboBox.Style>
+                            </ComboBox>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
+
+                <!-- Custom Ledger Autocomplete Picker (Down/Up arrows browse Popup ListBox ONLY; Tab or Mouse Click selects; Enter keeps exact typed text) -->
+                <DataGridTemplateColumn Header="Tally Ledger" Width="1.5*" MinWidth="195">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <Grid x:Name="LedgerPickerRoot" VerticalAlignment="Center">
+                                <Border CornerRadius="4" Background="{DynamicResource InputBg}" Height="26">
+                                    <Border.Style>
+                                        <Style TargetType="Border">
+                                            <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}"/>
+                                            <Setter Property="BorderThickness" Value="1"/>
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding IsNewLedger}" Value="True">
+                                                    <Setter Property="BorderBrush" Value="#A855F7"/>
+                                                    <Setter Property="BorderThickness" Value="1.5"/>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </Border.Style>
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="22"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBox x:Name="LedgerBox" Grid.Column="0"
+                                                 Text="{Binding SelectedLedger, Mode=TwoWay, UpdateSourceTrigger=Explicit}"
+                                                 Background="Transparent" BorderThickness="0" Padding="5,2"
+                                                 Foreground="{DynamicResource InputFg}" CaretBrush="{DynamicResource InputFg}"
+                                                 ToolTip="{Binding NewLedgerLabel}"
+                                                 TextChanged="LedgerBox_TextChanged"
+                                                 PreviewKeyDown="LedgerBox_PreviewKeyDown"
+                                                 LostFocus="LedgerBox_LostFocus"/>
+                                        <Button Grid.Column="1" Content="▾" FontSize="11"
+                                                Background="Transparent" Foreground="{DynamicResource InputFg}"
+                                                BorderThickness="0" Padding="0" Focusable="False" Cursor="Hand"
+                                                Click="LedgerDropBtn_Click"/>
+                                    </Grid>
+                                </Border>
+                                <Popup x:Name="LedgerPopup"
+                                       PlacementTarget="{Binding ElementName=LedgerPickerRoot}"
+                                       Placement="Bottom" StaysOpen="False" AllowsTransparency="True">
+                                    <Border MinWidth="{Binding ActualWidth, ElementName=LedgerPickerRoot}"
+                                            MaxHeight="240"
+                                            Background="{DynamicResource PopupBg}"
+                                            BorderBrush="{DynamicResource BorderBrush}"
+                                            BorderThickness="1" CornerRadius="4" Margin="0,2,0,0">
+                                        <ListBox x:Name="LedgerSuggestList"
+                                                 Background="{DynamicResource PopupBg}"
+                                                 Foreground="{DynamicResource InputFg}"
+                                                 BorderThickness="0"
+                                                 ScrollViewer.VerticalScrollBarVisibility="Auto"
+                                                 PreviewMouseLeftButtonUp="LedgerSuggestList_Click"/>
+                                    </Border>
+                                </Popup>
+                            </Grid>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
+
+                <!-- Against Invoice (live open Tally bills for Sundry Debtors/Creditors; optional "(None)") -->
+                <DataGridTemplateColumn Header="Against Invoice" Width="1.15*" MinWidth="135">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <ComboBox Height="26" VerticalAlignment="Center"
+                                      ItemsSource="{Binding AvailableBills}"
+                                      SelectedItem="{Binding BillRef, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                      DropDownOpened="InvoiceCombo_DropDownOpened"
+                                      SelectionChanged="InvoiceCombo_SelectionChanged"/>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
+
+                <DataGridTextColumn Header="ML %" Binding="{Binding ConfidenceDisplay}" IsReadOnly="True" Width="54" MinWidth="50"/>
+
+                <DataGridTemplateColumn Header="Status" Width="1.4*" MinWidth="190">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <TextBlock Text="{Binding StatusSummary}" TextTrimming="CharacterEllipsis" ToolTip="{Binding StatusSummary}" VerticalAlignment="Center"/>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
+            </DataGrid.Columns>
+
+            <DataGrid.ContextMenu>
+                <ContextMenu>
+                    <MenuItem Header="✂ Split Entry…" Click="BtnSplit_Click"/>
+                    <MenuItem Header="Bulk Set Ledger for highlighted rows…" Click="BtnBulkSetLedger_Click"/>
+                    <Separator/>
+                    <MenuItem Header="Take out of group" Click="MenuUngroup_Click"/>
+                    <MenuItem Header="Put back into its group" Click="MenuRegroup_Click"/>
+                </ContextMenu>
+            </DataGrid.ContextMenu>
+
+            <!-- "Group similar": a header per group (party • direction • ledger), with count, total and "Set ledger for all".
+                 A group of one is shown as a plain row (no header). -->
+            <DataGrid.GroupStyle>
+                <GroupStyle>
+                    <GroupStyle.ContainerStyle>
+                        <Style TargetType="{x:Type GroupItem}">
+                            <Setter Property="Template">
+                                <Setter.Value>
+                                    <ControlTemplate TargetType="{x:Type GroupItem}">
+                                        <Expander IsExpanded="{Binding Items, Converter={StaticResource GroupOpen}, Mode=OneWay}" Margin="0,2,0,2"
+                                                  Background="{DynamicResource CardBg}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,0,0,1">
+                                            <Expander.Header>
+                                                <StackPanel Orientation="Horizontal" Margin="2,3,0,3">
+                                                    <TextBlock Text="{Binding Name}" FontWeight="Bold" Foreground="{DynamicResource InkBrush}" VerticalAlignment="Center"/>
+                                                    <TextBlock Margin="14,0,0,0" Foreground="{DynamicResource InkBrush}" Opacity="0.8" VerticalAlignment="Center">
+                                                        <TextBlock.Text>
+                                                            <MultiBinding Converter="{StaticResource GroupSummary}">
+                                                                <Binding Path="Items"/>
+                                                                <Binding Path="ItemCount"/>
+                                                            </MultiBinding>
+                                                        </TextBlock.Text>
+                                                    </TextBlock>
+                                                    <Button Content="Set ledger for all" Click="GroupSetLedger_Click" Style="{StaticResource SecBtn}"
+                                                            Height="24" Padding="10,0" Margin="14,0,0,0"
+                                                            ToolTip="Choose one ledger for every entry in this group (they are ticked automatically)"/>
+                                                </StackPanel>
+                                            </Expander.Header>
+                                            <ItemsPresenter/>
+                                        </Expander>
+                                    </ControlTemplate>
+                                </Setter.Value>
+                            </Setter>
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding ItemCount}" Value="1">
+                                    <Setter Property="Template">
+                                        <Setter.Value>
+                                            <ControlTemplate TargetType="{x:Type GroupItem}">
+                                                <ItemsPresenter/>
+                                            </ControlTemplate>
+                                        </Setter.Value>
+                                    </Setter>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </GroupStyle.ContainerStyle>
+                </GroupStyle>
+            </DataGrid.GroupStyle>
+        </DataGrid>
+
+        <!-- Minimal Status Bar -->
+        <Border Grid.Row="4" Background="{DynamicResource CardBg}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,1,0,0" Padding="12,6">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <TextBlock x:Name="TxtFooter" FontSize="12" Foreground="{DynamicResource MutedBrush}" Text="Ready." TextTrimming="CharacterEllipsis"
+                           ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}" Margin="0,0,12,0"/>
+                <!-- what the colour strip at the left of each row means -->
+                <TextBlock x:Name="TxtStats" Grid.Column="1" FontSize="11" Foreground="{DynamicResource MutedBrush}" VerticalAlignment="Center" Margin="0,0,14,0"/>
+                <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center" TextElement.FontSize="11" TextElement.Foreground="{DynamicResource MutedBrush}">
+                    <Border Width="10" Height="10" CornerRadius="2" Background="{StaticResource StateReady}" Margin="0,0,4,0"/><TextBlock Text="Ready" Margin="0,0,10,0"/>
+                    <Border Width="10" Height="10" CornerRadius="2" Background="{StaticResource StateCheck}" Margin="0,0,4,0"/><TextBlock Text="Check" Margin="0,0,10,0"/>
+                    <Border Width="10" Height="10" CornerRadius="2" Background="{StaticResource StateSkipped}" Margin="0,0,4,0"/><TextBlock Text="Skipped / in Tally" Margin="0,0,10,0"/>
+                    <Border Width="10" Height="10" CornerRadius="2" Background="{StaticResource StateProblem}" Margin="0,0,4,0"/><TextBlock Text="Problem"/>
+                </StackPanel>
+            </Grid>
+        </Border>
+    </Grid>
+</Window>
