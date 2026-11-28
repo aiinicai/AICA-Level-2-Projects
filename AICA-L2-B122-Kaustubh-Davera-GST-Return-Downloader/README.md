@@ -4,6 +4,12 @@ A Windows desktop app that downloads GST returns from the Indian GST portal for 
 
 It was built for a tax practice where staff were downloading **GSTR-2B** by hand for 100+ clients every month.
 
+**AICA Level 2 Capstone Project** · Batch 122 · Kaustubh Davera
+
+## Demo video
+
+▶ **[Watch the demo video](https://docs.google.com/videos/d/1m9WpUxNRDriCr9Ma-9f2pbOCEDduhi2VI9J3K_boaGE/play?usp=sharing)**: the app downloading returns, the captcha step, file renaming, login safety, emailing clients and the tests.
+
 ![Clients screen](docs/screenshots/clients.png)
 
 ## Features
