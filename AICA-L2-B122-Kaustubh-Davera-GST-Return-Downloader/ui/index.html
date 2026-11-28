@@ -1,0 +1,333 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>GST Downloader</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="app">
+  <nav class="side">
+    <div class="brand">
+      <div class="brand-name">GST Downloader</div>
+      <div class="brand-firm" id="firmName"></div>
+    </div>
+    <button class="nav active" data-tab="clients">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="8" r="4"/><path d="M2 21c0-4 3-6 7-6s7 2 7 6"/><path d="M17 11a3 3 0 1 0 0-6"/><path d="M22 21c0-3-2-5-5-5.5"/></svg>Clients</button>
+    <button class="nav" data-tab="download">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M4 21h16"/></svg>Download</button>
+    <button class="nav" data-tab="status">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h10M4 18h6"/></svg>Status<span class="nav-dot" id="runDot" hidden></span></button>
+    <button class="nav" data-tab="email">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg>Email</button>
+    <div class="grow"></div>
+    <button class="nav" data-tab="settings">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M5 19l2-2M17 7l2-2"/></svg>Settings</button>
+  </nav>
+
+  <main>
+    <!-- ================= CLIENTS ================= -->
+    <section class="tab" id="tab-clients">
+      <div class="head">
+        <div>
+          <h1>Clients</h1>
+          <div class="sub"><span class="mono" id="excelPath"></span> · <span id="clientCount"></span> · loaded <span id="loadedAt"></span></div>
+        </div>
+        <div class="row-gap">
+          <button class="btn" id="btnChangeExcel">Change file…</button>
+          <button class="btn" id="btnOpenExcel">Open Excel</button>
+          <button class="btn" id="btnReload">Reload</button>
+          <button class="btn primary" id="btnAddClient">+ Add client</button>
+        </div>
+      </div>
+      <div class="banner error" id="loadError" hidden></div>
+      <section class="banner warn" id="issues" hidden>
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 2 20h20L12 3z"/><path d="M12 10v4M12 17h.01"/></svg>
+        <div class="grow">
+          <div class="banner-title" id="issuesTitle"></div>
+          <div class="issue-grid" id="issuesList"></div>
+        </div>
+      </section>
+      <div class="toolbar">
+        <label class="search">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg>
+          <input id="search" placeholder="Search name or GSTIN">
+        </label>
+        <div class="chips" id="chips"></div>
+      </div>
+      <div class="table-wrap">
+        <table class="table" id="clientTable">
+          <thead><tr>
+            <th class="w-check"><input type="checkbox" id="selectAll" aria-label="Select all shown"></th>
+            <th>Client</th><th>GSTIN</th><th>Email ID</th><th>Login ID</th><th>Filing</th><th>Password updated</th><th>Check</th><th></th>
+          </tr></thead>
+          <tbody id="clientRows"></tbody>
+        </table>
+        <div class="empty" id="clientEmpty" hidden>No clients match.</div>
+      </div>
+      <div class="foot">
+        <div class="muted"><b class="dark" id="selCount">0 selected</b> · <span id="shownCount"></span></div>
+        <div class="row-gap">
+          <button class="btn" id="btnSelectReady">Select all ready</button>
+          <button class="btn primary big" id="btnToDownload">Continue to Download →</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= DOWNLOAD ================= -->
+    <section class="tab" id="tab-download" hidden>
+      <div class="head"><div><h1>Download returns</h1><div class="sub">Choose the mode, period and forms, then press Start</div></div></div>
+      <div class="modes">
+        <button class="mode" data-mode="A"><b>One client · many months</b><span>Several months for one client in a single login</span></button>
+        <button class="mode" data-mode="B"><b>One form · all clients</b><span>One month's returns for every selected client</span></button>
+      </div>
+      <div class="dl-grid">
+        <section class="card dl-left">
+          <div class="two">
+            <label class="field" id="fieldClient">Client
+              <select id="dlClient"></select>
+            </label>
+            <div class="field" id="fieldClients" hidden>Clients
+              <div class="fake-input"><span id="dlClientsInfo"></span><button class="link" id="dlChangeClients">Change</button></div>
+            </div>
+            <label class="field">Financial year
+              <select id="dlFy"></select>
+            </label>
+          </div>
+          <div>
+            <div class="label" id="monthLabel">Months</div>
+            <div class="months" id="months"></div>
+            <div class="hint" id="monthHint">GSTR-2B for a month is generated on the 14th of the next month.</div>
+          </div>
+          <div>
+            <div class="label">Forms</div>
+            <div class="forms">
+              <div class="form-row">
+                <label class="chk strong"><input type="checkbox" id="f2b" checked>GSTR-2B</label>
+                <div class="row-gap"><label class="chk"><input type="checkbox" id="f2bExcel" checked>Excel</label><label class="chk"><input type="checkbox" id="f2bJson" checked>JSON</label></div>
+              </div>
+              <div class="form-row"><label class="chk strong"><input type="checkbox" id="f1">GSTR-1</label><span class="muted">PDF</span></div>
+              <div class="form-row"><label class="chk strong"><input type="checkbox" id="f3b">GSTR-3B</label><span class="muted">PDF</span></div>
+            </div>
+          </div>
+        </section>
+        <aside class="dl-right">
+          <section class="card summary">
+            <div class="card-title">This run</div>
+            <div class="kv"><span>Clients</span><b id="sumClients"></b></div>
+            <div class="kv"><span>Months</span><b id="sumMonths"></b></div>
+            <div class="kv"><span>Forms</span><b id="sumForms"></b></div>
+            <div class="kv"><span>Files expected</span><b id="sumFiles"></b></div>
+            <div class="kv"><span>Captcha entries</span><b id="sumCaptcha"></b></div>
+            <div class="kv warn-text" id="sumSkip" hidden></div>
+            <div class="divider"></div>
+            <label class="label" for="dlFolder">Save to folder</label>
+            <div class="row-gap"><input id="dlFolder" class="input mono small grow"><button class="btn outline" id="btnBrowse">Browse…</button></div>
+            <div class="hint" id="folderHint"></div>
+            <button class="btn primary big full" id="btnStart">Start download</button>
+          </section>
+          <section class="safety">
+            <b>Login safety</b>
+            <div>Wrong password → stops at once, never retried.</div>
+            <div>Wrong captcha → asks again (max 3 tries).</div>
+            <div>Blocked clients are skipped automatically.</div>
+          </section>
+        </aside>
+      </div>
+    </section>
+
+    <!-- ================= STATUS ================= -->
+    <section class="tab" id="tab-status" hidden>
+      <div class="empty big" id="statusEmpty">No download has been started yet.<br><button class="btn primary" data-go="download">Go to Download</button></div>
+      <div id="statusBody" hidden>
+        <div class="head">
+          <div><h1 id="jobTitle"></h1><div class="sub" id="jobSub"></div></div>
+          <div class="row-gap">
+            <button class="btn" id="btnPause">Pause</button>
+            <button class="btn danger" id="btnStop">Stop</button>
+          </div>
+        </div>
+        <div class="progress"><div id="progressBar"></div></div>
+        <div class="tiles">
+          <div class="tile"><div class="t ok">✓ Downloaded</div><div class="n" id="cDone">0</div></div>
+          <div class="tile"><div class="t bad">✕ Wrong password / blocked</div><div class="n" id="cBlocked">0</div></div>
+          <div class="tile"><div class="t warn">! Needs attention</div><div class="n" id="cAttn">0</div></div>
+          <div class="tile"><div class="t">○ Pending</div><div class="n" id="cPending">0</div></div>
+        </div>
+        <div class="table-wrap">
+          <table class="table">
+            <thead><tr><th>Client</th><th>Period</th><th>Form</th><th>Status</th><th>File / reason</th><th></th></tr></thead>
+            <tbody id="statusRows"></tbody>
+          </table>
+        </div>
+        <div class="foot">
+          <div class="row-gap">
+            <button class="btn" id="btnRetry">Retry failed</button>
+            <button class="btn" id="btnOpenFolder">Open folder</button>
+            <button class="btn" id="btnReport">Export report (Excel)</button>
+          </div>
+          <button class="btn primary big" data-go="email">Send emails →</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= EMAIL ================= -->
+    <section class="tab" id="tab-email" hidden>
+      <div class="head">
+        <div><h1>Email clients</h1><div class="sub">From <span id="sender"></span> · Sent mails appear in Gmail's Sent folder</div></div>
+        <div class="muted" id="emailCounts"></div>
+      </div>
+      <div class="empty big" id="emailEmpty" hidden>No downloaded files yet. Files appear here after a download run.</div>
+      <div class="email-grid" id="emailBody">
+        <section class="card list" id="emailList"></section>
+        <section class="card preview">
+          <div class="mail-fields">
+            <label for="mTo">To</label><input id="mTo" class="input">
+            <label for="mCc">CC</label><input id="mCc" class="input">
+            <label for="mSubject">Subject</label><input id="mSubject" class="input strong">
+          </div>
+          <div class="attach" id="mAttach"></div>
+          <textarea id="mBody" class="mail-body" aria-label="Message"></textarea>
+          <div class="row-gap">
+            <button class="btn" id="btnSkipMail">Skip</button>
+            <div class="grow"></div>
+            <button class="btn outline" id="btnSendAll">Send all remaining</button>
+            <button class="btn primary big" id="btnSendMail">Send</button>
+          </div>
+        </section>
+      </div>
+    </section>
+
+    <!-- ================= SETTINGS ================= -->
+    <section class="tab" id="tab-settings" hidden>
+      <div class="head"><div><h1>Settings</h1><div class="sub">Saved in config.json next to the app</div></div>
+        <div class="row-gap"><button class="btn" id="btnTestMail">Send test email</button><button class="btn primary" id="btnSaveSettings">Save settings</button></div>
+      </div>
+      <div class="settings-scroll">
+        <section class="card">
+          <div class="card-title">Firm</div>
+          <div class="grid4">
+            <label class="field">Firm name<input id="sFirm" class="input"></label>
+            <label class="field">Phone (in email signature)<input id="sPhone" class="input"></label>
+            <label class="field">2B data due by (day of next month)<input id="sDay" class="input" type="number" min="1" max="28"></label>
+            <label class="field">Warn when password older than (days)<input id="sAge" class="input" type="number" min="1"></label>
+          </div>
+        </section>
+        <section class="card">
+          <div class="card-title">Gmail</div>
+          <div class="hint">Use a Gmail App Password: Google Account → Security → 2-Step Verification → App passwords.</div>
+          <div class="grid4">
+            <label class="field">Gmail address<input id="sSender" class="input" placeholder="yourfirm@gmail.com"></label>
+            <label class="field">App password<input id="sAppPwd" class="input" type="password"></label>
+            <label class="field">Sender name<input id="sSenderName" class="input"></label>
+            <label class="field">Always CC<input id="sCc" class="input" placeholder="optional"></label>
+            <label class="field">SMTP server<input id="sSmtp" class="input"></label>
+            <label class="field">SMTP port<input id="sPort" class="input" type="number"></label>
+          </div>
+        </section>
+        <section class="card">
+          <div class="card-title">Email templates</div>
+          <div class="hint">Placeholders: {name} {legal_name} {gstin} {period} {forms} {file_list} {send_by_date} {firm_name} {firm_phone}</div>
+          <div class="tpl-grid">
+            <div>
+              <div class="label">GSTR-2B email (used when 2B files are attached)</div>
+              <input id="t2bSub" class="input">
+              <textarea id="t2bBody" class="tpl"></textarea>
+            </div>
+            <div>
+              <div class="label">GSTR-1 / GSTR-3B email</div>
+              <input id="tRetSub" class="input">
+              <textarea id="tRetBody" class="tpl"></textarea>
+            </div>
+          </div>
+        </section>
+      </div>
+    </section>
+  </main>
+</div>
+
+<!-- ================= EDIT DRAWER ================= -->
+<div class="scrim" id="drawerScrim" hidden></div>
+<aside class="drawer" id="drawer" role="dialog" aria-label="Edit client" hidden>
+  <div class="head">
+    <h2 id="dTitle">Edit client</h2>
+    <button class="icon-btn" id="dClose" aria-label="Close"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+  </div>
+  <div class="drawer-body">
+    <div class="banner bad" id="dBlocked" hidden>
+      <div id="dBlockedText"></div>
+      <button class="link" id="dUnblock">Unblock without changing password</button>
+    </div>
+    <label class="field">GSTIN<input id="dGstin" class="input mono" maxlength="15"></label>
+    <label class="field">Client name (legal)<input id="dName" class="input"></label>
+    <label class="field">Trade name (used in file names)<input id="dTrade" class="input" placeholder="Leave blank to use client name"></label>
+    <label class="field">Login ID<input id="dLogin" class="input"></label>
+    <div class="field">
+      <label for="dPwd">Password</label>
+      <div class="row-gap"><input id="dPwd" class="input grow" type="password" autocomplete="new-password"><button class="btn" id="dShow" type="button">Show</button></div>
+      <span class="hint" id="dPwdHint"></span>
+    </div>
+    <label class="field">Email ID<input id="dEmail" class="input" placeholder="name@example.com"><span class="hint">Separate multiple emails with commas</span></label>
+    <label class="field">Filing
+      <select id="dFiling"><option>Monthly</option><option>Quarterly</option></select>
+    </label>
+    <div class="banner error" id="dError" hidden></div>
+  </div>
+  <div class="hint">Changes are saved to the client Excel file. Close the file in Excel before saving.</div>
+  <div class="row-gap">
+    <button class="btn big grow" id="dCancel">Cancel</button>
+    <button class="btn primary big grow2" id="dSave">Save changes</button>
+  </div>
+</aside>
+
+<!-- ================= MODALS ================= -->
+<div class="overlay" id="overlay" hidden>
+  <section class="modal" id="captchaModal" role="dialog" aria-label="Enter captcha" hidden>
+    <div class="modal-top"><span id="cpIndex"></span><span id="cpAttempt"></span></div>
+    <div>
+      <div class="modal-title" id="cpClient"></div>
+      <div class="muted"><span class="mono" id="cpGstin"></span> · Login ID &amp; password filled ✓</div>
+    </div>
+    <div class="banner warn small" id="cpError" hidden></div>
+    <div class="row-gap center">
+      <div class="captcha-box"><img id="cpImg" alt="Captcha image from the GST portal"><span id="cpNoImg" hidden>Captcha not captured. Read it in the Chrome window.</span></div>
+      <button class="icon-btn big" id="cpRefresh" aria-label="Get a new captcha"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11a8 8 0 1 0-2.3 5.7"/><path d="M20 4v7h-7"/></svg></button>
+    </div>
+    <label class="field">Captcha code
+      <input id="cpInput" class="captcha-input" placeholder="Type the code and press Enter" autocomplete="off" spellcheck="false">
+    </label>
+    <div class="row-gap">
+      <button class="btn big grow" id="cpSkip">Skip this client</button>
+      <button class="btn primary big grow2" id="cpLogin">Login (Enter ↵)</button>
+    </div>
+    <div class="banner warn small">If the password is wrong, this client <b>stops immediately</b> and moves to the Blocked list. It will not be retried.</div>
+    <div class="row-between muted small"><span id="cpNext"></span><button class="link danger" id="cpStopAll">Stop the whole run</button></div>
+  </section>
+
+  <section class="modal" id="manualModal" role="dialog" aria-label="Manual step needed" hidden>
+    <div class="modal-title">Please click it in Chrome</div>
+    <div><b id="mnClient"></b> · <span id="mnWhat"></span></div>
+    <div class="banner warn small" id="mnReason"></div>
+    <div>In the Chrome window, open this return and click its download button. The app is watching the downloads and will save and rename the file by itself.</div>
+    <div class="muted small" id="mnNeed"></div>
+    <div class="row-gap">
+      <button class="btn big grow" id="mnSkip">Skip</button>
+      <button class="btn big grow" id="mnRetry">Try again automatically</button>
+      <button class="btn primary big grow" id="mnDone">I've downloaded it</button>
+    </div>
+  </section>
+
+  <section class="modal" id="confirmModal" role="dialog" aria-label="Confirm" hidden>
+    <div class="modal-title" id="cfTitle"></div>
+    <div id="cfText" class="pre"></div>
+    <div class="row-gap">
+      <button class="btn big grow" id="cfNo">Cancel</button>
+      <button class="btn primary big grow" id="cfYes">Yes</button>
+    </div>
+  </section>
+</div>
+
+<div class="toast" id="toast" hidden></div>
+<script src="app.js"></script>
+</body>
+</html>
