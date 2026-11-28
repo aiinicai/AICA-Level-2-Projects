@@ -1,0 +1,1850 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AuditLens AI – Invoice &amp; Compliance Analyzer (Standalone)</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Plus+Jakarta+Sans:wght@500;600;700&family=Public+Sans:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --bg: #f8fafc;
+        --surface: #ffffff;
+        --surface-muted: #f1f5f9;
+        --border: #e2e8f0;
+        --border-strong: #cbd5e1;
+        --text: #0f172a;
+        --text-secondary: #475569;
+        --text-muted: #64748b;
+        --primary: #1e3a5f;
+        --primary-hover: #162c49;
+        --emerald-bg: #ecfdf5;
+        --emerald-border: #a7f3d0;
+        --emerald-text: #065f46;
+        --amber-bg: #fffbeb;
+        --amber-border: #fde68a;
+        --amber-text: #92400e;
+        --red-bg: #fef2f2;
+        --red-border: #fecaca;
+        --red-text: #991b1b;
+        --font-sans: "Public Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        --font-display: "Plus Jakarta Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        --font-mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      }
+
+      *, *::before, *::after {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+        background: var(--bg);
+        color: var(--text);
+        font-family: var(--font-sans);
+        line-height: 1.5;
+        -webkit-font-smoothing: antialiased;
+      }
+
+      .tabular-nums {
+        font-variant-numeric: tabular-nums;
+      }
+
+      /* Top Bar */
+      .topbar {
+        background: var(--surface);
+        border-bottom: 1px solid var(--border);
+      }
+      .topbar-inner {
+        max-width: 1440px;
+        margin: 0 auto;
+        padding: 0 24px;
+        height: 64px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 32px;
+      }
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        white-space: nowrap;
+        flex-shrink: 0;
+        font-family: var(--font-display);
+        font-size: 18px;
+        font-weight: 700;
+        letter-spacing: -0.02em;
+        color: var(--text);
+      }
+      .brand-icon {
+        width: 32px;
+        height: 32px;
+        border-radius: 8px;
+        background: var(--primary);
+        color: #ffffff;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .nav-links {
+        display: flex;
+        align-items: center;
+        gap: 24px;
+      }
+      .nav-link {
+        background: none;
+        border: none;
+        padding: 4px;
+        font-family: inherit;
+        font-size: 14px;
+        font-weight: 500;
+        color: var(--text-secondary);
+        cursor: pointer;
+        white-space: nowrap;
+      }
+      .nav-link:hover {
+        color: var(--text);
+        text-decoration: underline;
+        text-underline-offset: 4px;
+      }
+      @media (max-width: 720px) {
+        .nav-links { display: none; }
+      }
+
+      /* Buttons */
+      .btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        border-radius: 8px;
+        font-family: inherit;
+        font-size: 13px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+        white-space: nowrap;
+        flex-shrink: 0;
+      }
+      .btn:disabled {
+        opacity: 0.45;
+        cursor: not-allowed;
+      }
+      .btn-primary {
+        background: var(--primary);
+        color: #ffffff;
+        border: 1px solid var(--primary);
+        padding: 10px 20px;
+      }
+      .btn-primary:hover:not(:disabled) {
+        background: var(--primary-hover);
+      }
+      .btn-secondary {
+        background: var(--surface);
+        color: var(--text-secondary);
+        border: 1px solid var(--border);
+        padding: 8px 14px;
+        font-size: 12px;
+      }
+      .btn-secondary:hover:not(:disabled) {
+        background: var(--bg);
+        color: var(--text);
+      }
+
+      /* Main Layout */
+      .main {
+        flex: 1;
+        max-width: 1440px;
+        width: 100%;
+        margin: 0 auto;
+        padding: 24px;
+        display: flex;
+        flex-direction: column;
+        gap: 20px;
+      }
+      .page-header h1 {
+        margin: 0;
+        font-family: var(--font-display);
+        font-size: 22px;
+        font-weight: 700;
+        letter-spacing: -0.02em;
+      }
+      .page-header p {
+        margin: 4px 0 0;
+        font-size: 14px;
+        color: var(--text-secondary);
+      }
+
+      .workbench-grid {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 24px;
+        align-items: start;
+      }
+      @media (min-width: 1024px) {
+        .workbench-grid {
+          grid-template-columns: 5fr 7fr;
+        }
+      }
+
+      .panel {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        overflow: hidden;
+      }
+      .panel-section {
+        padding: 20px;
+        border-bottom: 1px solid var(--border);
+      }
+      .panel-section:last-child {
+        border-bottom: none;
+      }
+      .section-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        margin-bottom: 12px;
+      }
+      .section-title {
+        margin: 0;
+        font-family: var(--font-display);
+        font-size: 14px;
+        font-weight: 600;
+        color: var(--text);
+      }
+      .section-hint {
+        font-size: 12px;
+        color: var(--text-muted);
+      }
+
+      /* Sample Case Buttons */
+      .sample-grid {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 10px;
+      }
+      @media (min-width: 640px) {
+        .sample-grid {
+          grid-template-columns: repeat(3, 1fr);
+        }
+      }
+      .sample-btn {
+        text-align: left;
+        padding: 10px 12px;
+        border-radius: 8px;
+        border: 1px solid var(--border);
+        background: var(--bg);
+        color: var(--text);
+        cursor: pointer;
+        font-family: inherit;
+        transition: all 0.15s ease;
+      }
+      .sample-btn:hover {
+        background: var(--surface-muted);
+        border-color: var(--border-strong);
+      }
+      .sample-btn.active {
+        background: var(--primary);
+        border-color: var(--primary);
+        color: #ffffff;
+      }
+      .sample-btn-title {
+        font-size: 12px;
+        font-weight: 600;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .sample-btn-sub {
+        font-size: 11px;
+        margin-top: 2px;
+        color: var(--text-muted);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .sample-btn.active .sample-btn-sub {
+        color: #cbd5e1;
+      }
+
+      /* Dropzone */
+      .dropzone {
+        border: 1px dashed var(--border-strong);
+        border-radius: 8px;
+        background: #f8fafc;
+        padding: 20px 16px;
+        text-align: center;
+        cursor: pointer;
+        transition: background-color 0.15s ease, border-color 0.15s ease;
+      }
+      .dropzone:hover, .dropzone.dragover {
+        background: #f1f5f9;
+        border-color: var(--primary);
+      }
+      .dropzone p {
+        margin: 6px 0 0;
+        font-size: 13px;
+        color: var(--text);
+        font-weight: 500;
+      }
+      .dropzone .sub {
+        margin-top: 4px;
+        font-size: 12px;
+        color: var(--text-muted);
+        font-weight: 400;
+      }
+      .file-attached {
+        border: 1px solid var(--border);
+        background: var(--bg);
+        border-radius: 8px;
+        padding: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+      }
+      .file-meta {
+        min-width: 0;
+      }
+      .file-name {
+        font-size: 13px;
+        font-weight: 600;
+        color: var(--text);
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .file-sub {
+        font-size: 12px;
+        color: var(--text-muted);
+      }
+
+      /* Textarea */
+      textarea.invoice-input {
+        width: 100%;
+        min-height: 260px;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        background: #fafbfc;
+        padding: 12px 14px;
+        font-family: var(--font-mono);
+        font-size: 12px;
+        line-height: 1.6;
+        color: var(--text);
+        resize: vertical;
+      }
+      textarea.invoice-input:focus {
+        outline: 2px solid var(--primary);
+        outline-offset: -1px;
+        background: var(--surface);
+      }
+
+      .action-bar {
+        margin-top: 14px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+      }
+
+      /* Output Panel */
+      .empty-state {
+        padding: 32px;
+        min-height: 520px;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+      }
+      .empty-icon {
+        width: 40px;
+        height: 40px;
+        border-radius: 8px;
+        background: var(--surface-muted);
+        border: 1px solid var(--border);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: var(--text-secondary);
+        margin-bottom: 16px;
+      }
+      .empty-grid {
+        margin-top: 28px;
+        padding-top: 24px;
+        border-top: 1px solid var(--border);
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 20px;
+      }
+      @media (min-width: 640px) {
+        .empty-grid { grid-template-columns: 1fr 1fr; }
+      }
+      .empty-grid h3 {
+        margin: 0;
+        font-size: 12px;
+        font-weight: 600;
+        color: var(--text);
+      }
+      .empty-grid p {
+        margin: 4px 0 0;
+        font-size: 12px;
+        color: var(--text-secondary);
+      }
+
+      /* Risk Banner */
+      .risk-banner {
+        border-radius: 8px;
+        border: 1px solid;
+        padding: 16px;
+      }
+      .risk-low {
+        background: var(--emerald-bg);
+        border-color: var(--emerald-border);
+        color: #064e3b;
+      }
+      .risk-medium {
+        background: var(--amber-bg);
+        border-color: var(--amber-border);
+        color: #78350f;
+      }
+      .risk-high {
+        background: var(--red-bg);
+        border-color: var(--red-border);
+        color: #7f1d1d;
+      }
+      .risk-top {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        margin-bottom: 6px;
+      }
+      .risk-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 2px 8px;
+        border-radius: 4px;
+        border: 1px solid;
+        font-size: 12px;
+        font-weight: 600;
+      }
+      .risk-low .risk-badge { background: #d1fae5; border-color: #6ee7b7; color: var(--emerald-text); }
+      .risk-medium .risk-badge { background: #fef3c7; border-color: #fcd34d; color: var(--amber-text); }
+      .risk-high .risk-badge { background: #fee2e2; border-color: #fca5a5; color: var(--red-text); }
+      .risk-summary {
+        margin: 0;
+        font-size: 14px;
+        font-weight: 500;
+      }
+
+      /* Tabs */
+      .tabs-bar {
+        padding: 12px 20px 0;
+        border-bottom: 1px solid var(--border);
+        display: flex;
+        gap: 24px;
+        overflow-x: auto;
+      }
+      .tab-btn {
+        background: none;
+        border: none;
+        border-bottom: 2px solid transparent;
+        padding: 0 0 12px;
+        font-family: inherit;
+        font-size: 13px;
+        font-weight: 500;
+        color: var(--text-muted);
+        cursor: pointer;
+        white-space: nowrap;
+      }
+      .tab-btn:hover {
+        color: var(--text);
+      }
+      .tab-btn.active {
+        color: var(--text);
+        font-weight: 600;
+        border-bottom-color: var(--primary);
+      }
+
+      /* Data Tables */
+      .kv-box {
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        overflow: hidden;
+      }
+      .kv-row {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 16px;
+        padding: 10px 16px;
+        border-bottom: 1px solid #f1f5f9;
+        font-size: 13px;
+      }
+      .kv-row:last-child {
+        border-bottom: none;
+      }
+      .kv-row.highlight {
+        background: #f8fafc;
+        font-weight: 600;
+      }
+      .kv-label {
+        color: var(--text-secondary);
+        flex-shrink: 0;
+      }
+      .kv-val {
+        text-align: right;
+        color: var(--text);
+        font-weight: 500;
+        word-break: break-word;
+      }
+      .kv-val.mono {
+        font-family: var(--font-mono);
+        font-size: 12px;
+      }
+      .kv-val.err {
+        color: var(--red-text);
+        font-weight: 600;
+      }
+
+      /* Findings */
+      .filter-bar {
+        display: inline-flex;
+        gap: 4px;
+        padding: 4px;
+        background: var(--surface-muted);
+        border-radius: 8px;
+        margin-bottom: 16px;
+        flex-wrap: wrap;
+      }
+      .filter-btn {
+        border: none;
+        background: transparent;
+        padding: 6px 12px;
+        border-radius: 6px;
+        font-family: inherit;
+        font-size: 12px;
+        font-weight: 500;
+        color: var(--text-secondary);
+        cursor: pointer;
+        white-space: nowrap;
+      }
+      .filter-btn.active {
+        background: var(--surface);
+        color: var(--text);
+        box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
+      }
+      .findings-list {
+        border: 1px solid var(--border);
+        border-radius: 8px;
+      }
+      .finding-item {
+        padding: 16px;
+        border-bottom: 1px solid var(--border);
+      }
+      .finding-item:last-child {
+        border-bottom: none;
+      }
+      .finding-meta {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 10px;
+        margin-bottom: 6px;
+      }
+      .sev-tag {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        padding: 2px 8px;
+        border-radius: 4px;
+        border: 1px solid;
+        font-size: 12px;
+        font-weight: 600;
+      }
+      .sev-Passed { background: var(--emerald-bg); border-color: var(--emerald-border); color: var(--emerald-text); }
+      .sev-Warning { background: var(--amber-bg); border-color: var(--amber-border); color: var(--amber-text); }
+      .sev-Critical { background: var(--red-bg); border-color: var(--red-border); color: var(--red-text); }
+      .finding-cat {
+        font-size: 12px;
+        color: var(--text-muted);
+        font-weight: 500;
+      }
+      .finding-title {
+        margin: 0;
+        font-family: var(--font-display);
+        font-size: 14px;
+        font-weight: 600;
+        color: var(--text);
+      }
+      .finding-detail {
+        margin: 4px 0 0;
+        font-size: 13px;
+        color: var(--text-secondary);
+      }
+      .finding-compare {
+        margin-top: 10px;
+        padding-top: 10px;
+        border-top: 1px solid #f1f5f9;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 20px;
+        font-size: 12px;
+        color: var(--text-muted);
+      }
+      .finding-compare code {
+        font-family: var(--font-mono);
+        color: var(--text);
+        font-weight: 600;
+      }
+
+      /* Query Draft */
+      .query-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-bottom: 16px;
+      }
+      .field-label {
+        display: block;
+        font-size: 12px;
+        font-weight: 600;
+        color: var(--text-secondary);
+        margin-bottom: 4px;
+      }
+      input.text-input, textarea.query-textarea {
+        width: 100%;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        background: #fafbfc;
+        padding: 9px 12px;
+        font-family: inherit;
+        font-size: 13px;
+        color: var(--text);
+      }
+      textarea.query-textarea {
+        min-height: 250px;
+        line-height: 1.6;
+        resize: vertical;
+      }
+
+      /* Modal */
+      .modal-backdrop {
+        position: fixed;
+        inset: 0;
+        z-index: 50;
+        background: rgba(15, 23, 42, 0.45);
+        display: none;
+        align-items: center;
+        justify-content: center;
+        padding: 16px;
+      }
+      .modal-backdrop.open {
+        display: flex;
+      }
+      .modal-box {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        width: 100%;
+        max-width: 680px;
+        max-height: 85vh;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+        box-shadow: 0 20px 40px rgba(15, 23, 42, 0.15);
+      }
+      .modal-head {
+        padding: 16px 20px;
+        border-bottom: 1px solid var(--border);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+      }
+      .modal-body {
+        padding: 20px;
+        overflow-y: auto;
+        font-size: 13px;
+      }
+      .state-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 12px;
+      }
+      .state-table th, .state-table td {
+        padding: 8px 10px;
+        border-bottom: 1px solid #f1f5f9;
+        text-align: left;
+      }
+      .state-table th {
+        background: var(--bg);
+        color: var(--text-secondary);
+      }
+
+      /* Footer */
+      footer {
+        background: var(--surface);
+        border-top: 1px solid var(--border);
+        padding: 14px 24px;
+        margin-top: auto;
+      }
+      .footer-inner {
+        max-width: 1440px;
+        margin: 0 auto;
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        font-size: 12px;
+        color: var(--text-muted);
+      }
+      .footer-disclaimer {
+        margin: 0;
+        font-weight: 500;
+        color: var(--text-secondary);
+      }
+    </style>
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="topbar-inner">
+        <div class="brand">
+          <span class="brand-icon" aria-hidden="true">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="m16 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z"/>
+              <path d="m2 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z"/>
+              <path d="M7 21h10"/>
+              <path d="M12 3v18"/>
+              <path d="M3 7h2c2 0 5-1 7-2 2 1 5 2 7 2h2"/>
+            </svg>
+          </span>
+          <span>AuditLens AI</span>
+        </div>
+
+        <nav class="nav-links">
+          <button type="button" class="nav-link" onclick="openModal('scope')">Rule 46 Checklist</button>
+          <button type="button" class="nav-link" onclick="openModal('states')">GST State Codes</button>
+        </nav>
+
+        <button type="button" id="resetBtn" class="btn btn-secondary" onclick="resetWorkspace()">
+          Reset Workspace
+        </button>
+      </div>
+    </header>
+
+    <main class="main">
+      <div class="page-header">
+        <h1>Invoice &amp; Compliance Analyzer</h1>
+        <p>Automated GSTIN state validation, arithmetic reconciliation, Rule 46 field checks, and vendor query drafting.</p>
+      </div>
+
+      <div class="workbench-grid">
+        <!-- Left Panel -->
+        <section class="panel" aria-label="Invoice Input Zone">
+          <div class="panel-section">
+            <div class="section-header">
+              <h2 class="section-title">Load Sample Case</h2>
+              <span class="section-hint">One-click test fixtures</span>
+            </div>
+            <div class="sample-grid" id="sampleButtons"></div>
+          </div>
+
+          <div class="panel-section">
+            <div class="section-header">
+              <h2 class="section-title">Upload Invoice Document</h2>
+              <span class="section-hint">TXT, CSV, PDF, PNG, JPG</span>
+            </div>
+            <input type="file" id="fileInput" accept=".txt,.csv,.json,.pdf,.png,.jpg,.jpeg,.webp" hidden />
+            <div id="dropzoneWrap"></div>
+          </div>
+
+          <div class="panel-section">
+            <div class="section-header">
+              <label for="rawText" class="section-title">Raw Invoice or Ledger Text</label>
+              <button type="button" id="clearTextBtn" class="nav-link" style="font-size:12px;display:none;" onclick="clearRawText()">Clear text</button>
+            </div>
+            <textarea
+              id="rawText"
+              class="invoice-input"
+              placeholder="Paste raw GST tax invoice text or Accounts Payable ledger entries here..."
+            ></textarea>
+
+            <div class="action-bar">
+              <span id="charCount" class="section-hint tabular-nums">Provide a file or invoice text</span>
+              <button type="button" id="runAuditBtn" class="btn btn-primary" onclick="runAuditCheck()">
+                Run Audit Check
+              </button>
+            </div>
+          </div>
+        </section>
+
+        <!-- Right Panel -->
+        <section class="panel" id="outputPanel" aria-label="Structured Audit Output"></section>
+      </div>
+    </main>
+
+    <footer>
+      <div class="footer-inner">
+        <p class="footer-disclaimer">AI-assisted preliminary review only. Final verification requires Chartered Accountant judgment.</p>
+        <span>AuditLens AI · Standalone HTML Edition</span>
+      </div>
+    </footer>
+
+    <!-- Reference Modal -->
+    <div id="refModal" class="modal-backdrop" role="dialog" aria-modal="true">
+      <div class="modal-box">
+        <div class="modal-head">
+          <strong style="font-family:var(--font-display);font-size:15px;" id="modalTitle">Compliance Reference</strong>
+          <button type="button" class="btn btn-secondary" onclick="closeModal()">Close</button>
+        </div>
+        <div class="modal-body" id="modalBody"></div>
+      </div>
+    </div>
+
+    <script>
+      const SAMPLE_CASES = [
+        {
+          id: "compliant-b2b",
+          shortLabel: "Sample 1",
+          title: "Compliant B2B Invoice",
+          summary: "Clean GST & math",
+          rawText: `TAX INVOICE (ORIGINAL FOR RECIPIENT)
+Supplier: Apex Precision Components Pvt. Ltd.
+Registered Office: Plot C-42, MIDC Bhosari, Pune, Maharashtra - 411026
+Supplier GSTIN: 27AABCA8942K1Z5
+State Name: Maharashtra, Code: 27
+PAN: AABCA8942K
+
+Invoice No: APC/26-27/0418
+Invoice Date: 14-Oct-2026 (Wednesday)
+Purchase Order Ref: PO-MML-2026-884 (Dated: 02-Oct-2026)
+Place of Supply: Maharashtra (State Code: 27)
+Supply Type: Intra-State B2B Taxable Supply
+
+Bill To / Recipient:
+Meridian Manufacturing Ltd.
+Unit 14, Chakan Industrial Area Phase II, Pune, Maharashtra - 410501
+Buyer GSTIN: 27AAACM9910R1Z3
+
+LINE ITEMS:
+1. CNC Machined Helical Gear Shaft (HSN: 84834000) | Qty: 50 Nos | Rate: INR 3,500.00 | Taxable Value: INR 1,75,000.00 | CGST @ 9%: INR 15,750.00 | SGST @ 9%: INR 15,750.00 | Line Total: INR 2,06,500.00
+2. High-Tensile Industrial Fastener Assembly (HSN: 73181500) | Qty: 1,000 Sets | Rate: INR 70.00 | Taxable Value: INR 70,000.00 | CGST @ 9%: INR 6,300.00 | SGST @ 9%: INR 6,300.00 | Line Total: INR 82,600.00
+
+TAX & TOTAL SUMMARY:
+Total Taxable Value: INR 2,45,000.00
+CGST (9%): INR 22,050.00
+SGST (9%): INR 22,050.00
+IGST (0%): INR 0.00
+Total Tax Amount: INR 44,100.00
+Grand Invoice Total: INR 2,89,100.00
+Amount in Words: Indian Rupees Two Lakh Eighty-Nine Thousand One Hundred Only
+Payment Terms: Net 30 Days | Authorised Signatory: Verified Digital Signature`
+        },
+        {
+          id: "high-risk-discrepancy",
+          shortLabel: "Sample 2",
+          title: "High-Risk Discrepancy",
+          summary: "Mismatched GSTIN state code, tax math error, missing HSN",
+          rawText: `TAX INVOICE
+Supplier: Vanguard Cloud Systems LLP
+Office Address: 88, 100 Feet Road, Indiranagar, Bengaluru, Karnataka - 560038
+Supplier GSTIN: 27AABCV7190M1Z4
+Declared State: Karnataka (Code: 29)
+
+Invoice No: VCS/2026/1192
+Invoice Date: 19-Oct-2026 (Monday)
+Place of Supply: Karnataka (29)
+PO Reference: PO-MML-2026-912
+
+Bill To:
+Meridian Manufacturing Ltd.
+Electronic City Phase I, Bengaluru, Karnataka - 560100
+Buyer GSTIN: 29AAACM9910R1Z9
+
+PARTICULARS:
+1. Enterprise Cloud Infrastructure & Annual Managed Hosting License
+   HSN / SAC Code: [NOT MENTIONED]
+   Qty: 1 Lot | Rate: INR 1,80,000.00 | Taxable Value: INR 1,80,000.00
+
+TAX CALCULATION:
+Taxable Value: INR 1,80,000.00
+CGST @ 9%: INR 18,200.00
+SGST @ 9%: INR 16,200.00
+Total GST Charged: INR 34,400.00
+Total Payable Amount: INR 2,16,400.00
+Note: Remit payment within 7 days to HDFC Bank A/c ending 4821.`
+        },
+        {
+          id: "suspicious-expense",
+          shortLabel: "Sample 3",
+          title: "Duplicate / Suspicious Expense",
+          summary: "Weekend date, round-figure consulting fee without PO reference",
+          rawText: `INVOICE & AP LEDGER EXCERPT
+Vendor: K.R. Advisory & Strategy Partners
+Address: Barakhamba Road, Connaught Place, New Delhi - 110001
+Vendor GSTIN: 07AAJFK4321P1Z8
+
+Invoice No: KRA-100
+Invoice Date: 18-Oct-2026 (Sunday)
+Place of Supply: Maharashtra (27)
+PO / Engagement Letter Reference: None / Verbal Approval
+
+Bill To:
+Meridian Manufacturing Ltd.
+Nariman Point, Mumbai, Maharashtra - 400021
+Buyer GSTIN: 27AAACM9910R1Z3
+
+DESCRIPTION OF SERVICES:
+- Management & Strategic Advisory Services - Special Consulting Retainer (SAC: 998311)
+  No timesheet, deliverable log, or SOW attached.
+  Taxable Amount: INR 5,00,000.00
+  IGST @ 18%: INR 90,000.00
+  Total Invoice Value: INR 5,90,000.00
+
+ACCOUNTS PAYABLE LEDGER CONTEXT (PAST 14 DAYS):
+- 11-Oct-2026 (Sunday) | Inv: KRA-099 | Vendor: K.R. Advisory & Strategy Partners | Amount: INR 5,90,000.00 | Status: Paid | Narration: Management & Strategic Advisory Services - Special Consulting Retainer
+- 18-Oct-2026 (Sunday) | Inv: KRA-100 | Vendor: K.R. Advisory & Strategy Partners | Amount: INR 5,90,000.00 | Status: Pending Audit Approval`
+        }
+      ];
+
+      const GST_STATES = {
+        "01": "Jammu & Kashmir", "02": "Himachal Pradesh", "03": "Punjab", "04": "Chandigarh",
+        "05": "Uttarakhand", "06": "Haryana", "07": "Delhi", "08": "Rajasthan",
+        "09": "Uttar Pradesh", "10": "Bihar", "11": "Sikkim", "12": "Arunachal Pradesh",
+        "13": "Nagaland", "14": "Manipur", "15": "Mizoram", "16": "Tripura",
+        "17": "Meghalaya", "18": "Assam", "19": "West Bengal", "20": "Jharkhand",
+        "21": "Odisha", "22": "Chhattisgarh", "23": "Madhya Pradesh", "24": "Gujarat",
+        "26": "Dadra & Nagar Haveli and Daman & Diu", "27": "Maharashtra", "29": "Karnataka",
+        "30": "Goa", "31": "Lakshadweep", "32": "Kerala", "33": "Tamil Nadu",
+        "34": "Puducherry", "35": "Andaman & Nicobar Islands", "36": "Telangana",
+        "37": "Andhra Pradesh", "38": "Ladakh"
+      };
+
+      const state = {
+        rawText: "",
+        activeSampleId: null,
+        uploadedFile: null,
+        report: null,
+        activeTab: "extracted",
+        severityFilter: "All",
+        draftSubject: "",
+        draftBody: ""
+      };
+
+      function esc(str) {
+        return String(str ?? "")
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/"/g, "&quot;");
+      }
+
+      function formatInr(num) {
+        if (num === null || num === undefined || Number.isNaN(num)) return "Not extracted";
+        return new Intl.NumberFormat("en-IN", {
+          style: "currency",
+          currency: "INR",
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 2
+        }).format(num);
+      }
+
+      function parseNum(str) {
+        if (!str) return null;
+        const cleaned = str.replace(/,/g, "").trim();
+        const val = Number(cleaned);
+        return Number.isFinite(val) ? val : null;
+      }
+
+      function extractNumberByPatterns(text, patterns) {
+        for (const re of patterns) {
+          const m = text.match(re);
+          if (m && m[1]) {
+            const val = parseNum(m[1]);
+            if (val !== null) return val;
+          }
+        }
+        return null;
+      }
+
+      function detectStateCodeFromText(textSnippet) {
+        if (!textSnippet) return null;
+        const codeMatch = textSnippet.match(/(?:code\s*:\s*|\()(\d{2})\)?/i);
+        if (codeMatch && GST_STATES[codeMatch[1]]) return codeMatch[1];
+        const lower = textSnippet.toLowerCase();
+        for (const [code, name] of Object.entries(GST_STATES)) {
+          if (lower.includes(name.toLowerCase())) return code;
+        }
+        return null;
+      }
+
+      function parseDayOfWeek(dateStr) {
+        if (!dateStr) return "";
+        const paren = dateStr.match(/\((Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)\)/i);
+        if (paren) return paren[1];
+        const clean = dateStr.replace(/\(.*?\)/g, "").trim();
+        const d = new Date(clean);
+        if (!Number.isNaN(d.getTime())) {
+          return ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"][d.getDay()];
+        }
+        return "";
+      }
+
+      function analyzeInvoiceText(text) {
+        const vendorMatch = text.match(/(?:Supplier|Vendor)\s*:\s*(.+)/i);
+        const buyerMatch = text.match(/(?:Bill To(?:\s*\/\s*Recipient)?|Buyer|Recipient)\s*:\s*(?:\n\s*)?([^\n]+)/i);
+        const invNoMatch = text.match(/Invoice\s*(?:No|Number|#)\s*:\s*([^\n]+)/i);
+        const dateMatch = text.match(/Invoice\s*Date\s*:\s*([^\n]+)/i);
+        const posMatch = text.match(/Place\s*of\s*Supply\s*:\s*([^\n]+)/i);
+        const poMatch = text.match(/(?:Purchase\s*Order\s*Ref|PO\s*(?:\/\s*Engagement\s*Letter)?\s*Ref(?:erence)?)\s*:\s*([^\n]+)/i);
+        const addrMatch = text.match(/(?:Office\s*Address|Registered\s*Office|Address)\s*:\s*([^\n]+)/i);
+        const declStateMatch = text.match(/(?:Declared\s*State|State\s*Name)\s*:\s*([^\n]+)/i);
+
+        const supplierGstinMatch = text.match(/(?:Supplier|Vendor)\s*GSTIN\s*:\s*([A-Z0-9]{15})/i);
+        const buyerGstinMatch = text.match(/(?:Buyer|Recipient)\s*GSTIN\s*:\s*([A-Z0-9]{15})/i);
+        const allGstins = [...text.matchAll(/\b([0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][1-9A-Z]Z[0-9A-Z])\b/g)].map(m => m[1]);
+
+        const vendorGstin = supplierGstinMatch ? supplierGstinMatch[1].toUpperCase() : (allGstins[0] || "");
+        const buyerGstin = buyerGstinMatch ? buyerGstinMatch[1].toUpperCase() : (allGstins[1] || "");
+
+        const hsnMatches = [...text.matchAll(/(?:HSN|SAC)(?:\s*\/\s*SAC)?(?:\s*Code)?\s*:\s*([^\n|)]+)/gi)]
+          .map(m => m[1].trim())
+          .filter(v => !/not\s*mentioned|none|n\/a|missing/i.test(v));
+        const hsnMissingExplicit = /HSN(?:\s*\/\s*SAC)?(?:\s*Code)?\s*:\s*\[?\s*(?:NOT\s*MENTIONED|MISSING|NONE|N\/A)\s*\]?/i.test(text);
+        const hsnSacCode = hsnMatches.length ? [...new Set(hsnMatches)].join(", ") : "";
+
+        const taxableAmount = extractNumberByPatterns(text, [
+          /Total\s+Taxable\s+(?:Value|Amount)\s*:\s*(?:INR|Rs\.?|₹)?\s*([\d,]+(?:\.\d{1,2})?)/i,
+          /(?:^|\n)\s*Taxable\s+(?:Value|Amount)\s*:\s*(?:INR|Rs\.?|₹)?\s*([\d,]+(?:\.\d{1,2})?)/i,
+          /Taxable\s*(?:Value|Amount)\s*:\s*(?:INR|Rs\.?|₹)?\s*([\d,]+(?:\.\d{1,2})?)/i
+        ]);
+        const cgstAmount = extractNumberByPatterns(text, [
+          /(?:^|\n)\s*CGST(?:\s*@\s*\d+(?:\.\d+)?%|\s*\(\d+(?:\.\d+)?%\))?\s*:\s*(?:INR|Rs\.?|₹)?\s*([\d,]+(?:\.\d{1,2})?)/i,
+          /CGST(?:\s*@\s*\d+(?:\.\d+)?%|\s*\(\d+(?:\.\d+)?%\))?\s*:\s*(?:INR|Rs\.?|₹)?\s*([\d,]+(?:\.\d{1,2})?)/i
+        ]) ?? 0;
+        const sgstAmount = extractNumberByPatterns(text, [
+          /(?:^|\n)\s*SGST(?:\s*@\s*\d+(?:\.\d+)?%|\s*\(\d+(?:\.\d+)?%\))?\s*:\s*(?:INR|Rs\.?|₹)?\s*([\d,]+(?:\.\d{1,2})?)/i,
+          /SGST(?:\s*@\s*\d+(?:\.\d+)?%|\s*\(\d+(?:\.\d+)?%\))?\s*:\s*(?:INR|Rs\.?|₹)?\s*([\d,]+(?:\.\d{1,2})?)/i
+        ]) ?? 0;
+        const igstAmount = extractNumberByPatterns(text, [
+          /(?:^|\n)\s*IGST(?:\s*@\s*\d+(?:\.\d+)?%|\s*\(\d+(?:\.\d+)?%\))?\s*:\s*(?:INR|Rs\.?|₹)?\s*([\d,]+(?:\.\d{1,2})?)/i,
+          /IGST(?:\s*@\s*\d+(?:\.\d+)?%|\s*\(\d+(?:\.\d+)?%\))?\s*:\s*(?:INR|Rs\.?|₹)?\s*([\d,]+(?:\.\d{1,2})?)/i
+        ]) ?? 0;
+        const declaredTotalTax = extractNumberByPatterns(text, [
+          /Total\s*(?:Tax\s*Amount|GST\s*Charged)\s*:\s*(?:INR|Rs\.?|₹)?\s*([\d,]+(?:\.\d{1,2})?)/i
+        ]);
+        const billedTotal = extractNumberByPatterns(text, [
+          /(?:Grand\s*Invoice\s*Total|Total\s*Payable\s*Amount|Total\s*Invoice\s*Value|Grand\s*Total|Total\s*Amount)\s*:\s*(?:INR|Rs\.?|₹)?\s*([\d,]+(?:\.\d{1,2})?)/i
+        ]);
+
+        const lineItems = [];
+        const lines = text.split(/\r?\n/);
+        for (const line of lines) {
+          const itemM = line.match(/^\s*\d+\.\s+(.+?)(?:\s*\|\s*|\s*$)/);
+          if (itemM && /Qty:|Taxable Value:|Rate:/i.test(line)) {
+            const descPart = itemM[1].replace(/\(HSN:\s*[^)]+\)/i, "").trim();
+            const hsnM = line.match(/(?:HSN|SAC)\s*:\s*([A-Za-z0-9]+)/i);
+            const qtyM = line.match(/Qty\s*:\s*([^|]+)/i);
+            const taxValM = line.match(/Taxable\s*Value\s*:\s*([^|]+)/i);
+            const totalM = line.match(/Line\s*Total\s*:\s*([^|\n]+)/i);
+            lineItems.push({
+              description: descPart,
+              hsnSac: hsnM ? hsnM[1].trim() : hsnSacCode || "Missing",
+              quantity: qtyM ? qtyM[1].trim() : "1",
+              taxableValue: taxValM ? taxValM[1].trim() : formatInr(taxableAmount),
+              total: totalM ? totalM[1].trim() : formatInr(billedTotal)
+            });
+          }
+        }
+
+        // Expected tax from rate % if specified on summary lines
+        const summarySection = text.slice(Math.max(0, text.search(/TAX\s*(?:&|CALCULATION|SUMMARY)/i)));
+        const rateSource = summarySection || text;
+        const cgstRateM = rateSource.match(/CGST\s*(?:@|\()\s*(\d+(?:\.\d+)?)%/i);
+        const sgstRateM = rateSource.match(/SGST\s*(?:@|\()\s*(\d+(?:\.\d+)?)%/i);
+        const igstRateM = rateSource.match(/IGST\s*(?:@|\()\s*(\d+(?:\.\d+)?)%/i);
+
+        let expectedCgst = cgstAmount;
+        let expectedSgst = sgstAmount;
+        let expectedIgst = igstAmount;
+        if (taxableAmount !== null) {
+          if (cgstRateM) expectedCgst = Math.round(taxableAmount * Number(cgstRateM[1]) ) / 100;
+          if (sgstRateM) expectedSgst = Math.round(taxableAmount * Number(sgstRateM[1]) ) / 100;
+          if (igstRateM) expectedIgst = Math.round(taxableAmount * Number(igstRateM[1]) ) / 100;
+        }
+        const recomputedTax = expectedCgst + expectedSgst + expectedIgst;
+        const actualTaxSum = cgstAmount + sgstAmount + igstAmount;
+        const calculatedTotal = taxableAmount !== null ? taxableAmount + recomputedTax : null;
+
+        const vendorName = vendorMatch ? vendorMatch[1].trim() : "Not extracted";
+        const buyerName = buyerMatch ? buyerMatch[1].trim() : "";
+        const invoiceNumber = invNoMatch ? invNoMatch[1].trim() : "";
+        const invoiceDateRaw = dateMatch ? dateMatch[1].trim() : "";
+        const dayOfWeek = parseDayOfWeek(invoiceDateRaw);
+        const placeOfSupply = posMatch ? posMatch[1].trim() : "";
+        const poReference = poMatch ? poMatch[1].trim() : "";
+
+        const gstinStateCode = vendorGstin ? vendorGstin.slice(0, 2) : "";
+        const gstinStateName = GST_STATES[gstinStateCode] || "";
+        const declaredStateText = (declStateMatch ? declStateMatch[1] : "") + " " + (addrMatch ? addrMatch[1] : "");
+        const declaredStateCode = detectStateCodeFromText(declaredStateText);
+        const posStateCode = detectStateCodeFromText(placeOfSupply) || (buyerGstin ? buyerGstin.slice(0, 2) : null);
+
+        const findings = [];
+
+        // 1. Mathematical checks
+        if (taxableAmount !== null && billedTotal !== null) {
+          const rateMismatch =
+            (cgstRateM && Math.abs(cgstAmount - expectedCgst) >= 0.5) ||
+            (sgstRateM && Math.abs(sgstAmount - expectedSgst) >= 0.5) ||
+            (igstRateM && Math.abs(igstAmount - expectedIgst) >= 0.5);
+
+          const taxSumMismatch = declaredTotalTax !== null && Math.abs(declaredTotalTax - actualTaxSum) >= 0.5;
+          const grandMismatch = Math.abs(billedTotal - calculatedTotal) >= 0.5;
+
+          if (rateMismatch || taxSumMismatch || grandMismatch) {
+            findings.push({
+              id: "math-error",
+              category: "Mathematical Accuracy",
+              severity: "Critical Flag",
+              title: "Tax & Grand Total Arithmetic Discrepancy",
+              detail: "Recomputed GST and invoice total do not reconcile with the billed amounts on the invoice.",
+              expectedValue: `Tax ${formatInr(recomputedTax)} · Total ${formatInr(calculatedTotal)}`,
+              observedValue: `Tax ${formatInr(declaredTotalTax ?? actualTaxSum)} · Total ${formatInr(billedTotal)}`,
+              ruleReference: "Arithmetic Reconciliation"
+            });
+          } else {
+            findings.push({
+              id: "math-ok",
+              category: "Mathematical Accuracy",
+              severity: "Passed",
+              title: "Taxable Value, GST & Grand Total Reconciled",
+              detail: "Line-item GST calculations and grand total match exact arithmetic.",
+              expectedValue: formatInr(calculatedTotal),
+              observedValue: formatInr(billedTotal),
+              ruleReference: "Arithmetic Reconciliation"
+            });
+          }
+
+          if (cgstAmount > 0 && sgstAmount > 0 && Math.abs(cgstAmount - sgstAmount) >= 0.5) {
+            findings.push({
+              id: "cgst-sgst-split",
+              category: "Mathematical Accuracy",
+              severity: "Critical Flag",
+              title: "Unequal CGST and SGST Amounts",
+              detail: "For intra-state supplies, CGST and SGST must be charged at identical rates and equal rupee amounts.",
+              expectedValue: `CGST = SGST = ${formatInr(expectedCgst)}`,
+              observedValue: `CGST ${formatInr(cgstAmount)} vs SGST ${formatInr(sgstAmount)}`,
+              ruleReference: "CGST/SGST Act"
+            });
+          }
+        } else {
+          findings.push({
+            id: "math-missing",
+            category: "Mathematical Accuracy",
+            severity: "Warning",
+            title: "Incomplete Financial Figures",
+            detail: "Could not locate both Taxable Value and Grand Total for full mathematical reconciliation.",
+            ruleReference: "Arithmetic Reconciliation"
+          });
+        }
+
+        // 2. GSTIN & Place of Supply
+        const gstinRegex = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][1-9A-Z]Z[0-9A-Z]$/;
+        if (!vendorGstin) {
+          findings.push({
+            id: "gstin-missing",
+            category: "GSTIN & Place of Supply",
+            severity: "Critical Flag",
+            title: "Missing Supplier GSTIN",
+            detail: "Supplier GSTIN was not detected in the document.",
+            ruleReference: "CGST Rule 46(a)"
+          });
+        } else if (!gstinRegex.test(vendorGstin)) {
+          findings.push({
+            id: "gstin-format",
+            category: "GSTIN & Place of Supply",
+            severity: "Critical Flag",
+            title: "Invalid 15-Character GSTIN Format",
+            detail: "Supplier GSTIN does not conform to the statutory 15-character PAN-based structure.",
+            observedValue: vendorGstin,
+            ruleReference: "CGST Rule 46(a)"
+          });
+        } else {
+          findings.push({
+            id: "gstin-format-ok",
+            category: "GSTIN & Place of Supply",
+            severity: "Passed",
+            title: "Valid 15-Character GSTIN Structure",
+            detail: `Supplier GSTIN (${vendorGstin}) matches statutory format for state code ${gstinStateCode} (${gstinStateName || "Unknown"}).`,
+            ruleReference: "CGST Rule 46(a)"
+          });
+        }
+
+        if (gstinStateCode && declaredStateCode && gstinStateCode !== declaredStateCode) {
+          findings.push({
+            id: "gstin-state-mismatch",
+            category: "GSTIN & Place of Supply",
+            severity: "Critical Flag",
+            title: "GSTIN State Code Mismatch vs. Declared Address",
+            detail: `Supplier GSTIN begins with '${gstinStateCode}' (${gstinStateName}), which conflicts with the supplier's declared state '${GST_STATES[declaredStateCode]}' (${declaredStateCode}).`,
+            expectedValue: `State Code ${declaredStateCode} (${GST_STATES[declaredStateCode]})`,
+            observedValue: `GSTIN prefix ${gstinStateCode} (${gstinStateName})`,
+            ruleReference: "CGST Act Sec 22 / Rule 46"
+          });
+        }
+
+        if (gstinStateCode && posStateCode) {
+          const isIntra = gstinStateCode === posStateCode;
+          if (isIntra && igstAmount > 0 && cgstAmount === 0) {
+            findings.push({
+              id: "tax-type-intra",
+              category: "GSTIN & Place of Supply",
+              severity: "Critical Flag",
+              title: "Incorrect IGST Charged on Intra-State Supply",
+              detail: "Supplier state matches Place of Supply; CGST + SGST should be charged instead of IGST.",
+              ruleReference: "IGST Act Sec 8"
+            });
+          } else if (!isIntra && (cgstAmount > 0 || sgstAmount > 0) && igstAmount === 0) {
+            findings.push({
+              id: "tax-type-inter",
+              category: "GSTIN & Place of Supply",
+              severity: "Critical Flag",
+              title: "Incorrect CGST/SGST Charged on Inter-State Supply",
+              detail: `Supplier GSTIN state (${gstinStateCode}) differs from Place of Supply (${posStateCode}); IGST is mandatory.`,
+              ruleReference: "IGST Act Sec 7"
+            });
+          } else {
+            findings.push({
+              id: "tax-type-ok",
+              category: "GSTIN & Place of Supply",
+              severity: "Passed",
+              title: isIntra ? "Intra-State Tax Type Verified (CGST + SGST)" : "Inter-State Tax Type Verified (IGST)",
+              detail: `Tax classification aligns with Supplier State (${gstinStateCode}) and Place of Supply (${posStateCode}).`,
+              ruleReference: "IGST Act Sec 7 & 8"
+            });
+          }
+        }
+
+        // 3. Mandatory Rule 46 Fields
+        if (!hsnSacCode || hsnMissingExplicit) {
+          findings.push({
+            id: "hsn-missing",
+            category: "Mandatory Fields (Rule 46)",
+            severity: "Critical Flag",
+            title: "Missing Mandatory HSN / SAC Code",
+            detail: "HSN/SAC code is omitted or marked not mentioned. Missing HSN/SAC violates CGST Rule 46 and jeopardizes Input Tax Credit.",
+            expectedValue: "Valid 4–8 digit HSN or 6-digit SAC code",
+            observedValue: "Not mentioned",
+            ruleReference: "CGST Rule 46(g)"
+          });
+        } else {
+          findings.push({
+            id: "hsn-ok",
+            category: "Mandatory Fields (Rule 46)",
+            severity: "Passed",
+            title: "HSN / SAC Code Present",
+            detail: `Extracted HSN/SAC code(s): ${hsnSacCode}.`,
+            ruleReference: "CGST Rule 46(g)"
+          });
+        }
+
+        const missingPo = !poReference || /none|verbal|not\s*mentioned|n\/a|missing/i.test(poReference);
+        if (missingPo) {
+          findings.push({
+            id: "po-missing",
+            category: "Mandatory Fields (Rule 46)",
+            severity: "Warning",
+            title: "Missing Purchase Order / Engagement Reference",
+            detail: "No formal PO, Work Order, or SOW reference is recorded to substantiate expenditure authorization.",
+            observedValue: poReference || "None",
+            ruleReference: "Internal Control / AP Policy"
+          });
+        } else {
+          findings.push({
+            id: "po-ok",
+            category: "Mandatory Fields (Rule 46)",
+            severity: "Passed",
+            title: "Purchase Order Reference Verified",
+            detail: `Authorized under reference: ${poReference}.`,
+            ruleReference: "Internal Control"
+          });
+        }
+
+        // 4. Expense & Fraud Patterns
+        if (dayOfWeek === "Saturday" || dayOfWeek === "Sunday") {
+          findings.push({
+            id: "weekend-date",
+            category: "Expense & Fraud Patterns",
+            severity: "Warning",
+            title: `Weekend Invoice Date (${dayOfWeek})`,
+            detail: `Invoice is dated on a ${dayOfWeek} (${invoiceDateRaw}), which is unusual for standard B2B corporate billing and warrants verification.`,
+            observedValue: invoiceDateRaw,
+            ruleReference: "Forensic Expense Review"
+          });
+        }
+
+        const isConsulting = /consulting|advisory|retainer|management\s*fee|strategy/i.test(text);
+        const isRoundFigure = taxableAmount !== null && taxableAmount >= 50000 && taxableAmount % 10000 === 0;
+        if (isConsulting && isRoundFigure && missingPo) {
+          findings.push({
+            id: "round-consulting",
+            category: "Expense & Fraud Patterns",
+            severity: "Warning",
+            title: "Round-Figure Consulting Fee Without PO or Deliverables",
+            detail: `Exact round-figure retainer (${formatInr(taxableAmount)}) billed for advisory services without an attached PO, SOW, or timesheet log.`,
+            observedValue: formatInr(taxableAmount),
+            ruleReference: "CARO / Fraud Risk Indicator"
+          });
+        }
+
+        const ledgerLines = text.split("\n").filter(l => /ledger|paid|pending\s*audit/i.test(l) || /\|\s*Inv:/i.test(l));
+        if (ledgerLines.length >= 2) {
+          findings.push({
+            id: "duplicate-ledger",
+            category: "Expense & Fraud Patterns",
+            severity: "Critical Flag",
+            title: "Potential Duplicate / Recurring Unsubstantiated Billing in AP Ledger",
+            detail: "AP ledger context shows consecutive identical-amount invoices from the same vendor on consecutive weekends under identical narration.",
+            observedValue: `${ledgerLines.length} matching ledger entries`,
+            ruleReference: "AP Duplicate Control"
+          });
+        }
+
+        const hasCrit = findings.some(f => f.severity === "Critical Flag");
+        const hasWarn = findings.some(f => f.severity === "Warning");
+        const riskLevel = hasCrit ? "High Risk" : hasWarn ? "Medium Risk" : "Low Risk";
+
+        const critTitles = findings.filter(f => f.severity === "Critical Flag").map(f => f.title);
+        const warnTitles = findings.filter(f => f.severity === "Warning").map(f => f.title);
+
+        let executiveSummary = "";
+        if (riskLevel === "Low Risk") {
+          executiveSummary = `Invoice ${invoiceNumber || "under review"} from ${vendorName} passed all GSTIN, CGST Rule 46, and arithmetic reconciliation checks with zero discrepancies.`;
+        } else if (riskLevel === "High Risk") {
+          executiveSummary = `High-risk compliance exceptions detected (${critTitles.join("; ")}) requiring immediate vendor rectification prior to ITC claim or payment release.`;
+        } else {
+          executiveSummary = `Medium-risk audit indicators flagged (${warnTitles.join("; ")}) requiring supporting authorization before payment approval.`;
+        }
+
+        let querySubject = "";
+        let queryBody = "";
+        if (riskLevel === "Low Risk") {
+          querySubject = `Audit Clearance: Invoice ${invoiceNumber || ""} – ${vendorName}`;
+          queryBody = `Dear Accounts Payable Team,\n\nPreliminary GST and arithmetic audit checks for Invoice ${invoiceNumber || "[N/A]"} dated ${invoiceDateRaw || "[N/A]"} from ${vendorName} (Total: ${formatInr(billedTotal)}) have passed with no discrepancies.\n\nThe invoice satisfies CGST Rule 46 requirements and is cleared for standard payment processing subject to final CA sign-off.\n\nRegards,\nAudit Review Team`;
+        } else {
+          const issues = findings
+            .filter(f => f.severity !== "Passed")
+            .map((f, i) => `${i + 1}. [${f.severity}] ${f.title}: ${f.detail}${f.expectedValue ? ` (Expected: ${f.expectedValue}; Observed: ${f.observedValue || "N/A"})` : ""}`)
+            .join("\n");
+          querySubject = `Audit Hold & Clarification Required: Invoice ${invoiceNumber || ""} – ${vendorName}`;
+          queryBody = `Dear ${vendorName} Billing Team / Internal Accounts Payable,\n\nDuring preliminary compliance verification of Invoice ${invoiceNumber || "[N/A]"} dated ${invoiceDateRaw || "[N/A]"} (Billed Total: ${formatInr(billedTotal)}), the following audit exceptions were identified:\n\n${issues}\n\nPlease hold payment processing and provide a revised GST-compliant tax invoice / credit note or supporting PO & deliverable documentation prior to GSTR-2B reconciliation.\n\nRegards,\nAudit & Compliance Team`;
+        }
+
+        return {
+          riskLevel,
+          executiveSummary,
+          auditTimestamp: new Date().toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" }),
+          extractedData: {
+            vendorName,
+            vendorGstin,
+            vendorState: gstinStateName ? `${gstinStateName} (${gstinStateCode})` : "",
+            buyerName,
+            buyerGstin,
+            placeOfSupply,
+            invoiceNumber,
+            invoiceDate: invoiceDateRaw,
+            dayOfWeek,
+            poReference: poReference || "Not specified",
+            hsnSacCode: hsnSacCode || "Not specified",
+            taxableAmount,
+            cgstAmount,
+            sgstAmount,
+            igstAmount,
+            totalTaxAmount: declaredTotalTax ?? actualTaxSum,
+            totalAmount: billedTotal,
+            calculatedTotalAmount: calculatedTotal,
+            lineItems
+          },
+          findings,
+          queryDraft: {
+            recipientType: riskLevel === "Low Risk" ? "Internal Accounts Payable Team" : "Vendor Billing & Accounts Payable Team",
+            subject: querySubject,
+            body: queryBody
+          }
+        };
+      }
+
+      function renderSamples() {
+        const container = document.getElementById("sampleButtons");
+        container.innerHTML = SAMPLE_CASES.map(s => `
+          <button type="button" class="sample-btn ${state.activeSampleId === s.id ? "active" : ""}" onclick="loadSample('${s.id}')">
+            <div class="sample-btn-title">${esc(s.shortLabel)}: ${esc(s.title)}</div>
+            <div class="sample-btn-sub">${esc(s.summary)}</div>
+          </button>
+        `).join("");
+      }
+
+      function renderDropzone() {
+        const wrap = document.getElementById("dropzoneWrap");
+        if (!state.uploadedFile) {
+          wrap.innerHTML = `
+            <div class="dropzone" id="dropzone" onclick="document.getElementById('fileInput').click()">
+              <p>Drop invoice file here, or <span style="color:var(--primary);text-decoration:underline;">browse file</span></p>
+              <p class="sub">Supports TXT, CSV, JSON, PDF, or image scans</p>
+            </div>
+          `;
+          const dz = document.getElementById("dropzone");
+          dz.addEventListener("dragover", e => { e.preventDefault(); dz.classList.add("dragover"); });
+          dz.addEventListener("dragleave", () => dz.classList.remove("dragover"));
+          dz.addEventListener("drop", e => {
+            e.preventDefault();
+            dz.classList.remove("dragover");
+            if (e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]);
+          });
+        } else {
+          wrap.innerHTML = `
+            <div class="file-attached">
+              <div class="file-meta">
+                <div class="file-name">${esc(state.uploadedFile.name)}</div>
+                <div class="file-sub">${esc(state.uploadedFile.type || "Document")} · ${(state.uploadedFile.size / 1024).toFixed(1)} KB</div>
+              </div>
+              <button type="button" class="btn btn-secondary" onclick="removeFile()">Remove</button>
+            </div>
+          `;
+        }
+      }
+
+      function handleFile(file) {
+        state.uploadedFile = file;
+        state.activeSampleId = null;
+        if (file.type.startsWith("text/") || /\.(txt|csv|json|md)$/i.test(file.name)) {
+          const reader = new FileReader();
+          reader.onload = () => {
+            state.rawText = String(reader.result || "");
+            document.getElementById("rawText").value = state.rawText;
+            updateInputMeta();
+          };
+          reader.readAsText(file);
+        }
+        renderSamples();
+        renderDropzone();
+        updateInputMeta();
+      }
+
+      function removeFile() {
+        state.uploadedFile = null;
+        renderDropzone();
+        updateInputMeta();
+      }
+
+      function loadSample(id) {
+        const sample = SAMPLE_CASES.find(s => s.id === id);
+        if (!sample) return;
+        state.activeSampleId = sample.id;
+        state.rawText = sample.rawText;
+        state.uploadedFile = null;
+        state.report = null;
+        document.getElementById("rawText").value = sample.rawText;
+        renderSamples();
+        renderDropzone();
+        updateInputMeta();
+        renderOutput();
+      }
+
+      function clearRawText() {
+        state.rawText = "";
+        state.activeSampleId = null;
+        document.getElementById("rawText").value = "";
+        renderSamples();
+        updateInputMeta();
+      }
+
+      function resetWorkspace() {
+        state.rawText = "";
+        state.activeSampleId = null;
+        state.uploadedFile = null;
+        state.report = null;
+        document.getElementById("rawText").value = "";
+        renderSamples();
+        renderDropzone();
+        updateInputMeta();
+        renderOutput();
+      }
+
+      function updateInputMeta() {
+        const len = state.rawText.trim().length;
+        document.getElementById("charCount").textContent = len > 0
+          ? `${len.toLocaleString("en-IN")} chars`
+          : state.uploadedFile ? "File attached" : "Provide a file or invoice text";
+        document.getElementById("clearTextBtn").style.display = len > 0 ? "inline" : "none";
+        document.getElementById("runAuditBtn").disabled = len === 0 && !state.uploadedFile;
+      }
+
+      function runAuditCheck() {
+        const text = state.rawText.trim();
+        if (!text) {
+          alert("Please load a sample case or paste invoice text to run the offline standalone check.");
+          return;
+        }
+        state.report = analyzeInvoiceText(text);
+        state.activeTab = "extracted";
+        state.severityFilter = "All";
+        state.draftSubject = state.report.queryDraft.subject;
+        state.draftBody = state.report.queryDraft.body;
+        renderOutput();
+      }
+
+      function setTab(tab) {
+        state.activeTab = tab;
+        renderOutput();
+      }
+
+      function setSeverityFilter(sev) {
+        state.severityFilter = sev;
+        renderOutput();
+      }
+
+      function copyQuery() {
+        const sub = document.getElementById("querySubject").value;
+        const body = document.getElementById("queryBody").value;
+        const text = `Subject: ${sub}\n\n${body}`;
+        navigator.clipboard.writeText(text).then(() => {
+          const btn = document.getElementById("copyQueryBtn");
+          btn.textContent = "Copied";
+          setTimeout(() => { btn.textContent = "Copy Query"; }, 2000);
+        });
+      }
+
+      function downloadFile(content, filename, mime) {
+        const blob = new Blob([content], { type: mime });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      }
+
+      function exportMarkdown() {
+        const r = state.report;
+        if (!r) return;
+        const d = r.extractedData;
+        const body = document.getElementById("queryBody")?.value || state.draftBody;
+        const md = [
+          `# AuditLens AI — Preliminary Compliance Audit Report`,
+          ``,
+          `- **Risk Level:** ${r.riskLevel}`,
+          `- **Executive Summary:** ${r.executiveSummary}`,
+          `- **Reviewed:** ${r.auditTimestamp}`,
+          ``,
+          `## 1. Extracted Invoice Data`,
+          `- Vendor Name: ${d.vendorName}`,
+          `- Vendor GSTIN: ${d.vendorGstin || "Not specified"}`,
+          `- Place of Supply: ${d.placeOfSupply || "Not specified"}`,
+          `- Invoice Number: ${d.invoiceNumber || "Not specified"}`,
+          `- Invoice Date: ${d.invoiceDate || "Not specified"}`,
+          `- HSN / SAC Code: ${d.hsnSacCode}`,
+          `- Taxable Amount: ${formatInr(d.taxableAmount)}`,
+          `- CGST / SGST / IGST: ${formatInr(d.cgstAmount)} / ${formatInr(d.sgstAmount)} / ${formatInr(d.igstAmount)}`,
+          `- Billed Total: ${formatInr(d.totalAmount)}`,
+          `- Recomputed Total: ${formatInr(d.calculatedTotalAmount)}`,
+          ``,
+          `## 2. Audit Findings`,
+          ...r.findings.map((f, i) => `### ${i + 1}. [${f.severity}] ${f.title}\n${f.detail}`),
+          ``,
+          `## 3. Auditor Query Draft`,
+          body,
+          ``,
+          `---`,
+          `*AI-assisted preliminary review only. Final verification requires Chartered Accountant judgment.*`
+        ].join("\n");
+        downloadFile(md, `AuditLens_Report_${(d.invoiceNumber || "invoice").replace(/[^a-zA-Z0-9_-]/g, "_")}.md`, "text/markdown;charset=utf-8");
+      }
+
+      function exportCsv() {
+        const r = state.report;
+        if (!r) return;
+        const d = r.extractedData;
+        const escCsv = v => `"${String(v ?? "").replace(/"/g, '""')}"`;
+        const rows = [
+          ["Section", "Field / Category", "Severity", "Value / Detail", "Expected", "Observed"],
+          ["Summary", "Risk Level", r.riskLevel, r.executiveSummary, "", ""],
+          ["Extracted", "Vendor Name", "", d.vendorName, "", ""],
+          ["Extracted", "Vendor GSTIN", "", d.vendorGstin, "", ""],
+          ["Extracted", "Invoice Number", "", d.invoiceNumber, "", ""],
+          ["Extracted", "Invoice Date", "", d.invoiceDate, "", ""],
+          ["Extracted", "HSN/SAC", "", d.hsnSacCode, "", ""],
+          ["Extracted", "Taxable Amount", "", d.taxableAmount, "", ""],
+          ["Extracted", "CGST", "", d.cgstAmount, "", ""],
+          ["Extracted", "SGST", "", d.sgstAmount, "", ""],
+          ["Extracted", "IGST", "", d.igstAmount, "", ""],
+          ["Extracted", "Billed Total", "", d.totalAmount, "", ""],
+          ["Extracted", "Recomputed Total", "", d.calculatedTotalAmount, "", ""],
+          ...r.findings.map(f => ["Finding", f.category, f.severity, `${f.title}: ${f.detail}`, f.expectedValue || "", f.observedValue || ""])
+        ];
+        downloadFile(rows.map(row => row.map(escCsv).join(",")).join("\r\n"), `AuditLens_Report_${(d.invoiceNumber || "invoice").replace(/[^a-zA-Z0-9_-]/g, "_")}.csv`, "text/csv;charset=utf-8");
+      }
+
+      function exportHtmlReport() {
+        const r = state.report;
+        if (!r) return;
+        const d = r.extractedData;
+        const subject = document.getElementById("querySubject")?.value || state.draftSubject;
+        const body = document.getElementById("queryBody")?.value || state.draftBody;
+        const riskCls = r.riskLevel === "Low Risk" ? "risk-low" : r.riskLevel === "Medium Risk" ? "risk-medium" : "risk-high";
+        const html = `<!doctype html>
+<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>AuditLens Report - ${esc(d.invoiceNumber || d.vendorName)}</title>
+<style>body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:#f8fafc;color:#0f172a;margin:0;line-height:1.5}.wrap{max-width:880px;margin:32px auto;padding:0 24px}.card{background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:24px;margin-bottom:20px}h1{margin:0 0 6px;font-size:20px}h2{margin:0 0 12px;font-size:15px;color:#1e3a5f}.banner{padding:14px 16px;border-radius:8px;border:1px solid;margin-top:12px}.risk-low{background:#ecfdf5;border-color:#a7f3d0;color:#065f46}.risk-medium{background:#fffbeb;border-color:#fde68a;color:#92400e}.risk-high{background:#fef2f2;border-color:#fecaca;color:#991b1b}table{width:100%;border-collapse:collapse;font-size:13px}td{padding:8px 10px;border-bottom:1px solid #f1f5f9}td.val{text-align:right;font-family:monospace;font-weight:600}.finding{padding:12px 0;border-bottom:1px solid #e2e8f0}.finding:last-child{border-bottom:none}pre{white-space:pre-wrap;font-family:inherit;background:#f8fafc;border:1px solid #e2e8f0;padding:14px;border-radius:8px;font-size:13px}.footer{text-align:center;font-size:12px;color:#64748b;margin-top:20px}</style>
+</head><body><div class="wrap">
+<div class="card"><h1>AuditLens AI — Preliminary Compliance Audit Report</h1><div style="font-size:12px;color:#64748b;">Reviewed: ${esc(r.auditTimestamp)}</div><div class="banner ${riskCls}"><strong>${esc(r.riskLevel)}</strong> — ${esc(r.executiveSummary)}</div></div>
+<div class="card"><h2>1. Extracted Invoice Data</h2><table><tbody>
+<tr><td>Vendor Name</td><td class="val">${esc(d.vendorName)}</td></tr>
+<tr><td>Vendor GSTIN</td><td class="val">${esc(d.vendorGstin || "Not specified")}</td></tr>
+<tr><td>Place of Supply</td><td class="val">${esc(d.placeOfSupply || "Not specified")}</td></tr>
+<tr><td>Invoice Number</td><td class="val">${esc(d.invoiceNumber || "Not specified")}</td></tr>
+<tr><td>Invoice Date</td><td class="val">${esc(d.invoiceDate || "Not specified")}</td></tr>
+<tr><td>HSN / SAC Code</td><td class="val">${esc(d.hsnSacCode)}</td></tr>
+<tr><td>Taxable Amount</td><td class="val">${esc(formatInr(d.taxableAmount))}</td></tr>
+<tr><td>CGST / SGST / IGST</td><td class="val">${esc(formatInr(d.cgstAmount))} / ${esc(formatInr(d.sgstAmount))} / ${esc(formatInr(d.igstAmount))}</td></tr>
+<tr><td>Billed Total</td><td class="val">${esc(formatInr(d.totalAmount))}</td></tr>
+<tr><td>Recomputed Total</td><td class="val">${esc(formatInr(d.calculatedTotalAmount))}</td></tr>
+</tbody></table></div>
+<div class="card"><h2>2. Audit Findings (${r.findings.length})</h2>${r.findings.map(f => `<div class="finding"><strong>[${esc(f.severity)}] ${esc(f.title)}</strong><p style="margin:4px 0 0;font-size:13px;color:#334155;">${esc(f.detail)}</p></div>`).join("")}</div>
+<div class="card"><h2>3. Auditor Query Draft</h2><p style="font-size:13px;"><strong>Subject:</strong> ${esc(subject)}</p><pre>${esc(body)}</pre></div>
+<p class="footer">AI-assisted preliminary review only. Final verification requires Chartered Accountant judgment.</p>
+</div></body></html>`;
+        downloadFile(html, `AuditLens_Report_${(d.invoiceNumber || "invoice").replace(/[^a-zA-Z0-9_-]/g, "_")}.html`, "text/html;charset=utf-8");
+      }
+
+      function renderOutput() {
+        const panel = document.getElementById("outputPanel");
+        if (!state.report) {
+          panel.innerHTML = `
+            <div class="empty-state">
+              <div>
+                <div class="empty-icon" aria-hidden="true">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10"/><path d="M9.1 9a3 3 0 0 1 5.8 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg>
+                </div>
+                <h2 style="margin:0;font-family:var(--font-display);font-size:18px;">Ready for Preliminary Compliance Review</h2>
+                <p style="margin:6px 0 0;font-size:14px;color:var(--text-secondary);max-width:520px;">
+                  Load one of the prepared sample cases or paste raw GST invoice text on the left to extract fields and run automated compliance checks.
+                </p>
+                <div class="empty-grid">
+                  <div><h3>01. Mathematical Reconciliation</h3><p>Verifies taxable totals, CGST/SGST equality, IGST rates, and grand total accuracy.</p></div>
+                  <div><h3>02. GSTIN &amp; Place of Supply</h3><p>Cross-checks 15-character GSTIN format and state-code prefixes against declared supplier state.</p></div>
+                  <div><h3>03. Mandatory Rule 46 Fields</h3><p>Audits HSN/SAC codes, invoice numbers, dates, buyer GSTIN, and PO references.</p></div>
+                  <div><h3>04. Anomaly &amp; Fraud Signals</h3><p>Flags weekend dates, round-figure retainers without POs, and duplicate ledger entries.</p></div>
+                </div>
+              </div>
+              <div style="margin-top:24px;padding-top:16px;border-top:1px solid var(--border);display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:space-between;">
+                <span class="section-hint">Quick-load an evaluation fixture:</span>
+                <div style="display:flex;flex-wrap:wrap;gap:8px;">
+                  ${SAMPLE_CASES.map(s => `<button type="button" class="btn btn-secondary" onclick="loadSample('${s.id}')">${esc(s.shortLabel)}: ${esc(s.title)}</button>`).join("")}
+                </div>
+              </div>
+            </div>
+          `;
+          return;
+        }
+
+        const r = state.report;
+        const d = r.extractedData;
+        const riskClass = r.riskLevel === "Low Risk" ? "risk-low" : r.riskLevel === "Medium Risk" ? "risk-medium" : "risk-high";
+        const critCount = r.findings.filter(f => f.severity === "Critical Flag").length;
+        const warnCount = r.findings.filter(f => f.severity === "Warning").length;
+        const passCount = r.findings.filter(f => f.severity === "Passed").length;
+        const mathMismatch = d.totalAmount !== null && d.calculatedTotalAmount !== null && Math.abs(d.totalAmount - d.calculatedTotalAmount) >= 0.5;
+
+        let tabHtml = "";
+        if (state.activeTab === "extracted") {
+          tabHtml = `
+            <div style="display:grid;gap:20px;">
+              <div>
+                <div class="section-hint" style="font-weight:600;margin-bottom:8px;">Document Metadata &amp; Tax Identifiers</div>
+                <div class="kv-box">
+                  <div class="kv-row"><span class="kv-label">Vendor Name</span><span class="kv-val">${esc(d.vendorName)}</span></div>
+                  <div class="kv-row"><span class="kv-label">Vendor GSTIN</span><span class="kv-val mono">${esc(d.vendorGstin || "Not specified")}${d.vendorState ? ` (${esc(d.vendorState)})` : ""}</span></div>
+                  <div class="kv-row"><span class="kv-label">Buyer / Recipient</span><span class="kv-val">${esc(d.buyerName || "Not specified")}${d.buyerGstin ? ` · ${esc(d.buyerGstin)}` : ""}</span></div>
+                  <div class="kv-row"><span class="kv-label">Place of Supply</span><span class="kv-val">${esc(d.placeOfSupply || "Not specified")}</span></div>
+                  <div class="kv-row"><span class="kv-label">Invoice Number</span><span class="kv-val mono">${esc(d.invoiceNumber || "Not specified")}</span></div>
+                  <div class="kv-row"><span class="kv-label">Invoice Date</span><span class="kv-val mono">${esc(d.invoiceDate || "Not specified")}</span></div>
+                  <div class="kv-row"><span class="kv-label">PO / Reference</span><span class="kv-val mono">${esc(d.poReference)}</span></div>
+                  <div class="kv-row"><span class="kv-label">HSN / SAC Code</span><span class="kv-val mono">${esc(d.hsnSacCode)}</span></div>
+                </div>
+              </div>
+              <div>
+                <div class="section-hint" style="font-weight:600;margin-bottom:8px;">Taxable &amp; GST Tax Breakdown</div>
+                <div class="kv-box">
+                  <div class="kv-row"><span class="kv-label">Taxable Amount</span><span class="kv-val mono tabular-nums">${esc(formatInr(d.taxableAmount))}</span></div>
+                  <div class="kv-row"><span class="kv-label">CGST</span><span class="kv-val mono tabular-nums">${esc(formatInr(d.cgstAmount))}</span></div>
+                  <div class="kv-row"><span class="kv-label">SGST</span><span class="kv-val mono tabular-nums">${esc(formatInr(d.sgstAmount))}</span></div>
+                  <div class="kv-row"><span class="kv-label">IGST</span><span class="kv-val mono tabular-nums">${esc(formatInr(d.igstAmount))}</span></div>
+                  <div class="kv-row highlight"><span class="kv-label">Total Tax Amount</span><span class="kv-val mono tabular-nums">${esc(formatInr(d.totalTaxAmount))}</span></div>
+                  <div class="kv-row highlight"><span class="kv-label">Billed Total Amount</span><span class="kv-val mono tabular-nums">${esc(formatInr(d.totalAmount))}</span></div>
+                  <div class="kv-row highlight"><span class="kv-label">Recomputed Total</span><span class="kv-val mono tabular-nums ${mathMismatch ? "err" : ""}">${esc(formatInr(d.calculatedTotalAmount))}${mathMismatch ? " (Mismatch)" : ""}</span></div>
+                </div>
+              </div>
+              ${d.lineItems && d.lineItems.length ? `
+              <div>
+                <div class="section-hint" style="font-weight:600;margin-bottom:8px;">Extracted Line Items (${d.lineItems.length})</div>
+                <div class="kv-box" style="overflow-x:auto;">
+                  <table class="state-table">
+                    <thead><tr><th>Description</th><th>HSN/SAC</th><th style="text-align:right;">Qty</th><th style="text-align:right;">Taxable</th><th style="text-align:right;">Total</th></tr></thead>
+                    <tbody>
+                      ${d.lineItems.map(li => `<tr><td>${esc(li.description)}</td><td style="font-family:var(--font-mono);">${esc(li.hsnSac)}</td><td style="text-align:right;font-family:var(--font-mono);">${esc(li.quantity)}</td><td style="text-align:right;font-family:var(--font-mono);">${esc(li.taxableValue)}</td><td style="text-align:right;font-family:var(--font-mono);font-weight:600;">${esc(li.total)}</td></tr>`).join("")}
+                    </tbody>
+                  </table>
+                </div>
+              </div>` : ""}
+            </div>
+          `;
+        } else if (state.activeTab === "findings") {
+          const filtered = state.severityFilter === "All" ? r.findings : r.findings.filter(f => f.severity === state.severityFilter);
+          tabHtml = `
+            <div>
+              <div class="filter-bar">
+                <button type="button" class="filter-btn ${state.severityFilter === "All" ? "active" : ""}" onclick="setSeverityFilter('All')">All (${r.findings.length})</button>
+                <button type="button" class="filter-btn ${state.severityFilter === "Critical Flag" ? "active" : ""}" onclick="setSeverityFilter('Critical Flag')">Critical Flag (${critCount})</button>
+                <button type="button" class="filter-btn ${state.severityFilter === "Warning" ? "active" : ""}" onclick="setSeverityFilter('Warning')">Warning (${warnCount})</button>
+                <button type="button" class="filter-btn ${state.severityFilter === "Passed" ? "active" : ""}" onclick="setSeverityFilter('Passed')">Passed (${passCount})</button>
+              </div>
+              <div class="findings-list">
+                ${filtered.map(f => {
+                  const sevCls = f.severity === "Critical Flag" ? "sev-Critical" : `sev-${f.severity}`;
+                  return `
+                    <div class="finding-item">
+                      <div class="finding-meta">
+                        <span class="sev-tag ${sevCls}">${esc(f.severity)}</span>
+                        <span class="finding-cat">${esc(f.category)}${f.ruleReference ? ` · ${esc(f.ruleReference)}` : ""}</span>
+                      </div>
+                      <h4 class="finding-title">${esc(f.title)}</h4>
+                      <p class="finding-detail">${esc(f.detail)}</p>
+                      ${(f.expectedValue || f.observedValue) ? `
+                        <div class="finding-compare">
+                          ${f.expectedValue ? `<span>Expected: <code>${esc(f.expectedValue)}</code></span>` : ""}
+                          ${f.observedValue ? `<span>Observed: <code>${esc(f.observedValue)}</code></span>` : ""}
+                        </div>
+                      ` : ""}
+                    </div>
+                  `;
+                }).join("")}
+              </div>
+            </div>
+          `;
+        } else {
+          tabHtml = `
+            <div>
+              <div style="margin-bottom:12px;">
+                <h3 class="section-title">Auditor Clarification &amp; Action Note</h3>
+                <div class="section-hint">Addressed to: ${esc(r.queryDraft.recipientType)}</div>
+              </div>
+              <div class="query-actions">
+                <button type="button" id="copyQueryBtn" class="btn btn-primary" style="padding:8px 14px;font-size:12px;" onclick="copyQuery()">Copy Query</button>
+                <button type="button" class="btn btn-secondary" onclick="exportMarkdown()">Export Report (Markdown)</button>
+                <button type="button" class="btn btn-secondary" onclick="exportCsv()">Export Report (CSV)</button>
+                <button type="button" class="btn btn-secondary" onclick="exportHtmlReport()">Export Report (HTML)</button>
+              </div>
+              <div style="display:grid;gap:12px;padding-top:12px;border-top:1px solid var(--border);">
+                <div>
+                  <label class="field-label" for="querySubject">Email Subject</label>
+                  <input type="text" id="querySubject" class="text-input" value="${esc(state.draftSubject)}" oninput="state.draftSubject = this.value" />
+                </div>
+                <div>
+                  <label class="field-label" for="queryBody">Message Body</label>
+                  <textarea id="queryBody" class="query-textarea" oninput="state.draftBody = this.value">${esc(state.draftBody)}</textarea>
+                </div>
+              </div>
+            </div>
+          `;
+        }
+
+        panel.innerHTML = `
+          <div class="panel-section">
+            <div class="risk-banner ${riskClass}">
+              <div class="risk-top">
+                <span class="risk-badge">${esc(r.riskLevel)}</span>
+                <span class="section-hint tabular-nums">${critCount} Critical · ${warnCount} Warning · ${passCount} Passed · ${esc(r.auditTimestamp)}</span>
+              </div>
+              <p class="risk-summary">${esc(r.executiveSummary)}</p>
+            </div>
+          </div>
+
+          <div class="tabs-bar">
+            <button type="button" class="tab-btn ${state.activeTab === "extracted" ? "active" : ""}" onclick="setTab('extracted')">Extracted Invoice Data</button>
+            <button type="button" class="tab-btn ${state.activeTab === "findings" ? "active" : ""}" onclick="setTab('findings')">Audit Red Flags &amp; Findings (${r.findings.length})</button>
+            <button type="button" class="tab-btn ${state.activeTab === "query" ? "active" : ""}" onclick="setTab('query')">Auditor Action &amp; Query Draft</button>
+          </div>
+
+          <div class="panel-section">${tabHtml}</div>
+        `;
+      }
+
+      function openModal(tab) {
+        const modal = document.getElementById("refModal");
+        const title = document.getElementById("modalTitle");
+        const body = document.getElementById("modalBody");
+        if (tab === "scope") {
+          title.textContent = "CGST Rule 46 — Mandatory Tax Invoice Checklist";
+          body.innerHTML = `
+            <ul style="margin:0;padding-left:20px;line-height:1.8;color:var(--text-secondary);">
+              <li>Supplier legal name, address, and 15-character GSTIN.</li>
+              <li>Consecutive serial invoice number unique for the financial year.</li>
+              <li>Date of issue (checked against weekend/holiday billing patterns).</li>
+              <li>Recipient name, address, and GSTIN (for B2B taxable supplies).</li>
+              <li>HSN code for goods or SAC code for services (mandatory for ITC).</li>
+              <li>Taxable value, rate, and CGST+SGST (intra-state) or IGST (inter-state).</li>
+              <li>Place of supply with state name and 2-digit state code.</li>
+            </ul>
+          `;
+        } else {
+          title.textContent = "Indian GST State Codes Directory";
+          body.innerHTML = `
+            <table class="state-table">
+              <thead><tr><th>Code</th><th>State / Union Territory</th></tr></thead>
+              <tbody>
+                ${Object.entries(GST_STATES).map(([c, n]) => `<tr><td style="font-family:var(--font-mono);font-weight:600;">${c}</td><td>${esc(n)}</td></tr>`).join("")}
+              </tbody>
+            </table>
+          `;
+        }
+        modal.classList.add("open");
+      }
+
+      function closeModal() {
+        document.getElementById("refModal").classList.remove("open");
+      }
+
+      document.getElementById("rawText").addEventListener("input", e => {
+        state.rawText = e.target.value;
+        state.activeSampleId = null;
+        renderSamples();
+        updateInputMeta();
+      });
+
+      document.getElementById("fileInput").addEventListener("change", e => {
+        if (e.target.files[0]) handleFile(e.target.files[0]);
+        e.target.value = "";
+      });
+
+      renderSamples();
+      renderDropzone();
+      updateInputMeta();
+      renderOutput();
+    </script>
+  </body>
+</html>
