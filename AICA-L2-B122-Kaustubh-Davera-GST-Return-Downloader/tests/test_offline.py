@@ -20,6 +20,17 @@ os.chdir(WORK)
 
 from datetime import date
 
+_n = 0
+
+
+def ok(msg):
+    global _n
+    _n += 1
+    print(f"[PASS] {msg}")
+
+
+print("GST Return Downloader - offline tests (fake GST portal)\n")
+
 import naming as N
 
 # ---------------------------------------------------------------- naming
@@ -36,7 +47,7 @@ assert N.send_by_date(2026, 10, 18) == date(2026, 11, 18)
 assert N.send_by_date(2026, 12, 18) == date(2027, 1, 18)
 assert N.is_period_available(2026, 10, date(2026, 11, 26))
 assert not N.is_period_available(2026, 11, date(2026, 11, 26))
-print("naming ok")
+ok("File names, financial year and quarter labels")
 
 # ---------------------------------------------------------------- clients
 import openpyxl
@@ -70,7 +81,7 @@ assert by["27AAPFM9021Q1Z8"].has_error                       # number password
 assert by["27BCGPS5512R1Z4"].quarterly
 assert any("Email" in m for _, m in by["27BCGPS5512R1Z4"].issues)
 assert by["27BCGPS5512R1Z4"].pwd_age_days() > 60
-print("load ok:", [(c.gstin[-4:], c.issues) for c in cs])
+ok("Excel checks: space in password, number password, missing email")
 
 cl.save_client(xl, "24AABFB7810L1Z6", {"gstin": "24AABFB7810L1Z6", "name": "Bhavani Textiles",
                                        "trade_name": "Bhavani Tex", "login_id": "bhav",
@@ -89,7 +100,7 @@ try:
     raise AssertionError("dup allowed")
 except cl.ClientFileError:
     pass
-print("save ok")
+ok("Edit / add client saves to Excel (symbols and = kept as text)")
 
 # ---------------------------------------------------------------- fake portal
 SUBMITS = {}
@@ -177,7 +188,7 @@ save_root = os.path.join(WORK, "out")
 
 
 def run_job(clients, periods, forms, responder):
-    j = jobs.JobRunner(cfg, clients, periods, forms, save_root)
+    j = jobs.JobRunner(cfg, clients, periods, forms, save_root, log=lambda *_: None)
     j.start()
     while not j.finished:
         st = j.state()
@@ -232,12 +243,13 @@ assert all(r["status"] == "done" for r in bh1), bh1
 # files renamed
 ag = os.path.join(save_root, "Agarwal Steel", "2026-27")
 names = sorted(os.listdir(ag))
-print(names)
 assert "Agarwal Steel GSTR2B Oct 2026.xlsx" in names and "Agarwal Steel GSTR2B Oct 2026.json" in names
 assert "Agarwal Steel GSTR1 Sep 2026.pdf" in names
 assert os.path.exists(os.path.join(save_root, "Om Sai Agencies", "2026-27", "Om Sai Agencies GSTR1 Q3 Oct-Dec 2026.pdf"))
 assert os.path.exists(os.path.join(save_root, "Bhavani Tex", "2026-27", "Bhavani Tex GSTR1 Oct 2026.pdf"))
-print("job 1 ok", st["counts"])
+ok("Wrong password: only 1 attempt, client blocked")
+ok("Wrong captcha: retried, max 3 tries")
+ok("Quarterly clients, manual fallback, files renamed")
 
 # ---- second run: blocked clients must be skipped with ZERO new submits
 before = dict(SUBMITS)
@@ -245,7 +257,7 @@ st2 = run_job(cs, [(2026, 10)], {"GSTR2B": {"excel": True, "json": False}}, auto
 assert SUBMITS["24AAHFP6634C1Z9"] == before["24AAHFP6634C1Z9"]
 assert SUBMITS["27AAKFR2208N1Z2"] == before["27AAKFR2208N1Z2"]
 assert all(r["status"] == "blocked" for r in st2["rows"] if r["gstin"] == "24AAHFP6634C1Z9")
-print("job 2 ok (blocked skipped)")
+ok("Blocked clients skipped in the next run (0 new logins)")
 
 # ---- password changed in Excel -> unblocked automatically
 cl.save_client(xl, "24AAHFP6634C1Z9", {"gstin": "24AAHFP6634C1Z9", "password": "R1ght#pwd"})
@@ -256,7 +268,7 @@ BEHAVIOUR["24AAHFP6634C1Z9"] = ["success"]
 SUBMITS["24AAHFP6634C1Z9"] = 0
 st3 = run_job([p], [(2026, 10)], {"GSTR2B": {"excel": True, "json": False}}, auto)
 assert st3["rows"][0]["status"] == "done", st3["rows"]
-print("job 3 ok (unblocked after password change)")
+ok("Client unblocked after password change")
 
 # ---- skip & stop from the captcha box
 def skipper(p, j):
@@ -265,7 +277,7 @@ c1 = next(c for c in cs if c.gstin == "27AAGCA4521K1Z3")
 SUBMITS.clear()
 st4 = run_job([c1], [(2026, 10)], {"GSTR3B": True}, skipper)
 assert st4["rows"][0]["status"] == "skipped" and not SUBMITS
-print("skip ok")
+ok("Skip from captcha box: no login sent")
 
 # ---------------------------------------------------------------- email
 import emailer
@@ -278,8 +290,7 @@ assert m["to"] == "a@x.in"
 r1 = [r for r in done_rows if r["form"] == "GSTR1"]
 m2 = emailer.build(cfg, c, r1)
 assert m2["subject"].startswith("Filed GST Return - GSTR-1"), m2["subject"]
-print(m["subject"]); print(m2["subject"])
-print("email ok")
+ok("Email: 2B and GSTR-1/3B templates, send-by date, attachments")
 
 # ---------------------------------------------------------------- api (no window)
 import api as apimod
@@ -287,6 +298,7 @@ SUBMITS.clear()
 BEHAVIOUR["27AAGCA4521K1Z3"] = ["success"]
 cfg_path = settings.CONFIG_PATH
 a = apimod.Api()
+a.open_path = lambda *_: {"ok": True}   # do not pop up the report
 a._cfg["clients_excel"] = xl
 a._cfg["download_folder"] = save_root
 a._cfg["browser"]["delay_between_clients"] = 0
@@ -311,5 +323,5 @@ assert el["items"] and el["items"][0]["status"] == "ready"
 pv = a.email_preview("27AAGCA4521K1Z3")
 assert pv["ok"] and pv["attachment_names"] == ["Agarwal Steel GSTR2B Oct 2026.xlsx", "Agarwal Steel GSTR2B Oct 2026.json"], pv
 assert a.export_report()["ok"]
-print("api ok")
-print("\nALL TESTS PASSED")
+ok("App layer: start run, status, email preview, Excel report")
+print("\n" + "=" * 52 + f"\n  ALL TESTS PASSED ({_n} checks)\n" + "=" * 52)
